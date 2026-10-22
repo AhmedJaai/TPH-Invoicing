@@ -2,13 +2,12 @@ import { MyUploads } from "@/components/my-uploads";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
-import { FolderSync, Inbox, UsersRound } from "lucide-react";
+import { FolderSync, Inbox } from "lucide-react";
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
 import { PageShell } from "@/components/page-shell";
-import { Callout, LinkButton, Section } from "@/components/ui";
-import { TeamCaptures } from "@/components/team-captures";
+import { Callout, LinkButton } from "@/components/ui";
 import { listPendingCaptures } from "@/services/capture.service";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -55,28 +54,12 @@ export default async function UploadPage() {
       title="ارفع مستنداً"
       intro="صوّر الفاتورة أو اختر ملفها كما وصلك. يقرأ النظام المورّد والرقم والتاريخ والمبالغ، ولا يُحفظ شيء حتى تؤكدها أنت."
     >
-      {/* صورُ الفريق أوّلاً — من جاء من «يحتاج قرارك» جاء لها */}
-      {team.length > 0 && (
-        <Section
-          id="team"
-          className="mb-10"
-          title="صوّرها الفريق، وتنتظرك"
-          icon={UsersRound}
-          count={team.length}
-          hint="افتح كل صورة لتراجعها في القارئ تحت القائمة ثم تعتمدها، أو ارفضها بسبب يراه من صوّرها."
-        >
-          <TeamCaptures
-            canSeeAmounts={showAmounts}
-            items={team.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
-          />
-        </Section>
-      )}
-
       <div id="reader" className="scroll-mt-24">
         <Uploader
           canSeeAmounts={showAmounts}
           canCreateSupplier={can(user.role, "supplier:edit")}
           suppliers={rows}
+          team={team.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
         />
       </div>
 

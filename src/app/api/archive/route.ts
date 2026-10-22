@@ -39,7 +39,7 @@ import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
-import { settleCapture } from "@/services/capture.service";
+import { loadCaptureFile, settleCapture, settleCaptureBySha } from "@/services/capture.service";
 
 export const runtime = "nodejs";
 
@@ -77,8 +77,11 @@ const ArchiveBody = z.object({
   folderName: Text(300),
   periodMonth: Text(7),
   mimeType: Text(120),
-  /** الملفُّ نفسُه — سقفُه فوق حدّ طلب المنصّة، فلا يُردّ رفعٌ صحيح */
-  fileBase64: z.string().max(12_000_000),
+  /**
+   * الملفُّ نفسُه — سقفُه فوق حدّ طلب المنصّة، فلا يُردّ رفعٌ صحيح. ويغيب لصورة الفريق
+   * (`captureId`): بايتاتُها في القاعدة، فتُؤخذ منها لا من المتصفّح.
+   */
+  fileBase64: z.string().max(12_000_000).optional(),
   documentKind: Text(40),
   supplierId: Opt(64),
   invoiceNumber: Opt(120),
@@ -160,6 +163,23 @@ export async function POST(request: Request) {
       throw new InvalidInputError("الاسم أو المجلد أو الشهر ناقص");
     }
 
+    /*
+      صورةُ الفريق بلا ملفٍّ مرفوع: بايتاتُها من صفّها المنتظِر نفسه، ونوعُها نوعُه — فما
+      يُؤرشف هو ما صوّره الباريستا بعينه، لا نسخةٌ مرّت بالمتصفّح.
+    */
+    let data: Buffer;
+    if (body.fileBase64) {
+      /* `Buffer.from(…, "base64")` لا يرمي أبداً — فالتحقّق بالبايتات لا بـ`try` */
+      data = Buffer.from(body.fileBase64, "base64");
+    } else if (body.captureId) {
+      const capture = await loadCaptureFile(body.captureId);
+      if (!capture) throw new InvalidInputError("هذه الصورة لم تعد تنتظر: اعتُمدت أو رُفضت. حدّث الصفحة.");
+      data = capture.data;
+      body.mimeType = capture.mimeType;
+    } else {
+      throw new InvalidInputError("لم يصل الملف");
+    }
+
     if (!ARCHIVABLE_TYPES.includes(body.mimeType)) {
       throw new InvalidInputError(`نوع الملف غير مقبول: ${body.mimeType}`);
     }
@@ -168,8 +188,6 @@ export async function POST(request: Request) {
       throw new InvalidInputError("اسم الملف أو المجلد فيه رموز غير مقبولة");
     }
 
-    /* `Buffer.from(…, "base64")` لا يرمي أبداً — فالتحقّق بالبايتات لا بـ`try` */
-    const data = Buffer.from(typeof body.fileBase64 === "string" ? body.fileBase64 : "", "base64");
     if (data.length === 0) throw new InvalidInputError("الملف فارغ");
     if (!signatureMatches(body.mimeType, data)) {
       throw new InvalidInputError("محتوى الملف لا يطابق نوعه المعلن");
@@ -325,6 +343,7 @@ export async function POST(request: Request) {
       });
 
       if (body.captureId) await settleCapture(tx, body.captureId, docId, user.id);
+      else await settleCaptureBySha(tx, sha256, docId, user.id);
 
       if (attachOnly) {
         await attachFileToStatementInvoice(tx, attachOnly, docId);

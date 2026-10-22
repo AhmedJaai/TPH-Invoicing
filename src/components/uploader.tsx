@@ -23,6 +23,7 @@ import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { Money } from "./money";
 import { captureIdOf, onCaptured, tagCapture, takeCaptured } from "@/lib/capture-queue";
 import { takeShared } from "@/lib/shared-inbox";
+import { TeamCaptures, type TeamCaptureItem, type TeamCaptureStatus } from "./team-captures";
 import { T } from "@/components/i18n/t";
 
 interface Finding {
@@ -90,16 +91,17 @@ interface Archived {
  */
 type Item =
   /** ينتظر دوره — يُقرأ ثلاثةٌ معاً لا عشرون (`READ_CONCURRENCY`) */
-  | { id: string; fileName: string; state: "queued"; previewUrl?: string; mime: string }
-  | { id: string; fileName: string; state: "reading"; startedAt: number; previewUrl: string; mime: string }
+  | { id: string; fileName: string; state: "queued"; previewUrl?: string; mime: string; captureId?: string }
+  | { id: string; fileName: string; state: "reading"; startedAt: number; previewUrl: string; mime: string; captureId?: string }
   /** `file` لما يُعاد: فشلٌ عابر لا يُطلب له البحثُ عن الملفّ ثانيةً */
-  | { id: string; fileName: string; state: "failed"; error: string; file?: File; previewUrl?: string; mime: string }
+  | { id: string; fileName: string; state: "failed"; error: string; file?: File; previewUrl?: string; mime: string; captureId?: string }
   | {
       id: string;
       fileName: string;
       state: "done";
       data: AnalysisResponse;
       edited: Record<string, string>;
+      /** فارغٌ لصورة الفريق المفتوحة بمعرّفها — بايتاتُها في القاعدة، والأرشفةُ تأخذها من هناك */
       fileBase64: string;
       mimeType: string;
       previewUrl: string;
@@ -113,7 +115,7 @@ type Item =
       reviewing?: boolean;
       reviewError?: string;
     }
-  | { id: string; fileName: string; state: "archived"; archived: Archived; previewUrl: string; mime: string };
+  | { id: string; fileName: string; state: "archived"; archived: Archived; previewUrl: string; mime: string; captureId?: string };
 
 const KIND_LABEL: Record<string, string> = {
   TAX_INVOICE: "فاتورة ضريبية",
@@ -144,6 +146,9 @@ const LOW_OTHER: Record<string, string> = { النوع: "نوع المستند",
  */
 const READ_CONCURRENCY = 3;
 
+/** كم صورةً من الفريق تُهيَّأ أمام المفتوحة — قليلةٌ عمداً: المستحقّاتُ والتكرارُ تتغيّر بكلّ اعتماد */
+const PREPARE_AHEAD = 2;
+
 /** ما يُحفَظ من بطاقة المراجعة في هذا المتصفّح حتّى تُؤرشَف (`review-drafts.ts`). */
 interface DraftPayload {
   fileName: string;
@@ -152,6 +157,8 @@ interface DraftPayload {
   data: AnalysisResponse;
   edited: Record<string, string>;
   chosen?: SupplierOption;
+  /** صورةُ الفريق التي تُحسم بهذه الأرشفة — كانت تضيع بتحديث الصفحة فتبقى الصورةُ «تنتظر» */
+  captureId?: string;
 }
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
@@ -162,6 +169,7 @@ function isDraftPayload(x: unknown): x is DraftPayload {
   if (typeof x.fileName !== "string" || typeof x.mimeType !== "string" || typeof x.fileBase64 !== "string") return false;
   if (!isRecord(x.edited) || !Object.values(x.edited).every((v) => typeof v === "string")) return false;
   if (x.chosen !== undefined && !(isRecord(x.chosen) && typeof x.chosen.id === "string" && typeof x.chosen.nameAr === "string")) return false;
+  if (x.captureId !== undefined && typeof x.captureId !== "string") return false;
   const data = x.data;
   if (!isRecord(data) || typeof data.originalFileName !== "string" || !isRecord(data.result)) return false;
   const r = data.result;
@@ -170,6 +178,20 @@ function isDraftPayload(x: unknown): x is DraftPayload {
 }
 
 const MAX_BYTES = 3 * 1024 * 1024;
+
+/** الحقولُ التي يصحّحها صاحبُ العمل، كما قرأها الخادم — نقطةُ بدء البطاقة */
+function editedFrom(data: AnalysisResponse): Record<string, string> {
+  return {
+    invoiceNumber: data.result.invoiceNumber ?? "",
+    invoiceDate: data.result.invoiceDate ?? "",
+    total: data.result.totalMinor !== undefined ? formatRiyalsDisplay(data.result.totalMinor) : "",
+    vat: data.result.vatMinor !== undefined ? formatRiyalsDisplay(data.result.vatMinor) : "",
+    discount: data.result.preVatDiscount ? formatRiyalsDisplay(data.result.preVatDiscount.discountMinor) : "",
+    fileName: data.result.proposedFileName ?? "",
+  };
+}
+
+const captureFileUrl = (captureId: string) => `/api/capture/file?id=${encodeURIComponent(captureId)}`;
 
 /**
  * الملفُّ نصّاً base64 — بقارئ المتصفّح نفسه.
@@ -619,10 +641,13 @@ export function Uploader({
   canSeeAmounts = true,
   canCreateSupplier = true,
   suppliers: initialSuppliers = [],
+  team = [],
 }: {
   canSeeAmounts?: boolean;
   canCreateSupplier?: boolean;
   suppliers?: SupplierOption[];
+  /** صورُ الفريق المنتظِرة — تُراجَع في مكانها من القائمة، واحدةً بعد واحدة */
+  team?: TeamCaptureItem[];
 }) {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
@@ -703,7 +728,7 @@ export function Uploader({
     /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
     if (file.size > MAX_BYTES) {
       const tooBig: Item = {
-        id, fileName: file.name, state: "failed", mime: file.type,
+        id, fileName: file.name, state: "failed", mime: file.type, captureId, file,
         error: file.type.startsWith("image/")
           ? "الصورة أكبر من ٣ ميجابايت، ولم يستطع المتصفح تصغيرها. صدّرها بصيغة JPG من تطبيق الصور ثم أعد المحاولة."
           : "الملف أكبر من ٣ ميجابايت، وهو الحد الأقصى للأرشفة. صغّر ملف PDF ثم أعد المحاولة.",
@@ -714,10 +739,10 @@ export function Uploader({
 
     const previewUrl = URL.createObjectURL(file);
     urls.current.add(previewUrl);
-    const reading: Item = { id, fileName: file.name, state: "reading", startedAt: Date.now(), previewUrl, mime: file.type };
+    const reading: Item = { id, fileName: file.name, state: "reading", startedAt: Date.now(), previewUrl, mime: file.type, captureId };
     setItems((prev) => prev.map((it) => (it.id === id ? reading : it)));
 
-    const failed = (error: string): Item => ({ id, fileName: file.name, state: "failed", error, file, previewUrl, mime: file.type });
+    const failed = (error: string): Item => ({ id, fileName: file.name, state: "failed", error, file, previewUrl, mime: file.type, captureId });
 
     try {
       // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
@@ -745,14 +770,7 @@ export function Uploader({
                 mimeType: file.type,
                 previewUrl,
                 captureId,
-                edited: {
-                  invoiceNumber: data.result.invoiceNumber ?? "",
-                  invoiceDate: data.result.invoiceDate ?? "",
-                  total: data.result.totalMinor !== undefined ? formatRiyalsDisplay(data.result.totalMinor) : "",
-                  vat: data.result.vatMinor !== undefined ? formatRiyalsDisplay(data.result.vatMinor) : "",
-                  discount: data.result.preVatDiscount ? formatRiyalsDisplay(data.result.preVatDiscount.discountMinor) : "",
-                  fileName: data.result.proposedFileName ?? "",
-                },
+                edited: editedFrom(data),
               }
             : it,
         ),
@@ -771,14 +789,15 @@ export function Uploader({
   const cancelled = useRef(new Set<string>());
   const analyze = useCallback((picked: File) => {
     const id = `${picked.name}-${Date.now()}-${Math.random()}`;
-    setItems((prev) => [{ id, fileName: picked.name, state: "queued", mime: picked.type }, ...prev]);
+    const captureId = captureIdOf(picked);
+    setItems((prev) => [{ id, fileName: picked.name, state: "queued", mime: picked.type, captureId }, ...prev]);
     void limit(async () => {
       if (cancelled.current.delete(id)) return;
       try {
         await read(id, picked);
       } catch (e) {
         /* تصغيرُ الصورة أو قراءةُ بايتاتها تعثّر قبل الإرسال — يُقال ولا يبقى «ينتظر دوره» إلى الأبد */
-        setItems((prev) => prev.map((it) => (it.id === id ? { id, fileName: picked.name, state: "failed", error: (e as Error).message || "تعذّرت قراءة الملف من جهازك.", file: picked, mime: picked.type } : it)));
+        setItems((prev) => prev.map((it) => (it.id === id ? { id, fileName: picked.name, state: "failed", error: (e as Error).message || "تعذّرت قراءة الملف من جهازك.", file: picked, mime: picked.type, captureId } : it)));
       }
     });
   }, [limit, read]);
@@ -801,15 +820,20 @@ export function Uploader({
         const p = row.payload;
         if (!isDraftPayload(p)) { void deleteDraft(row.id); continue; }
         let previewUrl: string;
-        try {
-          const bytes = Uint8Array.from(atob(p.fileBase64), (c) => c.charCodeAt(0));
-          previewUrl = URL.createObjectURL(new Blob([bytes], { type: p.mimeType }));
-        } catch {
-          void deleteDraft(row.id);
-          continue;
+        if (p.fileBase64 === "" && p.captureId) {
+          /* صورةُ فريقٍ فُتحت بمعرّفها: لا بايتاتَ هنا، والصورةُ من الخادم */
+          previewUrl = captureFileUrl(p.captureId);
+        } else {
+          try {
+            const bytes = Uint8Array.from(atob(p.fileBase64), (c) => c.charCodeAt(0));
+            previewUrl = URL.createObjectURL(new Blob([bytes], { type: p.mimeType }));
+          } catch {
+            void deleteDraft(row.id);
+            continue;
+          }
+          urls.current.add(previewUrl);
         }
-        urls.current.add(previewUrl);
-        restored.push({ id: row.id, fileName: p.fileName, state: "done", data: p.data, edited: p.edited, fileBase64: p.fileBase64, mimeType: p.mimeType, previewUrl });
+        restored.push({ id: row.id, fileName: p.fileName, state: "done", data: p.data, edited: p.edited, fileBase64: p.fileBase64, mimeType: p.mimeType, previewUrl, captureId: p.captureId });
         if (p.chosen) picks[row.id] = p.chosen;
       }
       if (restored.length === 0) return;
@@ -834,7 +858,7 @@ export function Uploader({
         const sig = JSON.stringify([it.edited, it.data.result, pick?.id ?? null]);
         if (savedSig.current.get(it.id) === sig) continue;
         savedSig.current.set(it.id, sig);
-        const payload: DraftPayload = { fileName: it.fileName, mimeType: it.mimeType, fileBase64: it.fileBase64, data: it.data, edited: it.edited, chosen: pick };
+        const payload: DraftPayload = { fileName: it.fileName, mimeType: it.mimeType, fileBase64: it.fileBase64, data: it.data, edited: it.edited, chosen: pick, captureId: it.captureId };
         void saveDraft(it.id, payload).then((ok) => { if (!ok) setDraftsFailed(true); });
       }
       for (const id of [...savedSig.current.keys()]) {
@@ -904,7 +928,8 @@ export function Uploader({
           folderName: r.proposedFolderName,
           periodMonth: r.periodMonth,
           mimeType: it.mimeType,
-          fileBase64: it.fileBase64,
+          /* صورةُ الفريق المفتوحة بمعرّفها لا ترفع ملفّاً: الخادمُ يأخذه من صفّها */
+          fileBase64: it.fileBase64 || undefined,
           documentKind: r.documentKind,
           supplierId: chosen[id]?.id ?? r.supplier?.id,
           invoiceNumber: it.edited.invoiceNumber,
@@ -938,7 +963,7 @@ export function Uploader({
         setItems((prev) =>
           prev.map((x) =>
             x.id === id && x.state === "done"
-              ? { id, fileName: x.fileName, state: "archived", archived: done, previewUrl: x.previewUrl, mime: x.mimeType }
+              ? { id, fileName: x.fileName, state: "archived", archived: done, previewUrl: x.previewUrl, mime: x.mimeType, captureId: x.captureId }
               : x,
           ),
         );
@@ -947,6 +972,8 @@ export function Uploader({
           title: "أُرشف المستند",
           body: done.needsReview ? "وينتظر من يملك صلاحية رؤية المبالغ ليؤكدها." : json.fileName,
         });
+        /* صورةُ فريقٍ اعتُمدت وهي المفتوحة: تُفتح التالية في مكانها — جاهزةً، قُرئت في الخلفية */
+        if (it.captureId && focusRef.current === it.captureId) advance.current(it.captureId);
         // تحديث أرقام الصفحة: عدد المستندات المؤرشفة وغيرها
         router.refresh();
       } else {
@@ -1070,16 +1097,257 @@ export function Uploader({
     }
   }
 
-  const count = (s: Item["state"]) => items.filter((i) => i.state === s).length;
+  /*
+    ── صورُ الفريق: تُراجَع في مكانها، واحدةً بعد واحدة ──
+
+    كانت «راجعها» تضع البطاقةَ في القارئ تحت قائمةٍ من مئة صورة وتنزل إليها، ثمّ يصعد
+    صاحبُ العمل ليبحث عن التالية. فصارت البطاقةُ تُفتح تحت صورتها، والتاليةُ تُقرأ في
+    الخلفية وهو يراجع، و«اعتمد» يفتحها في المكان نفسه. ولا يُعتمد شيءٌ وحده: كلُّ
+    صورةٍ تنتظر ضغطةَ «اعتمد» كما كانت — والخادمُ يعيد الحكمَ والحساب عند كلّ واحدة.
+  */
+  const teamRef = useRef(team);
+  teamRef.current = team;
+  const [focus, setFocus] = useState<string | null>(null);
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+  const [opening, setOpening] = useState<ReadonlySet<string>>(new Set());
+  const openingRef = useRef(new Set<string>());
+
+  /**
+   * يهيّئ صورةَ فريقٍ للمراجعة: بمعرّفها، فلا تُنزَّل ولا تُرفع — الخادمُ يأخذ بايتاتِها
+   * وقراءتَها المحفوظة من القاعدة (`/api/capture/analyze`). والكبيرةُ فوق حدّ الأرشفة
+   * وحدها تمرّ بالطريق القديم: تُنزَّل فتُصغَّر في المتصفّح ثمّ تُقرأ.
+   */
+  const openCapture = useCallback(async (cap: TeamCaptureItem) => {
+    if (itemsRef.current.some((x) => x.captureId === cap.id) || openingRef.current.has(cap.id)) return;
+    const name = `من-${cap.sender}.${cap.mimeType === "application/pdf" ? "pdf" : "jpg"}`;
+
+    if (cap.sizeBytes > MAX_BYTES) {
+      openingRef.current.add(cap.id);
+      setOpening(new Set(openingRef.current));
+      try {
+        const res = await fetch(captureFileUrl(cap.id));
+        if (!res.ok) {
+          const read = await readResponse(res);
+          toast({ tone: "danger", title: "تعذّر فتح الصورة", body: read.ok ? undefined : read.error });
+          if (res.status === 404) router.refresh();
+          return;
+        }
+        analyze(tagCapture(new File([await res.blob()], name, { type: cap.mimeType }), cap.id));
+      } catch {
+        toast({ tone: "danger", title: "تعذّر الاتصال", body: "تأكد من الشبكة ثم أعد المحاولة." });
+      } finally {
+        openingRef.current.delete(cap.id);
+        setOpening(new Set(openingRef.current));
+      }
+      return;
+    }
+
+    const id = `capture-${cap.id}-${Date.now()}`;
+    const previewUrl = captureFileUrl(cap.id);
+    const base = { id, fileName: name, mime: cap.mimeType, captureId: cap.id };
+    setItems((prev) => [{ ...base, state: "queued" }, ...prev]);
+    void limit(async () => {
+      if (cancelled.current.delete(id)) return;
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...base, state: "reading", startedAt: Date.now(), previewUrl } : it)));
+      const r = await postJson<AnalysisResponse>("/api/capture/analyze", { id: cap.id });
+      if (!r.ok) {
+        setItems((prev) => prev.map((it) => (it.id === id ? { ...base, state: "failed", error: r.error, previewUrl } : it)));
+        if (r.status === 404) router.refresh();
+        return;
+      }
+      const data = r.data;
+      setItems((prev) => prev.map((it) => (it.id === id
+        ? { id, fileName: name, state: "done", data, fileBase64: "", mimeType: cap.mimeType, previewUrl, captureId: cap.id, edited: editedFrom(data) }
+        : it)));
+    });
+  }, [analyze, limit, router]);
+
+  /** أعِد تهيئةَ صورةٍ تعثّرت — بمعرّفها كما فُتحت أوّل مرّة */
+  const retryCapture = useCallback((itemId: string, captureId: string) => {
+    const cap = teamRef.current.find((c) => c.id === captureId);
+    remove(itemId);
+    if (cap) void openCapture(cap);
+  }, [openCapture, remove]);
+
+  /** التاليةُ بعد هذه في القائمة — وما اعتُمد في هذه الجلسة ولم تُحدَّث القائمةُ بعد يُتخطّى */
+  const nextAfter = useCallback((captureId: string | null): TeamCaptureItem | null => {
+    const list = teamRef.current;
+    const at = captureId ? list.findIndex((c) => c.id === captureId) : -1;
+    for (let i = at + 1; i < list.length; i++) {
+      if (itemsRef.current.some((x) => x.captureId === list[i].id && x.state === "archived")) continue;
+      return list[i];
+    }
+    return null;
+  }, []);
+
+  const focusCapture = useCallback((cap: TeamCaptureItem | null, scroll = true) => {
+    setFocus(cap?.id ?? null);
+    if (!cap) return;
+    void openCapture(cap);
+    /* اثنتان أمامها تُهيَّآن في الخلفية — تكون التاليةُ جاهزةً حين تُعتمد هذه */
+    let ahead = nextAfter(cap.id);
+    for (let n = 0; ahead && n < PREPARE_AHEAD; n++) {
+      void openCapture(ahead);
+      ahead = nextAfter(ahead.id);
+    }
+    if (!scroll) return;
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById(`capture-${cap.id}`)?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    });
+  }, [nextAfter, openCapture]);
+
+  /*
+    تبدأ التهيئةُ حين تُفتح الصفحة لا حين يُضغط: الأقدمُ تُفتح بطاقتُها (وهي أوّلُ القائمة،
+    فلا قفزة) واللتان بعدها تُهيَّآن. ومرّةً واحدة — ما يفعله صاحبُ العمل بعدها له.
+  */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || team.length === 0) return;
+    started.current = true;
+    focusCapture(team[0], false);
+  }, [team, focusCapture]);
+
+  const advance = useRef<(fromId: string) => void>(() => {});
+  advance.current = (fromId) => focusCapture(nextAfter(fromId));
+
+  /** رُفضت صورةٌ من القائمة: بطاقتُها تُغلق، وإن كانت المفتوحةَ فُتحت التالية */
+  const onCaptureRejected = useCallback((captureId: string) => {
+    for (const it of itemsRef.current) if (it.captureId === captureId) remove(it.id);
+    if (focusRef.current === captureId) advance.current(captureId);
+  }, [remove]);
+
+  const teamIds = new Set(team.map((c) => c.id));
+  /** ما يُعرض في قائمة الجلسة: صورُ الفريق المنتظِرة تُعرض في مكانها من قائمتها لا هنا */
+  const sessionItems = items.filter((i) => !(i.captureId && teamIds.has(i.captureId)));
+
+  const captureStatus = (captureId: string): TeamCaptureStatus => {
+    const it = items.find((x) => x.captureId === captureId);
+    if (!it) return opening.has(captureId) ? "opening" : null;
+    if (it.state === "queued" || it.state === "reading") return "opening";
+    if (it.state === "done") return "ready";
+    return it.state;
+  };
+
+  const count = (s: Item["state"]) => sessionItems.filter((i) => i.state === s).length;
   const reading = count("reading");
   const queued = count("queued");
   const review = count("done");
   const archivedN = count("archived");
   const failedN = count("failed");
-  const compact = items.length > 0;
+  const compact = sessionItems.length > 0;
+
+  /** بطاقةُ الملفّ بحاله — في قائمة الجلسة، أو تحت صورته في قائمة الفريق */
+  const renderItem = (item: Item) => (
+    item.state === "queued" ? (
+      <Row name={item.fileName} steps={["todo", "todo", "todo"]} onRemove={() => remove(item.id)}>
+        <p className="text-xs text-muted"><T s="ينتظر دوره. نقرأ {0} فقط في الوقت نفسه حتى لا تتعثر القراءة." a={[READ_CONCURRENCY === 3 ? "ثلاثة ملفات" : `${READ_CONCURRENCY} ملفات`]} /></p>
+      </Row>
+    ) : item.state === "reading" ? (
+      <Row name={item.fileName} steps={["current", "todo", "todo"]}>
+        <Elapsed startedAt={item.startedAt} slowAfter={25} text="يقرأ الورقة ويستخرج بياناتها…" slowText="القراءة أبطأ من المعتاد، وما زالت مستمرة" />
+      </Row>
+    ) : item.state === "failed" ? (
+      <Row
+        name={item.fileName}
+        steps={["failed", "todo", "todo"]}
+        tone="danger"
+        onRemove={() => remove(item.id)}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <p role="alert" className="flex min-w-0 flex-1 items-start gap-2 text-xs leading-relaxed text-danger">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            <span>{item.error}</span>
+          </p>
+          {item.captureId && !item.file ? (
+            <button
+              type="button"
+              onClick={() => retryCapture(item.id, item.captureId!)}
+              className={buttonClass("secondary", "sm")}
+            >
+              <T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
+          ) : item.file && (
+            <button
+              type="button"
+              onClick={() => {
+                const file = item.file!;
+                remove(item.id);
+                analyze(file);
+              }}
+              className={buttonClass("secondary", "sm")}
+            >
+              <T s="{0}أعد القراءة" a={[<RotateCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
+          )}
+        </div>
+      </Row>
+    ) : item.state === "archived" ? (
+      <Row name={item.archived.fileName} steps={["done", "done", "done"]} tone="ok" mono>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <p className="min-w-0 text-ink-soft">
+            <span className="font-bold text-ok">أُرشف</span>
+            {item.archived.folder && <> <T s=" في {0}" a={[<bdi key="0" dir="ltr" className="text-muted">{item.archived.folder}</bdi>]} /></>}
+            {item.archived.renamed && <span className="block text-[11px] text-warn">أُضيف إلى الاسم رقم نسخة، ولم يُستبدل أي ملف موجود.</span>}
+            {item.archived.needsReview && <span className="block text-[11px] text-warn">ينتظر من يملك صلاحية رؤية المبالغ ليؤكدها.</span>}
+          </p>
+          <span className="flex gap-1.5">
+            {item.archived.link && (
+              <a href={item.archived.link} target="_blank" rel="noreferrer" className={buttonClass("quiet", "sm")}>
+                <T s="{0}الدرايف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
+            )}
+          </span>
+        </div>
+      </Row>
+    ) : (
+      <ReviewCard
+        item={item}
+        canSeeAmounts={canSeeAmounts}
+        canCreateSupplier={canCreateSupplier}
+        suppliers={suppliers}
+        chosen={chosen[item.id]}
+        onChoose={(sup) => {
+          chosenRef.current = { ...chosenRef.current, [item.id]: sup };
+          setChosen((prev) => ({ ...prev, [item.id]: sup }));
+          rejudge(item.id);
+        }}
+        onCreated={(sup) => {
+          setSuppliers((prev) =>
+            prev.some((x) => x.id === sup.id) ? prev : [...prev, sup].sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar")),
+          );
+          chosenRef.current = { ...chosenRef.current, [item.id]: sup };
+          setChosen((prev) => ({ ...prev, [item.id]: sup }));
+          rejudge(item.id);
+        }}
+        onEdit={(k, v) => editField(item.id, k, v)}
+        onArchive={() => archive(item.id)}
+        onRemove={() => {
+          remove(item.id);
+          if (item.captureId && focusRef.current === item.captureId) setFocus(null);
+        }}
+      />
+    )
+  );
 
   return (
     <section aria-label="ارفع مستنداً">
+      {team.length > 0 && (
+        <TeamCaptures
+          items={team}
+          canSeeAmounts={canSeeAmounts}
+          focus={focus}
+          statusOf={captureStatus}
+          renderOpen={(captureId) => {
+            const it = items.find((x) => x.captureId === captureId);
+            return it ? renderItem(it) : (
+              <Row name="" steps={["current", "todo", "todo"]}>
+                <p className="text-xs text-muted">تُهيَّأ للمراجعة…</p>
+              </Row>
+            );
+          }}
+          onReview={(cap) => focusCapture(cap)}
+          onRejected={onCaptureRejected}
+        />
+      )}
       {/*
         ── منطقة الالتقاط ──
 
@@ -1193,85 +1461,8 @@ export function Uploader({
           </div>
 
           <ul className="space-y-3">
-            {items.map((item) => (
-              <li key={item.id}>
-                {item.state === "queued" ? (
-                  <Row name={item.fileName} steps={["todo", "todo", "todo"]} onRemove={() => remove(item.id)}>
-                    <p className="text-xs text-muted"><T s="ينتظر دوره. نقرأ {0} فقط في الوقت نفسه حتى لا تتعثر القراءة." a={[READ_CONCURRENCY === 3 ? "ثلاثة ملفات" : `${READ_CONCURRENCY} ملفات`]} /></p>
-                  </Row>
-                ) : item.state === "reading" ? (
-                  <Row name={item.fileName} steps={["current", "todo", "todo"]}>
-                    <Elapsed startedAt={item.startedAt} slowAfter={25} text="يقرأ الورقة ويستخرج بياناتها…" slowText="القراءة أبطأ من المعتاد، وما زالت مستمرة" />
-                  </Row>
-                ) : item.state === "failed" ? (
-                  <Row
-                    name={item.fileName}
-                    steps={["failed", "todo", "todo"]}
-                    tone="danger"
-                    onRemove={() => remove(item.id)}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <p role="alert" className="flex min-w-0 flex-1 items-start gap-2 text-xs leading-relaxed text-danger">
-                        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                        <span>{item.error}</span>
-                      </p>
-                      {item.file && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const file = item.file!;
-                            remove(item.id);
-                            analyze(file);
-                          }}
-                          className={buttonClass("secondary", "sm")}
-                        >
-                          <T s="{0}أعد القراءة" a={[<RotateCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
-                      )}
-                    </div>
-                  </Row>
-                ) : item.state === "archived" ? (
-                  <Row name={item.archived.fileName} steps={["done", "done", "done"]} tone="ok" mono>
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <p className="min-w-0 text-ink-soft">
-                        <span className="font-bold text-ok">أُرشف</span>
-                        {item.archived.folder && <> <T s=" في {0}" a={[<bdi key="0" dir="ltr" className="text-muted">{item.archived.folder}</bdi>]} /></>}
-                        {item.archived.renamed && <span className="block text-[11px] text-warn">أُضيف إلى الاسم رقم نسخة، ولم يُستبدل أي ملف موجود.</span>}
-                        {item.archived.needsReview && <span className="block text-[11px] text-warn">ينتظر من يملك صلاحية رؤية المبالغ ليؤكدها.</span>}
-                      </p>
-                      <span className="flex gap-1.5">
-                        {item.archived.link && (
-                          <a href={item.archived.link} target="_blank" rel="noreferrer" className={buttonClass("quiet", "sm")}>
-                            <T s="{0}الدرايف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-                        )}
-                      </span>
-                    </div>
-                  </Row>
-                ) : (
-                  <ReviewCard
-                    item={item}
-                    canSeeAmounts={canSeeAmounts}
-                    canCreateSupplier={canCreateSupplier}
-                    suppliers={suppliers}
-                    chosen={chosen[item.id]}
-                    onChoose={(sup) => {
-                      chosenRef.current = { ...chosenRef.current, [item.id]: sup };
-                      setChosen((prev) => ({ ...prev, [item.id]: sup }));
-                      rejudge(item.id);
-                    }}
-                    onCreated={(sup) => {
-                      setSuppliers((prev) =>
-                        prev.some((x) => x.id === sup.id) ? prev : [...prev, sup].sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar")),
-                      );
-                      chosenRef.current = { ...chosenRef.current, [item.id]: sup };
-                      setChosen((prev) => ({ ...prev, [item.id]: sup }));
-                      rejudge(item.id);
-                    }}
-                    onEdit={(k, v) => editField(item.id, k, v)}
-                    onArchive={() => archive(item.id)}
-                    onRemove={() => remove(item.id)}
-                  />
-                )}
-              </li>
+            {sessionItems.map((item) => (
+              <li key={item.id}>{renderItem(item)}</li>
             ))}
           </ul>
 

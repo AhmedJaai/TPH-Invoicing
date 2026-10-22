@@ -355,6 +355,7 @@ export interface PendingCapture {
   createdAt: Date;
   note: string | null;
   mimeType: string;
+  sizeBytes: number;
   /** ما قُرئ منها — `null`: لم تُقرأ بعد (أو تعثّرت، و`readError` سببُه) */
   verdict: ClarityVerdict | null;
   readError: string | null;
@@ -368,6 +369,7 @@ export async function listPendingCaptures(): Promise<PendingCapture[]> {
       createdAt: captures.createdAt,
       note: captures.note,
       mimeType: captures.mimeType,
+      sizeBytes: captures.sizeBytes,
       readError: captures.readError,
       extraction: extractionCache.extraction,
     })
@@ -425,6 +427,18 @@ export async function settleCapture(t: Tx, captureId: string, documentId: string
     .update(captures)
     .set({ status: "ARCHIVED", documentId, decidedById: actorId, decidedAt: new Date(), fileData: null })
     .where(and(eq(captures.id, captureId), inArray(captures.status, ["PENDING", "REJECTED"])));
+}
+
+/**
+ * أُرشف ملفٌّ بلا معرّف صورته (بطاقةٌ استُعيدت بعد تحديث الصفحة قبل أن يُحفظ المعرّف
+ * معها): الصورةُ المنتظِرة ذاتُ البصمة نفسها هي هو بايتاً ببايت، فتُحسم معه — وإلّا
+ * بقيت «تنتظر» في القائمة ومستندُها في الدفاتر، ثمّ رُدّت «مكرّرة» إن اعتُمدت.
+ */
+export async function settleCaptureBySha(t: Tx, sha256: string, documentId: string, actorId: string): Promise<void> {
+  await t
+    .update(captures)
+    .set({ status: "ARCHIVED", documentId, decidedById: actorId, decidedAt: new Date(), fileData: null })
+    .where(and(eq(captures.sha256, sha256), eq(captures.status, "PENDING")));
 }
 
 /** أتنتظر صورةٌ من الفريق بهذه البصمة؟ — فقراءتُها المحفوظة صالحةٌ أطول. */

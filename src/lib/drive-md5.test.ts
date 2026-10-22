@@ -29,7 +29,8 @@ describe("drive_md5 موصول من الدرايف إلى التحليل", () =>
   });
 
   it("والتحليل يقابله قبل القراءة", () => {
-    const analyze = read("app", "api", "analyze", "route.ts");
+    /* التحليلُ في خدمته — يمرّ بها الرفعُ (`/api/analyze`) وصورُ الفريق (`/api/capture/analyze`) */
+    const analyze = read("services", "analyze.service.ts");
     const check = analyze.indexOf("eq(documents.driveMd5, md5)");
     const extract = analyze.indexOf("extractDocument(");
     expect(check).toBeGreaterThan(-1);

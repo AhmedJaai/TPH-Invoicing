@@ -67,9 +67,15 @@ export const RULES: Record<string, RateLimitRule> = {
   "capture-check": { limit: 40, windowSeconds: 3600 },
   "capture-submit": { limit: 40, windowSeconds: 3600 },
   "capture-file": { limit: 300, windowSeconds: 3600 },
+  /*
+    صورُ الفريق تُهيَّأ للمراجعة بمعرّفها: قراءتُها محفوظةٌ منذ وصلت، فالكلفةُ استعلاماتٌ لا
+    نموذج. وصاحبُ العمل يراجع مئةً في جلسة — حدُّ «analyze» (أربعون) كان يوقفه في منتصفها.
+  */
+  "capture-analyze": { limit: 400, windowSeconds: 3600 },
   "capture-decide": { limit: 120, windowSeconds: 3600 },
   "capture-link": { limit: 30, windowSeconds: 3600 },
-  archive: { limit: 60, windowSeconds: 3600 },
+  /* مئةُ صورةٍ من الفريق تُعتمد في جلسة — ستّون في الساعة كان يقطعها، وكلُّ واحدةٍ بضغطة إنسان */
+  archive: { limit: 240, windowSeconds: 3600 },
   "statement-reconcile": { limit: 20, windowSeconds: 3600 },
   /*
     المزامنة بلا حدّ — بطلبٍ صريح من أحمد.
