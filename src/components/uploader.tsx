@@ -23,7 +23,8 @@ import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { Money } from "./money";
 import { captureIdOf, onCaptured, tagCapture, takeCaptured } from "@/lib/capture-queue";
 import { takeShared } from "@/lib/shared-inbox";
-import { TeamCaptures, type TeamCaptureItem, type TeamCaptureStatus } from "./team-captures";
+import { TeamCaptures, type BulkProgress, type TeamCaptureItem, type TeamCaptureStatus } from "./team-captures";
+import { bulkSkipReason } from "@/lib/bulk-approve";
 import { T } from "@/components/i18n/t";
 
 interface Finding {
@@ -200,6 +201,11 @@ const PAID_BY_OWNER_CHOICES = [
   ["TRANSFERS", "نقداً من تحويلات المقهى لي"],
   ["PERSONAL", "من مالي الخاص"],
 ] as const;
+
+/** الحقولُ التي يصحّحها صاحبُ العمل وحدها — لمعرفة أصحّحها بيده (`bulkSkipReason`) */
+function pickEdited(e: Record<string, string>) {
+  return [e.invoiceNumber ?? "", e.invoiceDate ?? "", e.total ?? "", e.vat ?? "", e.discount ?? ""];
+}
 
 const captureFileUrl = (captureId: string) => `/api/capture/file?id=${encodeURIComponent(captureId)}`;
 
@@ -937,9 +943,13 @@ export function Uploader({
     setItems((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
-  const archive = useCallback(async (id: string) => {
-    const it = itemsRef.current.find((x) => x.id === id);
-    if (!it || it.state !== "done" || it.archiving) return;
+  /**
+   * يؤرشف بطاقةً واحدة — بابٌ واحد لـ«أكّد وأرشف» ولـ«اعتمد المحدَّد». و`bulk`: لا إشعارَ لكلّ
+   * واحدة ولا انتقالَ ولا تحديثَ للصفحة (يقع مرّةً في آخر الدفعة).
+   */
+  const archiveItem = useCallback(async (it: Extract<Item, { state: "done" }>, bulk = false): Promise<{ ok: true } | { ok: false; error: string }> => {
+    if (it.archiving) return { ok: false, error: "تُؤرشف الآن" };
+    const id = it.id;
     const r = it.data.result;
 
     setItems((prev) =>
@@ -969,7 +979,7 @@ export function Uploader({
           /* صورةُ الفريق المفتوحة بمعرّفها لا ترفع ملفّاً: الخادمُ يأخذه من صفّها */
           fileBase64: it.fileBase64 || undefined,
           documentKind: r.documentKind,
-          supplierId: chosen[id]?.id ?? r.supplier?.id,
+          supplierId: chosenRef.current[id]?.id ?? r.supplier?.id,
           invoiceNumber: it.edited.invoiceNumber,
           invoiceDate: it.edited.invoiceDate,
           subtotal: r.subtotalMinor !== undefined ? String(r.subtotalMinor / 100) : "",
@@ -1010,7 +1020,7 @@ export function Uploader({
               : x,
           ),
         );
-        toast({
+        if (!bulk) toast({
           tone: json.ownerPaidSkipped ? "warn" : "ok",
           title: "أُرشف المستند",
           body: json.ownerPaidSkipped
@@ -1020,9 +1030,10 @@ export function Uploader({
               : done.needsReview ? "وينتظر من يملك صلاحية رؤية المبالغ ليؤكدها." : json.fileName,
         });
         /* صورةُ فريقٍ اعتُمدت وهي المفتوحة: تُفتح التالية في مكانها — جاهزةً، قُرئت في الخلفية */
-        if (it.captureId && focusRef.current === it.captureId) advance.current(it.captureId);
+        if (!bulk && it.captureId && focusRef.current === it.captureId) advance.current(it.captureId);
         // تحديث أرقام الصفحة: عدد المستندات المؤرشفة وغيرها
-        router.refresh();
+        if (!bulk) router.refresh();
+        return { ok: true };
       } else {
         setItems((prev) =>
           prev.map((x) =>
@@ -1036,6 +1047,7 @@ export function Uploader({
               : x,
           ),
         );
+        return { ok: false, error: read.error };
       }
     } catch (e) {
       const aborted = (e as Error).name === "AbortError";
@@ -1053,10 +1065,16 @@ export function Uploader({
             : x,
         ),
       );
+      return { ok: false, error: aborted ? "تأخر الخادم أكثر من دقيقتين" : NETWORK_ERROR };
     } finally {
       clearTimeout(timer);
     }
-  }, [router, chosen]);
+  }, [router]);
+
+  const archive = useCallback((id: string) => {
+    const it = itemsRef.current.find((x) => x.id === id);
+    if (it?.state === "done") void archiveItem(it);
+  }, [archiveItem]);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -1270,6 +1288,71 @@ export function Uploader({
     if (focusRef.current === captureId) advance.current(captureId);
   }, [remove]);
 
+  /*
+    ── «اعتمد المحدَّد» ──
+    واحدةً بعد واحدة، كلٌّ بفحص الخادم نفسه (`archiveItem`). وما يحتاج عيناً (`bulkSkipReason`)
+    يُترك ويُسمّى سببُه — لا يُعتمد عن صاحبه شيءٌ لم يثق به النظام.
+  */
+  const [bulk, setBulk] = useState<BulkProgress | null>(null);
+  const approveMany = useCallback(async (caps: TeamCaptureItem[]) => {
+    setBulk({ running: true, done: 0, approved: 0, total: caps.length, skipped: {} });
+    for (const cap of caps) {
+      let reason: string | null = null;
+      let ok = false;
+      const existing = itemsRef.current.find((x) => x.captureId === cap.id);
+      if (existing?.state === "archived") {
+        ok = true;
+      } else {
+        let item = existing?.state === "done" ? existing : null;
+        if (!item) {
+          if (cap.sizeBytes > MAX_BYTES) {
+            reason = "الصورة كبيرة، فراجعها وحدها";
+          } else {
+            const r = await postJson<AnalysisResponse>("/api/capture/analyze", { id: cap.id });
+            if (!r.ok) {
+              reason = r.error;
+            } else {
+              const name = `من-${cap.sender}.${cap.mimeType === "application/pdf" ? "pdf" : "jpg"}`;
+              const built: Extract<Item, { state: "done" }> = {
+                id: `capture-${cap.id}-${Date.now()}`, fileName: name, state: "done", data: r.data, fileBase64: "",
+                mimeType: cap.mimeType, previewUrl: captureFileUrl(cap.id), captureId: cap.id, edited: editedFrom(r.data),
+              };
+              setItems((prev) => [built, ...prev.filter((x) => x.captureId !== cap.id)]);
+              item = built;
+            }
+          }
+        }
+        if (item) {
+          const res = item.data.result;
+          const evidence = parseEvidence(item.data.evidence);
+          reason = bulkSkipReason({
+            canArchive: res.canArchive,
+            acknowledged: !res.canArchive && Boolean(res.canArchiveWithAck) && item.edited.ackBlockers === "1",
+            firstBlocker: res.findings.find((f) => f.severity === "BLOCKER")?.message ?? null,
+            supplierKnown: Boolean(chosenRef.current[item.id] ?? res.supplier),
+            lowConfidenceFields: res.lowConfidenceFields,
+            editedByHand: JSON.stringify(pickEdited(item.edited)) !== JSON.stringify(pickEdited(editedFrom(item.data))),
+            evidence,
+            reviewing: Boolean(item.reviewing),
+          });
+          if (!reason) {
+            const out = await archiveItem(item, true);
+            if (out.ok) ok = true;
+            else reason = out.error;
+          }
+        }
+      }
+      setBulk((b) => b && ({
+        ...b,
+        done: b.done + 1,
+        approved: b.approved + (ok ? 1 : 0),
+        skipped: reason ? { ...b.skipped, [cap.id]: reason } : b.skipped,
+      }));
+    }
+    setBulk((b) => b && { ...b, running: false });
+    router.refresh();
+  }, [archiveItem, router]);
+
   const teamIds = new Set(team.map((c) => c.id));
   /** ما يُعرض في قائمة الجلسة: صورُ الفريق المنتظِرة تُعرض في مكانها من قائمتها لا هنا */
   const sessionItems = items.filter((i) => !(i.captureId && teamIds.has(i.captureId)));
@@ -1399,6 +1482,8 @@ export function Uploader({
           onReview={(cap) => focusCapture(cap)}
           onRejected={onCaptureRejected}
           onVisible={onVisible}
+          bulk={bulk}
+          onApproveMany={(caps) => void approveMany(caps)}
         />
       )}
       {/*

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, Copy, FileText, Link2, Loader2, Play, ScanEye, UsersRound, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import type { ClarityVerdict } from "@/lib/capture-clarity";
-import { timeAgo } from "@/lib/arabic";
+import { INVOICE, countNoun, timeAgo } from "@/lib/arabic";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 
@@ -22,6 +22,15 @@ export interface TeamCaptureItem {
   readError: string | null;
   /** أمسجّلةٌ من قبل؟ — `null`: لا شيء في الدفاتر يطابقها */
   recorded: RecordedLabel | null;
+}
+
+/** «اعتمد المحدَّد» وهو يجري أو بعد أن انتهى — `skipped`: ما تُرك وسببُه */
+export interface BulkProgress {
+  running: boolean;
+  done: number;
+  approved: number;
+  total: number;
+  skipped: Record<string, string>;
 }
 
 /** ما يُعرض من القائمة — والانتقالُ إلى التالية يبقى داخله */
@@ -56,7 +65,7 @@ const REASONS = [
  * وتُبلغ. و«ارفض» يقول لمرسلها لماذا، ولا تُحذف الصورة.
  */
 export function TeamCaptures({
-  items, canSeeAmounts, focus, statusOf, renderOpen, onReview, onRejected, onVisible,
+  items, canSeeAmounts, focus, statusOf, renderOpen, onReview, onRejected, onVisible, bulk, onApproveMany,
 }: {
   items: TeamCaptureItem[];
   canSeeAmounts: boolean;
@@ -69,6 +78,9 @@ export function TeamCaptures({
   onRejected: (id: string) => void;
   /** ما يُعرض بترتيبه — فـ«التالية» بعد الاعتماد من داخل التصفية */
   onVisible: (ids: string[] | null) => void;
+  bulk: BulkProgress | null;
+  /** تُعتمد بالترتيب، كلٌّ بفحص الخادم — وما يحتاج عيناً يُترك */
+  onApproveMany: (items: TeamCaptureItem[]) => void;
 }) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState<string | null>(null);
@@ -76,6 +88,14 @@ export function TeamCaptures({
   const [busy, setBusy] = useState(false);
 
   const [filter, setFilter] = useState<TeamFilter>("ALL");
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const running = Boolean(bulk?.running);
+  const toggle = (id: string) => setPicked((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const counts = { ALL: items.length, DUPLICATE: 0, STATEMENT: 0, NEW: 0 } as Record<TeamFilter, number>;
   for (const i of items) counts[FILTER_OF(i.recorded)]++;
   const shown = filter === "ALL" ? items : items.filter((i) => FILTER_OF(i.recorded) === filter);
@@ -98,6 +118,16 @@ export function TeamCaptures({
   }
 
   const first = shown.find((i) => statusOf(i.id) !== "archived");
+  /* المحدَّدُ القائم وحده — ما اعتُمد أو خرج من القائمة لا يُعدّ */
+  const pickedLive = items.filter((i) => picked.has(i.id) && statusOf(i.id) !== "archived");
+  const selectable = shown.filter((i) => statusOf(i.id) !== "archived");
+  const allShownPicked = selectable.length > 0 && selectable.every((i) => picked.has(i.id));
+
+  function startBulk() {
+    setConfirming(false);
+    onApproveMany(pickedLive);
+    setPicked(new Set());
+  }
 
   return (
     <section id="team" className="mb-10 scroll-mt-24">
@@ -134,6 +164,54 @@ export function TeamCaptures({
         </div>
       )}
 
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs sm:min-h-8">
+          <input
+            type="checkbox"
+            checked={allShownPicked}
+            disabled={running || selectable.length === 0}
+            onChange={() => setPicked(allShownPicked ? new Set() : new Set(selectable.map((i) => i.id)))}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          حدّد كل ما يظهر <span className="nums nums-count text-ink-soft">({selectable.length})</span>
+        </label>
+        <span className="ms-auto flex flex-wrap items-center gap-2">
+          {confirming ? (
+            <>
+              <span className="text-xs text-ink-soft">تُعتمد {countNoun(pickedLive.length, INVOICE)} واحدةً بعد الأخرى، وما يحتاج مراجعتك يُترك.</span>
+              <button type="button" onClick={startBulk} className={buttonClass("primary", "sm")}>
+                <CircleCheck className="h-4 w-4" aria-hidden /> نعم، اعتمدها
+              </button>
+              <button type="button" onClick={() => setConfirming(false)} className={buttonClass("quiet", "sm")}>تراجع</button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={running || pickedLive.length === 0}
+              onClick={() => setConfirming(true)}
+              className={buttonClass("primary", "sm")}
+            >
+              <CircleCheck className="h-4 w-4" aria-hidden /> اعتمد المحدَّد{pickedLive.length > 0 && <> (<span className="nums">{pickedLive.length}</span>)</>}
+            </button>
+          )}
+        </span>
+        {bulk && (
+          <p className="w-full text-xs" aria-live="polite">
+            {bulk.running ? (
+              <span className="flex items-center gap-1.5 text-ink-soft">
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+                يعتمد {bulk.done} من {bulk.total}…
+              </span>
+            ) : (
+              <span className={Object.keys(bulk.skipped).length > 0 ? "text-warn" : "text-ok"}>
+                اعتُمد {bulk.approved} من {bulk.total}
+                {Object.keys(bulk.skipped).length > 0 && <>، وبقي {countNoun(Object.keys(bulk.skipped).length, INVOICE)} تحتاج مراجعتك، وسبب كل واحدة تحتها.</>}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+
       <ul className="divide-y divide-line-soft overflow-clip rounded-xl border border-line bg-raised shadow-raised">
         {shown.map((item) => {
           const v = item.verdict;
@@ -143,6 +221,16 @@ export function TeamCaptures({
           return (
             <li key={item.id} id={`capture-${item.id}`} className={`scroll-mt-20 px-4 py-3 ${open ? "bg-accent-soft/40" : ""}`}>
               <div className="flex items-start gap-3">
+                {status !== "archived" && (
+                  <input
+                    type="checkbox"
+                    aria-label="حدّدها للاعتماد"
+                    checked={picked.has(item.id)}
+                    disabled={running}
+                    onChange={() => toggle(item.id)}
+                    className="mt-6 h-5 w-5 shrink-0 accent-[var(--accent)]"
+                  />
+                )}
                 <span className="grid h-16 w-12 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-sunken">
                   {isImage ? (
                     /* eslint-disable-next-line @next/next/no-img-element -- صورةٌ محروسة بالجلسة لا تمرّ بمحسّن الصور */
@@ -171,6 +259,12 @@ export function TeamCaptures({
                   )}
                   {item.note && <p className="mt-1 rounded-md bg-sand-bg px-2 py-1 text-xs text-ink-soft">«{item.note}»</p>}
                   {item.recorded && <RecordedNote r={item.recorded} />}
+                  {bulk?.skipped[item.id] && status !== "archived" && (
+                    <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-warn/30 bg-warn-bg px-2 py-1.5 text-xs leading-relaxed text-warn">
+                      <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>لم تُعتمد مع المحدَّد: {bulk.skipped[item.id]}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
