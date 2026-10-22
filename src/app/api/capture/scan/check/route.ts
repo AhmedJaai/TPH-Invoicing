@@ -1,17 +1,18 @@
 /**
  * فحصُ وضوح صورة الباريستا قبل إرسالها — بلا جلسة، والرمزُ إذنُه.
  *
- *   POST multipart { token, file } → { verdict } | { outage, message } | { duplicate }
+ *   POST multipart { token, file } → { verdict, draftId } | { outage, message, draftId } | { duplicate }
  *
  * يقرأ الورقة بالذكاء ويقول ما قرأه (المورّد · الرقم · التاريخ · الإجمالي) ليقارنه
- * المصوِّر بالورقة في يده. لا يحفظ صورةً — الإرسالُ خطوةٌ بعده. والقراءةُ تُحفظ
- * ببصمة الملفّ، فالإرسالُ وفتحُ صاحب العمل لها لا يُدفعان ثانيةً.
+ * المصوِّر بالورقة في يده. ويحفظ الصورةَ مسودّةً لا يراها أحد (`draftId`)، فـ«أرسل»
+ * يقلبها «تنتظر» بلا رفعٍ ثانٍ. والقراءةُ تُحفظ ببصمة الملفّ، فالإرسالُ وفتحُ صاحب
+ * العمل لها لا يُدفعان ثانيةً.
  */
 import { NextResponse } from "next/server";
 import { withDeadline } from "@/lib/ai/deadline";
 import { failWith } from "@/services/guard";
 import { consume } from "@/services/rate-limit.service";
-import { alreadyArrived, CaptureInputError, inspectFile, readForClarity, resolveLink } from "@/services/capture.service";
+import { alreadyArrived, CaptureInputError, inspectFile, readForClarity, resolveLink, saveDraft } from "@/services/capture.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,9 +49,16 @@ async function handle(request: Request) {
     const where = await alreadyArrived(file.sha256);
     if (where) return NextResponse.json({ duplicate: where });
 
-    const out = await readForClarity(file, link.createdById);
-    if (out.ok) return NextResponse.json({ verdict: out.verdict });
-    return NextResponse.json({ outage: out.outage, message: out.message });
+    /* المسودّةُ تُحفظ والنموذجُ يقرأ — وتعثُّرُها لا يُسقط الفحص: يُرفع الملفُّ عند الإرسال كما كان */
+    const [out, draftId] = await Promise.all([
+      readForClarity(file, link.createdById),
+      saveDraft(link, file).catch((e) => {
+        console.error("[capture] تعذّر حفظ مسودّة الفحص", e);
+        return null;
+      }),
+    ]);
+    if (out.ok) return NextResponse.json({ verdict: out.verdict, draftId });
+    return NextResponse.json({ outage: out.outage, message: out.message, draftId });
   } catch (e) {
     if (e instanceof CaptureInputError) return NextResponse.json({ error: e.message }, { status: e.status });
     return failWith(e, "capture-check");

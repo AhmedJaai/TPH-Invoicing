@@ -341,7 +341,8 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     في الإنتاج). والآن تجري وهو ينظر في صفحاته، فيجدها جاهزةً أو قاربت. ولكلّ ملفٍّ
     قراءتُه: إن تغيّرت الصفحاتُ صار ملفّاً آخر، وما قُرئ للأوّل يبقى في خزين الخادم.
   */
-  const reading = useRef<{ file: File; startedAt: number; result: Promise<Check> } | null>(null);
+  /** `draftId`: الصورةُ محفوظةٌ في الخادم من الفحص، فيرسلها «أرسل» بمعرّفها لا بملفّها */
+  const reading = useRef<{ file: File; startedAt: number; result: Promise<Check>; draftId: string | null } | null>(null);
   const [background, setBackground] = useState<{ key: object; done: boolean } | null>(null);
 
   const startReading = useCallback((file: File, key: object) => {
@@ -349,12 +350,16 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     const body = new FormData();
     body.append("token", token);
     body.append("file", file);
-    const result = (async (): Promise<Check> => {
+    const entry: { file: File; startedAt: number; result: Promise<Check>; draftId: string | null } = {
+      file, startedAt: Date.now(), result: Promise.resolve({ kind: "failed", message: "" }), draftId: null,
+    };
+    entry.result = (async (): Promise<Check> => {
       try {
         const res = await fetch("/api/capture/scan/check", { method: "POST", body });
-        const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE" }>(res);
+        const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE"; draftId?: string | null }>(res);
         if (!read.ok) return { kind: "failed", message: read.error };
         const d = read.data;
+        entry.draftId = d.draftId ?? null;
         if (d.duplicate) return { kind: "duplicate", where: d.duplicate };
         if (d.verdict) return { kind: "verdict", verdict: d.verdict };
         if (d.outage) return { kind: "outage", message: d.message ?? "" };
@@ -363,7 +368,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
         return { kind: "failed", message: "لا يوجد اتصال بالإنترنت. تأكد من الشبكة ثم أعد الفحص." };
       }
     })();
-    const entry = { file, startedAt: Date.now(), result };
+    const result = entry.result;
     reading.current = entry;
     setBackground({ key, done: false });
     void result.then(() => {
@@ -411,13 +416,20 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     if (!file) return;
     const before = stage;
     setStage({ kind: "sending" });
-    const body = new FormData();
-    body.append("token", token);
-    body.append("file", file);
-    if (note.trim()) body.append("note", note.trim());
+    const post = (part: { draftId: string } | { file: File }) => {
+      const body = new FormData();
+      body.append("token", token);
+      if ("draftId" in part) body.append("draftId", part.draftId);
+      else body.append("file", part.file);
+      if (note.trim()) body.append("note", note.trim());
+      return fetch("/api/capture/scan/submit", { method: "POST", body })
+        .then((res) => readResponse<{ id?: string; duplicate?: string; missing?: boolean }>(res));
+    };
     try {
-      const res = await fetch("/api/capture/scan/submit", { method: "POST", body });
-      const read = await readResponse<{ id?: string; duplicate?: string }>(res);
+      /* الصورةُ رُفعت في الفحص: يُرسَل معرّفُها وحده — وإن لم تُوجد مسودّتُها رُفع الملفّ */
+      const draftId = reading.current?.file === file ? reading.current.draftId : null;
+      let read = draftId ? await post({ draftId }) : null;
+      if (!read || (read.ok && read.data.missing)) read = await post({ file });
       if (!read.ok) {
         setError(read.error);
         setStage(before);

@@ -9,7 +9,7 @@
  * غير ما قُرئ من ورقته هو، ولا يكتب في الدرايف ولا في الدفاتر.
  */
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { captureLinks, captures, documents, extractionCache } from "@/db/schema";
 import { companyConfig } from "@/config/drive";
@@ -98,7 +98,7 @@ export async function listLinks(): Promise<CaptureLinkRow[]> {
       label: captureLinks.label,
       createdAt: captureLinks.createdAt,
       lastUsedAt: captureLinks.lastUsedAt,
-      sent: sql<number>`(select count(*)::int from ${captures} where ${captures}.link_id = ${captureLinks}.id)`,
+      sent: sql<number>`(select count(*)::int from ${captures} where ${captures}.link_id = ${captureLinks}.id and ${captures}.status <> 'DRAFT')`,
       waiting: sql<number>`(select count(*)::int from ${captures} where ${captures}.link_id = ${captureLinks}.id and ${captures}.status = 'PENDING')`,
     })
     .from(captureLinks)
@@ -134,7 +134,7 @@ export async function inspectFile(file: unknown): Promise<InspectedFile> {
   };
 }
 
-/** أوصلت هذه الصورةُ من قبل؟ — مستندٌ مؤرشف، أو صورةٌ تنتظر. والمرفوضُ لا يُعدّ. */
+/** أوصلت هذه الصورةُ من قبل؟ — مستندٌ مؤرشف، أو صورةٌ تنتظر. والمرفوضُ والمسودّةُ لا يُعدّان. */
 export async function alreadyArrived(sha256: string): Promise<"DOCUMENT" | "CAPTURE" | null> {
   const [doc] = await db
     .select({ id: documents.id })
@@ -145,7 +145,7 @@ export async function alreadyArrived(sha256: string): Promise<"DOCUMENT" | "CAPT
   const [cap] = await db
     .select({ id: captures.id })
     .from(captures)
-    .where(and(eq(captures.sha256, sha256), ne(captures.status, "REJECTED")))
+    .where(and(eq(captures.sha256, sha256), notInArray(captures.status, ["REJECTED", "DRAFT"])))
     .limit(1);
   return cap ? "CAPTURE" : null;
 }
@@ -185,15 +185,98 @@ export async function readForClarity(file: InspectedFile, cacheOwnerId: string |
   return { ok: true, verdict: judgeClarity(reading.value) };
 }
 
+/* ───────────────────────── المسودّة ───────────────────────── */
+
+/** ما لم يُرسَل من المسودّات بعد هذا يُمحى — صورةٌ تُركت، لا مستندٌ ولا مال */
+export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * يحفظ صورةَ الفحص مسودّةً فلا يرفعها «أرسل» ثانيةً — الرفعُ من جوال المقهى هو
+ * أكثرُ زمن الإرسال (٢٫٧ ثانية لـ٣١١ ك.ب، و٨٫٨ لـ٨٠٨ ك.ب في الإنتاج).
+ * والصورةُ نفسُها مفحوصةً ثانيةً تعود بمسودّتها لا بأخرى.
+ */
+export async function saveDraft(link: CaptureLink, file: InspectedFile): Promise<string> {
+  await db.delete(captures).where(and(eq(captures.status, "DRAFT"), lt(captures.createdAt, new Date(Date.now() - DRAFT_MAX_AGE_MS))));
+  const reuse = async () => {
+    const [row] = await db
+      .update(captures)
+      .set({ linkId: link.id })
+      .where(and(eq(captures.sha256, file.sha256), eq(captures.status, "DRAFT")))
+      .returning({ id: captures.id });
+    return row?.id ?? null;
+  };
+  const existing = await reuse();
+  if (existing) return existing;
+  try {
+    const [row] = await db
+      .insert(captures)
+      .values({
+        linkId: link.id,
+        status: "DRAFT",
+        fileData: file.buffer,
+        mimeType: file.mimeType,
+        sizeBytes: file.buffer.length,
+        sha256: file.sha256,
+        originalFileName: file.fileName,
+      })
+      .returning({ id: captures.id });
+    return row.id;
+  } catch (e) {
+    /* فحصان للصورة نفسها معاً: الفهرسُ الفريد ردّ الثاني، فمسودّةُ الأوّل هي */
+    if (pgErrorCode(e) === "23505") {
+      const again = await reuse();
+      if (again) return again;
+    }
+    throw e;
+  }
+}
+
 /* ───────────────────────── الإرسال ───────────────────────── */
 
 export type SaveOutcome = { kind: "SAVED"; id: string } | { kind: "DUPLICATE"; where: "DOCUMENT" | "CAPTURE" };
+
+/**
+ * «أرسل» لمسودّة الفحص: تصير «تنتظر» بمعرّفها، بلا رفعٍ ثانٍ.
+ *
+ * `null`: لا مسودّةَ بهذا المعرّف لهذا الرابط (مُحيت بعد يوم، أو من رابطٍ آخر) —
+ * فيرفع الجوالُ الملفَّ كما كان. والضغطتان معاً: الثانيةُ تجدها «تنتظر» فتُجاب بها.
+ */
+export async function submitDraft(link: CaptureLink, draftId: string, note: string | null): Promise<{ id: string; sha256: string } | null> {
+  const clean = note?.trim() ? note.trim().slice(0, 300) : null;
+  return db.transaction(async (t) => {
+    const [row] = await t
+      .update(captures)
+      .set({ status: "PENDING", note: clean, createdAt: new Date() })
+      .where(and(eq(captures.id, draftId), eq(captures.linkId, link.id), eq(captures.status, "DRAFT")))
+      .returning({ id: captures.id, sha256: captures.sha256 });
+    if (row) {
+      await t.update(captureLinks).set({ lastUsedAt: new Date() }).where(eq(captureLinks.id, link.id));
+      return row;
+    }
+    const [already] = await t
+      .select({ id: captures.id, sha256: captures.sha256 })
+      .from(captures)
+      .where(and(eq(captures.id, draftId), eq(captures.linkId, link.id), eq(captures.status, "PENDING")))
+      .limit(1);
+    return already ?? null;
+  });
+}
 
 export async function saveCapture(link: CaptureLink, file: InspectedFile, note: string | null): Promise<SaveOutcome> {
   const where = await alreadyArrived(file.sha256);
   if (where) return { kind: "DUPLICATE", where };
   try {
     const id = await db.transaction(async (t) => {
+      /* لها مسودّةٌ من الفحص (ضاع معرّفُها): تصير هي «تنتظر» — وإلّا ردّها الفهرسُ الفريد «مكرّرة» ولم يصل شيء */
+      const [draft] = await t
+        .update(captures)
+        .set({ status: "PENDING", linkId: link.id, note: note?.trim() ? note.trim().slice(0, 300) : null, createdAt: new Date() })
+        .where(and(eq(captures.sha256, file.sha256), eq(captures.status, "DRAFT")))
+        .returning({ id: captures.id });
+      if (draft) {
+        await t.update(captureLinks).set({ lastUsedAt: new Date() }).where(eq(captureLinks.id, link.id));
+        return draft.id;
+      }
       const [row] = await t
         .insert(captures)
         .values({
@@ -258,7 +341,7 @@ export async function recentForLink(linkId: string, limit = 15): Promise<SentCap
   const rows = await db
     .select({ id: captures.id, createdAt: captures.createdAt, status: captures.status, note: captures.note, decisionNote: captures.decisionNote })
     .from(captures)
-    .where(eq(captures.linkId, linkId))
+    .where(and(eq(captures.linkId, linkId), ne(captures.status, "DRAFT")))
     .orderBy(desc(captures.createdAt))
     .limit(limit);
   return rows.map((r) => ({ ...r, status: asStatus(r.status) }));
