@@ -12,7 +12,7 @@ import { sameInvoiceNumber } from "@/lib/invoice-number";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, monthCloses } from "@/db/schema";
-import { reviewConfirmed, type ConfirmedFields, type ConfirmReview } from "@/lib/confirm";
+import { OVERRIDABLE_BLOCKERS, reviewConfirmed, type ConfirmedFields, type ConfirmReview } from "@/lib/confirm";
 import { companyConfig } from "@/config/drive";
 import { supplierContext, type SupplierContext } from "./supplier.service";
 
@@ -57,6 +57,8 @@ export async function assertMonthOpen(month: string): Promise<void> {
 }
 
 export interface ReviewResult extends ConfirmReview {
+  /** موانعُ تُجووزت بإقرار الإنسان — تُسجَّل في التدقيق مع الأرشفة */
+  overridden: ConfirmReview["blockers"];
   supplier: SupplierContext | null;
 }
 
@@ -66,7 +68,11 @@ export interface ReviewResult extends ConfirmReview {
  */
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UTILITY"]);
 
-export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewResult> {
+/**
+ * `acknowledged`: موانعُ أقرّ بها الإنسانُ صراحةً — تُتجاوز إن كانت ممّا يُتجاوز
+ * (`OVERRIDABLE_BLOCKERS`) وحده، وتُعاد في `overridden` ليُسجَّل الإقرارُ في التدقيق.
+ */
+export async function reviewForArchive(fields: ConfirmedFields, acknowledged: readonly string[] = []): Promise<ReviewResult> {
   const supplier = await supplierContext(fields.supplierId);
   if (fields.supplierId && !supplier) throw new InvalidInputError("المورّد المحدد غير موجود");
 
@@ -109,9 +115,11 @@ export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewR
     duplicateInvoiceNumber,
   });
 
-  if (review.blockers.length > 0) {
-    throw new BlockedError(review.blockers.map((b) => b.message));
+  const waived = (code: string) => OVERRIDABLE_BLOCKERS.has(code) && acknowledged.includes(code);
+  const remaining = review.blockers.filter((b) => !waived(b.code));
+  if (remaining.length > 0) {
+    throw new BlockedError(remaining.map((b) => b.message));
   }
 
-  return { ...review, supplier };
+  return { ...review, supplier, overridden: review.blockers.filter((b) => waived(b.code)) };
 }

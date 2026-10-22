@@ -84,6 +84,18 @@ describe("رقم ضريبي لمنشأة أخرى", () => {
     expect(codes(r)).toContain(ISSUE.BUYER_VAT_MISMATCH);
     expect(r.canArchive).toBe(false);
   });
+
+  it("يُعتمد بإقرار صاحب العمل وحده، ولا تصلح ضريبتُه للخصم (أحمد، ٢٣ أكتوبر ٢٠٢٦)", () => {
+    const r = run({ buyerVatNumber: "310999999900003" });
+    expect(r.canArchiveWithAck).toBe(true);
+    expect(r.inputVatStatus).toBe("NOT_ELIGIBLE");
+  });
+
+  it("ولا يُتجاوز إن صحبه مانعٌ آخر — المكرَّرةُ لا تُقرّ", () => {
+    const r = run({ buyerVatNumber: "310999999900003" }, { existingInvoiceNumbers: ["260302"] });
+    expect(codes(r)).toContain(ISSUE.DUPLICATE_INVOICE);
+    expect(r.canArchiveWithAck).toBe(false);
+  });
 });
 
 describe("التكرار", () => {

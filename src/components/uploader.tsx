@@ -66,6 +66,8 @@ interface AnalysisResponse {
     findings: Finding[];
     lowConfidenceFields: string[];
     canArchive: boolean;
+    /** موانعُه كلُّها ممّا يُتجاوز بإقرار صاحب العمل (`OVERRIDABLE_BLOCKERS`) — اختياريٌّ لقراءاتٍ محفوظة قبله */
+    canArchiveWithAck?: boolean;
     /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — تُربط به ولا تُكرَّر */
     completesStatementInvoice?: string;
     /** خصمٌ قبل الضريبة: المجموعُ قبله والخصم — و`subtotalMinor` بعده */
@@ -924,8 +926,8 @@ export function Uploader({
         it.id === id && it.state === "done" ? { ...it, edited: { ...it.edited, [key]: value } } : it,
       ),
     );
-    /* اسمُ الملفّ ومصدرُ السداد لا يغيّران الحكم */
-    if (key !== "fileName" && key !== "paidByOwner") rejudge(id);
+    /* اسمُ الملفّ ومصدرُ السداد والإقرارُ لا تغيّر الحكم */
+    if (key !== "fileName" && key !== "paidByOwner" && key !== "ackBlockers") rejudge(id);
   }, [rejudge]);
 
   const remove = useCallback((id: string) => {
@@ -983,6 +985,10 @@ export function Uploader({
           lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
           captureId: it.captureId,
           paidByOwner: it.edited.paidByOwner || undefined,
+          /* المانعُ الذي أقرّ به صاحبُ العمل — والخادمُ لا يتجاوز به إلّا ما يُتجاوز */
+          acknowledgedBlockers: !r.canArchive && r.canArchiveWithAck && it.edited.ackBlockers === "1"
+            ? r.findings.filter((f) => f.severity === "BLOCKER").map((f) => f.code)
+            : undefined,
         }),
       });
       const read = await readResponse<{ fileName: string; webViewLink?: string; renamed?: boolean; needsReview?: boolean; ownerPaid?: { amountMinor: number; fromTransfers: boolean } | null; ownerPaidSkipped?: boolean }>(res);
@@ -1662,6 +1668,8 @@ function ReviewCard({
   */
   const findings = r.findings.filter((f) => f.code !== ISSUE.LOW_CONFIDENCE_FIELD || f.severity === "BLOCKER");
   const isStatement = r.documentKind === "STATEMENT";
+  /* أقرّ صاحبُ العمل بمانعٍ يُتجاوز (رقم المشتري) — وما زال وحدَه ما يمنع */
+  const acked = !r.canArchive && Boolean(r.canArchiveWithAck) && item.edited.ackBlockers === "1";
   const [showPaper, setShowPaper] = useState(false);
   const fid = (k: string) => `${item.id}-${k}`;
 
@@ -1918,19 +1926,32 @@ function ReviewCard({
         )}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* الطمأنةُ المعتادة لا تزاحم الزرَّ الملتصق على الجوّال — وما يمنع أو يتعثّر يُقال دائماً */}
-          <p className={`text-xs text-muted ${!item.reviewing && !item.reviewError && r.canArchive ? "hidden sm:block" : ""}`}>
+          {!r.canArchive && r.canArchiveWithAck && !item.reviewing && (
+            <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-warn/30 bg-warn-bg px-3 py-2 text-xs leading-relaxed text-ink sm:max-w-md">
+              <input
+                type="checkbox"
+                checked={acked}
+                onChange={(e) => onEdit("ackBlockers", e.target.checked ? "1" : "")}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+              />
+              <span>الفاتورة لنا رغم اختلاف رقم المشتري، فاعتمدها. <span className="text-ink-soft">تُسجَّل ولا تُخصم ضريبتها في الإقرار، ويُحفظ إقرارك في سجل التدقيق.</span></span>
+            </label>
+          )}
+          <p className={`text-xs text-muted ${!item.reviewing && !item.reviewError && (r.canArchive || acked) ? "hidden sm:block" : ""}`}>
             {item.reviewing
               ? "يعيد الفحص بتصحيحاتك…"
               : item.reviewError
                 ? `تعذّرت إعادة الفحص: ${item.reviewError}`
-                : r.canArchive
+                : r.canArchive || acked
                   ? "لا يُحفظ شيء قبل تأكيدك، ثم يُرفع الملف الأصلي إلى مجلده ويُسجَّل."
-                  : "لا تتم الأرشفة قبل معالجة ما يمنعها، وهو مذكور في «ملاحظات الفحص»."}
+                  : r.canArchiveWithAck
+                    ? "يمنعها اختلاف رقم المشتري. صحّحه إن كانت القراءة خاطئة، أو أقرّ بأن الفاتورة لك."
+                    : "لا تتم الأرشفة قبل معالجة ما يمنعها، وهو مذكور في «ملاحظات الفحص»."}
           </p>
           <button
             type="button"
             onClick={onArchive}
-            disabled={!r.canArchive || item.archiving || item.reviewing}
+            disabled={!(r.canArchive || acked) || item.archiving || item.reviewing}
             className={`${buttonClass("primary", "md")} w-full sm:w-auto`}
           >
             {item.archiving ? "يؤرشف…" : item.archiveError ? (

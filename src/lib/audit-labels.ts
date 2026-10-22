@@ -96,6 +96,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
   EXPENSE_REACTIVATED: "إعادة تفعيل مصروف متكرّر",
   INVOICE_PAID_BY_OWNER: "سداد فاتورة من حساب المالك",
+  DOCUMENT_BLOCKER_OVERRIDDEN: "أرشفة رغم مانع أقرّ به صاحب العمل",
   OWNER_PAYMENT_SOURCE_SET: "تحديد مصدر سداد المالك (من تحويلات المقهى أو من ماله الخاص)",
   SUPPLIER_CREDIT_APPLIED: "خصم رصيد المورّد من فاتورة",
   AI_ANALYSIS_RUN: "تحليل الذكاء لحساب مورّد",

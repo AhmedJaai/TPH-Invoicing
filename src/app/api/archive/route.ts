@@ -107,6 +107,11 @@ const ArchiveBody = z.object({
    * الدخل)، و`PERSONAL` من ماله الخاصّ (لا تُخصم). وغيابُه: لم تُسدَّد بعد، أو بحوالة المقهى.
    */
   paidByOwner: z.enum(["TRANSFERS", "PERSONAL"]).optional(),
+  /**
+   * موانعُ أقرّ بها صاحبُ العمل وهو يرى الفاتورة («الفاتورة لنا رغم اختلاف رقم المشتري»).
+   * لا يُتجاوز بها إلّا ما في `OVERRIDABLE_BLOCKERS`، والإقرارُ يُسجَّل باسمه.
+   */
+  acknowledgedBlockers: z.array(z.string().max(40)).max(5).optional(),
 });
 type ArchiveBody = z.infer<typeof ArchiveBody>;
 
@@ -307,7 +312,7 @@ export async function POST(request: Request) {
       chargesMinor: chargesReadMinor,
       sellerVat: body.sellerVat,
       buyerVat: body.buyerVat,
-    });
+    }, body.acknowledgedBlockers ?? []);
 
     // ── الدرايف ──
     const uploaded = await archiveToDrive({
@@ -352,6 +357,22 @@ export async function POST(request: Request) {
         uploadedById: user.id,
         status: needsReview ? "NEEDS_REVIEW" : "ARCHIVED",
       });
+
+      /* مانعٌ تجاوزه صاحبُ العمل بإقراره — يُسجَّل باسمه مع الأرشفة نفسها */
+      if (review.overridden.length > 0) {
+        await recordAudit({
+          actorId: user.id,
+          action: "DOCUMENT_BLOCKER_OVERRIDDEN",
+          entityType: "document",
+          entityId: docId,
+          after: {
+            المانع: review.overridden.map((b) => b.message).join("؛ "),
+            رقم_المشتري_على_الفاتورة: body.buyerVat ?? null,
+            الحال_الضريبية: review.taxStatus,
+            الأثر: "قُيّدت الفاتورة ولا تُخصم ضريبتها في الإقرار",
+          },
+        }, tx);
+      }
 
       if (body.captureId) await settleCapture(tx, body.captureId, docId, user.id);
       else await settleCaptureBySha(tx, sha256, docId, user.id);

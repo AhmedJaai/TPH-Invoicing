@@ -5,6 +5,7 @@
  * دالة خالصة عمداً — لا تلمس الشبكة ولا قاعدة البيانات، فتُختبر كلها.
  */
 import { sameInvoiceNumber, unreverseInvoiceNumber } from "@/lib/invoice-number";
+import { OVERRIDABLE_BLOCKERS } from "@/lib/confirm";
 import { parseRiyals } from "@/lib/money";
 import { drivePathFor, monthOf, resolveReceiptFiling } from "@/lib/filing";
 import {
@@ -66,6 +67,8 @@ export interface PipelineResult {
   lowConfidenceFields: string[];
   /** هل يمكن الرفع؟ يمنعه أي تنبيه من درجة BLOCKER */
   canArchive: boolean;
+  /** موانعُه كلُّها ممّا يتجاوزه الإنسانُ بإقرار — لا الأرشفةُ الآليّة */
+  canArchiveWithAck: boolean;
   /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — رقمُها كما قُيِّد */
   completesStatementInvoice?: string;
   /** خصمٌ قبل الضريبة: المجموعُ قبله والخصم — والوعاءُ (`subtotalMinor`) بعده */
@@ -339,5 +342,11 @@ export function runPipeline(input: PipelineInput): PipelineResult {
       Boolean(proposedFileName) &&
       Boolean(proposedFolderPath) &&
       !findings.some((f) => f.severity === "BLOCKER"),
+    /* تمنعها موانعُ كلُّها ممّا يُقرّ به الإنسان (`OVERRIDABLE_BLOCKERS`) — فتُعتمد بإقراره */
+    canArchiveWithAck:
+      Boolean(proposedFileName) &&
+      Boolean(proposedFolderPath) &&
+      findings.some((f) => f.severity === "BLOCKER") &&
+      findings.filter((f) => f.severity === "BLOCKER").every((f) => OVERRIDABLE_BLOCKERS.has(f.code)),
   };
 }

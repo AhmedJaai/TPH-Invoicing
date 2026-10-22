@@ -18,7 +18,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
-import { reviewConfirmed, type ConfirmReview } from "@/lib/confirm";
+import { OVERRIDABLE_BLOCKERS, reviewConfirmed, type ConfirmReview } from "@/lib/confirm";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
@@ -55,7 +55,7 @@ export interface RecordByHandInput {
   أو يُخطئ المورّدُ الطباعة والفاتورةُ لنا. أمّا المكرَّرة وعرضُ السعر فلا: الأولى مالٌ
   مرّتين، والثاني ليس ديناً.
 */
-const OVERRIDABLE = new Set<string>(["BUYER_VAT_MISMATCH"]);
+const OVERRIDABLE = OVERRIDABLE_BLOCKERS;
 /** سببٌ يُقرأ — لا حرفٌ يُكتب ليمرّ */
 const MIN_OVERRIDE_REASON = 8;
 
