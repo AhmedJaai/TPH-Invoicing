@@ -21,7 +21,7 @@
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { formatDay } from "@/lib/riyadh-time";
 
-export type OpexSource = "BANK" | "INVOICE" | "MANUAL" | "SPREAD" | "OFF_BOOK";
+export type OpexSource = "BANK" | "INVOICE" | "MANUAL" | "SPREAD" | "OFF_BOOK" | "OWNER_PAID";
 
 export const OPEX_SOURCE_LABEL: Record<OpexSource, string> = {
   BANK: "من كشف البنك",
@@ -29,7 +29,23 @@ export const OPEX_SOURCE_LABEL: Record<OpexSource, string> = {
   MANUAL: "مسجّل يدوياً",
   SPREAD: "حصة هذا الشهر من دفعة تغطي عدة أشهر، كما أضافها المالك",
   OFF_BOOK: "خارج كشف البنك، كما أضافه المالك",
+  OWNER_PAID: "فواتير مورّدين سدّدتها من مالك، محسوبة في المشتريات",
 };
+
+/**
+ * ما سدّدتَه للمورّدين من مالك الخاصّ يُخصم من تحويلات الشهر لحسابك.
+ *
+ * التحويلاتُ لحساب المالك مصروف (أحمد، ١٢ أكتوبر ٢٠٢٦)، وفاتورةُ المورّد مشتريات. فما دُفع
+ * منها نقداً لفاتورةٍ مقيَّدة كان يُحسب مرّتين: مصروفاً حين حُوِّل ومشترياتٍ حين قُيِّدت فاتورتُه
+ * (أحمد، ٢٢ أكتوبر ٢٠٢٦: «علّم المدفوعة نقداً … ويُخصم من تحويلاتي الشخصية»). ويُخصم المبلغُ
+ * كلُّه بضريبته: صافيه في المشتريات وضريبتُه تُستردّ في الإقرار، ولا شيءَ منه مصروف.
+ *
+ * ولا يُخصم فوق تحويلات الشهر: ما زاد دفعتَه من مالٍ لم يُحسب مصروفاً أصلاً، فلا تكرار فيه.
+ */
+export function ownerPaidDeduction(transfersMinor: number, ownerPaidMinor: number): { deductMinor: number; beyondMinor: number } {
+  const deductMinor = Math.max(0, Math.min(transfersMinor, ownerPaidMinor));
+  return { deductMinor, beyondMinor: Math.max(0, ownerPaidMinor - deductMinor) };
+}
 
 export interface OpexRow {
   category: TxCategory;

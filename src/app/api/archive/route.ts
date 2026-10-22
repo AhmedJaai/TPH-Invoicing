@@ -37,7 +37,7 @@ import { extractionCache, payments } from "@/db/schema";
 import { parseEvidence } from "@/lib/extraction/evidence";
 import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
-import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { applySupplierCredit, CreditError, markPaidByOwner } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { loadCaptureFile, settleCapture, settleCaptureBySha } from "@/services/capture.service";
 
@@ -102,6 +102,11 @@ const ArchiveBody = z.object({
     .transform((v) => v ?? undefined),
   /** صورةٌ من الفريق تُعتمد بهذه الأرشفة — تصير مستنداً في المعاملة نفسها */
   captureId: Opt(64),
+  /**
+   * سدّدها المالكُ نقداً بماله: `TRANSFERS` من تحويلات المقهى إليه (فتُخصم منها في قائمة
+   * الدخل)، و`PERSONAL` من ماله الخاصّ (لا تُخصم). وغيابُه: لم تُسدَّد بعد، أو بحوالة المقهى.
+   */
+  paidByOwner: z.enum(["TRANSFERS", "PERSONAL"]).optional(),
 });
 type ArchiveBody = z.infer<typeof ArchiveBody>;
 
@@ -116,6 +121,8 @@ function toResponse(e: unknown): NextResponse | null {
   if (e instanceof UnknownYearError) return NextResponse.json({ error: e.message }, { status: 400 });
   if (e instanceof DuplicateDocumentError) return NextResponse.json({ error: e.message }, { status: 409 });
   if (e instanceof MonthClosedError) return NextResponse.json({ error: e.message }, { status: 409 });
+  /* «سدّدتها بمالي» تعذّر — والمعاملةُ كلُّها رُدّت: لا مستندَ ولا فاتورة بلا سدادها المقصود */
+  if (e instanceof CreditError) return NextResponse.json({ error: e.message }, { status: e.status });
   if (e instanceof BlockedError) {
     return NextResponse.json({ error: e.message, blockers: e.blockers }, { status: 409 });
   }
@@ -187,6 +194,9 @@ export async function POST(request: Request) {
     if (!SAFE_NAME.test(body.fileName) || !SAFE_NAME.test(body.folderName)) {
       throw new InvalidInputError("اسم الملف أو المجلد فيه رموز غير مقبولة");
     }
+
+    /* «سدّدتها بمالي» ينشئ دفعة — كتابةُ مالٍ بصلاحية السداد لا الرفع وحده */
+    if (body.paidByOwner && !can(user.role, "payment:approve")) throw new ForbiddenError("payment:approve");
 
     if (data.length === 0) throw new InvalidInputError("الملف فارغ");
     if (!signatureMatches(body.mimeType, data)) {
@@ -321,6 +331,7 @@ export async function POST(request: Request) {
 
     // ── القاعدة ──
     const driveMd5 = md5Of(data);
+    let ownerPaid: { amountMinor: number; fromTransfers: boolean } | null = null;
     const documentId = await db.transaction(async (tx) => {
       const docId = await createDocument(tx, {
         driveFileId: uploaded.fileId,
@@ -374,6 +385,28 @@ export async function POST(request: Request) {
             subtotalMinor,
             lines: body.lines ?? [],
           });
+
+          /*
+            سدّدها المالكُ نقداً بماله: دفعةٌ منه تُخصَّص عليها في المعاملة نفسها — قبل رصيد
+            المورّد، فلا تُنسب إليها حوالةٌ لم تكن لها. والخصمُ من التحويلات لما قاله وحده.
+          */
+          if (body.paidByOwner) {
+            const out = await markPaidByOwner(tx, invoiceId, { fromTransfers: body.paidByOwner === "TRANSFERS" });
+            ownerPaid = { amountMinor: out.ownerPaymentMinor, fromTransfers: body.paidByOwner === "TRANSFERS" };
+            await recordAudit({
+              actorId: user.id,
+              action: "INVOICE_PAID_BY_OWNER",
+              entityType: "invoice",
+              entityId: invoiceId,
+              after: {
+                الفاتورة: out.invoiceNumber,
+                سداد_المالك_بالهللات: out.ownerPaymentMinor,
+                مصدر_السداد: body.paidByOwner === "TRANSFERS"
+                  ? "نقداً من تحويلات المقهى إلى المالك — يُخصم منها في قائمة الدخل"
+                  : "من مال المالك الخاصّ — لا يُخصم من التحويلات",
+              },
+            }, tx);
+          }
 
           /*
             مالٌ دفعتَه لهذا المورّد قبل وصول فاتورته يُخصم منها الآن.
@@ -506,6 +539,9 @@ export async function POST(request: Request) {
       /* ويُعاد إلى الشاشة كي يراه من رفع، لا يُصحَّح خلف ظهره */
       periodMonth,
       monthCorrected,
+      /* «سدّدتها بمالي» وقع أم لا — ولا يقع إلّا لفاتورةٍ قُيِّدت هنا (لا لملفٍّ رُبط بقيدٍ في شهرٍ مقفل) */
+      ownerPaid,
+      ownerPaidSkipped: Boolean(body.paidByOwner) && ownerPaid === null,
     });
   } catch (e) {
     const mapped = toResponse(e);

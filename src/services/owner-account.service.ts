@@ -3,8 +3,11 @@
  * ولا الملغاة) وحركاتُ البنك المصنَّفة «تحويل شخصيّ» بالاتّجاهين.
  * والحسابُ في `lib/owner-account.ts` الخالصة.
  */
-import { sql } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { payments } from "@/db/schema";
+import { recordAudit } from "@/lib/audit";
+import { assertMonthsOpen } from "./month-guard";
 import { txHref } from "@/lib/inspector";
 import { buildOwnerAccount, type OwnerAccount, type OwnerEntry } from "@/lib/owner-account";
 
@@ -16,9 +19,9 @@ export interface OwnerAccountView extends OwnerAccount {
 
 export async function loadOwnerAccount(): Promise<OwnerAccountView> {
   const [paid, moved, span] = await Promise.all([
-    db.execute<{ id: string; day: string; amount_minor: number; name: string | null; slug: string | null; raw: string | null }>(sql`
+    db.execute<{ id: string; day: string; amount_minor: number; name: string | null; slug: string | null; raw: string | null; from_transfers: boolean }>(sql`
       select p.id, to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
-             p.amount_minor, s.name_ar as name, s.slug, p.beneficiary_name_raw as raw
+             p.amount_minor, s.name_ar as name, s.slug, p.beneficiary_name_raw as raw, p.from_owner_transfers as from_transfers
         from payments p left join suppliers s on s.id = p.supplier_id
        where p.method = 'OWNER_ACCOUNT' and p.status not in ('REVERSED', 'VOID')
     `),
@@ -43,6 +46,7 @@ export async function loadOwnerAccount(): Promise<OwnerAccountView> {
       amountMinor: Number(r.amount_minor),
       label: r.name ?? r.raw ?? "دفعة بلا مورّد",
       href: r.slug ? `/suppliers/${r.slug}` : "/suppliers",
+      payment: { id: r.id, fromTransfers: Boolean(r.from_transfers) },
     })),
     ...moved.rows.map((r) => ({
       id: `t:${r.id}`,
@@ -59,4 +63,34 @@ export async function loadOwnerAccount(): Promise<OwnerAccountView> {
     bankFirstDay: span.rows[0]?.first_day ?? null,
     bankLastDay: span.rows[0]?.last_day ?? null,
   };
+}
+
+/**
+ * سدادٌ من مال المالك: أمِن تحويلات المقهى إليه (يُخصم منها في قائمة الدخل) أم من ماله
+ * الخاصّ (لا يُخصم)؟ يقرّره المالكُ لكلّ سدادٍ بعينه (083) — ولا يُفترض عنه شيء.
+ * والشهرُ المقفل لا يُغيَّر فيه شيء من أيّ باب.
+ *
+ * `false`: لا سدادَ قائمٌ من مال المالك بهذا المعرّف.
+ */
+export async function setOwnerPaymentSource(paymentId: string, fromTransfers: boolean, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const [row] = await t
+      .select({ id: payments.id, month: sql<string>`to_char(${payments.paidAt} at time zone 'Asia/Riyadh', 'YYYY-MM')`, before: payments.fromOwnerTransfers, amountMinor: payments.amountMinor })
+      .from(payments)
+      .where(and(eq(payments.id, paymentId), eq(payments.method, "OWNER_ACCOUNT"), notInArray(payments.status, ["REVERSED", "VOID"])))
+      .limit(1);
+    if (!row) return false;
+    if (row.before === fromTransfers) return true;
+    await assertMonthsOpen(t, [row.month]);
+    await t.update(payments).set({ fromOwnerTransfers: fromTransfers }).where(eq(payments.id, paymentId));
+    await recordAudit({
+      actorId,
+      action: "OWNER_PAYMENT_SOURCE_SET",
+      entityType: "payment",
+      entityId: paymentId,
+      before: { المصدر: row.before ? "من تحويلات المقهى" : "من مال المالك الخاص" },
+      after: { المصدر: fromTransfers ? "من تحويلات المقهى" : "من مال المالك الخاص", المبلغ_بالهللات: row.amountMinor },
+    }, t);
+    return true;
+  });
 }

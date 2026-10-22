@@ -478,6 +478,11 @@ export const payments = pgTable("payments", {
   reversalReason: text("reversal_reason"),
   /** سُجّلت خطأً ولم تقع أصلاً — غير المردودة. */
   voidedAt: timestamp("voided_at", { withTimezone: true }),
+  /**
+   * سدادٌ من مال المالك (`OWNER_ACCOUNT`) خرج من تحويلات المقهى إليه — فيُخصم منها في
+   * قائمة الدخل كي لا يُحسب مرّتين (083). يعلّمه المالكُ بعينه؛ وما دفعه من ماله الخاصّ لا.
+   */
+  fromOwnerTransfers: boolean("from_owner_transfers").notNull().default(false),
   createdAt: now(),
 }, (t) => [
   index("payments_supplier_date_idx").on(t.supplierId, t.paidAt),

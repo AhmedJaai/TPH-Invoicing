@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPnl, isTaxSettlement, monthsBetween, spreadShare, type PnlInput } from "./pnl";
+import { buildPnl, isTaxSettlement, monthsBetween, ownerPaidDeduction, spreadShare, type PnlInput } from "./pnl";
 
 const base: PnlInput = {
   month: "2026-06", open: false,
@@ -102,4 +102,22 @@ describe("التوزيع على أشهر", () => {
 it("سداد هيئة الزكاة والضريبة ليس مصروفاً", () => {
   expect(isTaxSettlement("Zakat, Tax and Customs Au thority رقم السداد310007971626300")).toBe(true);
   expect(isTaxSettlement("Ministry of Municipal and Rural Affairs")).toBe(false);
+});
+
+describe("فواتيرُ مورّدين سُدّدت من مال المالك (أحمد، ٢٢ أكتوبر ٢٠٢٦)", () => {
+  it("تُخصم من تحويلات الشهر فلا يُحسب المبلغُ مرّتين — ولا فوقها", () => {
+    expect(ownerPaidDeduction(2_000_000, 115_000)).toEqual({ deductMinor: 115_000, beyondMinor: 0 });
+    /* دفعتَ أكثر ممّا حوّلت: الزيادةُ من مالٍ لم يُحسب مصروفاً، فلا يُخصم منها شيء */
+    expect(ownerPaidDeduction(100_000, 150_000)).toEqual({ deductMinor: 100_000, beyondMinor: 50_000 });
+    expect(ownerPaidDeduction(0, 150_000)).toEqual({ deductMinor: 0, beyondMinor: 150_000 });
+    expect(ownerPaidDeduction(500_000, 0)).toEqual({ deductMinor: 0, beyondMinor: 0 });
+  });
+
+  it("سطرُ التحويلات يصغر بالمخصوم، والربحُ يكبر به", () => {
+    const transfer = { category: "PERSONAL" as const, label: "تحويل للمالك", amountMinor: 2_000_000, source: "BANK" as const };
+    const without = buildPnl({ ...base, opex: [...base.opex, transfer] });
+    const withPaid = buildPnl({ ...base, opex: [...base.opex, transfer, { category: "PERSONAL", label: "سدّدتَ منها فواتير", amountMinor: -115_000, source: "OWNER_PAID" }] });
+    expect(withPaid.opexByCategory.find((c) => c.category === "PERSONAL")?.amountMinor).toBe(1_885_000);
+    expect(withPaid.profitMinor).toBe((without.profitMinor ?? 0) + 115_000);
+  });
 });

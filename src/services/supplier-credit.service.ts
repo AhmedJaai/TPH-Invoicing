@@ -22,7 +22,7 @@
  * فاتورةً ولا دفعة.
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { paymentAllocations } from "@/db/schema";
+import { paymentAllocations, payments } from "@/db/schema";
 import {
   planCreditApplication,
   type AvailableCredit,
@@ -349,7 +349,11 @@ export interface OwnerPaidOutcome extends OwnerPaidPlan {
  *
  * في معاملةٍ واحدة يمرّرها المستدعي: إمّا أن يقع كلُّه أو لا يقع منه شيء.
  */
-export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerPaidOutcome> {
+/**
+ * `fromTransfers`: سُدّدت من تحويلات المقهى إلى المالك (لا من ماله الخاصّ) — فتُخصم منها في
+ * قائمة الدخل (083). يقرّره المالكُ لكلّ فاتورة؛ وبلا قرارٍ لا يُخصم شيء.
+ */
+export async function markPaidByOwner(tx: Tx, invoiceId: string, opts: { fromTransfers?: boolean } = {}): Promise<OwnerPaidOutcome> {
   const plan = await previewOwnerPaid(tx, invoiceId);
   const { inv } = await loadInvoiceForOwner(tx, invoiceId);
 
@@ -374,6 +378,9 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerP
   await allocate(tx, ownerPaymentId, [
     { invoiceId, amountMinor: plan.ownerPaymentMinor },
   ]);
+  if (opts.fromTransfers) {
+    await tx.update(payments).set({ fromOwnerTransfers: true }).where(eq(payments.id, ownerPaymentId));
+  }
 
   const credit = freedIds.length > 0
     ? await applySupplierCredit(tx, plan.supplierId, { forwardDays: null, paymentIds: freedIds })

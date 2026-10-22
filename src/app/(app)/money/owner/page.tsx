@@ -9,6 +9,7 @@ import { formatDay } from "@/lib/riyadh-time";
 import { OWNER_ENTRY_LABEL, signedMinor, type OwnerLine, type OwnerYear } from "@/lib/owner-account";
 import { loadOwnerAccount } from "@/services/owner-account.service";
 import { T } from "@/components/i18n/t";
+import { OwnerPaymentSource } from "@/components/owner-payment-source";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,8 @@ export default async function OwnerPage() {
   }
 
   const owed = a.balanceMinor > 0;
+  /* «من تحويلات المقهى» يُخصم من تحويلاتك في قائمة الدخل — قرارُ من يملك السداد */
+  const canDecide = can(user.role, "payment:approve");
 
   return (
     <PageShell
@@ -79,6 +82,12 @@ export default async function OwnerPage() {
       <Callout tone="info" icon={Info} className="mt-4">
         <T s="{0} لا يُحسب هنا إلا ما صُنّف «تحويل شخصي» أو سُجّل «من حساب المالك». أما التحويل غير المصنّف وما دفعته نقداً بلا تسجيل فغير محسوبين. والتسمية المحاسبية (مسحوبات، جاري المالك، رأس مال) يحددها محاسبك." a={[<strong key="0" className="text-ink">هذا جمع للأرقام فقط:</strong>]} /></Callout>
 
+      {canDecide && a.lines.some((l) => l.payment) && (
+        <Callout tone="muted" icon={HandCoins} className="mt-3">
+          ما سدّدته للمورّدين من مالك اختر مصدره في القيود أدناه. «من تحويلات المقهى» يُخصم من التحويلات إليك في «كم ربحت؟» فلا يُحسب المبلغ مرتين، و«من مالي الخاص» لا يُخصم. ولا يتغير شيء حتى تختار.
+        </Callout>
+      )}
+
       <Section title="سنة بسنة" icon={HandCoins} hint="يجيب عن سؤال «كم سحبت هذه السنة؟». السنة الأولى والأخيرة لا تشملان إلا ما يغطيه الكشف.">
         <DataTable<OwnerYear>
           rows={a.years}
@@ -109,6 +118,7 @@ export default async function OwnerPage() {
                 <span className="min-w-0">
                   <span className="block truncate font-bold">{l.label}</span>
                   <span className="mt-0.5 block"><Badge tone={l.kind === "TOOK_OUT" ? "warn" : "ok"}>{OWNER_ENTRY_LABEL[l.kind]}</Badge></span>
+                  {l.payment && canDecide && <OwnerPaymentSource paymentId={l.payment.id} fromTransfers={l.payment.fromTransfers} />}
                 </span>
               ),
             },

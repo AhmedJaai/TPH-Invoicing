@@ -27,7 +27,7 @@ import { varianceCostMinor } from "@/lib/inventory/purchases";
 import { indexRecipeVersions, type RecipeVersionInput } from "@/lib/inventory/recipe";
 import { toCanonical } from "@/lib/inventory/units";
 import {
-  buildPnl, isTaxSettlement, RECOVERABLE_VAT, spreadShare,
+  buildPnl, isTaxSettlement, ownerPaidDeduction, RECOVERABLE_VAT, spreadShare,
   type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs,
 } from "@/lib/finance/pnl";
 import { suspectCountJump } from "@/lib/finance/stock-flow";
@@ -35,6 +35,8 @@ import { previousMonth, stockWindow, type StockWindow } from "@/lib/finance/stoc
 import { addDays, currentMonthRiyadh, daysBetween, daysInMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { recordAudit } from "@/lib/audit";
+import { INVOICE, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { catalogCosts, latestInvoiceUnitCosts, loadSoldForReport, loadWaste } from "./inventory.service";
 import { loadRecipeVersions } from "./recipe.service";
 import { loadCountDays } from "./stock-flow.service";
@@ -378,7 +380,7 @@ export interface ExpenseRowView extends OpexRow {
 }
 
 async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
-  const [rows, draws] = await Promise.all([
+  const [rows, draws, ownerPaid] = await Promise.all([
     conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null }>(sql`
       select e.id, e.category::text as category, e.label, e.amount_minor, e.source::text as source, e.occurred_on,
              e.bank_transaction_id, bt.description, bt.beneficiary_raw as beneficiary
@@ -398,6 +400,17 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
        where direction = 'DEBIT' and category = 'PERSONAL'
          and to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}
        order by amount_minor desc
+    `),
+    /*
+      فواتيرُ مورّدين سدّدها المالكُ نقداً **من تحويلات المقهى إليه** — يعلّمها بعينها (083).
+      وما سدّده من ماله الخاصّ لا يُعلَّم ولا يُخصم: لم يُحسب مصروفاً أصلاً.
+    */
+    conn.execute<{ n: number; total: string | null }>(sql`
+      select count(*)::int as n, sum(amount_minor)::bigint as total
+        from payments
+       where method = 'OWNER_ACCOUNT' and from_owner_transfers
+         and status not in ('REVERSED', 'VOID')
+         and to_char(paid_at at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}
     `),
   ]);
   const spreadTx = new Map(declarations.filter((d) => d.kind === "SPREAD" && d.bankTransactionId).map((d) => [d.bankTransactionId, d]));
@@ -427,6 +440,19 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
   }
   for (const d of draws.rows) {
     opex.push({ id: `owner-${d.id}`, category: "PERSONAL", label: d.label ?? "تحويل لحساب المالك", amountMinor: d.amount_minor, source: "BANK", occurredOn: d.day, bankTransactionId: d.id, declarationId: null });
+  }
+  const paid = ownerPaid.rows[0];
+  const { deductMinor, beyondMinor } = ownerPaidDeduction(
+    draws.rows.reduce((sum, d) => sum + d.amount_minor, 0),
+    Number(paid?.total ?? 0),
+  );
+  if (deductMinor > 0) {
+    opex.push({
+      id: `owner-paid-${month}`, category: "PERSONAL",
+      label: `سدّدتَ منها نقداً لمورّدين (${countNoun(paid.n, INVOICE)})، محسوبة في المشتريات`
+        + (beyondMinor > 0 ? ` (وزاد ${formatRiyalsDisplay(beyondMinor)} على تحويلات الشهر فلم يُخصم)` : ""),
+      amountMinor: -deductMinor, source: "OWNER_PAID", occurredOn: null, bankTransactionId: null, declarationId: null,
+    });
   }
   return { opex, excluded, declaredNone };
 }

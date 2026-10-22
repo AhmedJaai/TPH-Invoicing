@@ -191,6 +191,14 @@ function editedFrom(data: AnalysisResponse): Record<string, string> {
   };
 }
 
+/** سندُ سداد (إيصال) لا فاتورة — لا يُسأل «من أين سُدّدت» */
+const PAYMENT_DOC_KINDS = new Set(["RECEIPT", "CASH_RECEIPT"]);
+const PAID_BY_OWNER_CHOICES = [
+  ["", "لم تُسدَّد، أو بحوالة المقهى"],
+  ["TRANSFERS", "نقداً من تحويلات المقهى لي"],
+  ["PERSONAL", "من مالي الخاص"],
+] as const;
+
 const captureFileUrl = (captureId: string) => `/api/capture/file?id=${encodeURIComponent(captureId)}`;
 
 /**
@@ -888,8 +896,8 @@ export function Uploader({
         it.id === id && it.state === "done" ? { ...it, edited: { ...it.edited, [key]: value } } : it,
       ),
     );
-    /* اسمُ الملفّ لا يغيّر الحكم */
-    if (key !== "fileName") rejudge(id);
+    /* اسمُ الملفّ ومصدرُ السداد لا يغيّران الحكم */
+    if (key !== "fileName" && key !== "paidByOwner") rejudge(id);
   }, [rejudge]);
 
   const remove = useCallback((id: string) => {
@@ -946,9 +954,10 @@ export function Uploader({
           findings: r.findings,
           lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
           captureId: it.captureId,
+          paidByOwner: it.edited.paidByOwner || undefined,
         }),
       });
-      const read = await readResponse<{ fileName: string; webViewLink?: string; renamed?: boolean; needsReview?: boolean }>(res);
+      const read = await readResponse<{ fileName: string; webViewLink?: string; renamed?: boolean; needsReview?: boolean; ownerPaid?: { amountMinor: number; fromTransfers: boolean } | null; ownerPaidSkipped?: boolean }>(res);
 
       if (read.ok) {
         const json = read.data;
@@ -968,9 +977,13 @@ export function Uploader({
           ),
         );
         toast({
-          tone: "ok",
+          tone: json.ownerPaidSkipped ? "warn" : "ok",
           title: "أُرشف المستند",
-          body: done.needsReview ? "وينتظر من يملك صلاحية رؤية المبالغ ليؤكدها." : json.fileName,
+          body: json.ownerPaidSkipped
+            ? "لكن لم تُسجَّل مسدّدة من مالك: رُبط الملف بفاتورة قُيّدت من قبل في شهر مقفل."
+            : json.ownerPaid
+              ? `وسُجّلت مسدّدة من مالك بـ${formatRiyalsDisplay(json.ownerPaid.amountMinor)} ريال${json.ownerPaid.fromTransfers ? "، وتُخصم من تحويلات المقهى إليك." : "، دون خصم من التحويلات."}`
+              : done.needsReview ? "وينتظر من يملك صلاحية رؤية المبالغ ليؤكدها." : json.fileName,
         });
         /* صورةُ فريقٍ اعتُمدت وهي المفتوحة: تُفتح التالية في مكانها — جاهزةً، قُرئت في الخلفية */
         if (it.captureId && focusRef.current === it.captureId) advance.current(it.captureId);
@@ -1735,6 +1748,40 @@ function ReviewCard({
               )}
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
                 يعيد النظام حساب المبالغ والحالة الضريبية عند التأكيد، فما تكتبه هنا يُفحص ولا يُعتمد كما هو.
+              </p>
+            </Group>
+          )}
+
+          {/*
+            ── هل سُدّدت من مالك؟ ──
+            التحويلاتُ لحسابك مصروف، فما سدّدتَه منها نقداً لهذه الفاتورة يُخصم منها كي لا يُحسب
+            مرّتين. وما دفعتَه من مالك الخاصّ لا يُخصم. ولا يُفترض شيء: الأصلُ «لم تُسدَّد».
+          */}
+          {canSeeAmounts && !isStatement && !PAYMENT_DOC_KINDS.has(r.documentKind) && (
+            <Group title="السداد">
+              <div role="radiogroup" aria-label="من أين سُدّدت" className="flex flex-wrap gap-1.5">
+                {PAID_BY_OWNER_CHOICES.map(([value, label]) => {
+                  const on = (item.edited.paidByOwner ?? "") === value;
+                  return (
+                    <button
+                      key={value || "none"}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => onEdit("paidByOwner", value)}
+                      className={`min-h-11 rounded-full border px-3 text-xs sm:min-h-9 ${on ? "border-accent bg-accent-soft font-bold" : "border-line"}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                {item.edited.paidByOwner === "TRANSFERS"
+                  ? "تُسجَّل مسدّدة من حسابك، ويُخصم مبلغها من تحويلات المقهى إليك في «كم ربحت؟» فلا يُحسب مرتين."
+                  : item.edited.paidByOwner === "PERSONAL"
+                    ? "تُسجَّل مسدّدة من حسابك، ولا يُخصم شيء من التحويلات: دفعتها من مالك الخاص."
+                    : "تبقى مستحقة للمورّد، وتُخصم منها حوالات المقهى له إن وُجدت."}
               </p>
             </Group>
           )}

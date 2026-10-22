@@ -114,7 +114,7 @@ export function TeamCaptures({
                     {canSeeAmounts && v?.read.total && <span className="nums text-ink-soft"> · {v.read.total} ريال</span>}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
-                    من {item.sender} · {timeAgo(item.createdAt)}
+                    من {item.sender} · <span suppressHydrationWarning>{timeAgo(item.createdAt)}</span>
                     {v?.read.invoiceNumber && <> · رقم <span className="nums" dir="ltr">{v.read.invoiceNumber}</span></>}
                   </p>
                   {v ? (

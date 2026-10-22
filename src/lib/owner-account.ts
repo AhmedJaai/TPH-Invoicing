@@ -30,6 +30,8 @@ export interface OwnerEntry {
   label: string;
   /** موضعُ السجلّ — حركةُ البنك أو ملفُّ المورّد. */
   href: string;
+  /** سدادُ المورّد (`PAID_FOR_CAFE`) وحده: معرّفُه، وأمِن تحويلات المقهى سُدّد (083) */
+  payment?: { id: string; fromTransfers: boolean };
 }
 
 export const OWNER_ENTRY_LABEL: Record<OwnerEntryKind, string> = {
