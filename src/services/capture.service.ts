@@ -163,13 +163,17 @@ export type ClarityOutcome =
  * `extraction_cache`، فلا يدفع صاحبُ العمل ثمنَها ثانيةً حين يفتحها.
  */
 export async function readForClarity(file: InspectedFile, cacheOwnerId: string | null): Promise<ClarityOutcome> {
-  const cached = await loadCachedReading(file.sha256, CAPTURE_READING_MAX_AGE_MS);
+  /* معاً لا تباعاً: الباريستا ينتظر، وقائمةُ المورّدين رخيصةٌ إن لم يُحتج إليها */
+  const [cached, suppliers] = await Promise.all([
+    loadCachedReading(file.sha256, CAPTURE_READING_MAX_AGE_MS),
+    loadSupplierRecords(),
+  ]);
   const reading = cached ?? await extractDocument({
     data: file.buffer,
     mimeType: file.mimeType,
     companyVat: companyConfig.vatNumber,
     companyName: companyConfig.nameAr,
-    supplierNames: (await loadSupplierRecords()).map((s) => `${s.nameAr} (${s.slug})`),
+    supplierNames: suppliers.map((s) => `${s.nameAr} (${s.slug})`),
   });
   if (!reading.ok) {
     if (isReaderOutage(reading)) {

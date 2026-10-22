@@ -25,7 +25,7 @@ import { parseLineQuantity } from "@/lib/line-pricing";
 import { decimalToMilli } from "@/lib/inventory/units";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import type { ExtractionResult } from "./schema";
-import { vatMatchesStandardRate, vatOnNet } from "@/lib/vat";
+import { VAT_PERCENT, vatMatchesStandardRate, vatOnNet } from "@/lib/vat";
 import { isoDay } from "@/lib/riyadh-time";
 
 export type ConflictCode =
@@ -231,8 +231,17 @@ export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): E
       const lineTotal = money(line.lineTotal);
       if (qMilli === null || unit === null || lineTotal === null) continue;
 
-      /* الكمّيّة بالمِلّي × السعر بالهللات، يُقابَل بإجماليّ السطر × ١٠٠٠ — بلا عددٍ عشريّ */
-      if (Math.abs(qMilli * unit - lineTotal * 1000) > TOTAL_ROUNDING_TOLERANCE_MINOR * 1000) {
+      /*
+        الكمّيّة بالمِلّي × السعر بالهللات، يُقابَل بإجماليّ السطر × ١٠٠٠ — بلا عددٍ عشريّ.
+        وإجماليُّ السطر الشاملُ ضريبتَه (٥ × ١٠٠ = ٥٧٥) طباعةٌ صحيحة لا خطأُ قراءة
+        (`line-pricing.ts` يفهمها): كان يُعاد عنه السؤالُ فيبقى كما هو ويُدفع نداءٌ ثالث.
+      */
+      const net = qMilli * unit;
+      const printed = lineTotal * 1000;
+      const tolerance = TOTAL_ROUNDING_TOLERANCE_MINOR * 1000;
+      const asNet = Math.abs(net - printed) <= tolerance;
+      const asGross = Math.abs(net * (100 + VAT_PERCENT) - printed * 100) <= tolerance * 100;
+      if (!asNet && !asGross) {
         conflicts.push({
           code: "LINE_MATH",
           fields: [`lines[${i}]`],
@@ -250,7 +259,10 @@ export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): E
     }, 0);
 
     if (lineSum !== null && subtotal !== null && subtotal > 0) {
-      if (Math.abs(lineSum - subtotal) > LINES_TOLERANCE_MINOR) {
+      /* والبنودُ الشاملةُ الضريبة تجمع إلى الصافي × ١٫١٥ — بأعدادٍ صحيحة */
+      const sumsToNet = Math.abs(lineSum - subtotal) <= LINES_TOLERANCE_MINOR;
+      const sumsToGross = Math.abs(lineSum * 100 - subtotal * (100 + VAT_PERCENT)) <= LINES_TOLERANCE_MINOR * 100;
+      if (!sumsToNet && !sumsToGross) {
         conflicts.push({
           code: "LINES_NOT_SUBTOTAL",
           fields: ["lines", "subtotalAmount"],

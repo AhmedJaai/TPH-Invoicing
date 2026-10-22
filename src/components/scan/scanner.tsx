@@ -178,6 +178,8 @@ export function Scanner({ token, label, recent }: { token: string; label: string
 
   /* النموذجُ يُحمَّل والباريستا ما زال في الصفحة الأولى — جاهزٌ حين يصوّر */
   useEffect(() => { warmDetector(); }, []);
+  /* والقارئُ في الخادم يُسخَّن كذلك — يبدأ بارداً فيضيف ثوانيَ إلى أوّل فحص */
+  useEffect(() => { void fetch("/api/capture/scan/check", { cache: "no-store" }).catch(() => undefined); }, []);
 
   const onPicked = useCallback(async (list: FileList | null) => {
     const file = list?.[0];
@@ -320,42 +322,88 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     setStage({ kind: "home" });
   }, []);
 
-  const fileForSending = useCallback((): File | null => {
+  const fileForSending = useCallback((quiet = false): File | null => {
     if (built.current) return built.current;
     if (pagesRef.current.length === 0) return null;
     const file = buildFile(pagesRef.current);
     if (file.size > MAX_SEND_BYTES) {
-      setError("الصفحات أكبر من حد الإرسال. احذف صفحة وأرسلها في فاتورة مستقلة.");
+      if (!quiet) setError("الصفحات أكبر من حد الإرسال. احذف صفحة وأرسلها في فاتورة مستقلة.");
       return null;
     }
     built.current = file;
     return file;
   }, []);
 
+  /*
+    القراءةُ تبدأ في الخلفية حين تجهز الصفحات، لا حين يُضغط «افحص الوضوح».
+
+    كانت تبدأ بالضغط فينتظر الباريستا رفعَ الصورة وقراءتَها كاملتين (نحو ربع دقيقة
+    في الإنتاج). والآن تجري وهو ينظر في صفحاته، فيجدها جاهزةً أو قاربت. ولكلّ ملفٍّ
+    قراءتُه: إن تغيّرت الصفحاتُ صار ملفّاً آخر، وما قُرئ للأوّل يبقى في خزين الخادم.
+  */
+  const reading = useRef<{ file: File; startedAt: number; result: Promise<Check> } | null>(null);
+  const [background, setBackground] = useState<{ key: object; done: boolean } | null>(null);
+
+  const startReading = useCallback((file: File, key: object) => {
+    if (reading.current?.file === file) return reading.current;
+    const body = new FormData();
+    body.append("token", token);
+    body.append("file", file);
+    const result = (async (): Promise<Check> => {
+      try {
+        const res = await fetch("/api/capture/scan/check", { method: "POST", body });
+        const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE" }>(res);
+        if (!read.ok) return { kind: "failed", message: read.error };
+        const d = read.data;
+        if (d.duplicate) return { kind: "duplicate", where: d.duplicate };
+        if (d.verdict) return { kind: "verdict", verdict: d.verdict };
+        if (d.outage) return { kind: "outage", message: d.message ?? "" };
+        return { kind: "failed", message: d.message ?? "تعذّرت قراءة الصورة." };
+      } catch {
+        return { kind: "failed", message: "لا يوجد اتصال بالإنترنت. تأكد من الشبكة ثم أعد الفحص." };
+      }
+    })();
+    const entry = { file, startedAt: Date.now(), result };
+    reading.current = entry;
+    setBackground({ key, done: false });
+    void result.then(() => {
+      if (reading.current === entry) setBackground({ key, done: true });
+    });
+    return entry;
+  }, [token]);
+
+  /* ما يميّز ما على الشاشة: مصفوفةُ الصفحات، أو المسحُ الجاهز نفسُه */
+  const readingKey: object | null = stage.kind === "pages" ? pages : stage.kind === "ready" ? stage : null;
+
+  useEffect(() => {
+    if (!readingKey) return;
+    /* مهلةٌ قصيرة: من يضيف صفحةً أو يبدّل النمط فوراً لا تُدفع له قراءةٌ تُرمى */
+    const timer = setTimeout(() => {
+      const file = fileForSending(true);
+      if (file) startReading(file, readingKey);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [readingKey, fileForSending, startReading]);
+
   const check = useCallback(async () => {
     setError(null);
     const file = fileForSending();
     if (!file) return;
-    setStage({ kind: "checking", startedAt: Date.now() });
-    const body = new FormData();
-    body.append("token", token);
-    body.append("file", file);
-    try {
-      const res = await fetch("/api/capture/scan/check", { method: "POST", body });
-      const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE" }>(res);
-      if (!read.ok) {
-        setStage({ kind: "checked", result: { kind: "failed", message: read.error } });
-        return;
-      }
-      const d = read.data;
-      if (d.duplicate) setStage({ kind: "checked", result: { kind: "duplicate", where: d.duplicate } });
-      else if (d.verdict) setStage({ kind: "checked", result: { kind: "verdict", verdict: d.verdict } });
-      else if (d.outage) setStage({ kind: "checked", result: { kind: "outage", message: d.message ?? "" } });
-      else setStage({ kind: "checked", result: { kind: "failed", message: d.message ?? "تعذّرت قراءة الصورة." } });
-    } catch {
-      setStage({ kind: "checked", result: { kind: "failed", message: "لا يوجد اتصال بالإنترنت. تأكد من الشبكة ثم أعد الفحص." } });
+    const prefetched = reading.current?.file === file;
+    let entry = startReading(file, readingKey ?? file);
+    setStage({ kind: "checking", startedAt: entry.startedAt });
+    let result = await entry.result;
+    /* ما تعثّر في الخلفية (انقطاعٌ لحظيّ) يُعاد مرّةً الآن — لا يُعرض فشلٌ قديم */
+    if (result.kind === "failed" && prefetched && reading.current === entry) {
+      reading.current = null;
+      entry = startReading(file, readingKey ?? file);
+      setStage({ kind: "checking", startedAt: entry.startedAt });
+      result = await entry.result;
     }
-  }, [fileForSending, token]);
+    /* تُرك الفحصُ (ألغى أو بدأ من جديد) — لا يُقفَز به إلى نتيجةٍ لم يعد ينتظرها */
+    if (built.current !== file) return;
+    setStage({ kind: "checked", result });
+  }, [fileForSending, readingKey, startReading]);
 
   const send = useCallback(async () => {
     setError(null);
@@ -436,9 +484,9 @@ export function Scanner({ token, label, recent }: { token: string; label: string
               <p className="text-xs text-muted">مسحٌ جاهز من ماسح الجوال، يُرسل كما هو.</p>
             </div>
           </div>
-          <button type="button" onClick={() => void check()} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
-            <ScanLine className="h-5 w-5" aria-hidden /> افحص الوضوح
-          </button>
+          <div className="mt-4">
+            <CheckButton onClick={() => void check()} reading={background?.key === stage ? (background.done ? "done" : "running") : null} />
+          </div>
           <button type="button" onClick={startOver} className={`${buttonClass("quiet", "md")} mt-2 w-full`}>اختر ملفاً آخر</button>
         </section>
       )}
@@ -474,6 +522,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
           onAdjust={(id) => void adjustPage(id)}
           onAdd={openCamera}
           onCheck={() => void check()}
+          reading={background?.key === pages ? (background.done ? "done" : "running") : null}
         />
       )}
 
@@ -495,7 +544,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
             setStage({ kind: pages.length > 1 ? "pages" : "home" });
             openCamera();
           }}
-          onRecheck={() => void check()}
+          onRecheck={() => { reading.current = null; void check(); }}
           onDone={startOver}
         />
       )}
@@ -712,7 +761,7 @@ function Adjust({
 }
 
 function Pages({
-  pages, mode, onMode, onRemove, onAdjust, onAdd, onCheck,
+  pages, mode, onMode, onRemove, onAdjust, onAdd, onCheck, reading,
 }: {
   pages: ScanPage[];
   mode: ScanMode;
@@ -721,6 +770,8 @@ function Pages({
   onAdjust: (id: string) => void;
   onAdd: () => void;
   onCheck: () => void;
+  /** القراءةُ في الخلفية لهذه الصفحات: جارية · انتهت · لم تبدأ */
+  reading: "running" | "done" | null;
 }) {
   const issues = [...new Set(pages.flatMap((p) => p.issues))];
   return (
@@ -777,10 +828,27 @@ function Pages({
       <button type="button" onClick={onAdd} className={`${buttonClass("secondary", "md")} mt-3 w-full`}>
         <Plus className="h-4 w-4" aria-hidden /> أضف صفحة أخرى من الفاتورة نفسها
       </button>
-      <button type="button" onClick={onCheck} className={`${buttonClass("primary", "lg")} mt-2 w-full`}>
-        <ScanLine className="h-5 w-5" aria-hidden /> افحص الوضوح
-      </button>
+      <div className="mt-2">
+        <CheckButton onClick={onCheck} reading={reading} />
+      </div>
     </section>
+  );
+}
+
+/** «افحص الوضوح» — ويقول إن كانت القراءةُ قد بدأت في الخلفية أو انتهت. */
+function CheckButton({ onClick, reading }: { onClick: () => void; reading: "running" | "done" | null }) {
+  return (
+    <>
+      <button type="button" onClick={onClick} className={`${buttonClass("primary", "lg")} w-full`}>
+        {reading === "done"
+          ? <><CircleCheck className="h-5 w-5" aria-hidden /> اعرض ما قرأه النظام</>
+          : <><ScanLine className="h-5 w-5" aria-hidden /> افحص الوضوح</>}
+      </button>
+      <p className="mt-2 flex min-h-5 items-center justify-center gap-1.5 text-xs text-muted" aria-live="polite">
+        {reading === "running" && <><Clock className="h-3.5 w-3.5" aria-hidden /> بدأ النظام يقرأ الفاتورة…</>}
+        {reading === "done" && <><Check className="h-3.5 w-3.5" aria-hidden /> قُرئت الفاتورة، والنتيجة جاهزة</>}
+      </p>
+    </>
   );
 }
 

@@ -117,6 +117,24 @@ describe("التحقّق من القراءة", () => {
     expect(line("2.5 كجم", "112.50")).not.toContain("LINE_MATH");
   });
 
+  it("بنودٌ إجماليُّها شاملٌ الضريبة لا تُعدّ تعارضاً — والخطأُ الحقيقيّ يبقى مكشوفاً", () => {
+    /* من فاتورةٍ وصلت من الباريستا: ٥ × ١٠٠ = ٥٧٥، و٣ × ١٣٢ = ٤٥٥٫٤٠، والصافي ٨٩٦ */
+    const inclusive = invoice({
+      subtotalAmount: "896.00", vatAmount: "134.40", totalAmount: "1030.40",
+      lines: [
+        { description: "Cheesecake", quantity: "5", unitPrice: "100.00", lineTotal: "575.00" },
+        { description: "Chocolate Cake", quantity: "3", unitPrice: "132.00", lineTotal: "455.40" },
+      ],
+    });
+    expect(findConflicts(inclusive)).toEqual([]);
+
+    const wrong = invoice({
+      subtotalAmount: "896.00", vatAmount: "134.40", totalAmount: "1030.40",
+      lines: [{ description: "Cheesecake", quantity: "5", unitPrice: "100.00", lineTotal: "540.00" }],
+    });
+    expect(findConflicts(wrong).map((x) => x.code)).toEqual(["LINE_MATH", "LINES_NOT_SUBTOTAL"]);
+  });
+
   it("يكشف مبلغاً لا يُقرأ", () => {
     const c = findConflicts(invoice({ totalAmount: "غير واضح" }));
     expect(c.map((x) => x.code)).toContain("AMOUNT_UNREADABLE");

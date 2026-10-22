@@ -20,6 +20,18 @@ export async function POST(request: Request) {
   return withDeadline(55_000, () => handle(request));
 }
 
+/**
+ * تسخينٌ يطلبه الماسحُ حين يُفتح — `GET` بلا رمزٍ ولا قاعدة.
+ *
+ * المسارُ يُطلب نادراً فيبدأ بارداً في كلّ مرّة تقريباً: قيس في الإنتاج نحو سبع ثوانٍ
+ * قبل أوّل نداءٍ للنموذج. فيُحمَّل الآن ما تحتاجه القراءةُ (sharp وفكُّ الرمز) والباريستا
+ * ما زال يصوّر، فيجد «افحص الوضوح» نسخةً دافئة.
+ */
+export async function GET() {
+  await Promise.all([import("sharp"), import("qr/decode.js")]).catch(() => undefined);
+  return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+}
+
 async function handle(request: Request) {
   try {
     let form: FormData;
