@@ -634,12 +634,40 @@ function ImagePaper({ url, name }: { url: string; name: string }) {
 }
 
 /** الورقةُ بجانب القراءة — صورةٌ تُعرَض بتكبيرٍ وتدوير، وPDF يُضمَّن على الحاسوب. */
+/**
+ * الـPDF في إطار — من نسخةٍ محلّيّة (`blob:`) دائماً.
+ *
+ * صورةُ الفريق المفتوحة بمعرّفها رابطُها رابطُ الخادم (`/api/capture/file`)، والخادمُ يمنع
+ * تضمينَ أيّ ردٍّ منه في إطار (`X-Frame-Options: DENY` في `next.config.ts` — حمايةٌ لا تُرخى)،
+ * فظهر «رفض الاتصال» مكانَ الورقة. فيُجلب الملفُّ ويُعرض من نسخته المحلّيّة كما كان قبلها.
+ */
+function PdfPaper({ url, name }: { url: string; name: string }) {
+  const local = url.startsWith("blob:");
+  const [fetched, setFetched] = useState<{ from: string; blob: string | null } | null>(null);
+  useEffect(() => {
+    if (local) return;
+    let alive = true;
+    let made: string | null = null;
+    fetch(url)
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((b) => {
+        if (!alive) return;
+        made = b ? URL.createObjectURL(b) : null;
+        setFetched({ from: url, blob: made });
+      })
+      .catch(() => { if (alive) setFetched({ from: url, blob: null }); });
+    return () => { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [url, local]);
+  const src = local ? url : fetched?.from === url ? fetched.blob : undefined;
+  if (src === undefined) return <p className="p-4 text-xs text-muted">يجهّز الورقة…</p>;
+  if (src === null) return <p className="p-4 text-xs text-danger">تعذّر عرض الورقة. أعد فتح البطاقة.</p>;
+  /* `iframe` لا `object`: سياسةُ المحتوى تمنع `object-src` كلَّه (`next.config.ts`) */
+  return <iframe src={src} title={`الورقة: ${name}`} className="h-[70vh] w-full rounded-lg border-0 bg-raised" />;
+}
+
 function Paper({ url, mime, name }: { url: string; mime: string; name: string }) {
   if (mime.startsWith("image/")) return <ImagePaper url={url} name={name} />;
-  if (mime === "application/pdf" || /\.pdf$/i.test(name)) {
-    /* `iframe` لا `object`: سياسةُ المحتوى تمنع `object-src` كلَّه (`next.config.ts`) */
-    return <iframe src={url} title={`الورقة: ${name}`} className="h-[70vh] w-full rounded-lg border-0 bg-raised" />;
-  }
+  if (mime === "application/pdf" || /\.pdf$/i.test(name)) return <PdfPaper url={url} name={name} />;
   return <p className="p-4 text-xs text-muted">لا معاينة لهذا النوع.</p>;
 }
 
