@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import type { RecordedLabel } from "@/lib/capture-recorded";
 import { useRouter } from "next/navigation";
-import { CircleAlert, CircleCheck, FileText, Loader2, Play, ScanEye, UsersRound, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Copy, FileText, Link2, Loader2, Play, ScanEye, UsersRound, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import type { ClarityVerdict } from "@/lib/capture-clarity";
 import { timeAgo } from "@/lib/arabic";
@@ -18,7 +20,22 @@ export interface TeamCaptureItem {
   sizeBytes: number;
   verdict: ClarityVerdict | null;
   readError: string | null;
+  /** أمسجّلةٌ من قبل؟ — `null`: لا شيء في الدفاتر يطابقها */
+  recorded: RecordedLabel | null;
 }
+
+/** ما يُعرض من القائمة — والانتقالُ إلى التالية يبقى داخله */
+export type TeamFilter = "ALL" | "DUPLICATE" | "STATEMENT" | "NEW";
+
+const FILTER_OF = (r: RecordedLabel | null): Exclude<TeamFilter, "ALL"> =>
+  !r ? "NEW" : r.kind === "STATEMENT_NO_FILE" ? "STATEMENT" : "DUPLICATE";
+
+const FILTER_LABEL: Record<TeamFilter, string> = {
+  ALL: "الكل",
+  DUPLICATE: "مسجّلة من قبل",
+  STATEMENT: "من كشف المورّد بلا ملف",
+  NEW: "جديدة",
+};
 
 /** حالُ الصورة في القارئ: تُهيَّأ · جاهزة · تعثّرت · اعتُمدت — أو لم تُفتح */
 export type TeamCaptureStatus = "opening" | "ready" | "failed" | "archived" | null;
@@ -39,7 +56,7 @@ const REASONS = [
  * وتُبلغ. و«ارفض» يقول لمرسلها لماذا، ولا تُحذف الصورة.
  */
 export function TeamCaptures({
-  items, canSeeAmounts, focus, statusOf, renderOpen, onReview, onRejected,
+  items, canSeeAmounts, focus, statusOf, renderOpen, onReview, onRejected, onVisible,
 }: {
   items: TeamCaptureItem[];
   canSeeAmounts: boolean;
@@ -50,15 +67,24 @@ export function TeamCaptures({
   renderOpen: (id: string) => React.ReactNode;
   onReview: (item: TeamCaptureItem) => void;
   onRejected: (id: string) => void;
+  /** ما يُعرض بترتيبه — فـ«التالية» بعد الاعتماد من داخل التصفية */
+  onVisible: (ids: string[] | null) => void;
 }) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function reject(id: string) {
+  const [filter, setFilter] = useState<TeamFilter>("ALL");
+  const counts = { ALL: items.length, DUPLICATE: 0, STATEMENT: 0, NEW: 0 } as Record<TeamFilter, number>;
+  for (const i of items) counts[FILTER_OF(i.recorded)]++;
+  const shown = filter === "ALL" ? items : items.filter((i) => FILTER_OF(i.recorded) === filter);
+  const shownKey = filter === "ALL" ? "" : shown.map((i) => i.id).join(",");
+  useEffect(() => { onVisible(shownKey ? shownKey.split(",") : null); }, [shownKey, onVisible]);
+
+  async function reject(id: string, why = reason) {
     setBusy(true);
-    const res = await postJson("/api/capture/decide", { id, reason });
+    const res = await postJson("/api/capture/decide", { id, reason: why });
     setBusy(false);
     if (!res.ok) {
       toast({ tone: "danger", title: "لم تُرفض", body: res.error });
@@ -71,7 +97,7 @@ export function TeamCaptures({
     router.refresh();
   }
 
-  const first = items.find((i) => statusOf(i.id) !== "archived");
+  const first = shown.find((i) => statusOf(i.id) !== "archived");
 
   return (
     <section id="team" className="mb-10 scroll-mt-24">
@@ -91,8 +117,25 @@ export function TeamCaptures({
         تُفتح كل صورة في مكانها، وبعد «اعتمد» تُفتح التالية جاهزة. لا يُعتمد شيء دون ضغطتك، ولا تُحذف صورة: المرفوضة تبقى بسببها.
       </p>
 
+      {(counts.DUPLICATE > 0 || counts.STATEMENT > 0) && (
+        <div role="radiogroup" aria-label="اعرض" className="mb-3 flex flex-wrap gap-1.5">
+          {(["ALL", "DUPLICATE", "STATEMENT", "NEW"] as const).filter((f) => f === "ALL" || counts[f] > 0).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="radio"
+              aria-checked={filter === f}
+              onClick={() => setFilter(f)}
+              className={`min-h-11 rounded-full border px-3 text-xs sm:min-h-8 ${filter === f ? "border-accent bg-accent-soft font-bold" : "border-line"}`}
+            >
+              {FILTER_LABEL[f]} <span className="nums nums-count text-ink-soft">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <ul className="divide-y divide-line-soft overflow-clip rounded-xl border border-line bg-raised shadow-raised">
-        {items.map((item) => {
+        {shown.map((item) => {
           const v = item.verdict;
           const isImage = item.mimeType.startsWith("image/");
           const status = statusOf(item.id);
@@ -127,6 +170,7 @@ export function TeamCaptures({
                     <p className="mt-1 text-xs text-muted">{item.readError ?? "لم تُقرأ بعد. تُقرأ حين تفتحها."}</p>
                   )}
                   {item.note && <p className="mt-1 rounded-md bg-sand-bg px-2 py-1 text-xs text-ink-soft">«{item.note}»</p>}
+                  {item.recorded && <RecordedNote r={item.recorded} />}
                 </div>
               </div>
 
@@ -168,6 +212,15 @@ export function TeamCaptures({
                       <ScanEye className="h-4 w-4" aria-hidden /> {status === "ready" ? "افتحها، جاهزة" : "راجعها واعتمدها"}
                     </button>
                   )}
+                  {item.recorded?.kind === "RECORDED" || item.recorded?.kind === "TWIN" ? (
+                    <button type="button" disabled={busy} aria-busy={busy}
+                      onClick={() => void reject(item.id, item.recorded!.kind === "TWIN"
+                        ? "صُوّرت مرتين، والصورة الأخرى تنتظر المراجعة"
+                        : `وصلت من قبل: الفاتورة ${item.recorded!.invoiceNumber} مسجّلة`)}
+                      className={buttonClass("secondary", "sm")}>
+                      ارفضها: {item.recorded.kind === "TWIN" ? "صُوّرت مرتين" : "مسجّلة من قبل"}
+                    </button>
+                  ) : null}
                   <button type="button" onClick={() => { setRejecting(item.id); setReason(""); }} className={buttonClass("quiet", "sm")}>
                     ارفضها
                   </button>
@@ -183,5 +236,44 @@ export function TeamCaptures({
         })}
       </ul>
     </section>
+  );
+}
+
+/** حالُها في الدفاتر — بما يُفعل بها. */
+function RecordedNote({ r }: { r: RecordedLabel }) {
+  const link = r.invoiceId ? (
+    <Link href={`/purchases/invoices/${r.invoiceId}`} className="font-bold underline-offset-2 hover:underline">
+      <bdi dir="ltr" className="nums">{r.invoiceNumber}</bdi>
+    </Link>
+  ) : <bdi dir="ltr" className="nums">{r.invoiceNumber}</bdi>;
+  if (r.kind === "STATEMENT_NO_FILE") {
+    return (
+      <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-accent-line bg-accent-soft px-2 py-1.5 text-xs leading-relaxed">
+        <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>مسجّلة من كشف المورّد بلا ملف (فاتورة {link}). اعتمدها ليُربط ملفها بقيدها، ولن تُسجَّل مرة ثانية.</span>
+      </p>
+    );
+  }
+  if (r.kind === "RECORDED") {
+    return (
+      <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-line bg-sunken px-2 py-1.5 text-xs leading-relaxed text-ink-soft">
+        <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>مسجّلة من قبل بملفها: فاتورة {link}{r.supplierName ? <> من {r.supplierName}</> : null}. يمكنك تجاهلها.</span>
+      </p>
+    );
+  }
+  if (r.kind === "TWIN") {
+    return (
+      <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-line bg-sunken px-2 py-1.5 text-xs leading-relaxed text-ink-soft">
+        <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>صُوّرت مرتين: صورة أقدم للفاتورة {link} نفسها تنتظر في القائمة.</span>
+      </p>
+    );
+  }
+  return (
+    <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-warn/30 bg-warn-bg px-2 py-1.5 text-xs leading-relaxed text-warn">
+      <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>يُرجَّح أنها مسجّلة: فاتورة {link}{r.supplierName ? <> من {r.supplierName}</> : null} بالرقم والمبلغ نفسيهما. تأكد قبل أن تتجاهلها.</span>
+    </p>
   );
 }

@@ -11,7 +11,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { captureLinks, captures, documents, extractionCache } from "@/db/schema";
+import { captureLinks, captures, documents, extractionCache, invoices, suppliers as suppliers_ } from "@/db/schema";
+import { labelRecorded, type RecordedLabel } from "@/lib/capture-recorded";
+import type { ExtractionResult } from "@/lib/extraction/schema";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { judgeClarity, type ClarityVerdict } from "@/lib/capture-clarity";
@@ -359,6 +361,8 @@ export interface PendingCapture {
   /** ما قُرئ منها — `null`: لم تُقرأ بعد (أو تعثّرت، و`readError` سببُه) */
   verdict: ClarityVerdict | null;
   readError: string | null;
+  /** أمسجّلةٌ من قبل؟ (`capture-recorded.ts`) — `null`: لا شيء في الدفاتر يطابقها */
+  recorded: RecordedLabel | null;
 }
 
 export async function listPendingCaptures(): Promise<PendingCapture[]> {
@@ -378,10 +382,57 @@ export async function listPendingCaptures(): Promise<PendingCapture[]> {
     .leftJoin(extractionCache, eq(extractionCache.sha256, captures.sha256))
     .where(eq(captures.status, "PENDING"))
     .orderBy(captures.createdAt);
-  return rows.map(({ extraction, ...r }) => {
+  const parsedRows = rows.map(({ extraction, ...r }) => {
     const parsed = extraction ? extractionSchema.safeParse(extraction) : null;
-    return { ...r, verdict: parsed?.success ? judgeClarity(parsed.data) : null };
+    return { ...r, reading: parsed?.success ? parsed.data : null };
   });
+  const labels = await labelRecordedCaptures(parsedRows);
+  return parsedRows.map(({ reading, ...r }) => ({
+    ...r,
+    verdict: reading ? judgeClarity(reading) : null,
+    recorded: labels.get(r.id) ?? null,
+  }));
+}
+
+/**
+ * يقابل قراءاتِ الصور بالفواتير المقيَّدة — مرّةً للقائمة كلّها لا لكلّ صورة. وما قُيِّد
+ * من كشف المورّد بلا ملفّ (`documents.origin`) يُميَّز: ملفُّه ينتظر، فلا يُترك.
+ */
+async function labelRecordedCaptures(
+  rows: readonly { id: string; reading: ExtractionResult | null }[],
+): Promise<Map<string, RecordedLabel>> {
+  const readable = rows.filter((r) => r.reading && r.reading.invoiceNumber.trim() !== "");
+  if (readable.length === 0) return new Map();
+  const [suppliers, recorded] = await Promise.all([
+    loadSupplierRecords(),
+    db
+      .select({
+        id: invoices.id,
+        supplierId: invoices.supplierId,
+        supplierName: suppliers_.nameAr,
+        invoiceNumber: invoices.invoiceNumber,
+        totalMinor: invoices.totalMinor,
+        origin: documents.origin,
+      })
+      .from(invoices)
+      .innerJoin(suppliers_, eq(suppliers_.id, invoices.supplierId))
+      .leftJoin(documents, eq(documents.id, invoices.documentId)),
+  ]);
+  return labelRecorded(
+    readable.map((r) => ({
+      id: r.id,
+      sellerVatNumber: r.reading!.sellerVatNumber,
+      supplierNameAr: r.reading!.supplierNameAr,
+      supplierNameEn: r.reading!.supplierNameEn,
+      invoiceNumber: r.reading!.invoiceNumber,
+      totalAmount: r.reading!.totalAmount,
+    })),
+    suppliers,
+    recorded.map((i) => ({
+      id: i.id, supplierId: i.supplierId, supplierName: i.supplierName, invoiceNumber: i.invoiceNumber,
+      totalMinor: Number(i.totalMinor), fromStatement: i.origin !== null,
+    })),
+  );
 }
 
 export async function pendingCaptureCount(): Promise<number> {

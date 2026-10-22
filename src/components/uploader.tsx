@@ -1217,9 +1217,14 @@ export function Uploader({
     if (cap) void openCapture(cap);
   }, [openCapture, remove]);
 
+  /** ما يُعرض من القائمة إن صُفّيت (`TeamCaptures`) — فالتاليةُ من داخل التصفية */
+  const visibleRef = useRef<string[] | null>(null);
+  const onVisible = useCallback((ids: string[] | null) => { visibleRef.current = ids; }, []);
+
   /** التاليةُ بعد هذه في القائمة — وما اعتُمد في هذه الجلسة ولم تُحدَّث القائمةُ بعد يُتخطّى */
   const nextAfter = useCallback((captureId: string | null): TeamCaptureItem | null => {
-    const list = teamRef.current;
+    const visible = visibleRef.current;
+    const list = visible ? teamRef.current.filter((c) => visible.includes(c.id)) : teamRef.current;
     const at = captureId ? list.findIndex((c) => c.id === captureId) : -1;
     for (let i = at + 1; i < list.length; i++) {
       if (itemsRef.current.some((x) => x.captureId === list[i].id && x.state === "archived")) continue;
@@ -1393,6 +1398,7 @@ export function Uploader({
           }}
           onReview={(cap) => focusCapture(cap)}
           onRejected={onCaptureRejected}
+          onVisible={onVisible}
         />
       )}
       {/*
