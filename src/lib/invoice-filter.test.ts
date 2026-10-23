@@ -80,3 +80,13 @@ describe("مرشّح الأصول الثابتة", () => {
   });
 });
 
+
+describe("من الكشف بلا ملف", () => {
+  it("يُقرأ من الرابط ويُكتب فيه ويُقال بجملة", () => {
+    const f = parseFilters({ noFile: "1", supplier: "HungryMan" });
+    expect(f.noFile).toBe(true);
+    expect(hasFilters(f)).toBe(true);
+    expect(linkTo(f, {})).toContain("noFile=1");
+    expect(describeFilters(f, "هنقري مان")).toContain("من كشف المورّد بلا ملف");
+  });
+});

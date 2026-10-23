@@ -39,6 +39,8 @@ export interface DirectoryRow {
   contractRequired: boolean;
   paperInvoices: boolean;
   invoiceCount: number;
+  /** منها: قُيِّدت من سطر كشف المورّد ولا ملفَّ لها عندنا — تُطلب منه أو يُبحث عنها */
+  statementOnlyCount: number;
   paymentCount: number;
   /** YYYY-MM-DD — `null`: لا تعامل بعد. */
   lastActivity: string | null;
@@ -52,12 +54,14 @@ export async function loadSupplierDirectory(): Promise<DirectoryRow[]> {
     await db.execute<{
       id: string; slug: string; name_ar: string; name_en: string | null; vat_number: string | null;
       issues_invoices: boolean; contract_on_file: boolean; contract_required: boolean; paper_invoices: boolean;
-      invoice_count: number; payment_count: number; last_invoice: string | null; last_payment: string | null;
+      invoice_count: number; statement_only_count: number; payment_count: number; last_invoice: string | null; last_payment: string | null;
       aliases: string | null;
     }>(sql`
       select s.id, s.slug, s.name_ar, s.name_en, s.vat_number,
              s.issues_invoices, s.contract_on_file, s.contract_required, s.paper_invoices,
              (select count(*)::int from invoices i where i.supplier_id = s.id) as invoice_count,
+             (select count(*)::int from invoices i join documents d on d.id = i.document_id
+               where i.supplier_id = s.id and d.origin = 'STATEMENT_LINE') as statement_only_count,
              (select count(*)::int from payments p
                where p.supplier_id = s.id and p.status not in ('REVERSED','VOID')) as payment_count,
              (select ${RIYADH_DAY(sql`max(i.invoice_date)`)} from invoices i where i.supplier_id = s.id) as last_invoice,
@@ -85,6 +89,7 @@ export async function loadSupplierDirectory(): Promise<DirectoryRow[]> {
       contractRequired: r.contract_required,
       paperInvoices: r.paper_invoices,
       invoiceCount: Number(r.invoice_count),
+      statementOnlyCount: Number(r.statement_only_count),
       paymentCount: Number(r.payment_count),
       lastActivity: kind === "INVOICE" ? inv : kind === "PAYMENT" ? pay : null,
       lastActivityKind: kind,

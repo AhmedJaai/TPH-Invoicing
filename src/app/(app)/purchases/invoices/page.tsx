@@ -90,6 +90,7 @@ export default async function InvoicesPage({
   if (f.supplier) others.push(eq(suppliers.slug, f.supplier));
   if (f.tax) others.push(eq(invoices.taxStatus, f.tax));
   /* وفاتورةُ سطر الكشف (057) لا ملفَّ لها تُقرأ منه بنود — ليست «بلا بنود مقروءة» */
+  if (f.noFile) others.push(sql`exists (select 1 from ${documents} where ${documents}.id = ${invoices}.document_id and ${documents}.origin = 'STATEMENT_LINE')`);
   if (f.noLines) others.push(sql`${lineCount} = 0 and not exists (select 1 from ${documents} where ${documents}.id = ${invoices}.document_id and ${documents}.origin is not null)`);
   if (f.withVat) others.push(sql`${invoices.vatMinor} > 0`);
   if (f.fixedAsset) others.push(sql`${invoices.isFixedAsset}`);
@@ -286,6 +287,9 @@ export default async function InvoicesPage({
                 <T s="متأخرة أكثر من {0} يوماً" a={[<span key="0" className="nums">{OVERDUE_DAYS}</span>]} /></Toggle>
               <Toggle href={linkTo(f, { noLines: !f.noLines })} on={Boolean(f.noLines)}>
                 بلا بنود
+              </Toggle>
+              <Toggle href={linkTo(f, { noFile: !f.noFile })} on={Boolean(f.noFile)}>
+                من الكشف بلا ملف
               </Toggle>
               <Toggle href={linkTo(f, { fixedAsset: !f.fixedAsset })} on={Boolean(f.fixedAsset)}>
                 أصول ثابتة

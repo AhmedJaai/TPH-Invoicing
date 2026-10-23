@@ -22,6 +22,7 @@ import { Kbd } from "./ui";
 import { openCommandPalette } from "@/lib/ui-events";
 import { LinkPending, Sheet, toast } from "./ui-client";
 import { useShellPath } from "./use-shell-path";
+import { useShellCounts } from "./shell-counts";
 import { T } from "@/components/i18n/t";
 
 /**
@@ -39,8 +40,10 @@ import { T } from "@/components/i18n/t";
 export type ShellCounts = {
   pending: number | null;
   documents: number | null;
-  /** كم بنداً من الطابور يقع في كلّ مساحة (بمسارها) — تُرسَم نقطةً. */
+  /** كم بنداً من الطابور يقع في كلّ مساحة (بمسارها) — عددٌ بجانب اسمها. */
   areas?: Record<string, number>;
+  /** وكم في كلّ لسانٍ داخلها — عددٌ بجانب اسم اللسان أعلى الصفحة. */
+  tabs?: Record<string, number>;
 };
 
 export function Sidebar({
@@ -181,6 +184,7 @@ export function AreaTabs({ role }: { role: Role }) {
             }`}
           >
             {c.label}
+            <TabCount href={c.href} />
             <LinkPending />
             {/* الخطُّ ينزلق من اللسان القديم إلى الجديد — عنصرٌ واحدٌ يتحرّك لا خطّان يومضان */}
             {on && (
@@ -321,7 +325,7 @@ function CountBadge({ counts, href, className }: { counts?: Promise<ShellCounts>
   if (href !== "/attention" && href !== "/documents") {
     return (
       <Suspense fallback={null}>
-        <AreaDot counts={counts} href={href} frame={className.includes("frame")} />
+        <AreaDot counts={counts} href={href} frame={className.includes("frame")} className={className} />
       </Suspense>
     );
   }
@@ -333,16 +337,44 @@ function CountBadge({ counts, href, className }: { counts?: Promise<ShellCounts>
 }
 
 /**
- * نقطةٌ بجانب المساحة التي فيها ما ينتظر قراراً — تُعرف بلا فتحها. نقطةٌ لا عدد:
- * العددُ واحدٌ (شارةُ «يحتاج قرارك»)، وهذه تقول أين يقع بعضُه.
+ * كم بنداً مما ينتظر قراراً يقع في هذه المساحة — عددٌ لا نقطة (أحمد، ٢٣ أكتوبر ٢٠٢٦):
+ * النقطةُ تقول «شيءٌ هنا» ولا تقول أهو بندٌ أم سبعة. والعددُ من بنود «يحتاج قرارك» نفسها.
  */
-function AreaDot({ counts, href, frame }: { counts: Promise<ShellCounts>; href: string; /** على الإطار الزيتيّ — لونُ إبرازه الكريميّ. */ frame: boolean }) {
+function AreaDot({ counts, href, frame, className }: { counts: Promise<ShellCounts>; href: string; /** على الإطار الزيتيّ — لونُ إبرازه الكريميّ. */ frame: boolean; /** موضعُ الشارة على أيقونة شريط الجوّال */ className: string }) {
   const n = use(counts).areas?.[href] ?? 0;
   if (n === 0) return null;
   return (
-    <span className="relative grid h-4 w-4 shrink-0 place-items-center" data-tip={`فيها ${n} مما يحتاج قرارك`}>
-      <span aria-hidden className={`h-2 w-2 rounded-full ${frame ? "bg-frame-accent" : "bg-accent"}`} />
-      <span className="sr-only"><T s="فيها {0} مما يحتاج قرارك" a={[n]} /></span>
+    <span
+      className={`nums nums-count ${frame ? "min-w-5 shrink-0 rounded-full bg-frame-accent/25 px-1.5 text-center text-[11px] font-bold leading-5 text-frame-accent" : className}`}
+      data-tip={`فيها ${n} مما يحتاج قرارك`}
+      aria-label={`فيها ${n} مما يحتاج قرارك`}
+    >
+      {n}
+    </span>
+  );
+}
+
+/** عددُ بنود «يحتاج قرارك» التي تفتح هذا اللسان — ينتظر وحده ولا ينتظره رسمُ الألسنة. */
+function TabCount({ href }: { href: string }) {
+  const counts = useShellCounts();
+  if (!counts) return null;
+  return (
+    <Suspense fallback={null}>
+      <TabCountValue counts={counts} href={href} />
+    </Suspense>
+  );
+}
+
+function TabCountValue({ counts, href }: { counts: Promise<ShellCounts>; href: string }) {
+  const n = use(counts).tabs?.[href] ?? 0;
+  if (n === 0) return null;
+  return (
+    <span
+      className="nums nums-count ms-1.5 min-w-5 rounded-full bg-warn-bg px-1.5 text-center text-[11px] font-bold leading-5 text-warn"
+      data-tip={`فيها ${n} مما يحتاج قرارك`}
+      aria-label={`فيها ${n} مما يحتاج قرارك`}
+    >
+      {n}
     </span>
   );
 }

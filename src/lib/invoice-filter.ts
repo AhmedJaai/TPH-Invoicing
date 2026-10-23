@@ -25,6 +25,8 @@ export interface InvoiceFilters {
   paid?: PaidFilter;
   /** فواتير بلا بنود مقروءة */
   noLines?: boolean;
+  /** قُيِّدت من سطر كشف المورّد ولا ملفَّ لها عندنا — اطلبها من المورّد أو ابحث عنها (057) */
+  noFile?: boolean;
   /** مضى على استحقاقها أكثر من الحدّ */
   overdue?: boolean;
   /** فيها ضريبةٌ مقروءة — «معرّضة للضياع» ما فيه ضريبة وحده */
@@ -49,6 +51,7 @@ export function parseFilters(raw: Record<string, string | undefined>): InvoiceFi
     tax: TAX_VALUES.includes(raw.tax ?? "") ? (raw.tax as TaxFilter) : undefined,
     paid: PAID_VALUES.includes(raw.paid ?? "") ? (raw.paid as PaidFilter) : undefined,
     noLines: raw.noLines === "1",
+    noFile: raw.noFile === "1",
     overdue: raw.overdue === "1",
     withVat: raw.withVat === "1",
     fixedAsset: raw.asset === "1",
@@ -70,6 +73,7 @@ export function linkTo(
   if (next.tax) params.set("tax", next.tax);
   if (next.paid) params.set("paid", next.paid);
   if (next.noLines) params.set("noLines", "1");
+  if (next.noFile) params.set("noFile", "1");
   if (next.overdue) params.set("overdue", "1");
   if (next.withVat) params.set("withVat", "1");
   if (next.fixedAsset) params.set("asset", "1");
@@ -83,7 +87,7 @@ export function linkTo(
 
 /** هل من مُرشِّح فعّال؟ يُستعمل لعرض زرّ «امسح الترشيح». */
 export function hasFilters(f: InvoiceFilters): boolean {
-  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.overdue || f.withVat || f.fixedAsset);
+  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.noFile || f.overdue || f.withVat || f.fixedAsset);
 }
 
 export const TAX_LABEL: Record<TaxFilter, string> = {
@@ -113,6 +117,7 @@ export function describe(f: InvoiceFilters, supplierName?: string | null): strin
   if (f.paid) parts.push(PAID_LABEL[f.paid]);
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
+  if (f.noFile) parts.push("من كشف المورّد بلا ملف");
   if (f.withVat) parts.push("فيها ضريبة");
   if (f.fixedAsset) parts.push("أصول ثابتة (فوق حد الرسملة)");
   if (f.month) parts.push(`في ${f.month}`);

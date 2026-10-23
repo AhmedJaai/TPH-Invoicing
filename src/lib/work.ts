@@ -27,7 +27,7 @@ import { buildAttention, type AttentionItem } from "./attention";
 import { gatherAttentionFacts } from "./attention-facts";
 import { partitionSnoozed, type SnoozedItem } from "./attention-snooze";
 import { todayInRiyadh } from "./riyadh-time";
-import { areaCounts } from "./nav";
+import { areaCounts, tabCounts } from "./nav";
 import { loadOpenIbanWatch } from "@/services/iban-guard.service";
 import { groupIban } from "./bank/iban-guard";
 import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
@@ -109,6 +109,10 @@ export const workCount = cache(async (): Promise<number> => (await attentionItem
 /** أين تقع البنودُ المفتوحة — نقطةٌ بجانب المساحة في الشريط (`areaCounts`). */
 export const workByArea = cache(async (): Promise<Record<string, number>> =>
   areaCounts((await attentionItems()).map((i) => i.href)));
+
+/** وكم منها في كلّ لسانٍ داخل المساحة — عددٌ بجانب اسم اللسان (`tabCounts`). */
+export const workByTab = cache(async (): Promise<Record<string, number>> =>
+  tabCounts((await attentionItems()).map((i) => i.href)));
 
 /** مستنداتٌ لم يُبَتّ فيها — العدد الذي تفتحه «المستندات». */
 export const inboxCount = cache(async (): Promise<number> => {

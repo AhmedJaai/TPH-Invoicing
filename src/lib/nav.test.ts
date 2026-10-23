@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AREAS,
+  tabCounts,
   ACCOUNT_LINKS,
   MOBILE_TABS,
   activeArea,
@@ -352,5 +353,12 @@ describe("نقطة المساحة من وجهات بنود الطابور", () =
   it("ما وجهته الطابور نفسه أو «اليوم» لا يعدّ لمساحة", async () => {
     const { areaCounts } = await import("./nav");
     expect(areaCounts(["/attention?item=x", "/", "/no-such-page"])).toEqual({});
+  });
+});
+
+describe("عددُ البنود في كلّ لسان", () => {
+  it("البندُ يُنسب إلى اللسان الذي يفتحه رابطُه، والرابطُ بلا لسانٍ لا يُعدّ", () => {
+    const n = tabCounts(["/bank#queue", "/bank?x=1", "/money/pos", "/money/recurring", "/attention?item=x", "/"]);
+    expect(n).toEqual({ "/bank": 2, "/money/pos": 1, "/money/recurring": 1 });
   });
 });

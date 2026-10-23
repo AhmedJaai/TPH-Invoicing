@@ -324,6 +324,23 @@ export function areaCounts(hrefs: readonly string[]): Record<string, number> {
   return out;
 }
 
+/**
+ * كم بنداً من الطابور يقع في كلّ لسان (بمساره) — «في حركة البنك ٢، وفي تسويات الشبكة ١».
+ * البندُ يُنسب إلى اللسان الذي يفتحه رابطُه؛ وما لا يقع في لسانٍ لا يُعدّ في واحد.
+ */
+export function tabCounts(hrefs: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const href of hrefs) {
+    const path = href.split(/[?#]/)[0];
+    const area = activeArea(path);
+    if (!area || area.href === "/" || area.href === "/attention") continue;
+    const child = activeChild(path, area);
+    if (!child) continue;
+    out[child.href] = (out[child.href] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** اللسان الظاهر داخل المساحة — أطول بادئة أيضاً. */
 export function activeChild(pathname: string, area: NavArea): NavLink | undefined {
   const path = normalize(pathname);

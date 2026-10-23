@@ -1,3 +1,4 @@
+import { ShellCountsProvider } from "./shell-counts";
 import { MobileTabBar, Sidebar, AreaTabs, type ShellCounts } from "./nav";
 import { CommandPalette } from "./command-palette";
 import { Suspense, ViewTransition } from "react";
@@ -16,7 +17,7 @@ import { Tooltips } from "./tooltips";
 import { ServiceWorkerRegistration } from "./service-worker";
 import { ShellUserProvider } from "./shell-context";
 import { can, type Role } from "@/lib/permissions";
-import { inboxCount, workCount, workByArea } from "@/lib/work";
+import { inboxCount, workCount, workByArea, workByTab } from "@/lib/work";
 import { isAuthBypassed } from "@/lib/session";
 
 /**
@@ -53,7 +54,8 @@ export function AppShell({
     inboxCount().catch(() => null),
     /* من بنود الطابور نفسها (مخبّأةٌ في الطلب) — لا استعلامَ ثانٍ */
     can(user.role, "reports:view") ? workByArea().catch(() => ({})) : Promise.resolve({}),
-  ]).then(([pending, documents, areas]) => ({ pending, documents, areas }));
+    can(user.role, "reports:view") ? workByTab().catch(() => ({})) : Promise.resolve({}),
+  ]).then(([pending, documents, areas, tabs]) => ({ pending, documents, areas, tabs }));
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
@@ -83,7 +85,7 @@ export function AppShell({
             firstName: user.name && user.name !== "وضع التجربة" ? user.name.split(" ")[0] : null,
           }}
         >
-          {children}
+          <ShellCountsProvider counts={counts}>{children}</ShellCountsProvider>
         </ShellUserProvider>
       </div>
 

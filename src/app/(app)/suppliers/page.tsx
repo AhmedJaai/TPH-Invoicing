@@ -197,6 +197,35 @@ export default async function SuppliersPage({
       ),
     },
     /*
+      كم فاتورةً لها ملفٌّ عندنا، وكم قُيِّدت من كشف المورّد وحده (أحمد، ٢٣ أكتوبر ٢٠٢٦):
+      الثانيةُ تُطلب من المورّد أو يُبحث عنها وتُرفع — والرابطُ يفتحها مرشَّحةً بمورّدها.
+    */
+    {
+      key: "files",
+      header: "الفواتير",
+      sortBy: (r) => (r.invoiceCount === 0 ? null : r.statementOnlyCount),
+      sortFirst: "desc",
+      cell: (r) =>
+        r.invoiceCount === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <span className="flex flex-col gap-0.5 text-[12px]">
+            <Link href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}`} className="relative whitespace-nowrap text-ink-soft hover:text-accent">
+              <T s="{0} بملف" a={[<b key="0" className="nums text-ink">{r.invoiceCount - r.statementOnlyCount}</b>]} />
+            </Link>
+            {r.statementOnlyCount > 0 && (
+              <Link
+                href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}&noFile=1`}
+                className="relative whitespace-nowrap font-bold text-warn hover:underline"
+                data-tip="قُيّدت من كشف حسابه ولا ملف لها عندنا. اطلبها منه أو ابحث عنها وارفعها"
+              >
+                <T s="{0} من الكشف بلا ملف ←" a={[<span key="0" className="nums">{r.statementOnlyCount}</span>]} />
+              </Link>
+            )}
+          </span>
+        ),
+    },
+    /*
       أعمدةُ المال لا تُعرض لمن لا يرى المال: شَرطتان في كلّ صفّ تُقرآن
       «لا دَين» — وهي «لا تُعرَض لك».
     */
