@@ -13,6 +13,7 @@ import {
   ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
 import { WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from "@/lib/payroll/saudi-rules";
 import type { PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
 import { buttonClass, fieldClass } from "../ui-tokens";
@@ -179,23 +180,25 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
   const [day, setDay] = useState(defaultDay);
   const [kind, setKind] = useState<"LATE" | "EARLY" | "ABSENT" | "LEAVE">("LATE");
   const [minutes, setMinutes] = useState("");
+  const [disrupted, setDisrupted] = useState(false);
   const [note, setNote] = useState("");
   const { busy, error, send } = useSend();
   const n = Number(minutes);
   const byMinutes = kind === "LATE" || kind === "EARLY";
-  const charged = byMinutes && Number.isInteger(n) && n > 0 ? Math.max(0, n - (kind === "LATE" ? graceMinutes : 0)) : 0;
+  const valid = byMinutes && Number.isInteger(n) && n > 0;
+  const withinGrace = kind === "LATE" && valid && n <= graceMinutes;
   const units = salaryMinor !== null ? unitValues(salaryMinor, shiftMinutes) : null;
-  const preview = units === null ? null
-    : byMinutes ? divRound(salaryMinor! * charged, DAYS_PER_MONTH * shiftMinutes)
-    : kind === "ABSENT" ? units.dayMinor : 0;
+  /* أجرُ الوقت للعين — والجزاءُ ومرّتُه يحسبهما الخادم من سجلّه */
+  const timeWage = units === null ? null : byMinutes ? (valid && !withinGrace ? divRound(salaryMinor! * n, DAYS_PER_MONTH * shiftMinutes) : 0) : kind === "ABSENT" ? units.dayMinor : 0;
+  const rule = kind === "LATE" && valid && !withinGrace ? RULES[lateCode(n, disrupted)] : kind === "EARLY" && valid ? RULES[earlyCode(n)] : kind === "ABSENT" ? RULES["1/11"] : null;
 
   return (
     <form className="space-y-3" onSubmit={async (e) => {
       e.preventDefault();
-      if (await send("/api/payroll/entry", { action: "day", employeeId, day, kind, minutes: byMinutes ? n : null, note })) { setMinutes(""); setNote(""); }
+      if (await send("/api/payroll/entry", { action: "day", employeeId, day, kind, minutes: byMinutes ? n : null, disrupted: kind === "LATE" ? disrupted : undefined, note })) { setMinutes(""); setNote(""); setDisrupted(false); }
     }}>
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="حال اليوم">
-        {([["LATE", "تأخر"], ["EARLY", "انصرف مبكراً"], ["ABSENT", "غاب"], ["LEAVE", "إجازة"]] as const).map(([k, l]) => (
+        {([["LATE", "تأخر"], ["EARLY", "انصرف مبكراً"], ["ABSENT", "غاب دون إذن"], ["LEAVE", "إجازة أو عذر مقبول"]] as const).map(([k, l]) => (
           <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)}
             className={`min-h-10 rounded-lg border px-3 text-xs font-bold ${kind === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-raised text-ink-soft hover:bg-hover"}`}>{l}</button>
         ))}
@@ -205,18 +208,61 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
         {byMinutes && <label className={label}>كم دقيقة<input className={`${field} nums mt-1.5 text-end`} dir="ltr" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="15" required /></label>}
         <label className={label}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></label>
       </div>
+      {kind === "LATE" && (
+        <label className="flex min-h-10 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft">
+          <input type="checkbox" checked={disrupted} onChange={(e) => setDisrupted(e.target.checked)} />
+          تأخره عطّل زملاءه (مثلاً لم يُفتح المقهى أو انتظره من يسلّمه الوردية) — بند أشد في اللائحة
+        </label>
+      )}
       <div className="flex items-start gap-2 rounded-lg bg-sunken px-3 py-2 text-[12px] leading-relaxed text-ink-soft">
         <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
         {units === null ? <span>اكتب راتب الموظف ليحسب الخصم.</span>
-          : kind === "LEAVE" ? <span>الإجازة لا يُخصم عليها.</span>
-          : <span>
-              الدقيقة {formatRiyalsDisplay(units.minuteMinor)} · الساعة {formatRiyalsDisplay(units.hourMinor)} · اليوم {formatRiyalsDisplay(units.dayMinor)} ريال
-              {byMinutes && kind === "LATE" && graceMinutes > 0 && <> · السماح {graceMinutes} دقيقة في اليوم</>}
-              {preview !== null && (byMinutes ? charged > 0 : true) && <strong className="ms-1 text-ink">← يُخصم نحو {formatRiyalsDisplay(preview)} ريال، ويُجمع مع باقي الشهر</strong>}
+          : kind === "LEAVE" ? <span>الإجازة أو العذر المقبول لا يُخصم عليه.</span>
+          : withinGrace ? <span>في حدود السماح ({graceMinutes} دقيقة)، فلا يُحسب.</span>
+          : <span className="space-y-1">
+              <span className="block">
+                {byMinutes ? <>أجر الدقائق: <strong className="text-ink">{formatRiyalsDisplay(timeWage ?? 0)}</strong> ريال</> : <>أجر اليوم: <strong className="text-ink">{formatRiyalsDisplay(units.dayMinor)}</strong> ريال</>}
+                {" "}(الدقيقة {formatRiyalsDisplay(units.minuteMinor)} · اليوم {formatRiyalsDisplay(units.dayMinor)})
+              </span>
+              {rule && (
+                <span className="block">
+                  وفوقه جزاء البند {rule.code} من لائحة تنظيم العمل «{rule.label}»: {rule.ladder.map((p, i) => `${ORDINAL[i]} ${penaltyLabel(p)}`).join("، ")}.
+                  تُحسب المرة من سجله خلال ١٨٠ يوماً.
+                </span>
+              )}
             </span>}
       </div>
       <ErrorLine error={error} />
       <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || (byMinutes && !(n > 0))} aria-busy={busy}>سجّل اليوم</button>
+    </form>
+  );
+}
+
+/* ─────────────── مخالفةٌ من بقيّة جدول اللائحة ─────────────── */
+
+export function ViolationForm({ employeeId, defaultDay }: { employeeId: string; defaultDay: string }) {
+  const [code, setCode] = useState(MANUAL_CODES[0]);
+  const [day, setDay] = useState(defaultDay);
+  const [note, setNote] = useState("");
+  const { busy, error, send } = useSend();
+  const rule = RULES[code];
+  return (
+    <form className="space-y-3" onSubmit={async (e) => {
+      e.preventDefault();
+      if (await send("/api/payroll/entry", { action: "violation", employeeId, day, code, note })) setNote("");
+    }}>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <label className={label}>المخالفة
+          <select className={`${field} mt-1.5`} value={code} onChange={(e) => setCode(MANUAL_CODES.find((c) => c === e.target.value) ?? MANUAL_CODES[0])}>
+            {MANUAL_CODES.map((c) => <option key={c} value={c}>{RULES[c].label} ({c})</option>)}
+          </select>
+        </label>
+        <label className={label}>اليوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={day} onChange={(e) => setDay(e.target.value)} required /></label>
+      </div>
+      <label className={label}>ما حدث <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></label>
+      <p className="text-[11px] leading-relaxed text-muted">الجزاء من الجدول: {rule.ladder.map((p, i) => `${ORDINAL[i]} ${penaltyLabel(p)}`).join("، ")}. ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام.</p>
+      <ErrorLine error={error} />
+      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy} aria-busy={busy}>سجّل المخالفة</button>
     </form>
   );
 }

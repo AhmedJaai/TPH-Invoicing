@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   endOfService, loanBalance, workedDays,
-  absenceDeductionMinor, beneficiaryIdOf, beneficiaryNameOf, divRound, hoursPayMinor, lateDeductionMinor, parseHours,
+  absenceDeductionMinor, beneficiaryIdOf, beneficiaryNameOf, divRound, hoursPayMinor, parseHours,
   payrollTotals, payslip, rateFor, suggestedPayMonth, unitValues, weekMonth, weekStartOf, weeksOfMonth,
   type PayslipInput,
 } from "./calc";
@@ -27,21 +27,9 @@ describe("rateFor — الراتب يتغيّر بشهرٍ يبدأ منه", () 
   });
 });
 
-describe("حاسبة التأخير", () => {
-  it("ساعةُ تأخيرٍ من راتب ٣٠٠٠ ودوام ثماني ساعات = ١٢٫٥٠", () => {
-    expect(lateDeductionMinor(300_000, policy, [60])).toBe(1_250);
+describe("أجر الوقت غير المعمول", () => {
+  it("قيم الدقيقة والساعة واليوم من راتب ٣٠٠٠ ودوام ثماني ساعات", () => {
     expect(unitValues(300_000, 480)).toEqual({ minuteMinor: 21, hourMinor: 1_250, dayMinor: 10_000 });
-  });
-  it("السماحُ يُطرح من كلّ يوم: ١٠ و٢٠ دقيقة بسماح ١٥ = ٥ دقائق", () => {
-    expect(lateDeductionMinor(300_000, { shiftMinutes: 480, graceMinutes: 15 }, [10, 20])).toBe(divRound(300_000 * 5, 30 * 480));
-  });
-  it("يتراكم على الشهر ويُقرَّب مرّةً واحدة", () => {
-    const days = Array(30).fill(7);
-    expect(lateDeductionMinor(300_000, policy, days)).toBe(divRound(300_000 * 210, 14_400));
-  });
-  it("بلا راتبٍ معروف: الخصم غير معروف، إلّا إن لم يتأخّر", () => {
-    expect(lateDeductionMinor(null, policy, [30])).toBeNull();
-    expect(lateDeductionMinor(null, policy, [])).toBe(0);
   });
   it("الغياب: يومٌ = الراتب ÷ ٣٠", () => {
     expect(absenceDeductionMinor(300_000, 2)).toBe(20_000);
@@ -91,13 +79,13 @@ describe("payslip — كم لازم أحوّل", () => {
     expect(s.dueMinor).toBe(250_000);
     expect(loanBalance({ loanLinksMinor: 100_000, loanGivenMinor: 200_000, repaidMinor: 50_000 })).toBe(250_000);
   });
-  it("الانصراف المبكّر يُخصم كالتأخير بلا سماح، والإجازة لا تُخصم", () => {
+  it("السماح عتبة: ما دونه لا يُحسب وما فوقه يُحسب كله، والانصراف بلا سماح، والإجازة لا تُخصم", () => {
     const s = payslip({ ...base, policy: { shiftMinutes: 480, graceMinutes: 15 }, attendance: [
-      { kind: "LATE", minutes: 10 }, { kind: "EARLY", minutes: 60 }, { kind: "LEAVE", minutes: null }, { kind: "ABSENT", minutes: null },
+      { kind: "LATE", minutes: 10 }, { kind: "LATE", minutes: 20 }, { kind: "EARLY", minutes: 60 }, { kind: "LEAVE", minutes: null }, { kind: "ABSENT", minutes: null },
     ] });
-    expect(s.lateMinutes).toBe(0);
+    expect(s.lateMinutes).toBe(20);
+    expect(s.lateMinor).toBe(divRound(300_000 * 80, 30 * 480));
     expect(s.earlyMinutes).toBe(60);
-    expect(s.lateMinor).toBe(1_250);
     expect(s.leaveDays).toBe(1);
     expect(s.absenceMinor).toBe(10_000);
   });
@@ -160,5 +148,15 @@ describe("reclassTarget — أثر الغرض في قائمة الدخل", () =>
     expect(reclassTarget("SALARY", "PERSONAL")).toBe("PERSONAL");
     expect(reclassTarget("PERSONAL", "PERSONAL")).toBeNull();
     expect(reclassTarget("PERSONAL", "LOAN")).toBe("SALARY");
+  });
+});
+
+describe("جزاءات اللائحة وحد نصف الأجر في المسيّر", () => {
+  it("الجزاء المحسوم يُطرح، وما زاد على نصف الأجر لا يُحسم", () => {
+    const s = payslip({ ...base, penalties: { chargedMinor: 50_000, droppedMinor: 10_000, warnings: 1 }, adjustments: [{ kind: "DEDUCTION", amountMinor: 120_000 }] });
+    expect(s.penaltiesMinor).toBe(50_000);
+    expect(s.overHalfMinor).toBe(20_000);
+    expect(s.deductionsMinor).toBe(150_000);
+    expect(s.dueMinor).toBe(150_000);
   });
 });

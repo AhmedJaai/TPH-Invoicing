@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٨٨
+## الجداول — ٨٩
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -19,7 +19,7 @@
 `foodics_stock_counts` `foodics_stock_count_items` `foodics_item_moves` `foodics_move_days`
 `finance_declarations` `finance_snapshots` `finance_readings`
 `capture_links` `captures`
-`employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins`
+`employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
 
 التعريف في `src/db/schema.ts`.
 
@@ -131,6 +131,7 @@
 | `082_capture_drafts.sql` | مسودّةُ صورة الباريستا (`captures.status = 'DRAFT'`): يحفظها الفحصُ فيقلبها «أرسل» «تنتظر» بمعرّفها بلا رفعٍ ثانٍ؛ لا يراها أحد، وتُمحى إن لم تُرسَل في يوم. والقيدان المسمّيان `captures_file_while_open_check` · `captures_decided_check` بدلَ المجهولَي الاسم — إضافةٌ خالصة |
 | `083_owner_transfer_payments.sql` | `payments.from_owner_transfers`: سدادٌ من مال المالك (`OWNER_ACCOUNT`) خرج من تحويلات المقهى إليه، فيُخصم منها في قائمة الدخل كي لا يُحسب مرّتين — يعلّمه أحمد لكلّ سدادٍ بعينه وأصلُه «لا»، والقيدُ `payments_owner_transfers_check` يمنعه على غير `OWNER_ACCOUNT` — إضافةٌ خالصة |
 | `084_payroll.sql` | الموظّفون والرواتب والحضور: `employees` (شهريّ أو جزئيّ، رقمُ المستفيد في البنك، الدوام، رابطُ الحضور ببصمة رمزه) · `employee_rates` (الراتبُ من شهرٍ يبدأ منه) · `payroll_adjustments` (خصم · مخالفة · سلفة · قسط · مكافأة · إضافيّ · بدل، يُسحب ولا يُحذف) · `payroll_attendance` (تأخير · انصراف مبكّر · غياب · إجازة، بيدٍ أو من الحضور) · `payroll_weeks` (أسبوعُ الجزئيّ) · `payroll_links` (حوالةٌ أو جزؤها لموظّفٍ **بغرضها**؛ المؤثِّرُ `payroll_link_guard` يرفض ما يتجاوز الحوالة وغيرَ الخارجة وغيرَ «راتب»/«تحويل للمالك» والشهرَ المقفل) · `attendance_checkins` (الحضورُ بموقعه وشبكته وحكمه) · `obligations.employee_id` — إضافةٌ خالصة |
+| `085_payroll_saudi_rules.sql` | الخصمُ بلائحة تنظيم العمل: `payroll_attendance.disrupted` (التأخيرُ عطّل غيره) و`penalty_waived` (عفا عن جزائه)، و`payroll_violations` (مخالفةٌ من بقيّة الجدول برقم بندها) — الجزاءُ يُحسب ولا يُخزَّن — إضافةٌ خالصة |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

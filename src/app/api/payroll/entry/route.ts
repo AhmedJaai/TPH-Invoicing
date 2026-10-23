@@ -6,11 +6,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { isAdjustmentKind, parseHours } from "@/lib/payroll/calc";
+import { isViolationCode } from "@/lib/payroll/saudi-rules";
 import { Amount, Day, Id, Month, Note, positiveMinor } from "@/lib/payroll/request";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { failWith, guard } from "@/services/guard";
 import {
-  addAdjustment, clearAttendance, clearWeek, PayrollRefused, setAttendance, setWeek, voidAdjustment,
+  addAdjustment, addViolation, clearAttendance, clearWeek, PayrollRefused, setAttendance, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -18,7 +19,10 @@ export const runtime = "nodejs";
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("adjust"), employeeId: Id, month: Month, kind: z.string().refine(isAdjustmentKind, "نوع غير معروف"), amount: Amount, note: Note }).strict(),
   z.object({ action: z.literal("adjust-void"), id: Id }).strict(),
-  z.object({ action: z.literal("day"), employeeId: Id, day: Day, kind: z.enum(["LATE", "EARLY", "ABSENT", "LEAVE"]), minutes: z.number().int().min(1).max(960).nullable().optional(), note: Note }).strict(),
+  z.object({ action: z.literal("day"), employeeId: Id, day: Day, kind: z.enum(["LATE", "EARLY", "ABSENT", "LEAVE"]), minutes: z.number().int().min(1).max(960).nullable().optional(), disrupted: z.boolean().optional(), note: Note }).strict(),
+  z.object({ action: z.literal("violation"), employeeId: Id, day: Day, code: z.string().refine(isViolationCode, "بند غير معروف"), note: Note }).strict(),
+  z.object({ action: z.literal("violation-void"), id: Id }).strict(),
+  z.object({ action: z.literal("waive"), id: Id, waived: z.boolean() }).strict(),
   z.object({ action: z.literal("day-clear"), id: Id }).strict(),
   z.object({ action: z.literal("week"), employeeId: Id, day: Day, hours: z.string().trim().max(8).optional(), amount: z.string().trim().max(20).optional(), note: Note }).strict(),
   z.object({ action: z.literal("week-clear"), id: Id }).strict(),
@@ -43,8 +47,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, message: done ? "سُحب البند" : "سُحب من قبل" });
       }
       case "day": {
-        await setAttendance({ employeeId: b.employeeId, day: b.day, kind: b.kind, minutes: b.minutes ?? null, note: b.note }, user.id);
+        await setAttendance({ employeeId: b.employeeId, day: b.day, kind: b.kind, minutes: b.minutes ?? null, note: b.note, disrupted: b.disrupted }, user.id);
         return NextResponse.json({ ok: true, message: "سُجّل اليوم، ويتراكم على الشهر" });
+      }
+      case "violation": {
+        await addViolation({ employeeId: b.employeeId, day: b.day, code: b.code, note: b.note }, user.id);
+        return NextResponse.json({ ok: true, message: "سُجّلت المخالفة، وحُسب جزاؤها من جدول اللائحة" });
+      }
+      case "violation-void": {
+        const done = await voidViolation(b.id, user.id);
+        return NextResponse.json({ ok: true, message: done ? "سُحبت المخالفة" : "سُحبت من قبل" });
+      }
+      case "waive": {
+        const done = await setPenaltyWaived(b.id, b.waived, user.id);
+        return NextResponse.json({ ok: true, message: !done ? "لم تُوجد المخالفة" : b.waived ? "عُفي عن الجزاء، ولا تُعدّ في التكرار" : "أُعيد الجزاء" });
       }
       case "day-clear": {
         const done = await clearAttendance(b.id, user.id);

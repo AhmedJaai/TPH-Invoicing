@@ -29,6 +29,8 @@ function deductionText(r: PayrollRow): string {
   }
   if (s.lateMinutes + s.earlyMinutes > 0) parts.push(`تأخير ${s.lateMinutes + s.earlyMinutes} دقيقة`);
   if (s.absentDays > 0) parts.push(`غياب ${s.absentDays} يوم`);
+  if (s.penaltiesMinor > 0) parts.push(`جزاءات اللائحة ${formatRiyalsDisplay(s.penaltiesMinor)}`);
+  if (s.warnings > 0) parts.push(`${s.warnings} إنذار`);
   return parts.join(" · ");
 }
 

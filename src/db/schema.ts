@@ -2459,6 +2459,10 @@ export const payrollAttendance = pgTable("payroll_attendance", {
   kind: text("kind").$type<AttendanceKind>().notNull(),
   minutes: integer("minutes"),
   source: text("source").$type<"MANUAL" | "CHECKIN">().notNull().default("MANUAL"),
+  /** التأخيرُ عطّل غيره — بندٌ أشدّ في جدول اللائحة (085). */
+  disrupted: boolean("disrupted").notNull().default(false),
+  /** عفا صاحبُ العمل عن جزائه (085). */
+  penaltyWaived: boolean("penalty_waived").notNull().default(false),
   note: text("note"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
@@ -2488,6 +2492,20 @@ export const payrollLinks = pgTable("payroll_links", {
   bankTransactionId: text("bank_transaction_id").notNull().references(() => bankTransactions.id, { onDelete: "restrict" }),
   amountMinor: integer("amount_minor").notNull(),
   note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+});
+
+/** مخالفةٌ من جدول لائحة تنظيم العمل يسجّلها صاحبُ المقهى — جزاؤها يُحسب ولا يُخزَّن (085). */
+export const payrollViolations = pgTable("payroll_violations", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  day: text("day").notNull(),
+  code: text("code").notNull(),
+  note: text("note"),
+  waived: boolean("waived").notNull().default(false),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
   voidedAt: timestamp("voided_at", { withTimezone: true }),

@@ -7,9 +7,9 @@
  * القاعدة: **الراتبُ المجهول ليس صفراً**. موظّفٌ لم يُكتب راتبُه لشهرٍ فمستحقُّه «غير معروف»
  * ولا يدخل مجموعاً يُقال إنّه كامل.
  *
- * حاسبةُ التأخير: قيمةُ الدقيقة = الراتب ÷ (٣٠ يوماً × دقائق الدوام). ودقائقُ السماح تُطرح من
- * كلّ يومٍ على حدة لا من الشهر. والغيابُ يومٌ = الراتب ÷ ٣٠. القسمةُ في الآخر مرّةً واحدة،
- * فلا يتراكم تقريبُ الأيّام.
+ * أجرُ الوقت غير المعمول: الدقيقة = الراتب ÷ (٣٠ يوماً × دقائق الدوام)، واليومُ = الراتب ÷ ٣٠،
+ * والقسمةُ في الآخر مرّةً واحدة. والسماحُ عتبة: تأخيرٌ في حدوده لا يُحسب، وما فوقه يُحسب كلُّه.
+ * وجزاءاتُ المخالفات فوق ذلك من لائحة تنظيم العمل (`saudi-rules.ts`).
  *
  * نقيّ: المالُ هللاتٌ صحيحة، والوقتُ دقائقُ صحيحة.
  */
@@ -19,8 +19,8 @@ import { isoDay } from "@/lib/riyadh-time";
 export const DAYS_PER_MONTH = 30;
 
 export const ADJUSTMENT_LABEL: Record<PayrollAdjustmentKind, string> = {
-  DEDUCTION: "خصم",
-  FINE: "مخالفة",
+  DEDUCTION: "خصم بموافقته الخطية",
+  FINE: "تعويض ضرر أو مخالفة بلدية بخطئه",
   ADVANCE: "سلفة نقداً على راتب الشهر",
   LOAN_REPAYMENT: "قسط سلفة",
   BONUS: "مكافأة",
@@ -30,10 +30,10 @@ export const ADJUSTMENT_LABEL: Record<PayrollAdjustmentKind, string> = {
 };
 
 export const ADJUSTMENT_HINT: Record<PayrollAdjustmentKind, string> = {
-  DEDUCTION: "خصمٌ من الراتب لأي سبب",
-  FINE: "مخالفة بلدية أو غيرها يتحملها الموظف",
+  DEDUCTION: "نظام العمل (م ٩٢) لا يجيز الحسم لحقٍّ خاص إلا بموافقة العامل الخطية. والجزاءات التأديبية تُسجَّل من «مخالفة من اللائحة»",
+  FINE: "ما أتلفه أو مخالفة بلدية وقعت على المقهى بخطئه. لا يزيد ما يُحسم لها على أجر خمسة أيام في الشهر (م ٩١)",
   ADVANCE: "أخذه مقدماً نقداً من راتب هذا الشهر. إن حوّلته بالبنك فاربط الحوالة بغرض «سلفة على الراتب» بدلاً منه",
-  LOAN_REPAYMENT: "قسطٌ يُخصم من راتب الشهر سداداً لسلفة سابقة",
+  LOAN_REPAYMENT: "قسطٌ يُخصم من راتب الشهر سداداً لسلفة سابقة، ولا يزيد على ١٠٪ من الراتب (م ٩٢)",
   BONUS: "مبلغٌ يُضاف فوق الراتب",
   OVERTIME: "ساعاتٌ زائدة على الدوام",
   ALLOWANCE: "بدل سكن أو مواصلات أو غيره",
@@ -121,19 +121,6 @@ export function proratedSalary(salaryMinor: number | null, days: { worked: numbe
 export interface LatePolicy {
   shiftMinutes: number;
   graceMinutes: number;
-}
-
-/** الدقائقُ المحسوبة بعد السماح، يوماً يوماً. */
-export function chargeableMinutes(lateMinutesPerDay: readonly number[], graceMinutes: number): number {
-  return lateMinutesPerDay.reduce((s, m) => s + Math.max(0, m - graceMinutes), 0);
-}
-
-/** خصمُ التأخير للشهر — `null` إن لم يُعرف الراتب. */
-export function lateDeductionMinor(salaryMinor: number | null, policy: LatePolicy, lateMinutesPerDay: readonly number[]): number | null {
-  const minutes = chargeableMinutes(lateMinutesPerDay, policy.graceMinutes);
-  if (minutes === 0) return 0;
-  if (salaryMinor === null) return null;
-  return divRound(salaryMinor * minutes, DAYS_PER_MONTH * policy.shiftMinutes);
 }
 
 export function absenceDeductionMinor(salaryMinor: number | null, days: number): number | null {
@@ -268,6 +255,8 @@ export interface PayslipInput {
   policy: LatePolicy;
   adjustments: readonly { kind: PayrollAdjustmentKind; amountMinor: number }[];
   attendance: readonly { kind: AttendanceKind; minutes: number | null }[];
+  /** جزاءاتُ لائحة تنظيم العمل بعد حدودها (`saudi-rules.ts` · `monthViolations`). */
+  penalties?: { chargedMinor: number; droppedMinor: number; warnings: number };
   /** ما رُبط من حوالات بغرض «راتب» أو «سلفة على الراتب» لهذا الشهر. */
   paidMinor: number;
 }
@@ -279,15 +268,23 @@ export interface Payslip {
   baseMinor: number | null;
   days: { worked: number; of: number } | null;
   additionsMinor: number;
-  /** خصمٌ ومخالفةٌ وقسطُ سلفة كما كُتبت. */
+  /** خصمٌ بموافقته ومخالفةٌ بخطئه وقسطُ سلفة كما كُتبت. */
   manualDeductionsMinor: number;
+  /** دقائقُ التأخير فوق السماح، والانصرافُ المبكّر. */
   lateMinutes: number;
   earlyMinutes: number;
-  /** خصمُ التأخير والانصراف المبكّر معاً. */
+  /** أجرُ دقائق التأخير والانصراف — ليس جزاءً، بل أجرُ وقتٍ لم يُعمل. */
   lateMinor: number | null;
   absentDays: number;
   leaveDays: number;
+  /** أجرُ أيّام الغياب. */
   absenceMinor: number | null;
+  /** جزاءاتُ اللائحة المحسومة، وما زاد على حدّها فلم يُحسم، وعددُ الإنذارات. */
+  penaltiesMinor: number;
+  penaltiesDroppedMinor: number;
+  warnings: number;
+  /** ما زاد على نصف الأجر (م ٩٢) فلم يُحسم. */
+  overHalfMinor: number;
   /** كلُّ ما يُنقص الراتب (بلا السلف). */
   deductionsMinor: number | null;
   /** الراتب + الإضافات − الخصومات. */
@@ -310,24 +307,29 @@ export function payslip(input: PayslipInput): Payslip {
   const additionsMinor = pick((k) => ADDITIONS.has(k));
   const manualDeductionsMinor = pick((k) => DEDUCTIONS.has(k));
   const advancesMinor = pick((k) => k === "ADVANCE");
-  const minutesOf = (kind: AttendanceKind) => input.attendance.filter((a) => a.kind === kind).map((a) => a.minutes ?? 0);
-  /* السماحُ للتأخير وحده؛ والانصرافُ المبكّر يُحسب كلُّه */
-  const lateMinutes = chargeableMinutes(minutesOf("LATE"), input.policy.graceMinutes);
-  const earlyMinutes = chargeableMinutes(minutesOf("EARLY"), 0);
+  /* السماحُ عتبة: ما دونه لا يُحسب أصلاً، وما فوقه يُحسب كلُّه (اللائحةُ تعدّ التأخير من أوّل دقيقة) */
+  const lateMinutes = sumOf(input.attendance.filter((a) => a.kind === "LATE" && (a.minutes ?? 0) > input.policy.graceMinutes).map((a) => a.minutes ?? 0));
+  const earlyMinutes = sumOf(input.attendance.filter((a) => a.kind === "EARLY").map((a) => a.minutes ?? 0));
   const absentDays = input.attendance.filter((a) => a.kind === "ABSENT").length;
   const leaveDays = input.attendance.filter((a) => a.kind === "LEAVE").length;
-  /* التأخيرُ والغيابُ يُقاسان على راتب الشهر كاملاً — والجزئيُّ يُدفع بساعاته فلا يُخصم عليه */
+  /* أجرُ الوقت الذي لم يُعمل يُقاس على راتب الشهر كاملاً — والجزئيُّ يُدفع بساعاته فلا يُحسم عليه */
   const rate = monthly ? input.salaryMinor : 0;
   const lateMinor = !monthly || lateMinutes + earlyMinutes === 0 ? 0
     : rate === null ? null : divRound(rate * (lateMinutes + earlyMinutes), DAYS_PER_MONTH * input.policy.shiftMinutes);
   const absenceMinor = monthly ? absenceDeductionMinor(rate, absentDays) : 0;
-  const deductionsMinor = lateMinor === null || absenceMinor === null ? null : manualDeductionsMinor + lateMinor + absenceMinor;
+  const pen = monthly ? input.penalties ?? { chargedMinor: 0, droppedMinor: 0, warnings: 0 } : { chargedMinor: 0, droppedMinor: 0, warnings: 0 };
+  /* م ٩٢/٢: الحسمُ كلُّه لا يزيد على نصف الأجر — وأجرُ الوقت غير المعمول ليس حسماً من أجرٍ استُحقّ */
+  const halfCap = rate ? divRound(rate, 2) : null;
+  const charges = manualDeductionsMinor + pen.chargedMinor;
+  const overHalfMinor = halfCap !== null && charges > halfCap ? charges - halfCap : 0;
+  const deductionsMinor = lateMinor === null || absenceMinor === null ? null : charges - overHalfMinor + lateMinor + absenceMinor;
   const earnedMinor = baseMinor === null || deductionsMinor === null ? null : baseMinor + additionsMinor - deductionsMinor;
   const dueMinor = earnedMinor === null ? null : earnedMinor - advancesMinor;
   return {
     fullSalaryMinor: monthly ? input.salaryMinor : null,
     baseMinor, days: monthly ? input.days : null, additionsMinor, manualDeductionsMinor,
     lateMinutes, earlyMinutes, lateMinor, absentDays, leaveDays, absenceMinor,
+    penaltiesMinor: pen.chargedMinor, penaltiesDroppedMinor: pen.droppedMinor, warnings: pen.warnings, overHalfMinor,
     deductionsMinor, earnedMinor, advancesMinor, dueMinor,
     paidMinor: input.paidMinor,
     remainingMinor: dueMinor === null ? null : dueMinor - input.paidMinor,

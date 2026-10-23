@@ -13,10 +13,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  appSettings, attendanceCheckins, employeeRates, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollWeeks,
+  appSettings, attendanceCheckins, employeeRates, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
   type AttendanceKind, type CheckinVerdict, type PayrollAdjustmentKind, type PayrollLinkPurpose,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { formatRiyalsDisplay } from "@/lib/money";
 import {
   activeIn, beneficiaryIdOf, beneficiaryNameOf, hoursPayMinor, loanBalance, PAYS_SALARY, payslip, rateFor, reclassTarget,
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
@@ -25,6 +26,9 @@ import {
   DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhDay, type CafePlace,
 } from "@/lib/payroll/attendance";
 import { addDays, monthEndDay } from "@/lib/riyadh-time";
+import {
+  damageCapMinor, isViolationCode, loanCapMinor, monthViolations, REPEAT_WINDOW_DAYS, type AssessedViolation,
+} from "@/lib/payroll/saudi-rules";
 import { pgErrorCode } from "./guard";
 import { assertMonthsOpen } from "./month-guard";
 import type { Conn } from "./types";
@@ -111,7 +115,11 @@ export interface PayrollRow {
   rateMinor: number | null;
   slip: Payslip;
   adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date }[];
-  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null }[];
+  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean }[];
+  /** مخالفاتُ الشهر بجزائها من جدول اللائحة — من الحضور ومن المسجَّل بيده. */
+  violations: (AssessedViolation & { source: "ATTENDANCE" | "MANUAL" })[];
+  /** غيابٌ فوق عشرة أيّامٍ متّصلة — المادّة ٨٠، قرارٌ لا مبلغ. */
+  article80: { start: string; days: number }[];
   weeks: { id: string; weekStart: string; minutes: number | null; amountMinor: number; note: string | null }[];
   /** كلُّ ما رُبط به في الشهر — راتباً أو غيره. */
   links: LinkView[];
@@ -127,14 +135,18 @@ export interface PayrollMonth {
 export async function loadPayrollMonth(month: string, conn: Conn = db): Promise<PayrollMonth> {
   const firstWeek = weekStartOf(`${month}-01`);
   const lastDay = monthEndDay(month);
-  const [list, adj, att, weeks, links, loans] = await Promise.all([
+  /* التكرارُ يُعدّ من ١٨٠ يوماً قبل المخالفة — فيُقرأ ما قبل الشهر بقدرها وفوقه سلسلةٌ أطول */
+  const historyFrom = addDays(`${month}-01`, -(REPEAT_WINDOW_DAYS * 2));
+  const [list, adj, attAll, weeks, links, loans, manualAll] = await Promise.all([
     loadEmployees(conn),
     conn.select().from(payrollAdjustments).where(and(eq(payrollAdjustments.month, month), isNull(payrollAdjustments.voidedAt))).orderBy(payrollAdjustments.createdAt),
-    conn.select().from(payrollAttendance).where(and(gte(payrollAttendance.day, `${month}-01`), lte(payrollAttendance.day, lastDay), isNull(payrollAttendance.voidedAt))).orderBy(payrollAttendance.day),
+    conn.select().from(payrollAttendance).where(and(gte(payrollAttendance.day, historyFrom), lte(payrollAttendance.day, lastDay), isNull(payrollAttendance.voidedAt))).orderBy(payrollAttendance.day),
     conn.select().from(payrollWeeks).where(and(gte(payrollWeeks.weekStart, firstWeek), lte(payrollWeeks.weekStart, lastDay), isNull(payrollWeeks.voidedAt))).orderBy(payrollWeeks.weekStart),
     loadLinks(conn, sql`pl.month = ${month}`),
     loadLoanBalances(conn),
+    conn.select().from(payrollViolations).where(and(gte(payrollViolations.day, historyFrom), lte(payrollViolations.day, lastDay), isNull(payrollViolations.voidedAt))),
   ]);
+  const att = attAll.filter((a) => a.day >= `${month}-01`);
   const rows: PayrollRow[] = [];
   for (const employee of list) {
     const mine = <T extends { employeeId: string }>(xs: readonly T[]) => xs.filter((x) => x.employeeId === employee.id);
@@ -145,6 +157,13 @@ export async function loadPayrollMonth(month: string, conn: Conn = db): Promise<
     const myWeeks = mine(weeks).filter((w) => weekMonth(w.weekStart) === month);
     const myAtt = mine(att);
     const rateMinor = rateFor(employee.rates, month);
+    const regs = employee.kind === "MONTHLY" && rateMinor !== null
+      ? monthViolations({
+          month, monthlyMinor: rateMinor, graceMinutes: employee.lateGraceMinutes, daysOff: employee.daysOff,
+          history: mine(attAll), manual: mine(manualAll).map((v) => ({ id: v.id, day: v.day, code: v.code, waived: v.waived, note: v.note })),
+        })
+      : null;
+    const manualIds = new Set(manualAll.map((v) => v.id));
     rows.push({
       employee, rateMinor,
       slip: payslip({
@@ -155,10 +174,13 @@ export async function loadPayrollMonth(month: string, conn: Conn = db): Promise<
         policy: { shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes },
         adjustments: myAdj,
         attendance: myAtt,
+        penalties: regs?.capped,
         paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((s, l) => s + l.amountMinor, 0),
       }),
       adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt })),
-      attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note })),
+      attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived })),
+      violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
+      article80: regs?.article80 ?? [],
       weeks: myWeeks.map((w) => ({ id: w.id, weekStart: w.weekStart, minutes: w.minutes, amountMinor: w.amountMinor, note: w.note })),
       links: myLinks,
       loanMinor: loans.get(employee.id) ?? 0,
@@ -415,6 +437,20 @@ export async function addAdjustment(input: { employeeId: string; month: string; 
       const balance = (await loadLoanBalances(t)).get(input.employeeId) ?? 0;
       if (input.amountMinor > balance) throw new PayrollRefused(balance > 0 ? "القسط أكبر من رصيد سلفه." : "لا سلفة عليه لتُسدَّد. سجّل السلفة أولاً.");
     }
+    /* حدودُ نظام العمل تُفرض عند الكتابة: قسطُ القرض ≤ ١٠٪ من الأجر (م ٩٢)، والتعويضُ ≤ أجر ٥ أيّام في الشهر (م ٩١) */
+    if (input.kind === "LOAN_REPAYMENT" || input.kind === "FINE") {
+      const rates = await t.select().from(employeeRates).where(eq(employeeRates.employeeId, input.employeeId));
+      const wage = rateFor(rates, input.month);
+      if (wage === null) throw new PayrollRefused("اكتب راتبه لهذا الشهر أولاً: الحد النظامي يُحسب منه.");
+      const [{ total }] = await t.select({ total: sql<string>`coalesce(sum(${payrollAdjustments.amountMinor}), 0)` }).from(payrollAdjustments)
+        .where(and(eq(payrollAdjustments.employeeId, input.employeeId), eq(payrollAdjustments.month, input.month), eq(payrollAdjustments.kind, input.kind), isNull(payrollAdjustments.voidedAt)));
+      const cap = input.kind === "FINE" ? damageCapMinor(wage) : loanCapMinor(wage);
+      const room = cap - Number(total);
+      if (input.amountMinor > room) {
+        const what = input.kind === "FINE" ? "لا يُحسم لتعويض الضرر في الشهر أكثر من أجر خمسة أيام (نظام العمل، م ٩١)" : "لا يزيد قسط السلفة على ١٠٪ من الراتب (نظام العمل، م ٩٢)";
+        throw new PayrollRefused(`${what}: الحد ${formatRiyalsDisplay(cap)} ريال${Number(total) > 0 ? `، وسُجّل منه ${formatRiyalsDisplay(Number(total))}` : ""}. سجّل الباقي في الشهر القادم.`);
+      }
+    }
     const [row] = await t.insert(payrollAdjustments).values({ ...input, createdById: actorId }).returning({ id: payrollAdjustments.id });
     await recordAudit({ actorId, action: "PAYROLL_ADJUSTMENT_ADDED", entityType: "payroll_adjustment", entityId: row.id, before: null, after: input }, t);
     return row.id;
@@ -437,7 +473,7 @@ const MINUTE_KINDS: ReadonlySet<AttendanceKind> = new Set(["LATE", "EARLY"]);
  * يومُ تأخيرٍ أو انصرافٍ مبكّر أو غيابٍ أو إجازة — يستبدل ما سُجّل لليوم نفسه بالنوع نفسه.
  * والغيابُ والإجازةُ لا يجتمعان في يوم، ولا يجتمعان مع تأخير.
  */
-export async function setAttendance(input: { employeeId: string; day: string; kind: AttendanceKind; minutes: number | null; note: string | null }, actorId: string | null, conn?: Conn): Promise<void> {
+export async function setAttendance(input: { employeeId: string; day: string; kind: AttendanceKind; minutes: number | null; note: string | null; disrupted?: boolean }, actorId: string | null, conn?: Conn): Promise<void> {
   const minutes = MINUTE_KINDS.has(input.kind) ? input.minutes : null;
   if (MINUTE_KINDS.has(input.kind) && !(minutes && minutes > 0)) throw new PayrollRefused("اكتب عدد الدقائق.");
   const run = async (t: Conn) => {
@@ -446,7 +482,7 @@ export async function setAttendance(input: { employeeId: string; day: string; ki
     const before = await t.update(payrollAttendance).set({ voidedAt: new Date() })
       .where(and(eq(payrollAttendance.employeeId, input.employeeId), eq(payrollAttendance.day, input.day), inArray(payrollAttendance.kind, clash), isNull(payrollAttendance.voidedAt)))
       .returning();
-    const [row] = await t.insert(payrollAttendance).values({ ...input, minutes, source: "MANUAL", createdById: actorId }).returning({ id: payrollAttendance.id });
+    const [row] = await t.insert(payrollAttendance).values({ ...input, minutes, disrupted: input.kind === "LATE" && input.disrupted === true, source: "MANUAL", createdById: actorId }).returning({ id: payrollAttendance.id });
     await recordAudit({ actorId, action: "PAYROLL_ATTENDANCE_SET", entityType: "payroll_attendance", entityId: row.id, before: before.length > 0 ? before : null, after: { ...input, minutes } }, t);
   };
   if (conn) await run(conn);
@@ -496,6 +532,41 @@ export async function clearWeek(id: string, actorId: string): Promise<boolean> {
       .where(and(eq(payrollWeeks.id, id), isNull(payrollWeeks.voidedAt))).returning();
     if (done.length === 0) return false;
     await recordAudit({ actorId, action: "PAYROLL_WEEK_CLEARED", entityType: "payroll_week", entityId: id, before: done[0], after: null }, t);
+    return true;
+  });
+}
+
+/* ─────────────────────────── مخالفاتُ اللائحة ─────────────────────────── */
+
+export async function addViolation(input: { employeeId: string; day: string; code: string; note: string | null }, actorId: string): Promise<string> {
+  if (!isViolationCode(input.code) || input.code.startsWith("1/")) throw new PayrollRefused("بندٌ غير معروف. مخالفات المواعيد تُسجَّل من التأخير والغياب.");
+  return db.transaction(async (t) => {
+    await assertEmployee(t, input.employeeId);
+    const [row] = await t.insert(payrollViolations).values({ ...input, createdById: actorId }).returning({ id: payrollViolations.id });
+    await recordAudit({ actorId, action: "PAYROLL_VIOLATION_ADDED", entityType: "payroll_violation", entityId: row.id, before: null, after: input }, t);
+    return row.id;
+  });
+}
+
+export async function voidViolation(id: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const done = await t.update(payrollViolations).set({ voidedAt: new Date(), voidedById: actorId })
+      .where(and(eq(payrollViolations.id, id), isNull(payrollViolations.voidedAt))).returning();
+    if (done.length === 0) return false;
+    await recordAudit({ actorId, action: "PAYROLL_VIOLATION_VOIDED", entityType: "payroll_violation", entityId: id, before: done[0], after: null }, t);
+    return true;
+  });
+}
+
+/** العفوُ عن جزاء مخالفةٍ أو سحبُه — من الحضور أو من المسجَّل بيده. أجرُ الوقت يبقى محسوماً. */
+export async function setPenaltyWaived(id: string, waived: boolean, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const fromAttendance = await t.update(payrollAttendance).set({ penaltyWaived: waived })
+      .where(and(eq(payrollAttendance.id, id), isNull(payrollAttendance.voidedAt))).returning({ id: payrollAttendance.id });
+    const fromManual = fromAttendance.length > 0 ? [] : await t.update(payrollViolations).set({ waived })
+      .where(and(eq(payrollViolations.id, id), isNull(payrollViolations.voidedAt))).returning({ id: payrollViolations.id });
+    if (fromAttendance.length + fromManual.length === 0) return false;
+    await recordAudit({ actorId, action: waived ? "PAYROLL_PENALTY_WAIVED" : "PAYROLL_PENALTY_RESTORED", entityType: fromAttendance.length > 0 ? "payroll_attendance" : "payroll_violation", entityId: id, before: { عفو: !waived }, after: { عفو: waived } }, t);
     return true;
   });
 }

@@ -78,5 +78,17 @@
   "مكافأة": "Bonus",
   "عمل إضافي": "Overtime",
   "بدل": "Allowance",
-  "سلفة نقداً تُسدَّد على أشهر": "Cash loan repaid over months"
+  "سلفة نقداً تُسدَّد على أشهر": "Cash loan repaid over months",
+  "المخالفات والجزاءات": "Violations and penalties",
+  "اعفُ عنه": "Waive",
+  "أعد الجزاء": "Restore penalty",
+  "معفى": "Waived",
+  "إنذار": "Warning",
+  "سجّل المخالفة": "Record violation",
+  "سجّل مخالفة أخرى من اللائحة": "Record another regulation violation",
+  "غاب دون إذن": "Absent without leave",
+  "إجازة أو عذر مقبول": "Leave or accepted excuse",
+  "خصم بموافقته الخطية": "Deduction with written consent",
+  "تعويض ضرر أو مخالفة بلدية بخطئه": "Damages or municipal fine caused by them",
+  "يجيز الفصل": "Permits dismissal"
 }

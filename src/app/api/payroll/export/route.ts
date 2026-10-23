@@ -21,11 +21,11 @@ export async function GET(request: Request) {
     const m = new URL(request.url).searchParams.get("month") ?? "";
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(m) ? m : currentMonthRiyadh();
     const sheet = await loadPayrollMonth(month);
-    const head = ["الموظف", "النوع", "الآيبان", "رقم المستفيد", "الراتب", "الإضافات", "الخصومات", "دقائق التأخير", "أيام الغياب", "السلف نقداً", "المستحق", "حُوّل", "الباقي للتحويل"];
+    const head = ["الموظف", "النوع", "الآيبان", "رقم المستفيد", "الراتب", "الإضافات", "الخصومات", "دقائق التأخير", "أيام الغياب", "جزاءات اللائحة", "إنذارات", "السلف نقداً", "المستحق", "حُوّل", "الباقي للتحويل"];
     const lines = sheet.rows.map((r) => [
       r.employee.name, r.employee.kind === "PART_TIME" ? "جزئي" : "شهري", r.employee.iban, r.employee.bankBeneficiaryId,
       money(r.slip.baseMinor), money(r.slip.additionsMinor), money(r.slip.deductionsMinor), r.slip.lateMinutes + r.slip.earlyMinutes,
-      r.slip.absentDays, money(r.slip.advancesMinor), money(r.slip.dueMinor), money(r.slip.paidMinor), money(r.slip.remainingMinor),
+      r.slip.absentDays, money(r.slip.penaltiesMinor), r.slip.warnings, money(r.slip.advancesMinor), money(r.slip.dueMinor), money(r.slip.paidMinor), money(r.slip.remainingMinor),
     ].map(cell).join(","));
     const body = "﻿" + [head.map(cell).join(","), ...lines].join("\r\n");
     return new NextResponse(body, {

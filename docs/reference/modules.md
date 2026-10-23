@@ -178,7 +178,7 @@
 | `sales-analysis.service.ts` · `/finance/sales` | **المبيعات**: يوماً وساعةً وصنفاً بهامشه، ما صعد وما هبط، وما خرج من الإيراد — بإيراد قائمة الدخل نفسِه |
 | `finance-position.service.ts` · `/finance/position` | **الوضع الآن**: رصيدُ البنك، المستحقُّ للمورّدين، ضريبةُ الإقرار، النقدُ والصندوق — كلٌّ من مصدره القائم |
 | `src/lib/finance/reading.ts` · `finance-reading.service.ts` | **القراءةُ الذكيّة**: حقائقُ مرقَّمة يحسبها الخادم، ويُتحقَّق أنّ كلَّ رقمٍ ذكره النموذج منها؛ تُحفَظ بمدخلاتها (`npm run finance:reading-eval`) |
-| `src/lib/payroll/calc.ts` · `attendance.ts` · `payroll.service.ts` · `/payroll` · `/a/[token]` | **الموظّفون**: الراتبُ بشهره، المسيّرُ محسوباً (`payslip`)، حاسبةُ التأخير، توزيعُ الحوالة بغرضها وأثرُه في قائمة الدخل (`payrollReclass`)، الحضورُ برابطٍ وموقعٍ وشبكة، قسيمةُ الراتب، ملفُّ CSV (`/api/payroll/export`) |
+| `src/lib/payroll/calc.ts` · `attendance.ts` · `saudi-rules.ts` · `payroll.service.ts` · `/payroll` · `/a/[token]` | **الموظّفون**: الراتبُ بشهره، المسيّرُ محسوباً (`payslip`)، حاسبةُ التأخير وجزاءاتُ لائحة تنظيم العمل بحدود نظام العمل (`saudi-rules.ts`)، توزيعُ الحوالة بغرضها وأثرُه في قائمة الدخل (`payrollReclass`)، الحضورُ برابطٍ وموقعٍ وشبكة، قسيمةُ الراتب، ملفُّ CSV (`/api/payroll/export`) |
 | `src/lib/finance/stock-gaps.ts` · `finance-attention.service.ts` | بنودُ المالية في «يحتاج قرارك»: إيجارٌ لم يُوزَّع، ربطٌ جاهز، صندوقٌ فرقُه ظاهر، مزامنةٌ وقفت، صنفٌ تكرّر فرقُه |
 | `src/lib/foodics/stock.ts` | شاهدُ المخزون من فودكس: عدُّ الرفّ، وصرفُ الأصناف مجموعاً يوماً بصنف (`foodics:sync -- --moves`) |
 | `src/lib/sales/witness.ts` · `sales-witness.service.ts` | ملفُّ فودكس **شاهداً** على ضريبة مبيعات الإقرار والنقد المكتوب بيد — يُعرض الفرقُ والتغطية ولا يدخل الحساب |

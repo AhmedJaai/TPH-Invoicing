@@ -166,6 +166,10 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PAYROLL_WEEK_CLEARED: "مسح أسبوع موظف جزئي",
   PAYROLL_LINKED: "ربط حوالة بموظف",
   PAYROLL_UNLINKED: "فكّ ربط حوالة بموظف",
+  PAYROLL_VIOLATION_ADDED: "تسجيل مخالفة من لائحة تنظيم العمل",
+  PAYROLL_VIOLATION_VOIDED: "سحب مخالفة مسجّلة",
+  PAYROLL_PENALTY_WAIVED: "العفو عن جزاء مخالفة",
+  PAYROLL_PENALTY_RESTORED: "إعادة جزاء بعد العفو",
   EMPLOYEE_CHECKIN_LINK_ISSUED: "إنشاء رابط حضور لموظف",
   EMPLOYEE_CHECKIN_LINK_REVOKED: "إلغاء رابط حضور موظف",
   ATTENDANCE_SETTINGS_SET: "ضبط موقع المقهى أو شبكته للحضور",
@@ -232,6 +236,7 @@ export const ENTITY_LABEL: Record<string, string> = {
   payroll_week: "أسبوع موظف جزئي",
   payroll_link: "ربط حوالة براتب",
   attendance_checkin: "تسجيل حضور",
+  payroll_violation: "مخالفة من لائحة تنظيم العمل",
 };
 
 /** اسمُ فعلٍ مقروءٍ من القاعدة — وما لا اسم له يُعرَض كما هو ولا يُخفى. */

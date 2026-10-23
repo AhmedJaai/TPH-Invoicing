@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, CalendarClock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -9,13 +9,14 @@ import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { ObligationForm } from "@/components/obligation-form";
 import {
-  AdjustmentForm, CheckinLinkPanel, DayForm, EmployeeForm, LinkTransferForm, RateForm, WeekForm,
+  AdjustmentForm, CheckinLinkPanel, DayForm, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
 } from "@/components/payroll/forms";
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { ADJUSTMENT_LABEL, endOfService, formatMinutes, PURPOSE_LABEL, rateFor } from "@/lib/payroll/calc";
 import { WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
+import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { OBLIGATION_KIND_LABEL, isObligationKind } from "@/lib/obligations";
 import {
@@ -112,9 +113,15 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 <Line key={a.id} label={ADJUSTMENT_LABEL[a.kind]} note={a.note ?? undefined} minor={a.amountMinor} sign="−" />
               ))}
               {slip!.lateMinutes + slip!.earlyMinutes > 0 && (
-                <Line label="التأخير والانصراف المبكر" note={`${slip!.lateMinutes + slip!.earlyMinutes} دقيقة محسوبة${employee.lateGraceMinutes > 0 ? ` بعد سماح ${employee.lateGraceMinutes} دقيقة يومياً` : ""}`} minor={slip!.lateMinor} sign="−" />
+                <Line label="أجر دقائق التأخير والانصراف المبكر" note={`${slip!.lateMinutes + slip!.earlyMinutes} دقيقة لم يعملها${employee.lateGraceMinutes > 0 ? ` · ما كان في حدود سماح ${employee.lateGraceMinutes} دقيقة لم يُحسب` : ""}`} minor={slip!.lateMinor} sign="−" />
               )}
-              {slip!.absentDays > 0 && <Line label="الغياب" note={`${slip!.absentDays} يوم`} minor={slip!.absenceMinor} sign="−" />}
+              {slip!.absentDays > 0 && <Line label="أجر أيام الغياب" note={`${slip!.absentDays} يوم`} minor={slip!.absenceMinor} sign="−" />}
+              {(slip!.penaltiesMinor > 0 || slip!.warnings > 0) && (
+                <Line label="جزاءات المخالفات (لائحة تنظيم العمل)"
+                  note={[slip!.warnings > 0 ? `${slip!.warnings} إنذار كتابي بلا خصم` : null, slip!.penaltiesDroppedMinor > 0 ? `وزاد ${formatRiyalsDisplay(slip!.penaltiesDroppedMinor)} على حد أجر خمسة أيام فلا يُحسم` : null].filter(Boolean).join(" · ") || undefined}
+                  minor={slip!.penaltiesMinor} sign="−" />
+              )}
+              {slip!.overHalfMinor > 0 && <p className="py-2 text-[11px] font-bold text-warn">زادت الخصومات على نصف الراتب، فلم يُحسم {formatRiyalsDisplay(slip!.overHalfMinor)} ريال (نظام العمل، م ٩٢)</p>}
               <Line label="المستحق عن الشهر" minor={slip!.earnedMinor} strong />
               {slip!.advancesMinor > 0 && <Line label="سلف نقداً على الراتب" minor={slip!.advancesMinor} sign="−" />}
               <Line label="حُوّل له" minor={slip!.paidMinor} sign="−" />
@@ -128,7 +135,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           {canEdit && (
             <div className="space-y-5">
               <Card>
-                <h2 className="mb-3 text-sm font-bold">خصم، سلفة، مخالفة، مكافأة…</h2>
+                <h2 className="mb-3 text-sm font-bold">سلفة، مكافأة، بدل، تعويض ضرر…</h2>
                 <AdjustmentForm employeeId={id} month={month} loanMinor={row.loanMinor} />
               </Card>
               {employee.kind === "MONTHLY" ? (
@@ -162,7 +169,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                 <span className="min-w-0 flex-1 basis-48 text-sm">
                   {ATT_LABEL[a.kind]} {a.minutes !== null && <span className="nums">{a.minutes} دقيقة</span>} · {formatDay(a.day)}
-                  <span className="block text-[11px] text-muted">{a.source === "CHECKIN" ? "من تسجيل الحضور" : "سجّلته بيدك"}{a.note && a.source === "MANUAL" ? ` · ${a.note}` : ""}</span>
+                  <span className="block text-[11px] text-muted">{a.source === "CHECKIN" ? "من تسجيل الحضور" : "سجّلته بيدك"}{a.disrupted ? " · عطّل زملاءه" : ""}{a.note && a.source === "MANUAL" ? ` · ${a.note}` : ""}</span>
                 </span>
                 {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "day-clear", id: a.id }} variant="quiet" done="مُسح">امسح</PostAction>}
               </li>
@@ -175,6 +182,45 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      {row && employee.kind === "MONTHLY" && (
+        <Section id="violations" title="المخالفات والجزاءات" icon={Scale} count={row.violations.length}
+          hint="من جدول المخالفات في لائحة تنظيم العمل النموذجية: الجزاء بنوع المخالفة ومرتها خلال ١٨٠ يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
+          {row.article80.map((a) => (
+            <Callout key={a.start} tone="danger" icon={TriangleAlert} className="mb-3" title={`غاب ${a.days} أيام متصلة من ${formatDay(a.start)}`}>
+              الغياب أكثر من عشرة أيام متصلة يجيز الفصل دون مكافأة بشرط إنذاره كتابةً بعد خمسة أيام غياب (نظام العمل، م ٨٠). هذا قرارك، ولا يُحسم له مبلغ هنا غير أجر أيام الغياب.
+            </Callout>
+          ))}
+          {row.violations.length === 0 ? <EmptyState compact icon={Scale} title="لا مخالفات هذا الشهر." /> : (
+            <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
+              {row.violations.map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1 basis-56 text-sm">
+                    {v.detail} · {formatDay(v.day)}
+                    <span className="block text-[11px] text-muted">البند {v.code}: {v.label} · المرة {ORDINAL[Math.min(v.occurrence, 4) - 1]} ← {penaltyLabel(v.penalty)}</span>
+                  </span>
+                  {v.waived ? <Badge tone="muted">معفى</Badge> : v.penalty.kind === "WARNING" ? <Badge tone="warn">إنذار</Badge> : v.amountMinor === null ? <Badge tone="danger">يجيز الفصل</Badge> : <Money minor={v.amountMinor} />}
+                  {canEdit && (
+                    <span className="flex gap-1">
+                      <PostAction url="/api/payroll/entry" body={{ action: "waive", id: v.id, waived: !v.waived }} variant="quiet" done={v.waived ? "أُعيد الجزاء" : "عُفي عنه"}>{v.waived ? "أعد الجزاء" : "اعفُ عنه"}</PostAction>
+                      {v.source === "MANUAL" && <PostAction url="/api/payroll/entry" body={{ action: "violation-void", id: v.id }} variant="quiet" done="سُحبت">اسحب</PostAction>}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-[11px] leading-relaxed text-muted">
+            النظام يشترط قبل توقيع الجزاء أن يُبلَّغ العامل كتابةً بما نُسب إليه ويُسمع دفاعه، وأن يُبلَّغ بالجزاء كتابةً. قسيمة الراتب تذكر كل جزاء ببنده ومرته.
+          </p>
+          {canEdit && (
+            <details className="mt-3 rounded-xl border border-line bg-raised">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold">سجّل مخالفة أخرى من اللائحة</summary>
+              <div className="border-t border-line p-4"><ViolationForm employeeId={id} defaultDay={defaultDay} /></div>
+            </details>
+          )}
         </Section>
       )}
 

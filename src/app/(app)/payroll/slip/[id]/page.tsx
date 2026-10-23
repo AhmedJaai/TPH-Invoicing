@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/icons";
 import { LinkButton, NoAccess } from "@/components/ui";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { ADJUSTMENT_LABEL, PURPOSE_LABEL } from "@/lib/payroll/calc";
+import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadPayrollMonth } from "@/services/payroll.service";
 
@@ -32,8 +33,14 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
     [row.employee.kind === "PART_TIME" ? "أجر الأسابيع" : s.days && s.days.worked < s.days.of ? `الراتب (${s.days.worked} من ${s.days.of} يوماً)` : "الراتب الشهري", money(s.baseMinor)],
     ...row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `+ ${money(a.amountMinor)}`]),
     ...row.adjustments.filter((a) => a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `− ${money(a.amountMinor)}`]),
-    ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`التأخير (${s.lateMinutes + s.earlyMinutes} دقيقة)`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
-    ...(s.absentDays > 0 ? [[`الغياب (${s.absentDays} يوم)`, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
+    ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`أجر دقائق التأخير والانصراف (${s.lateMinutes + s.earlyMinutes} دقيقة)`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
+    ...(s.absentDays > 0 ? [[`أجر أيام الغياب (${s.absentDays} يوم)`, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
+    ...row.violations.filter((v) => !v.waived).map((v): [string, string] => [
+      `${v.detail} ${formatDay(v.day)} — البند ${v.code} من لائحة تنظيم العمل، المرة ${ORDINAL[Math.min(v.occurrence, 4) - 1]}: ${penaltyLabel(v.penalty)}`,
+      v.amountMinor === null ? "—" : v.amountMinor === 0 ? "إنذار" : `− ${money(v.amountMinor)}`,
+    ]),
+    ...(s.penaltiesDroppedMinor > 0 ? [["ما زاد على حد أجر خمسة أيام للجزاءات فلا يُحسم", `+ ${money(s.penaltiesDroppedMinor)}`] as [string, string]] : []),
+    ...(s.overHalfMinor > 0 ? [["ما زاد على نصف الراتب فلا يُحسم (م ٩٢)", `+ ${money(s.overHalfMinor)}`] as [string, string]] : []),
     ["المستحق", money(s.earnedMinor), true],
     ...(s.advancesMinor > 0 ? [["سلف نقداً", `− ${money(s.advancesMinor)}`] as [string, string]] : []),
     ...row.links.filter((l) => l.purpose === "SALARY" || l.purpose === "ADVANCE").map((l): [string, string] => [`${PURPOSE_LABEL[l.purpose]} محوّل ${formatDay(l.txDay)}`, `− ${money(l.amountMinor)}`]),
