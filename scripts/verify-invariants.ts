@@ -369,7 +369,45 @@ async function main() {
       { code: "23505" })] : []),
   ];
 
-  const all = [...results, ...inventory];
+  /*
+    الموظّفون (084): الحوالةُ لا تُوزَّع بأكثر من مبلغها، ولا تُربط إلّا خارجةً «راتباً» أو
+    «تحويلاً للمالك»، والربطُ لا يُعدَّل. موظّفٌ وحوالةٌ يصنعهما الفحصُ داخل معاملته.
+  */
+  const salaryTx = await one<{ id: string; amount_minor: number }>(
+    `select id, amount_minor from bank_transactions where direction = 'DEBIT' and category = 'SALARY' and amount_minor > 1000
+       and not month_is_closed(to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM')) limit 1`);
+  const creditTx = await one<{ id: string }>(`select id from bank_transactions where direction = 'CREDIT' limit 1`);
+  const employee = `insert into employees (id, name, kind, hired_on) values ('t-emp', 'موظف الفحص', 'MONTHLY', '2026-05-01');`;
+  const payroll = salaryTx ? [
+    await mustFail("حوالةٌ تُوزَّع على الرواتب بأكثر من مبلغها",
+      `${employee}
+       insert into payroll_links (id, employee_id, month, bank_transaction_id, amount_minor) values ('t-pl-1', 't-emp', '2026-05', '${salaryTx.id}', ${salaryTx.amount_minor});
+       insert into payroll_links (id, employee_id, month, bank_transaction_id, amount_minor) values ('t-pl-2', 't-emp', '2026-05', '${salaryTx.id}', 1)`,
+      { code: "P0001", message: /أكثر من مبلغها/ }),
+    await mustPass("حوالةٌ تُقسم على غرضين بمجموع مبلغها",
+      `${employee}
+       insert into payroll_links (id, employee_id, month, purpose, bank_transaction_id, amount_minor) values ('t-pl-1', 't-emp', '2026-05', 'SALARY', '${salaryTx.id}', ${salaryTx.amount_minor - 500});
+       insert into payroll_links (id, employee_id, month, purpose, bank_transaction_id, amount_minor) values ('t-pl-2', 't-emp', '2026-05', 'INVOICE', '${salaryTx.id}', 500)`),
+    await mustFail("ربطُ حوالةٍ بالراتب يُعدَّل مبلغه",
+      `${employee}
+       insert into payroll_links (id, employee_id, month, bank_transaction_id, amount_minor) values ('t-pl-1', 't-emp', '2026-05', '${salaryTx.id}', 100);
+       update payroll_links set amount_minor = 200 where id = 't-pl-1'`,
+      { code: "P0001", message: /لا يُعدَّل/ }),
+    await mustFail("غرضٌ غير معروف لجزء الحوالة",
+      `${employee}
+       insert into payroll_links (id, employee_id, month, purpose, bank_transaction_id, amount_minor) values ('t-pl-1', 't-emp', '2026-05', 'GIFT', '${salaryTx.id}', 100)`,
+      { code: "23514" }),
+    ...(creditTx ? [await mustFail("حوالةٌ واردة تُربط براتب",
+      `${employee}
+       insert into payroll_links (id, employee_id, month, bank_transaction_id, amount_minor) values ('t-pl-1', 't-emp', '2026-05', '${creditTx.id}', 100)`,
+      { code: "P0001", message: /خارجة/ })] : []),
+    await mustFail("تأخيرٌ بلا دقائق",
+      `${employee}
+       insert into payroll_attendance (id, employee_id, day, kind) values ('t-att', 't-emp', '2026-05-02', 'LATE')`,
+      { code: "23514" }),
+  ] : [];
+
+  const all = [...results, ...inventory, ...payroll];
   const passed = all.filter(Boolean).length;
   console.log(`\n${passed} من ${all.length} قيداً يعمل.`);
   await pool.end();

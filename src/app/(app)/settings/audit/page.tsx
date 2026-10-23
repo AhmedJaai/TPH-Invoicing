@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, desc, eq, inArray, not, sql, type SQL } from "drizzle-orm";
 import {
-  Boxes, FileText, Landmark, Sparkles, Store, UserRound, Wallet, CircleDot, type LucideIcon,
+  Boxes, FileText, Landmark, Sparkles, Store, UserRound, Users, Wallet, CircleDot, type LucideIcon,
 } from "lucide-react";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { db } from "@/db";
@@ -40,6 +40,7 @@ const KIND_ICON: Record<AuditKind, LucideIcon> = {
   bank: Landmark,
   suppliers: Store,
   inventory: Boxes,
+  payroll: Users,
   learned: Sparkles,
   other: CircleDot,
 };
@@ -50,6 +51,7 @@ const KIND_TONE: Record<AuditKind, string> = {
   bank: "bg-sand-bg text-sand",
   suppliers: "bg-plum-bg text-plum",
   inventory: "bg-ok-bg text-ok",
+  payroll: "bg-info-bg text-info",
   learned: "bg-sunken text-muted",
   other: "bg-sunken text-ink-soft",
 };

@@ -81,5 +81,6 @@
   "080_finance.sql": "197b934c512200247d3429bae7d647ca557c5e31fe0b0583b3ee8fbedfee2003",
   "081_team_captures.sql": "cb66828f9738532641fbc8392a20d84f279ec99654fdb50f5c84fc11bbc9609a",
   "082_capture_drafts.sql": "ceb3d6aef7f42ad1bad5171aa9da3bc38efde911a362a720cf433e0c8bb24319",
-  "083_owner_transfer_payments.sql": "ec5d8e37586fe303c5abc22b66a3ce02cc4c91c302833cb8c58c480ef20d3956"
+  "083_owner_transfer_payments.sql": "ec5d8e37586fe303c5abc22b66a3ce02cc4c91c302833cb8c58c480ef20d3956",
+  "084_payroll.sql": "b2256ca9b493b63fd10a7a24074ed7e3f7ea7288a7c8964a7b1b31a713368c00"
 }

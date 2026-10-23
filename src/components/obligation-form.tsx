@@ -16,14 +16,18 @@ import { buttonClass, fieldClass } from "./ui-tokens";
  * يُفتح في لوحٍ كي لا يطول الجدول. والخطأُ بجانب حقله، والخادمُ يعيد الفحص.
  * وما كُتب يبقى في اللوح إن فشل الحفظ.
  */
-export function ObligationForm({ existing }: { existing?: Obligation }) {
+export function ObligationForm({ existing, preset }: {
+  existing?: Obligation;
+  /** وثيقةُ موظّفٍ من صفحته: نوعُها وصاحبُها معروفان، وتُربط به (084). */
+  preset?: { kind: ObligationKind; holder: string; employeeId: string };
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<ObligationKind>(existing?.kind ?? "MUNICIPAL_LICENCE");
+  const [kind, setKind] = useState<ObligationKind>(existing?.kind ?? preset?.kind ?? "MUNICIPAL_LICENCE");
   const [title, setTitle] = useState(existing?.title ?? "");
   const [issuer, setIssuer] = useState(existing?.issuer ?? "");
   const [reference, setReference] = useState(existing?.reference ?? "");
-  const [holder, setHolder] = useState(existing?.holder ?? "");
+  const [holder, setHolder] = useState(existing?.holder ?? preset?.holder ?? "");
   const [expiresOn, setExpiresOn] = useState(existing?.expiresOn ?? "");
   const [remindDays, setRemindDays] = useState(String(existing?.remindDays ?? DEFAULT_REMIND_DAYS));
   const [note, setNote] = useState(existing?.note ?? "");
@@ -43,6 +47,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
       action: existing ? "update" : "create",
       ...(existing ? { id: existing.id } : {}),
       kind, title: title.trim(), issuer, reference, holder, expiresOn, remindDays: remind, note,
+      ...(preset && !existing ? { employeeId: preset.employeeId } : {}),
     });
     if (!r.ok) {
       setError(r.error);
@@ -51,7 +56,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
     toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "حُفظ" });
     setOpen(false);
     if (!existing) {
-      setTitle(""); setIssuer(""); setReference(""); setHolder(""); setExpiresOn(""); setNote(""); setTried(false);
+      setTitle(""); setIssuer(""); setReference(""); setHolder(preset?.holder ?? ""); setExpiresOn(""); setNote(""); setTried(false);
     }
     router.refresh();
     return true;
@@ -61,7 +66,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
     <>
       <button type="button" onClick={() => setOpen(true)} className={`${buttonClass(existing ? "quiet" : "primary", existing ? "sm" : "md")} relative`}>
         {existing ? <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
-        {existing ? "تعديل أو تجديد" : "إضافة وثيقة"}
+        {existing ? "تعديل أو تجديد" : preset ? "أضف وثيقة له" : "إضافة وثيقة"}
       </button>
       <Sheet
         open={open}

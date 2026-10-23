@@ -74,6 +74,8 @@ export interface ObligationInput {
   expiresOn: string;
   remindDays: number;
   note: string | null;
+  /** يُكتب عند الإنشاء من صفحة الموظّف؛ والتعديلُ بلا الحقل لا يفكّه. */
+  employeeId?: string;
 }
 
 function auditShape(o: ObligationInput) {

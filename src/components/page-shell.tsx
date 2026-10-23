@@ -50,11 +50,11 @@ export function AppShell({
   drawer?: React.ReactNode;
 }) {
   const counts: Promise<ShellCounts> = Promise.all([
-    can(user.role, "reports:view") ? workCount().catch(() => null) : Promise.resolve(0),
+    can(user.role, "reports:view") ? workCount(user.role).catch(() => null) : Promise.resolve(0),
     inboxCount().catch(() => null),
     /* من بنود الطابور نفسها (مخبّأةٌ في الطلب) — لا استعلامَ ثانٍ */
-    can(user.role, "reports:view") ? workByArea().catch(() => ({})) : Promise.resolve({}),
-    can(user.role, "reports:view") ? workByTab().catch(() => ({})) : Promise.resolve({}),
+    can(user.role, "reports:view") ? workByArea(user.role).catch(() => ({})) : Promise.resolve({}),
+    can(user.role, "reports:view") ? workByTab(user.role).catch(() => ({})) : Promise.resolve({}),
   ]).then(([pending, documents, areas, tabs]) => ({ pending, documents, areas, tabs }));
 
   return (

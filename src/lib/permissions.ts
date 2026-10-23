@@ -43,10 +43,11 @@ export type Capability =
   | "bank:edit"
   | "expense:edit"
   /**
-   * ⚠ معرَّفةٌ ولا تُفرَض بعد: لا صفحةَ ولا مسارَ يسأل عنها، فمن يملك `bank:view` يرى
-   * حوالات الرواتب في كشف البنك والمصروفات. فلا تُعدّ حمايةً قائمة — انظر `SECURITY.md` §٥.
+   * الموظّفون والرواتب والحضور (084): للمالك وحده، قراءةً وكتابة — ومنحُها للمحاسب قرارُ أحمد.
+   * (وحوالاتُ الرواتب ما زالت تُرى في كشف البنك لمن يملك `bank:view` — انظر `SECURITY.md` §٥.)
    */
   | "payroll:view"
+  | "payroll:edit"
   | "payment:approve"
   | "month:close"
   | "month:reopen"
@@ -74,7 +75,7 @@ export type Capability =
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
-    "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view",
+    "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view", "payroll:edit",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
   ],
@@ -126,6 +127,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "bank:edit": "تصنيف حركات البنك",
   "expense:edit": "تعديل المصروفات",
   "payroll:view": "عرض الرواتب",
+  "payroll:edit": "تعديل الموظفين والرواتب والحضور",
   "payment:approve": "اعتماد السداد",
   "month:close": "إقفال الشهر",
   "month:reopen": "إعادة فتح الشهر",

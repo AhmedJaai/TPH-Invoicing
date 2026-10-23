@@ -83,7 +83,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 - **عددٌ واحد للعمل الباقي**: `countPendingWork()` = بنود `/attention`. والقاعدة الواحدة تُستدعى أو تُحقَن ولا تُنسَخ في شاشة.
 - **لا `as` لإسكات اختلاف أنواع** — الترجمة صريحة ولها اختبار، والطلبُ يُفحَص بـzod وقتَ التشغيل لا بـ`as Body`.
 - **قاعدةٌ لا تعرف شيئاً بعد لا تعرض أصفاراً ولا «سليم»** — السؤال «أيعرف شيئاً؟» واحد (`src/services/start.service.ts`). والصدقُ المنطقيّ على المجموعة الفارغة كذبٌ عمليّ.
-- **التنقّل تسعُ مساحاتٍ في ثلاث مجموعات (`src/lib/nav.ts`)**، ولوحةُ الأوامر (`src/lib/commands.ts`) واختصاراتُ `G` تُشتقّ منه ولا تُنسَخ. **والشكلُ نظامُ التصميم الثاني** (`globals.css` · `ui.tsx`) — لا تُعِد الأبيضَ والأسودَ الخالصين.
+- **التنقّل عشرُ مساحاتٍ في ثلاث مجموعات (`src/lib/nav.ts`)**، ولوحةُ الأوامر (`src/lib/commands.ts`) واختصاراتُ `G` تُشتقّ منه ولا تُنسَخ. **والشكلُ نظامُ التصميم الثاني** (`globals.css` · `ui.tsx`) — لا تُعِد الأبيضَ والأسودَ الخالصين.
 - **وضع المعاينة و`AUTH_BYPASS` لا يعملان في الإنتاج** (`src/lib/preview-mode.ts`)، و`VERCEL_ENV` هو الحاكم حيث يوجد.
 
 ## خريطة الوثائق — ماذا تقرأ قبل أن تمسّ
@@ -100,6 +100,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | الجرد، الوصفات، كتالوج فودكس، استيراد المبيعات | `docs/decisions/inventory-foodics.md` | `src/lib/inventory/` · `src/lib/sales/` · `inventory.service.ts` · `sales-import.service.ts` · `catalog-import.service.ts` |
 | واجهةُ فودكس، مرآتُه، مقارنتُه بالبنك وبالفواتير | `docs/decisions/foodics-witness.md` | `src/lib/foodics/` · `foodics-sync.service.ts` · `foodics-takings.service.ts` · `foodics-compare.service.ts` |
 | المالية: الربح، الوضع الآن، المبيعات، المشترى والمباع، القراءةُ الذكيّة | `docs/decisions/finance.md` | `src/lib/finance/` · `profit.service.ts` · `stock-flow.service.ts` · `stock-link.service.ts` · `sales-analysis.service.ts` · `finance-reading.service.ts` |
+| الموظّفون، الرواتب، ربطُ الحوالات بغرضها، الحضور برابط الموقع | `docs/decisions/payroll.md` | `src/lib/payroll/` · `payroll.service.ts` · `/payroll` · `/a/[token]` |
 | القاعدة والمخطّط والهجرات | `docs/data-model/migrations.md` | `src/db/schema.ts` · `drizzle/sql/` |
 | نصوص الإصلاح، البوّابة، الاختبار، التشغيل، الأمان | `docs/decisions/engineering-ops.md` | `scripts/` · `guard.ts` · `SECURITY.md` |
 | أين تقع دالّةٌ ما | `docs/reference/modules.md` | — |
@@ -127,4 +128,5 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 - **تدوير `GEMINI_API_KEY` و`GOOGLE_CLIENT_SECRET`** — ظهرا في محادثة. و**`FOODICS_API_TOKEN`** ظهر كذلك (١١ أكتوبر ٢٠٢٦): قراءةٌ فقط، ويُلغى من «Authorized Apps» ويُطلَب غيرُه.
 - **«سبعة جرة — عميل»** مسجَّلٌ مورّداً وهو عميل؛ ولا جدول عملاء بعد.
-- **ما لا يراه الكشف** (`/finance/inputs`): رواتبُ مايو (لا راتبَ في كشفه)، وهل يُدفَع شيءٌ نقداً من الصندوق. و**إقرارُ ١٣ ربطاً جاهزاً** لبنود الفواتير (`/finance/stock/links`). (الإيجارُ وتحويلاتُ المالك حُسما في ١٢ أكتوبر ٢٠٢٦ — `docs/decisions/finance.md`.)
+- **إدخالُ الموظّفين وتوزيعُ الحوالات** (`/payroll`): ثمانيةُ مستفيدين في الكشف ينتظرون «أضفه»، ورواتبُ مايو تُوزَّع من تحويلاته لنفسه؛ وضبطُ موقع المقهى وشبكته وإرسالُ روابط الحضور. **و`payroll:view` للمحاسب؟** قرارُه.
+- **ما لا يراه الكشف** (`/finance/inputs`): وهل يُدفَع شيءٌ نقداً من الصندوق. و**إقرارُ ١٣ ربطاً جاهزاً** لبنود الفواتير (`/finance/stock/links`). (الإيجارُ وتحويلاتُ المالك حُسما في ١٢ أكتوبر ٢٠٢٦ — `docs/decisions/finance.md`.)

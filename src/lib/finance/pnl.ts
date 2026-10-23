@@ -59,6 +59,8 @@ export interface ExcludedRow {
   label: string;
   amountMinor: number;
   reason: string;
+  /** ضريبةٌ (الأصل) أو مالٌ محسوبٌ في المشتريات — أعطاه المالكُ موظّفاً ليسدّد فاتورة (084). */
+  kind?: "TAX" | "PURCHASES";
 }
 
 /** ضريبةُ الرسوم مبلغُها هو الضريبة، وتُخصَم في الإقرار (`vat-return.ts`) — ليست مصروفاً. */
@@ -286,8 +288,10 @@ export function buildPnl(input: PnlInput): Pnl {
   lines.push({ id: "profit", label: profitLabel, amountMinor: profitMinor, kind: "total", note: profitMinor === null ? "يحتاج إلى إيراد وتكلفة" : undefined });
 
   /* ── للعلم: ما ليس مصروفاً ── */
-  const excludedMinor = input.excluded.reduce((s, x) => s + x.amountMinor, 0);
+  const excludedMinor = input.excluded.filter((x) => x.kind !== "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);
   if (excludedMinor > 0) lines.push({ id: "excluded", label: "ضريبة سُدّدت أو تُخصم في الإقرار، وليست مصروفاً", amountMinor: excludedMinor, kind: "memo" });
+  const viaStaffMinor = input.excluded.filter((x) => x.kind === "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);
+  if (viaStaffMinor > 0) lines.push({ id: "excluded-purchases", label: "مبالغ أعطيتها موظفين ليسددوا فواتير مورّدين، محسوبة في المشتريات لا في المصروفات", amountMinor: viaStaffMinor, kind: "memo" });
   if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروبات الموظفين بتكلفتها، وهي داخلة في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
 
   return {

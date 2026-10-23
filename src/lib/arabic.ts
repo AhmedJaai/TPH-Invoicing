@@ -67,6 +67,22 @@ export const TRANSACTION: NounForms = {
   zero: "لا حركات",
 };
 
+export const TRANSFER: NounForms = {
+  one: "حوالة واحدة",
+  two: "حوالتان",
+  few: "حوالات",
+  many: "حوالة",
+  zero: "لا حوالات",
+};
+
+export const EMPLOYEE: NounForms = {
+  one: "موظف واحد",
+  two: "موظفان",
+  few: "موظفين",
+  many: "موظفاً",
+  zero: "لا موظفين",
+};
+
 export const TIME: NounForms = {
   one: "مرّة واحدة",
   two: "مرّتين",

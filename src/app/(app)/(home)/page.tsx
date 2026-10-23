@@ -63,7 +63,7 @@ export default async function HomePage() {
   const canPay = can(user.role, "payment:approve");
   const canBank = can(user.role, "bank:view");
 
-  const attentionP = attentionItems();
+  const attentionP = attentionItems(user.role);
   /* «ما الذي تغيّر» يجري مع الطابور لا بعده — يأخذ منه ارتفاعَ الأسعار وعداً */
   const factsP = gatherChangeFacts(attentionP.then((a) => {
     const rises = a.find((i) => i.id === "price-rises");

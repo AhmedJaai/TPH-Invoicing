@@ -66,6 +66,8 @@ export const RULES: Record<string, RateLimitRule> = {
   */
   "capture-check": { limit: 40, windowSeconds: 3600 },
   "capture-submit": { limit: 40, windowSeconds: 3600 },
+  /* رابطُ الحضور: تسجيلان في اليوم عادةً — والعشرون سقفٌ لمن يعبث بالرابط */
+  "attend": { limit: 20, windowSeconds: 3600 },
   "capture-file": { limit: 300, windowSeconds: 3600 },
   "capture-state": { limit: 300, windowSeconds: 3600 },
   /*

@@ -35,10 +35,11 @@ import { previousMonth, stockWindow, type StockWindow } from "@/lib/finance/stoc
 import { addDays, currentMonthRiyadh, daysBetween, daysInMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { recordAudit } from "@/lib/audit";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { catalogCosts, latestInvoiceUnitCosts, loadSoldForReport, loadWaste } from "./inventory.service";
 import { loadRecipeVersions } from "./recipe.service";
+import { payrollReclass } from "./payroll.service";
 import { loadCountDays } from "./stock-flow.service";
 import { coverageOf } from "./vat-return.service";
 import type { Conn } from "./types";
@@ -380,7 +381,7 @@ export interface ExpenseRowView extends OpexRow {
 }
 
 async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
-  const [rows, draws, ownerPaid] = await Promise.all([
+  const [rows, draws, ownerPaid, toPayroll] = await Promise.all([
     conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null }>(sql`
       select e.id, e.category::text as category, e.label, e.amount_minor, e.source::text as source, e.occurred_on,
              e.bank_transaction_id, bt.description, bt.beneficiary_raw as beneficiary
@@ -412,6 +413,8 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
          and status not in ('REVERSED', 'VOID')
          and to_char(paid_at at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}
     `),
+    /* ما وُزّع من حوالات الرواتب وتحويلات المالك على موظّفين بغرضه — «الموظفون» (084) */
+    payrollReclass(month, conn),
   ]);
   const spreadTx = new Map(declarations.filter((d) => d.kind === "SPREAD" && d.bankTransactionId).map((d) => [d.bankTransactionId, d]));
   const opex: ExpenseRowView[] = [];
@@ -441,9 +444,30 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
   for (const d of draws.rows) {
     opex.push({ id: `owner-${d.id}`, category: "PERSONAL", label: d.label ?? "تحويل لحساب المالك", amountMinor: d.amount_minor, source: "BANK", occurredOn: d.day, bankTransactionId: d.id, declarationId: null });
   }
+  /*
+    الحوالةُ لموظّفٍ بغرضها (084): ليس كلُّ ما حوّله المالكُ لنفسه شخصيّاً (منه رواتبُ دفعها)،
+    وليس كلُّ ما حُوِّل للوليد راتباً (منه ما سدّد به فاتورة). فيُنقل الجزءُ من فئة الحوالة إلى فئة
+    غرضه — المجموعُ لا يتغيّر — وسدادُ الفاتورة يخرج: محسوبٌ في المشتريات.
+  */
+  const RECLASS_LABEL: Record<string, string> = {
+    SALARY: "رواتب ودفعات للموظفين من هذه الحوالات",
+    OTHER: "مصروفات دفعها موظفون من حوالاتهم",
+    PERSONAL: "مال شخصي حوّلته لموظفين",
+  };
+  let movedFromPersonal = 0;
+  for (const r of toPayroll) {
+    const from = r.from === "PERSONAL" ? "تحويلاتك لحسابك" : "حوالات الرواتب";
+    opex.push({ id: `payroll-out-${r.from}-${r.purpose}-${month}`, category: r.from, label: `منها ${countNoun(r.transfers, TRANSACTION)} وُزّعت على موظفين بغرض آخر، فنُقلت إلى بابها`, amountMinor: -r.amountMinor, source: "BANK", occurredOn: null, bankTransactionId: null, declarationId: null });
+    if (r.from === "PERSONAL") movedFromPersonal += r.amountMinor;
+    if (r.to === "EXCLUDED") {
+      excluded.push({ id: `payroll-invoice-${r.from}-${month}`, label: `من ${from}: مبالغ أعطيتها موظفين ليسددوا فواتير مورّدين`, amountMinor: r.amountMinor, reason: "محسوبة في المشتريات حين قُيّدت الفاتورة، فلا تُحسب مصروفاً مرة ثانية", kind: "PURCHASES" });
+    } else {
+      opex.push({ id: `payroll-in-${r.from}-${r.purpose}-${month}`, category: r.to, label: `${RECLASS_LABEL[r.to]} (من ${from})`, amountMinor: r.amountMinor, source: "BANK", occurredOn: null, bankTransactionId: null, declarationId: null });
+    }
+  }
   const paid = ownerPaid.rows[0];
   const { deductMinor, beyondMinor } = ownerPaidDeduction(
-    draws.rows.reduce((sum, d) => sum + d.amount_minor, 0),
+    draws.rows.reduce((sum, d) => sum + d.amount_minor, 0) - movedFromPersonal,
     Number(paid?.total ?? 0),
   );
   if (deductMinor > 0) {

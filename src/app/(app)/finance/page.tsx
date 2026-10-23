@@ -28,7 +28,7 @@ function hrefOf(id: string, month: string): string | null {
   if (id === "cogs-theoretical" || id === "cogs-unexplained" || id === "cogs-waste" || id === "staff-drinks") return `/finance/stock?month=${month}`;
   if (id === "opex") return `/finance/rows?month=${month}&line=opex`;
   if (id.startsWith("op-")) return `/finance/rows?month=${month}&line=opex&category=${id.slice(3)}`;
-  if (id === "excluded") return `/finance/rows?month=${month}&line=excluded`;
+  if (id === "excluded" || id === "excluded-purchases") return `/finance/rows?month=${month}&line=excluded`;
   return null;
 }
 

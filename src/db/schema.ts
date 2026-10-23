@@ -2110,6 +2110,8 @@ export const obligations = pgTable("obligations", {
   issuer: text("issuer"),
   reference: text("reference"),
   holder: text("holder"),
+  /** وثيقةُ موظّف (إقامة · شهادة صحية) — 084. */
+  employeeId: text("employee_id").references((): AnyPgColumn => employees.id, { onDelete: "set null" }),
   /** YYYY-MM-DD — شرطُ الوثيقة: لا تُحفظ بلا تاريخ. */
   expiresOn: text("expires_on").notNull(),
   remindDays: integer("remind_days").notNull().default(30),
@@ -2395,4 +2397,120 @@ export const captures = pgTable("captures", {
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionNote: text("decision_note"),
   createdAt: now(),
+});
+
+/* ───────────────────────── الموظّفون والرواتب والحضور (084) ───────────────────────── */
+
+/** موظّفٌ شهريّ أو جزئيّ، ومدّةُ عمله بأيّامها. رقمُ المستفيد في البنك تُقترح به حوالاتُه. */
+export const employees = pgTable("employees", {
+  id: id(),
+  name: text("name").notNull(),
+  kind: text("kind").$type<"MONTHLY" | "PART_TIME">().notNull(),
+  jobTitle: text("job_title"),
+  phone: text("phone"),
+  nationalId: text("national_id"),
+  bankBeneficiaryId: text("bank_beneficiary_id"),
+  iban: text("iban"),
+  hiredOn: text("hired_on").notNull(),
+  leftOn: text("left_on"),
+  shiftStart: text("shift_start"),
+  shiftMinutes: integer("shift_minutes").notNull().default(480),
+  lateGraceMinutes: integer("late_grace_minutes").notNull().default(0),
+  daysOff: text("days_off").notNull().default(""),
+  checkinTokenHash: text("checkin_token_hash"),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** الراتبُ من شهرٍ يبدأ منه — للشهريّ راتبُ الشهر، وللجزئيّ أجرُ الساعة. */
+export const employeeRates = pgTable("employee_rates", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  fromMonth: text("from_month").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+});
+
+export type PayrollAdjustmentKind =
+  | "DEDUCTION" | "FINE" | "ADVANCE" | "LOAN_REPAYMENT" | "BONUS" | "OVERTIME" | "ALLOWANCE" | "LOAN_GIVEN";
+
+export const payrollAdjustments = pgTable("payroll_adjustments", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  month: text("month").notNull(),
+  kind: text("kind").$type<PayrollAdjustmentKind>().notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+});
+
+export type AttendanceKind = "LATE" | "EARLY" | "ABSENT" | "LEAVE";
+
+export const payrollAttendance = pgTable("payroll_attendance", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  day: text("day").notNull(),
+  kind: text("kind").$type<AttendanceKind>().notNull(),
+  minutes: integer("minutes"),
+  source: text("source").$type<"MANUAL" | "CHECKIN">().notNull().default("MANUAL"),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+});
+
+export const payrollWeeks = pgTable("payroll_weeks", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  weekStart: text("week_start").notNull(),
+  minutes: integer("minutes"),
+  amountMinor: integer("amount_minor").notNull(),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+});
+
+export type PayrollLinkPurpose = "SALARY" | "ADVANCE" | "LOAN" | "INVOICE" | "EXPENSE" | "PERSONAL";
+
+/** حوالةٌ أو جزءٌ منها لموظّفٍ بغرضها — يحرسه مؤثِّر 084. */
+export const payrollLinks = pgTable("payroll_links", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  month: text("month").notNull(),
+  purpose: text("purpose").$type<PayrollLinkPurpose>().notNull().default("SALARY"),
+  bankTransactionId: text("bank_transaction_id").notNull().references(() => bankTransactions.id, { onDelete: "restrict" }),
+  amountMinor: integer("amount_minor").notNull(),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+});
+
+export type CheckinVerdict = "IN_PLACE" | "ON_NETWORK" | "FAR" | "NO_LOCATION";
+
+/** تسجيلُ حضورٍ أو انصرافٍ من جوال الموظّف — بموقعه وشبكته والحكمِ عليه. */
+export const attendanceCheckins = pgTable("attendance_checkins", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  kind: text("kind").$type<"IN" | "OUT">().notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  day: text("day").notNull(),
+  latMicro: integer("lat_micro"),
+  lngMicro: integer("lng_micro"),
+  accuracyM: integer("accuracy_m"),
+  distanceM: integer("distance_m"),
+  ip: text("ip"),
+  verdict: text("verdict").$type<CheckinVerdict>().notNull(),
+  userAgent: text("user_agent"),
+  review: text("review").$type<"ACCEPTED" | "REJECTED">(),
+  reviewedById: text("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
 });

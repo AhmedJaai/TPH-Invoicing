@@ -28,6 +28,7 @@ import { gatherAttentionFacts } from "./attention-facts";
 import { partitionSnoozed, type SnoozedItem } from "./attention-snooze";
 import { todayInRiyadh } from "./riyadh-time";
 import { areaCounts, tabCounts } from "./nav";
+import { can, type Capability, type Role } from "./permissions";
 import { loadOpenIbanWatch } from "@/services/iban-guard.service";
 import { groupIban } from "./bank/iban-guard";
 import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
@@ -37,6 +38,7 @@ import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service"
 import { loadFinanceAttentionFacts } from "@/services/finance-attention.service";
 import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { loadRepeatDeliveries } from "@/services/repeat-delivery.service";
+import { loadPayrollAttentionFacts } from "@/services/payroll.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
 
 /** كلُّ البنود كما يبنيها `buildAttention` — قبل أن يُفرز المؤجَّل. */
@@ -44,9 +46,10 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, payroll] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(),
+    loadPayrollAttentionFacts(todayInRiyadh()),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -62,6 +65,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     foodicsPurchaseMissing: foodics.purchaseMissing,
     financeRentLumps: finance.rentLumps,
     financeLastMonthMissing: finance.lastMonthMissing,
+    payroll,
     stockLinksReady: finance.readyLinks,
     foodicsTillGaps: finance.tillGaps,
     foodicsStaleHours: finance.foodicsStaleHours,
@@ -98,21 +102,27 @@ export const attentionSplit = cache(async (): Promise<{ active: AttentionItem[];
   return partitionSnoozed(items, rows.rows, todayInRiyadh());
 });
 
-export const attentionItems = cache(async (): Promise<AttentionItem[]> => (await attentionSplit()).active);
+/**
+ * بندٌ يحتاج صلاحيةً (الرواتب للمالك وحده) لا يُعرض لمن لا يملكها — رابطٌ يفتح «لا صلاحية»
+ * طريقٌ مسدود. والدورُ نفسُه يمرّ بالعدّاد والصفحة، فيبقى العددُ عددَ ما يُفتح.
+ */
+const visibleTo = (role: Role | undefined) => (i: { needs?: Capability }) => !i.needs || !role || can(role, i.needs);
+
+export const attentionItems = cache(async (role?: Role): Promise<AttentionItem[]> => (await attentionSplit()).active.filter(visibleTo(role)));
 
 /** ما أُجِّل من البنود — بيوم عودته وسببه. */
-export const snoozedAttention = cache(async (): Promise<SnoozedItem[]> => (await attentionSplit()).snoozed);
+export const snoozedAttention = cache(async (role?: Role): Promise<SnoozedItem[]> => (await attentionSplit()).snoozed.filter((s) => visibleTo(role)(s.item)));
 
 /** عددُ ما ينتظر قراراً — وهو عددُ بنود `/attention` نفسه. */
-export const workCount = cache(async (): Promise<number> => (await attentionItems()).length);
+export const workCount = cache(async (role?: Role): Promise<number> => (await attentionItems(role)).length);
 
 /** أين تقع البنودُ المفتوحة — نقطةٌ بجانب المساحة في الشريط (`areaCounts`). */
-export const workByArea = cache(async (): Promise<Record<string, number>> =>
-  areaCounts((await attentionItems()).map((i) => i.href)));
+export const workByArea = cache(async (role?: Role): Promise<Record<string, number>> =>
+  areaCounts((await attentionItems(role)).map((i) => i.href)));
 
 /** وكم منها في كلّ لسانٍ داخل المساحة — عددٌ بجانب اسم اللسان (`tabCounts`). */
-export const workByTab = cache(async (): Promise<Record<string, number>> =>
-  tabCounts((await attentionItems()).map((i) => i.href)));
+export const workByTab = cache(async (role?: Role): Promise<Record<string, number>> =>
+  tabCounts((await attentionItems(role)).map((i) => i.href)));
 
 /** مستنداتٌ لم يُبَتّ فيها — العدد الذي تفتحه «المستندات». */
 export const inboxCount = cache(async (): Promise<number> => {

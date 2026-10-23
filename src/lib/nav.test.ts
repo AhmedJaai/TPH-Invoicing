@@ -89,7 +89,7 @@ describe("visibleAreas", () => {
   it("المالك يرى المساحات التسع كلّها", () => {
     expect(visibleAreas("OWNER")).toHaveLength(AREAS.length);
     /* ثمانٍ ثمّ «المالية» (١١ أكتوبر ٢٠٢٦) — وما زاد فوقها يُسأل: أهو عملٌ يوميّ أم لسانٌ في مساحة؟ */
-    expect(AREAS).toHaveLength(9);
+    expect(AREAS).toHaveLength(10);
   });
 
   it("مدير المشتريات لا يرى المال ولا ما يحتاج قراراً", () => {

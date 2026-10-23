@@ -4,7 +4,7 @@
  *   اليوم      — ما حال المقهى؟ · ما ينتظر قراري؟ · ما الذي وصلني؟
  *   المال      — هل ربحتُ ولماذا؟ · لمن أدين؟ · ماذا أدفع هذا الأسبوع وهل يكفي
  *                النقد؟ · أين ذهب المال؟ · هل يُقفَل الشهر؟
- *   التشغيل    — أين ذهب ما اشتريتُه؟
+ *   التشغيل    — أين ذهب ما اشتريتُه؟ · كم أحوّل لكلّ موظّف، ومن حضر؟
  *
  * كان ستَّ مساحاتٍ تحت كلٍّ منها ألسنة، و«المال» تجمع البنكَ والإقفالَ
  * ودفعةَ الشهر في بابٍ واحد — فيقرأ صاحبُ المقهى «عليك ١٢ ألفاً» ثمّ
@@ -28,7 +28,7 @@ export type NavGroup = "today" | "money" | "ops";
 /** مفتاحُ الأيقونة — يُرسَم في `components/icons.tsx`. */
 export type NavIcon =
   | "today" | "decisions" | "documents" | "suppliers" | "payments"
-  | "bank" | "close" | "inventory" | "settings" | "audit" | "finance";
+  | "bank" | "close" | "inventory" | "settings" | "audit" | "finance" | "team";
 
 export interface NavArea extends NavLink {
   /** الاسم القصير لشريط الجوّال. */
@@ -210,6 +210,26 @@ export const AREAS: readonly NavArea[] = [
       { href: "/inventory/items", label: "الأصناف" },
       /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
       { href: "/inventory/habit", label: "عادة البيع" },
+    ],
+  },
+  /*
+    الموظّفون (أحمد، ٢٣ أكتوبر ٢٠٢٦): مَن يعمل، وكم راتبُه، وكم بقي له، وأيُّ حوالةٍ دفعته
+    وبأيّ غرض، ومَن حضر ومتى — بلا بصمةٍ ولا كاميرات.
+  */
+  {
+    href: "/payroll",
+    label: "الموظفون",
+    short: "الموظفون",
+    icon: "team",
+    group: "ops",
+    question: "كم أحوّل لكل موظف، ومن حضر ومن تأخر",
+    chord: "e",
+    needs: "payroll:view",
+    owns: ["/payroll/slip", "/payroll/employee"],
+    children: [
+      { href: "/payroll", label: "مسيّر الرواتب" },
+      { href: "/payroll/attendance", label: "الحضور" },
+      { href: "/payroll/employees", label: "الموظفون" },
     ],
   },
 ];

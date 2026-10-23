@@ -40,7 +40,8 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" },
+          /* الموقعُ للتطبيق نفسه: رابطُ حضور الموظّف يتحقّق أنّه في المقهى، وصاحبُه يثبّت موقعَه (084) */
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self), payment=(), usb=()" },
           /* نافذةٌ فتحها رابطُ درايف لا تمسك بنافذة التطبيق، وملفّاتُه لا يحمّلها موقعٌ آخر */
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },

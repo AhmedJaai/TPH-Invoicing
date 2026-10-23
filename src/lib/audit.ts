@@ -109,6 +109,22 @@ export type AuditAction =
   /* مورّدُ فودكس رُبط بمورّدنا أو فُكّ — قرارُ إنسانٍ تقوم عليه مقارنةُ المشتريات */
   | "SUPPLIER_FOODICS_LINKED"
   /* المساحةُ الماليّة: إقرارُ المالك عمّا لا يراه الكشف، وتجميدُ تقرير الشهر المقفل */
+  /* الموظّفون والرواتب (084) */
+  | "EMPLOYEE_SAVED"
+  | "EMPLOYEE_RATE_SET"
+  | "EMPLOYEE_RATE_REMOVED"
+  | "PAYROLL_ADJUSTMENT_ADDED"
+  | "PAYROLL_ADJUSTMENT_VOIDED"
+  | "PAYROLL_ATTENDANCE_SET"
+  | "PAYROLL_ATTENDANCE_CLEARED"
+  | "PAYROLL_WEEK_SET"
+  | "PAYROLL_WEEK_CLEARED"
+  | "PAYROLL_LINKED"
+  | "PAYROLL_UNLINKED"
+  | "EMPLOYEE_CHECKIN_LINK_ISSUED"
+  | "EMPLOYEE_CHECKIN_LINK_REVOKED"
+  | "ATTENDANCE_SETTINGS_SET"
+  | "ATTENDANCE_CHECKIN_REVIEWED"
   | "FINANCE_DECLARATION_CREATED"
   | "FINANCE_DECLARATION_VOIDED"
   | "FINANCE_PNL_FROZEN"

@@ -17,7 +17,11 @@ import { previewAllowed } from "@/lib/preview-mode";
   `/models/` و`/ort/`: نموذجُ زوايا الورقة وملفّاتُ تشغيله — ملفّاتٌ ثابتة لا بيانات، يطلبها
   عاملُ ماسح الباريستا بلا جلسة. كانت تُحوَّل إلى صفحة الدخول (٣٠٧) فلا يُحمَّل النموذجُ أبداً.
 */
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/", "/c/", "/api/capture/scan/", "/models/", "/ort/"];
+/*
+  `/a/` و`/api/attend`: رابطُ حضور الموظّف — بلا جلسة، ورمزُه إذنُه، ولا يملك إلّا تسجيلَ حضورِ صاحبه
+  (`payroll.service.ts` · `resolveCheckinToken`).
+*/
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/", "/c/", "/api/capture/scan/", "/models/", "/ort/", "/a/", "/api/attend"];
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;

@@ -35,6 +35,8 @@ export const ATTENTION_IDS = [
   "foodics-stale",
   "foodics-till-gap",
   "finance-incomplete",
+  "payroll-checkins",
+  "payroll-open",
   "stock-links-ready",
   "stock-gap-shortage",
   "stock-gap-over",

@@ -60,7 +60,7 @@ export default async function AttentionPage({
     );
   }
 
-  const [items, snoozed] = await Promise.all([attentionItems(), snoozedAttention()]);
+  const [items, snoozed] = await Promise.all([attentionItems(user.role), snoozedAttention(user.role)]);
   const snoozedBlock = snoozed.length > 0 ? <SnoozedList snoozed={snoozed} canEdit={can(user.role, "bank:edit")} /> : null;
   const { top, rest } = prioritize(items, items.length);
   const ordered = [...top, ...rest];

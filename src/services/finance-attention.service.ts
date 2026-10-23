@@ -101,7 +101,11 @@ export async function loadFinanceAttentionFacts(): Promise<FinanceAttentionFacts
                          and not exists (select 1 from finance_declarations d where d.bank_transaction_id = e.bank_transaction_id and d.voided_at is null and d.kind = 'SPREAD'))
               or exists (select 1 from finance_declarations d where d.voided_at is null and d.category = 'RENT' and d.from_month <= ${lastMonth} and d.to_month >= ${lastMonth})) as rent,
              (exists (select 1 from expenses e where e.period_month = ${lastMonth} and e.category = 'SALARY' and e.amount_minor > 0)
-              or exists (select 1 from finance_declarations d where d.voided_at is null and d.category = 'SALARY' and d.from_month <= ${lastMonth} and d.to_month >= ${lastMonth})) as salary
+              or exists (select 1 from finance_declarations d where d.voided_at is null and d.category = 'SALARY' and d.from_month <= ${lastMonth} and d.to_month >= ${lastMonth})
+              /* رواتبُ دفعها المالكُ من تحويلاته لنفسه ووزّعها على موظّفيه (084) */
+              or exists (select 1 from payroll_links pl join bank_transactions bt on bt.id = pl.bank_transaction_id
+                          where pl.voided_at is null and pl.purpose in ('SALARY', 'ADVANCE', 'LOAN') and bt.category = 'PERSONAL'
+                            and to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM') = ${lastMonth})) as salary
     `),
     loadStockLinks(),
     db.execute<{ id: string; day: string; user_name: string | null; variance_minor: number | null; closing_minor: number | null; estimated_cash_minor: number | null }>(sql`

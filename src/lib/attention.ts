@@ -2,6 +2,7 @@ import {
   BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun, type NounForms,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
+import type { Capability } from "./permissions";
 import { formatDay, formatMonth } from "./riyadh-time";
 import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
@@ -106,6 +107,8 @@ export interface AttentionItem {
   /** أثره بالريال — يُقدَّم على الشدّة في الترتيب حين يكون معلوماً. */
   impact: AttentionImpact;
   evidence: AttentionEvidence[];
+  /** صلاحيةُ صفحته — لا يُعرض لمن لا يملكها (`work.ts`). */
+  needs?: Capability;
 }
 
 export interface AttentionFacts {
@@ -228,6 +231,8 @@ export interface AttentionFacts {
    */
   financeRentLumps?: { day: string; amountMinor: number }[];
   financeLastMonthMissing?: { month: string; rent: boolean; salary: boolean } | null;
+  /** الموظّفون (084): حوالاتُ رواتب لم تُوزَّع، وحضورٌ بلا شاهد، وموظّفٌ بلا راتب. */
+  payroll?: { unlinkedSalary: { count: number; amountMinor: number }; unreviewedCheckins: number; missingRates: string[] };
   stockLinksReady?: { count: number; valueMinor: number };
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
   foodicsStaleHours?: number | null;
@@ -890,6 +895,46 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: Math.max(1, lumps.length),
       impact: { kind: "BLOCKED", amountMinor: lumps.length > 0 ? lumps.reduce((s, l) => s + l.amountMinor, 0) : null },
       evidence: lumps.slice(0, 4).map((l) => ({ label: `إيجار خرج ${formatDay(l.day)}`, sub: "لم يُوزَّع على أشهره", amountMinor: l.amountMinor })),
+    });
+  }
+
+  /* الموظّفون: ما يُكمل المسيّرَ وما يحتاج حكمَ صاحبه — للمالك وحده (`needs`) */
+  const pay = f.payroll;
+  if (pay && pay.unreviewedCheckins > 0) {
+    out.push({
+      id: "payroll-checkins",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: pay.unreviewedCheckins === 1 ? "تسجيل حضور من خارج المقهى" : `${pay.unreviewedCheckins} تسجيلات حضور من خارج المقهى أو بلا موقع`,
+      detail: "سجّل الموظف حضوره أو انصرافه وجواله بعيد عن المقهى، أو لم يسمح بقراءة موقعه، ولم يكن على شبكة المقهى.",
+      action: "اقبله إن كان في المقهى فعلاً، أو ردّه.",
+      actionLabel: "راجع الحضور",
+      href: "/payroll/attendance#review",
+      count: pay.unreviewedCheckins,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+      needs: "payroll:view",
+    });
+  }
+  if (pay && (pay.unlinkedSalary.count > 0 || pay.missingRates.length > 0)) {
+    out.push({
+      id: "payroll-open",
+      area: "DATA",
+      severity: "OPPORTUNITY",
+      title: pay.unlinkedSalary.count > 0
+        ? `${countNoun(pay.unlinkedSalary.count, TRANSACTION)} رواتب في الكشف لم تُنسب لموظف`
+        : `${pay.missingRates.length === 1 ? pay.missingRates[0] : `${pay.missingRates.length} موظفين`} بلا راتب مكتوب`,
+      detail: [
+        pay.unlinkedSalary.count > 0 ? "بدون نسبتها لا يعرف المسيّر ما حُوّل لكل موظف، ولا كم بقي له." : null,
+        pay.missingRates.length > 0 ? `لم يُكتب راتب ${pay.missingRates.join("، ")} لهذا الشهر، فمستحقه غير معروف.` : null,
+      ].filter(Boolean).join(" "),
+      action: "انسب كل حوالة لصاحبها وغرضها (راتب، سلفة، سداد فاتورة…)، واكتب الراتب الناقص.",
+      actionLabel: "افتح المسيّر",
+      href: "/payroll#transfers",
+      count: pay.unlinkedSalary.count + pay.missingRates.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: pay.unlinkedSalary.amountMinor > 0 ? pay.unlinkedSalary.amountMinor : null },
+      evidence: [],
+      needs: "payroll:view",
     });
   }
 

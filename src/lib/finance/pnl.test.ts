@@ -121,3 +121,14 @@ describe("فواتيرُ مورّدين سُدّدت من مال المالك (�
     expect(withPaid.profitMinor).toBe((without.profitMinor ?? 0) + 115_000);
   });
 });
+
+describe("ما سُدّد به فاتورةٌ عبر موظّف (084)", () => {
+  it("يُعرض سطراً باسمه لا تحت الضريبة", () => {
+    const p = buildPnl({ ...base, excluded: [
+      { label: "ضريبة رسوم", amountMinor: 1_879, reason: "ضريبة" },
+      { label: "فاتورة عبر موظف", amountMinor: 100_000, reason: "مشتريات", kind: "PURCHASES" },
+    ] });
+    expect(p.lines.find((l) => l.id === "excluded")?.amountMinor).toBe(1_879);
+    expect(p.lines.find((l) => l.id === "excluded-purchases")?.amountMinor).toBe(100_000);
+  });
+});

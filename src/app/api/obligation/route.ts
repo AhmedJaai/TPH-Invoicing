@@ -25,6 +25,8 @@ const Fields = z.object({
   expiresOn: z.string().refine(isRealDay, "تاريخ الانتهاء غير صالح. اكتبه بصيغة YYYY-MM-DD."),
   remindDays: z.number().int().min(1, "أقل مهلة يوم واحد").max(MAX_REMIND_DAYS, `أطول مهلة ${MAX_REMIND_DAYS} يوماً`).optional(),
   note: optional(500),
+  /** وثيقةُ موظّف (إقامة · شهادة صحية) — تُربط به عند الإنشاء (084). */
+  employeeId: Id.optional(),
 });
 
 const Body = z.discriminatedUnion("action", [
@@ -46,6 +48,7 @@ function toInput(f: z.infer<typeof Fields>): ObligationInput {
     expiresOn: f.expiresOn,
     remindDays: f.remindDays ?? DEFAULT_REMIND_DAYS,
     note: clean(f.note),
+    ...(f.employeeId ? { employeeId: f.employeeId } : {}),
   };
 }
 
