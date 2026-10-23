@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, statements,
+  documents, statementLines, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -24,7 +24,7 @@ import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import {
   buildDiscrepancyMemo, type StatementLineInput,
 } from "@/lib/statement-match";
-import { parseStatementExtras } from "@/lib/extraction/statement-extras";
+import { parseStatementExtras, readingBalances } from "@/lib/extraction/statement-extras";
 import { companyConfig } from "@/config/drive";
 import { reconcileAndPersist } from "@/services/statement-reconcile.service";
 import { withDeadline } from "@/lib/ai/deadline";
@@ -215,6 +215,24 @@ async function handle(request: Request) {
    */
   void periodStart;
   void periodEnd;
+
+  /*
+    قراءةٌ لا يستقيم حسابُها لا تحلّ محلَّ قراءةٍ يستقيم حسابُها. النموذجُ قد يأخذ عمودَ الرصيد
+    مبلغاً أو يُسقط سطراً في قراءةٍ ثانية — والمحفوظُ المتّزنُ أصدقُ منه. فيُبقى، ويُقال لماذا.
+  */
+  if (persist) {
+    const fresh = readingBalances(parsedLines, extras.openingBalanceMinor, extras.closingBalanceMinor);
+    if (fresh === false) {
+      const [old] = await db.select({ ob: statements.openingBalanceMinor, cb: statements.closingBalanceMinor }).from(statements).where(eq(statements.id, statementId)).limit(1);
+      const kept = await db.select({ debitMinor: statementLines.debitMinor, creditMinor: statementLines.creditMinor }).from(statementLines).where(eq(statementLines.statementId, statementId));
+      if (old && readingBalances(kept, old.ob, old.cb) === true) {
+        return NextResponse.json({
+          error: "القراءة الجديدة للكشف لا يستقيم حسابها (الرصيد الافتتاحي مع الحركات لا يساوي الختامي)، "
+            + "فربما أُخذ عمود الرصيد مكان المبلغ أو سقط سطر. أبقيتُ القراءة السابقة لأن حسابها مستقيم، ولم يتغيّر شيء.",
+        }, { status: 409 });
+      }
+    }
+  }
 
   const { result, ours, start, end, periodLabel } = await reconcileAndPersist({
     statementId: persist ? statementId : null,

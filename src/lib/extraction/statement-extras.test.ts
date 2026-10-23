@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseStatementExtras, repairRunningBalance, repairStatementArithmetic } from "./statement-extras";
+import { parseStatementExtras, repairRunningBalance, repairStatementArithmetic, readingBalances } from "./statement-extras";
 
 describe("parseStatementExtras", () => {
   it("يقرأ الأسطر والرصيدين من مخرَج النموذج", () => {
@@ -158,5 +158,22 @@ describe("كشفٌ لا يستقيم بقراءةٍ واحدةٍ خاطئة", ()
     expect(repairStatementArithmetic([ln("2026-06-04", 80_00)], null, 320_00)).toBeNull();
     /* ينقص ١٠٠ ولا سطرَ مقروؤه رصيدُه — لا يُخمَّن أيُّها الخطأ */
     expect(repairStatementArithmetic([ln("2026-06-04", 80_00), ln("2026-06-05", 50_00)], 240_00, 470_00)).toBeNull();
+  });
+});
+
+describe("readingBalances — قراءةٌ لا يستقيم حسابها لا تحلّ محلّ مستقيمة", () => {
+  it("بيكوف: السطورُ الصحيحة تستقيم، والرصيدُ مأخوذاً مبلغاً لا يستقيم", () => {
+    const good = [15000, 15000, 15000, 15000, 15000, 15000].map((d) => ({ debitMinor: d, creditMinor: 0 }))
+      .concat([{ debitMinor: 0, creditMinor: 75000 }, { debitMinor: 0, creditMinor: 15000 }])
+      .concat([15000, 15000, 15000, 24000, 20000].map((d) => ({ debitMinor: d, creditMinor: 0 })))
+      .concat([{ debitMinor: 0, creditMinor: 54000 }, { debitMinor: 0, creditMinor: 15000 }])
+      .concat([24000, 24000].map((d) => ({ debitMinor: d, creditMinor: 0 })));
+    expect(readingBalances(good, 0, 68000)).toBe(true);
+    const balances = [15000, 30000, 45000, 60000, 75000, 90000].map((d) => ({ debitMinor: d, creditMinor: 0 }));
+    expect(readingBalances(balances, 0, 68000)).toBe(false);
+  });
+
+  it("الختاميُّ المجهول لا يحكم", () => {
+    expect(readingBalances([{ debitMinor: 100, creditMinor: 0 }], 0, null)).toBeNull();
   });
 });

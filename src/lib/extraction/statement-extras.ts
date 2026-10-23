@@ -221,3 +221,21 @@ function balanceOnly(
   if (charges < 2 || Math.abs(prev - closingMinor) > TOL) return null;
   return out;
 }
+
+/**
+ * أيستقيم حسابُ القراءة؟ افتتاحيٌّ + مدين − دائن = ختاميّ، بريالٍ تسامحاً. و`null`: لا يُعرف
+ * (ختاميٌّ لم يُقرأ) — فلا يُحكم به لقراءةٍ ولا عليها.
+ *
+ * بيكوف (٢٣ أكتوبر ٢٠٢٦): كشفُها مطابَقٌ سليم منذ ٦ أكتوبر (١٨ سطراً بلا فرق)، فضُغط
+ * «أعد القراءة» فأخذ النموذجُ عمودَ الرصيد مديناً ودائناً وأسقط سطرين — فحلّت قراءةٌ
+ * لا يستقيم حسابُها (صافيها ٦٬٠٥٠ والختاميّ ٦٨٠) محلَّ قراءةٍ تستقيم، وظهرت ١١ «فرقاً».
+ */
+export function readingBalances(
+  lines: readonly { debitMinor: number; creditMinor: number }[],
+  openingMinor: number | null,
+  closingMinor: number | null,
+): boolean | null {
+  if (closingMinor === null || lines.length === 0) return null;
+  const net = lines.reduce((s, l) => s + l.debitMinor - l.creditMinor, 0);
+  return Math.abs((openingMinor ?? 0) + net - closingMinor) <= 100;
+}
