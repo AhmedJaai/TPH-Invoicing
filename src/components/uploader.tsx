@@ -856,13 +856,26 @@ export function Uploader({
   const [draftsFailed, setDraftsFailed] = useState(false);
   useEffect(() => {
     let alive = true;
-    void loadDrafts().then((rows) => {
+    void loadDrafts().then(async (rows) => {
       if (!alive || rows.length === 0) return;
+      /*
+        مسوّدةُ صورةِ فريقٍ اعتُمدت أو رُفضت من مكانٍ آخر («اعتمد المحدَّد»، جهازٌ آخر) لا تُستعاد:
+        كانت تعود «تنتظر مراجعتك» لفاتورةٍ مؤرشفة، وصورتُها فارغة. وإن تعذّر السؤالُ بقيت كما هي.
+      */
+      const captureIds = rows.map((r) => r.payload).filter(isDraftPayload).flatMap((p) => (p.captureId ? [p.captureId] : []));
+      let waiting: Set<string> | null = null;
+      if (captureIds.length > 0) {
+        const r = await postJson<{ waiting: string[] }>("/api/capture/state", { ids: captureIds });
+        if (r.ok) waiting = new Set(r.data.waiting);
+      }
+      if (!alive) return;
       const restored: Item[] = [];
       const picks: Record<string, SupplierOption> = {};
+      let settled = 0;
       for (const row of rows) {
         const p = row.payload;
         if (!isDraftPayload(p)) { void deleteDraft(row.id); continue; }
+        if (p.captureId && waiting && !waiting.has(p.captureId)) { void deleteDraft(row.id); settled++; continue; }
         let previewUrl: string;
         if (p.fileBase64 === "" && p.captureId) {
           /* صورةُ فريقٍ فُتحت بمعرّفها: لا بايتاتَ هنا، والصورةُ من الخادم */
@@ -879,6 +892,9 @@ export function Uploader({
         }
         restored.push({ id: row.id, fileName: p.fileName, state: "done", data: p.data, edited: p.edited, fileBase64: p.fileBase64, mimeType: p.mimeType, previewUrl, captureId: p.captureId });
         if (p.chosen) picks[row.id] = p.chosen;
+      }
+      if (settled > 0) {
+        toast({ tone: "info", title: `أُزيلت ${countNoun(settled, FILE)} من المراجعة`, body: "صورها من الفريق اعتُمدت أو رُفضت من قبل، فلا شيء ينتظرك فيها." });
       }
       if (restored.length === 0) return;
       setItems((prev) => [...prev, ...restored.filter((r) => !prev.some((x) => x.id === r.id))]);

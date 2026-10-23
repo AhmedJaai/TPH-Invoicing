@@ -67,6 +67,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "capture-check": { limit: 40, windowSeconds: 3600 },
   "capture-submit": { limit: 40, windowSeconds: 3600 },
   "capture-file": { limit: 300, windowSeconds: 3600 },
+  "capture-state": { limit: 300, windowSeconds: 3600 },
   /*
     صورُ الفريق تُهيَّأ للمراجعة بمعرّفها: قراءتُها محفوظةٌ منذ وصلت، فالكلفةُ استعلاماتٌ لا
     نموذج. وصاحبُ العمل يراجع مئةً في جلسة — حدُّ «analyze» (أربعون) كان يوقفه في منتصفها.
