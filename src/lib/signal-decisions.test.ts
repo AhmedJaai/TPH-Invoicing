@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "./riyadh-time";
-import { DISMISSED, isSilenced, priceRiseKey, signalPrefix, silencedKeys, snoozeDay, snoozedUntil, statementGapKey } from "./signal-decisions";
+import { DISMISSED, isSilenced, priceRiseKey, signalPrefix, silencedKeys, snoozeDay, snoozedUntil, statementGapKey, vatRiskKey } from "./signal-decisions";
 
 describe("signal-decisions", () => {
   it("المفتاح يقبل ببادئته المعروفة وحدها", () => {
@@ -54,5 +54,13 @@ describe("مفتاحا «علمت» لارتفاع السعر وفرق الكش�
     expect(priceRiseKey("s", "حليب", 27_30)).not.toBe(priceRiseKey("s", "حليب", 30_00));
     expect(priceRiseKey("s", "حليب", 27_30)).not.toBe(priceRiseKey("s", "لبن", 27_30));
     expect(statementGapKey("x", "2026-06-05", 80_00, 0)).not.toBe(statementGapKey("x", "2026-06-05", 80_00, 80_00));
+  });
+});
+
+describe("«علمت» على ضريبةٍ لا تُخصم", () => {
+  it("بصيغة SQL نفسها، وضريبةٌ تغيّرت مفتاحٌ آخر", () => {
+    expect(vatRiskKey("faafb710-211b-4c1a-beae-34c042b5b1a1", 471_00)).toBe("vat-risk:faafb710-211b-4c1a-beae-34c042b5b1a1:47100");
+    expect(signalPrefix(vatRiskKey("abc", 1))).toBe("vat-risk");
+    expect(vatRiskKey("abc", 1)).not.toBe(vatRiskKey("abc", 2));
   });
 });

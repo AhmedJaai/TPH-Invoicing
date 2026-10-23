@@ -28,6 +28,7 @@ export const SIGNAL_PREFIXES = [
   "repeat-delivery",
   "price-rise",
   "statement-gap",
+  "vat-risk",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -50,6 +51,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "repeat-delivery": "توريد يبدو مسجّلاً مرتين",
   "price-rise": "ارتفاع سعر صنف عند مورّده",
   "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
+  "vat-risk": "ضريبة فاتورة لا تُخصم",
 };
 
 /*
@@ -63,6 +65,15 @@ export function priceRiseKey(supplierId: string, normalizedDescription: string, 
 
 export function statementGapKey(slug: string, day: string, theirsMinor: number, oursMinor: number): string {
   return `statement-gap:${encodeURIComponent(slug).slice(0, 80)}:${day}:${theirsMinor}:${oursMinor}`;
+}
+
+/**
+ * «علمتُ أنّ ضريبة هذه الفاتورة لا تُخصم» — بالفاتورة وضريبتها. لا يغيّر حكمها ولا الإقرار:
+ * يُخرجها من «يحتاج قرارك» وحده، وتعود إن تغيّرت ضريبتُها. ويُبنى في SQL بالصيغة نفسها
+ * (`vatRiskKeySql` في `attention-facts.ts`) — واختبارٌ يقابلهما.
+ */
+export function vatRiskKey(invoiceId: string, vatMinor: number): string {
+  return `vat-risk:${invoiceId}:${vatMinor}`;
 }
 
 /** بصمةٌ قصيرة ثابتة لنصٍّ قد يحوي مسافاتٍ وحروفاً عربيّة — FNV-1a، لا للأمان بل للمفتاح. */

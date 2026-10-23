@@ -25,7 +25,7 @@ import { latestStatementGaps } from "@/services/statement-reconcile.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, vatRiskKey } from "./signal-decisions";
 import { todayInRiyadh } from "./riyadh-time";
 import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
 
@@ -33,8 +33,19 @@ interface Row {
   [key: string]: unknown;
 }
 
+/**
+ * فاتورةٌ أسكت صاحبُها «ضريبتها لا تُخصم» (`vatRiskKey`) — بالمفتاح نفسه مبنيّاً في SQL،
+ * والمؤجَّلةُ حتى يومها. تخرج من العدد والمبلغ والدليل معاً، لا من الدليل وحده.
+ */
+function vatRiskSilencedSql(today: string) {
+  return sql`exists (select 1 from alert_resolutions ar
+    where ar.key = 'vat-risk:' || invoices.id || ':' || invoices.vat_minor
+      and (ar.decision = 'DISMISSED' or (ar.decision like 'SNOOZED:%' and substr(ar.decision, 9) >= ${today})))`;
+}
+
 export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const lastMonth = previousMonth(currentMonthRiyadh());
+  const today = todayInRiyadh();
   /*
     الوقائعُ مستقلّةٌ بعضُها عن بعض — تُطلَب معاً لا واحدةً بعد أخرى.
     كانت ستَّ عشرةَ رحلةً متتابعة إلى القاعدة في كلّ صفحة (عدّادُ القشرة
@@ -48,9 +59,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
           (select count(*)::int from captures where status = 'PENDING')                       as team_captures,
           /* ما لا ضريبة فيه لا يخصم منه شيء — أوراق الزيتون ولافا (٦٦ فاتورة) بلا ضريبة أصلاً */
-          (select count(*)::int from invoices where tax_status='INVALID' and vat_minor > 0)  as not_valid,
+          (select count(*)::int from invoices where tax_status='INVALID' and vat_minor > 0
+             and not ${vatRiskSilencedSql(today)})                                          as not_valid,
           (select coalesce(sum(vat_minor),0)::bigint from invoices
-             where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
+             where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0
+               and not ${vatRiskSilencedSql(today)})                                        as vat_at_risk,
           (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
           /*
             ── عدد البند هو عدد الطابور نفسه ──
@@ -72,10 +85,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                and not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
       `),
     db.execute<Row>(sql`
-        select i.id, i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
-        from invoices i left join suppliers s on s.id = i.supplier_id
-        where i.input_vat_status='NOT_ELIGIBLE' and i.vat_minor > 0
-        order by i.vat_minor desc limit 10
+        select invoices.id, invoices.invoice_number, s.name_ar, invoices.vat_minor, invoices.invoice_date::date
+        from invoices left join suppliers s on s.id = invoices.supplier_id
+        where invoices.input_vat_status='NOT_ELIGIBLE' and invoices.vat_minor > 0
+          and not ${vatRiskSilencedSql(today)}
+        order by invoices.vat_minor desc limit 10
       `),
     db.execute<Row>(sql`
         select i.id, i.invoice_number, s.name_ar, i.total_minor
@@ -238,6 +252,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       الضريبةُ صفرٌ إن لم يكن المورّدُ مسجَّلاً — والخادمُ يعيد اشتقاق الحال.
     */
     href: invoiceHref(String(r.id), "tax"),
+    signalKey: vatRiskKey(String(r.id), Number(r.vat_minor)),
   }));
 
   const unknownEvidence = (
