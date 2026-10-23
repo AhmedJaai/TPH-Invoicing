@@ -44,6 +44,7 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
     ["المستحق", money(s.earnedMinor), true],
     ...(s.advancesMinor > 0 ? [["سلف نقداً", `− ${money(s.advancesMinor)}`] as [string, string]] : []),
     ...row.links.filter((l) => l.purpose === "SALARY" || l.purpose === "ADVANCE").map((l): [string, string] => [`${PURPOSE_LABEL[l.purpose]} محوّل ${formatDay(l.txDay)}`, `− ${money(l.amountMinor)}`]),
+    ...row.adjustments.filter((a) => a.kind === "PAID_OUTSIDE").map((a): [string, string] => [`دُفع له خارج الكشف${a.note ? ` (${a.note})` : ""}`, `− ${money(a.amountMinor)}`]),
     [s.remainingMinor !== null && s.remainingMinor < 0 ? "حُوّل زيادة" : "الباقي", money(s.remainingMinor === null ? null : Math.abs(s.remainingMinor)), true],
   ];
   return (

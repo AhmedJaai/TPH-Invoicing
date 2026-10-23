@@ -27,6 +27,7 @@ export const ADJUSTMENT_LABEL: Record<PayrollAdjustmentKind, string> = {
   OVERTIME: "عمل إضافي",
   ALLOWANCE: "بدل",
   LOAN_GIVEN: "سلفة نقداً تُسدَّد على أشهر",
+  PAID_OUTSIDE: "دُفع له خارج الكشف",
 };
 
 export const ADJUSTMENT_HINT: Record<PayrollAdjustmentKind, string> = {
@@ -38,11 +39,12 @@ export const ADJUSTMENT_HINT: Record<PayrollAdjustmentKind, string> = {
   OVERTIME: "ساعاتٌ زائدة على الدوام",
   ALLOWANCE: "بدل سكن أو مواصلات أو غيره",
   LOAN_GIVEN: "سلفة أعطيته إياها نقداً ويسددها أقساطاً. لا تنقص راتب هذا الشهر، وتدخل رصيد سلفه",
+  PAID_OUTSIDE: "راتب دفعته نقداً أو من حسابك ولا حوالة له في كشف البنك. يُحسب مما دُفع له، ولا يظهر في قائمة الدخل لأن مصدره غير معروف. إن عرفت الحوالة فوزّعها بدلاً منه",
 };
 
 export const ADDITIONS: ReadonlySet<PayrollAdjustmentKind> = new Set(["BONUS", "OVERTIME", "ALLOWANCE"]);
 export const DEDUCTIONS: ReadonlySet<PayrollAdjustmentKind> = new Set(["DEDUCTION", "FINE", "LOAN_REPAYMENT"]);
-export const ADJUSTMENT_KINDS: readonly PayrollAdjustmentKind[] = ["DEDUCTION", "FINE", "ADVANCE", "LOAN_REPAYMENT", "BONUS", "OVERTIME", "ALLOWANCE", "LOAN_GIVEN"];
+export const ADJUSTMENT_KINDS: readonly PayrollAdjustmentKind[] = ["DEDUCTION", "FINE", "ADVANCE", "LOAN_REPAYMENT", "BONUS", "OVERTIME", "ALLOWANCE", "LOAN_GIVEN", "PAID_OUTSIDE"];
 
 export function isAdjustmentKind(v: unknown): v is PayrollAdjustmentKind {
   return typeof v === "string" && ADJUSTMENT_KINDS.some((k) => k === v);
@@ -262,6 +264,8 @@ export interface PayslipInput {
 }
 
 export interface Payslip {
+  /** ما دُفع خارج الكشف (داخلٌ في `paidMinor`). */
+  paidOutsideMinor: number;
   /** راتبُ الشهر كاملاً كما كُتب — للعرض. */
   fullSalaryMinor: number | null;
   /** الراتبُ بأيّامه، أو مجموعُ الأسابيع للجزئيّ. `null` لم يُعرف. */
@@ -307,6 +311,8 @@ export function payslip(input: PayslipInput): Payslip {
   const additionsMinor = pick((k) => ADDITIONS.has(k));
   const manualDeductionsMinor = pick((k) => DEDUCTIONS.has(k));
   const advancesMinor = pick((k) => k === "ADVANCE");
+  const paidOutsideMinor = pick((k) => k === "PAID_OUTSIDE");
+  const paidMinor = input.paidMinor + paidOutsideMinor;
   /* السماحُ عتبة: ما دونه لا يُحسب أصلاً، وما فوقه يُحسب كلُّه (اللائحةُ تعدّ التأخير من أوّل دقيقة) */
   const lateMinutes = sumOf(input.attendance.filter((a) => a.kind === "LATE" && (a.minutes ?? 0) > input.policy.graceMinutes).map((a) => a.minutes ?? 0));
   const earlyMinutes = sumOf(input.attendance.filter((a) => a.kind === "EARLY").map((a) => a.minutes ?? 0));
@@ -331,8 +337,8 @@ export function payslip(input: PayslipInput): Payslip {
     lateMinutes, earlyMinutes, lateMinor, absentDays, leaveDays, absenceMinor,
     penaltiesMinor: pen.chargedMinor, penaltiesDroppedMinor: pen.droppedMinor, warnings: pen.warnings, overHalfMinor,
     deductionsMinor, earnedMinor, advancesMinor, dueMinor,
-    paidMinor: input.paidMinor,
-    remainingMinor: dueMinor === null ? null : dueMinor - input.paidMinor,
+    paidMinor, paidOutsideMinor,
+    remainingMinor: dueMinor === null ? null : dueMinor - paidMinor,
   };
 }
 

@@ -124,7 +124,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               {slip!.overHalfMinor > 0 && <p className="py-2 text-[11px] font-bold text-warn">زادت الخصومات على نصف الراتب، فلم يُحسم {formatRiyalsDisplay(slip!.overHalfMinor)} ريال (نظام العمل، م ٩٢)</p>}
               <Line label="المستحق عن الشهر" minor={slip!.earnedMinor} strong />
               {slip!.advancesMinor > 0 && <Line label="سلف نقداً على الراتب" minor={slip!.advancesMinor} sign="−" />}
-              <Line label="حُوّل له" minor={slip!.paidMinor} sign="−" />
+              <Line label="حُوّل له" minor={slip!.paidMinor} sign="−" note={slip!.paidOutsideMinor > 0 ? `منها ${formatRiyalsDisplay(slip!.paidOutsideMinor)} خارج كشف البنك` : undefined} />
               <Line label={slip!.remainingMinor !== null && slip!.remainingMinor < 0 ? "حُوّل له زيادة" : "الباقي للتحويل"} minor={slip!.remainingMinor === null ? null : Math.abs(slip!.remainingMinor)} strong />
             </div>
             {slip!.leaveDays > 0 && <p className="mt-2 text-[11px] text-muted">وأخذ {slip!.leaveDays} يوم إجازة لا يُخصم عليها.</p>}

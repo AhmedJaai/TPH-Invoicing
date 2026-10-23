@@ -160,3 +160,13 @@ describe("جزاءات اللائحة وحد نصف الأجر في المسيّ
     expect(s.dueMinor).toBe(150_000);
   });
 });
+
+describe("ما دُفع خارج الكشف", () => {
+  it("يُحسب مما دُفع له ولا ينقص المستحق", () => {
+    const s = payslip({ ...base, adjustments: [{ kind: "PAID_OUTSIDE", amountMinor: 128_400 }], paidMinor: 100_000 });
+    expect(s.dueMinor).toBe(300_000);
+    expect(s.paidMinor).toBe(228_400);
+    expect(s.paidOutsideMinor).toBe(128_400);
+    expect(s.remainingMinor).toBe(71_600);
+  });
+});

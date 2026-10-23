@@ -155,6 +155,7 @@ export function AdjustmentForm({ employeeId, month, loanMinor }: { employeeId: s
             <optgroup label="ينقص الراتب">{(["DEDUCTION", "FINE", "ADVANCE", "LOAN_REPAYMENT"] as const).map((k) => <option key={k} value={k}>{ADJUSTMENT_LABEL[k]}</option>)}</optgroup>
             <optgroup label="يزيد الراتب">{(["BONUS", "OVERTIME", "ALLOWANCE"] as const).map((k) => <option key={k} value={k}>{ADJUSTMENT_LABEL[k]}</option>)}</optgroup>
             <optgroup label="خارج راتب الشهر"><option value="LOAN_GIVEN">{ADJUSTMENT_LABEL.LOAN_GIVEN}</option></optgroup>
+            <optgroup label="دُفع له"><option value="PAID_OUTSIDE">{ADJUSTMENT_LABEL.PAID_OUTSIDE}</option></optgroup>
           </select>
         </label>
         <label className={label}>المبلغ (ريال)<input className={`${field} nums mt-1.5 text-end`} dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required /></label>

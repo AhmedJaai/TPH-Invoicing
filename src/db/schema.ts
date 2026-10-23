@@ -2435,7 +2435,7 @@ export const employeeRates = pgTable("employee_rates", {
 });
 
 export type PayrollAdjustmentKind =
-  | "DEDUCTION" | "FINE" | "ADVANCE" | "LOAN_REPAYMENT" | "BONUS" | "OVERTIME" | "ALLOWANCE" | "LOAN_GIVEN";
+  | "DEDUCTION" | "FINE" | "ADVANCE" | "LOAN_REPAYMENT" | "BONUS" | "OVERTIME" | "ALLOWANCE" | "LOAN_GIVEN" | "PAID_OUTSIDE";
 
 export const payrollAdjustments = pgTable("payroll_adjustments", {
   id: id(),
