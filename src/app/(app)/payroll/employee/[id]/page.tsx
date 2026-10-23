@@ -61,7 +61,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     loadEmployeeDocuments(id),
     loadOpenTransfers(transfersSince(month)),
     loadCheckins(`${month}-01`, monthEndDay(month)),
-    loadEmployeeHistory(id, workMonths.slice(0, 6)),
+    loadEmployeeHistory(id, workMonths.slice(0, 24)),
   ]);
   const row = sheet.rows.find((r) => r.employee.id === id);
   const slip = row?.slip;
@@ -77,6 +77,16 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const serviceDays = daysBetween(employee.hiredOn, employee.leftOn ?? today) + 1;
   const eos = latestRate !== null && employee.kind === "MONTHLY" ? endOfService(latestRate, serviceDays) : null;
   const defaultDay = month === current ? today : `${month}-01`;
+  /*
+    الرصيدُ منذ المباشرة: ما استحقّه كلَّ شهرٍ مقابل ما وصله — زيادةُ شهرٍ لا تُنسى في الذي بعده.
+    والشهرُ الجاري خارجه حتى ينتهي، وشهرٌ مستحقُّه مجهول يُقال ولا يُعدّ صفراً.
+  */
+  const closedMonths = history.filter((h) => h.month < current);
+  const unknownMonths = closedMonths.filter((h) => h.slip.dueMinor === null).length;
+  const balanceMinor = closedMonths.reduce((sum, h) => sum + (h.slip.dueMinor ?? 0) - h.slip.paidMinor, 0);
+  const gaps = closedMonths.filter((h) => h.slip.dueMinor !== null && h.slip.dueMinor !== h.slip.paidMinor)
+    .map((h) => ({ month: h.month, diff: (h.slip.dueMinor ?? 0) - h.slip.paidMinor }));
+  const pendingMinor = open.filter((o) => o.suggestion?.employeeId === id).reduce((sum, o) => sum + o.freeMinor, 0);
 
   return (
     <PageShell
@@ -90,12 +100,35 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </>
       }
     >
-      <MonthTabs base={`/payroll/employee/${id}`} months={workMonths.slice(0, 8)} active={month} />
+      <MonthTabs base={`/payroll/employee/${id}`} months={workMonths.slice(0, 12)} active={month} />
+      <nav aria-label="أقسام الصفحة" className="sticky top-14 z-10 -mx-1 mt-3 flex gap-1 overflow-x-auto bg-surface/90 px-1 py-2 backdrop-blur">
+        {[["#month", "الشهر"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "الحضور"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
+          .filter(([href]) => employee.kind === "MONTHLY" || href !== "#violations")
+          .map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-hover">{label}</a>)}
+      </nav>
+      {closedMonths.length > 0 && (
+        <Callout tone={balanceMinor > 0 ? "warn" : balanceMinor < 0 ? "info" : "ok"} icon={Wallet} className="mt-3"
+          title={balanceMinor > 0 ? `باقٍ له ${formatRiyalsDisplay(balanceMinor)} ريال من الأشهر الماضية` : balanceMinor < 0 ? `حُوّل له ${formatRiyalsDisplay(-balanceMinor)} ريال فوق مستحقه في الأشهر الماضية` : "حسابه مع المقهى متساوٍ حتى آخر شهر انتهى"}>
+          منذ {formatMonth(closedMonths[closedMonths.length - 1].month)}، كل شهر بما استحقه وما وصله.
+          {gaps.length > 0 && (
+            <span className="mt-1 flex flex-wrap gap-1.5">
+              {gaps.map((g) => (
+                <a key={g.month} href={`/payroll/employee/${id}?month=${g.month}`} className="rounded-full border border-line bg-raised px-2 py-0.5 text-[11px] font-bold hover:bg-hover">
+                  {formatMonth(g.month)}: {g.diff > 0 ? `باقٍ ${formatRiyalsDisplay(g.diff)}` : `زيادة ${formatRiyalsDisplay(-g.diff)}`}
+                </a>
+              ))}
+            </span>
+          )}
+          {pendingMinor > 0 && <span className="mt-1 block font-bold">وفي الكشف حوالات له بـ{formatRiyalsDisplay(pendingMinor)} ريال لم توزَّع بعد. <a className="underline" href="#transfers">وزّعها</a></span>}
+          {balanceMinor < 0 && " إن كانت سلفة فسجّلها قسطاً، وإن كان راتبه أعلى مما كتبت فعدّل الراتب."}
+          {unknownMonths > 0 && ` (${unknownMonths} شهر بلا راتب مكتوب لم يدخل الحساب)`}
+        </Callout>
+      )}
 
       {!row ? (
         <div className="mt-6"><EmptyState icon={ReceiptText} title={`لم يكن يعمل في ${formatMonth(month)}.`} /></div>
       ) : (
-        <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div id="month" className="mt-5 grid scroll-mt-28 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <Card>
             <h2 className="flex items-center gap-2 text-sm font-bold"><ReceiptText className="h-4 w-4 text-muted" aria-hidden />{formatMonth(month)}</h2>
             <div className="mt-2 divide-y divide-line/60">
@@ -224,7 +257,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </Section>
       )}
 
-      <Section title="الحوالات له" icon={Link2} count={row?.links.length ?? 0} hint="ما وُزّع له عن هذا الشهر، بغرضه. ما حُوّل ليسدد فاتورة أو كمصروف لا يُحسب من راتبه.">
+      <Section id="transfers" title="الحوالات له" icon={Link2} count={row?.links.length ?? 0} hint="ما وُزّع له عن هذا الشهر، بغرضه. ما حُوّل ليسدد فاتورة أو كمصروف لا يُحسب من راتبه.">
         {row && row.links.length > 0 ? (
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {row.links.map((l) => (
@@ -246,7 +279,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                   <span>باقٍ <Money minor={o.freeMinor} /></span>
                 </summary>
                 <div className="border-t border-line p-4">
-                  <LinkTransferForm tx={{ id: o.id, freeText: formatRiyalsDisplay(o.freeMinor), viaOwner: o.viaOwner }} employees={[{ id, name: employee.name }]}
+                  <LinkTransferForm tx={{ id: o.id, freeMinor: o.freeMinor, freeText: formatRiyalsDisplay(o.freeMinor), viaOwner: o.viaOwner }} employees={[{ id, name: employee.name }]}
                     defaults={{ employeeId: id, month: o.suggestion?.month ?? (o.viaOwner ? month : suggestedPayMonth(o.day)), purpose: "SALARY" }} />
                 </div>
               </details>
@@ -269,7 +302,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </Section>
       )}
 
-      <Section title="الراتب" icon={Wallet} count={employee.rates.length} hint={employee.kind === "MONTHLY" ? "كل تغيير يسري من شهره حتى التغيير التالي: مثلاً من مايو ٣٠٠٠، ومن سبتمبر ٣٥٠٠." : "أجر الساعة، يسري من شهره."}>
+      <Section id="salary" title="الراتب" icon={Wallet} count={employee.rates.length} hint={employee.kind === "MONTHLY" ? "كل تغيير يسري من شهره حتى التغيير التالي: مثلاً من مايو ٣٠٠٠، ومن سبتمبر ٣٥٠٠." : "أجر الساعة، يسري من شهره."}>
         {employee.rates.length > 0 && (
           <ul className="mb-3 divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {[...employee.rates].reverse().map((r) => (
@@ -284,7 +317,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         {canEdit && <RateForm employeeId={id} kind={employee.kind} month={month} />}
       </Section>
 
-      <Section title="رابط الحضور" icon={CalendarClock} hint="رابط خاص به يفتحه من جواله عند وصوله وانصرافه. يُقرأ موقعه ليُعرف أنه في المقهى، ويُحسب التأخير وحده من بداية دوامه.">
+      <Section id="checkin" title="رابط الحضور" icon={CalendarClock} hint="رابط خاص به يفتحه من جواله عند وصوله وانصرافه. يُقرأ موقعه ليُعرف أنه في المقهى، ويُحسب التأخير وحده من بداية دوامه.">
         <p className="mb-3 text-xs text-ink-soft">
           {employee.shiftStart ? <>دوامه يبدأ <span className="nums font-bold" dir="ltr">{employee.shiftStart}</span> لمدة {formatMinutes(employee.shiftMinutes)} ساعة</> : "لم تُحدَّد بداية دوامه، فلا يُحسب التأخير من الحضور. حدّدها من «تعديل البيانات»."}
           {employee.daysOff && <> · راحته {employee.daysOff.split("").map((d) => WEEKDAY_LABEL[Number(d)]).join(" و")}</>}
@@ -292,7 +325,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         {canEdit ? <CheckinLinkPanel employeeId={id} name={employee.name} phone={employee.phone} hasLink={employee.hasCheckinLink} /> : <Badge tone={employee.hasCheckinLink ? "ok" : "muted"}>{employee.hasCheckinLink ? "مفعّل" : "لا رابط"}</Badge>}
       </Section>
 
-      <Section title="الوثائق" icon={FileBadge} count={docs.length} hint="الإقامة والشهادة الصحية وغيرها، ويُذكّرك النظام قبل انتهائها." action={canEdit ? <ObligationForm preset={{ kind: "HEALTH_CERTIFICATE", holder: employee.name, employeeId: id }} /> : undefined}>
+      <Section id="docs" title="الوثائق" icon={FileBadge} count={docs.length} hint="الإقامة والشهادة الصحية وغيرها، ويُذكّرك النظام قبل انتهائها." action={canEdit ? <ObligationForm preset={{ kind: "HEALTH_CERTIFICATE", holder: employee.name, employeeId: id }} /> : undefined}>
         {docs.length === 0 ? <EmptyState compact icon={FileBadge} title="لا وثائق مسجّلة له." /> : (
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {docs.map((d) => {
@@ -310,7 +343,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       </Section>
 
       {history.length > 0 && (
-        <Section title="الأشهر السابقة" icon={History}>
+        <Section id="history" title="الأشهر" icon={History}>
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {history.map((h) => (
               <li key={h.month}>
@@ -337,7 +370,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       )}
 
       {canEdit && (
-        <Section title="تعديل البيانات" icon={Pencil} hint="الاسم والنوع ورقم المستفيد والدوام وأيام الراحة، ويوم الخروج إن ترك العمل.">
+        <Section id="edit" title="تعديل البيانات" icon={Pencil} hint="الاسم والنوع ورقم المستفيد والدوام وأيام الراحة، ويوم الخروج إن ترك العمل.">
           <details className="rounded-xl border border-line bg-raised">
             <summary className="cursor-pointer px-4 py-3 text-sm font-bold">افتح البيانات</summary>
             <div className="border-t border-line p-3">

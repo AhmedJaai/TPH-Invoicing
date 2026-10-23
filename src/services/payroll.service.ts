@@ -134,60 +134,80 @@ export interface PayrollMonth {
 }
 
 export async function loadPayrollMonth(month: string, conn: Conn = db): Promise<PayrollMonth> {
-  const firstWeek = weekStartOf(`${month}-01`);
-  const lastDay = monthEndDay(month);
-  /* التكرارُ يُعدّ من ١٨٠ يوماً قبل المخالفة — فيُقرأ ما قبل الشهر بقدرها وفوقه سلسلةٌ أطول */
-  const historyFrom = addDays(`${month}-01`, -(REPEAT_WINDOW_DAYS * 2));
-  const [list, adj, attAll, weeks, links, loans, manualAll] = await Promise.all([
+  return (await loadPayrollMonths([month], conn))[0];
+}
+
+/**
+ * مسيّراتُ عدّة أشهرٍ بالاستعلامات نفسها — لا مسيّرٌ كاملٌ لكلّ شهر: سجلُّ الموظّف (أربعةٌ وعشرون شهراً)
+ * والمستحقّاتُ لزرّ «املأ بما بقي» تُقرأ مرّةً. وعلى Vercel اتّصالٌ واحد، فالمئتا استعلامٍ تصطفّ.
+ */
+export async function loadPayrollMonths(months: readonly string[], conn: Conn = db): Promise<PayrollMonth[]> {
+  if (months.length === 0) return [];
+  const sorted = [...new Set(months)].sort();
+  const first = sorted[0], last = sorted[sorted.length - 1];
+  const lastDay = monthEndDay(last);
+  /* التكرارُ يُعدّ من ١٨٠ يوماً قبل المخالفة — فيُقرأ ما قبل أوّل شهرٍ بقدرها وفوقه سلسلةٌ أطول */
+  const historyFrom = addDays(`${first}-01`, -(REPEAT_WINDOW_DAYS * 2));
+  const firstWeek = weekStartOf(`${first}-01`);
+  const monthList = sql.join(sorted.map((m) => sql`${m}`), sql`, `);
+  const [list, adjAll, attAll, weeksAll, linksAll, loans, manualAll] = await Promise.all([
     loadEmployees(conn),
-    conn.select().from(payrollAdjustments).where(and(eq(payrollAdjustments.month, month), isNull(payrollAdjustments.voidedAt))).orderBy(payrollAdjustments.createdAt),
+    conn.select().from(payrollAdjustments).where(and(sql`${payrollAdjustments.month} in (${monthList})`, isNull(payrollAdjustments.voidedAt))).orderBy(payrollAdjustments.createdAt),
     conn.select().from(payrollAttendance).where(and(gte(payrollAttendance.day, historyFrom), lte(payrollAttendance.day, lastDay), isNull(payrollAttendance.voidedAt))).orderBy(payrollAttendance.day),
     conn.select().from(payrollWeeks).where(and(gte(payrollWeeks.weekStart, firstWeek), lte(payrollWeeks.weekStart, lastDay), isNull(payrollWeeks.voidedAt))).orderBy(payrollWeeks.weekStart),
-    loadLinks(conn, sql`pl.month = ${month}`),
+    loadLinks(conn, sql`pl.month in (${monthList})`),
     loadLoanBalances(conn),
     conn.select().from(payrollViolations).where(and(gte(payrollViolations.day, historyFrom), lte(payrollViolations.day, lastDay), isNull(payrollViolations.voidedAt))),
   ]);
-  const att = attAll.filter((a) => a.day >= `${month}-01`);
-  const rows: PayrollRow[] = [];
-  for (const employee of list) {
-    const mine = <T extends { employeeId: string }>(xs: readonly T[]) => xs.filter((x) => x.employeeId === employee.id);
-    const myLinks = mine(links);
-    const myAdj = mine(adj);
-    /* مَن خرج من الشهر وبقي له فيه مالٌ مربوط أو بند لا يختفي */
-    if (!activeIn(employee, month) && myLinks.length === 0 && myAdj.length === 0) continue;
-    const myWeeks = mine(weeks).filter((w) => weekMonth(w.weekStart) === month);
-    const myAtt = mine(att);
-    const rateMinor = rateFor(employee.rates, month);
-    const regs = employee.kind === "MONTHLY" && rateMinor !== null
-      ? monthViolations({
-          month, monthlyMinor: rateMinor, graceMinutes: employee.lateGraceMinutes, daysOff: employee.daysOff,
-          history: mine(attAll), manual: mine(manualAll).map((v) => ({ id: v.id, day: v.day, code: v.code, waived: v.waived, note: v.note })),
-        })
-      : null;
-    const manualIds = new Set(manualAll.map((v) => v.id));
-    rows.push({
-      employee, rateMinor,
-      slip: payslip({
-        kind: employee.kind,
-        salaryMinor: employee.kind === "MONTHLY" ? rateMinor : null,
-        days: workedDays(employee, month) ?? { worked: 0, of: 1 },
-        weeksMinor: myWeeks.map((w) => w.amountMinor),
-        policy: { shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes },
-        adjustments: myAdj,
-        attendance: myAtt,
-        penalties: regs?.capped,
-        paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((s, l) => s + l.amountMinor, 0),
-      }),
-      adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt })),
-      attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived })),
-      violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
-      article80: regs?.article80 ?? [],
-      weeks: myWeeks.map((w) => ({ id: w.id, weekStart: w.weekStart, minutes: w.minutes, amountMinor: w.amountMinor, note: w.note })),
-      links: myLinks,
-      loanMinor: loans.get(employee.id) ?? 0,
-    });
-  }
-  return { month, rows };
+  const manualIds = new Set(manualAll.map((v) => v.id));
+  return months.map((month) => {
+    const monthEnd = monthEndDay(month);
+    const adj = adjAll.filter((a) => a.month === month);
+    const links = linksAll.filter((l) => l.month === month);
+    const att = attAll.filter((a) => a.day >= `${month}-01` && a.day <= monthEnd);
+    /* التاريخُ حتى آخر الشهر وحده — مخالفةٌ بعده لا تُشدّد جزاءَ ما قبلها */
+    const history = attAll.filter((a) => a.day <= monthEnd);
+    const manualHistory = manualAll.filter((v) => v.day <= monthEnd);
+    const rows: PayrollRow[] = [];
+    for (const employee of list) {
+      const mine = <T extends { employeeId: string }>(xs: readonly T[]) => xs.filter((x) => x.employeeId === employee.id);
+      const myLinks = mine(links);
+      const myAdj = mine(adj);
+      /* مَن خرج من الشهر وبقي له فيه مالٌ مربوط أو بند لا يختفي */
+      if (!activeIn(employee, month) && myLinks.length === 0 && myAdj.length === 0) continue;
+      const myWeeks = mine(weeksAll).filter((w) => weekMonth(w.weekStart) === month);
+      const myAtt = mine(att);
+      const rateMinor = rateFor(employee.rates, month);
+      const regs = employee.kind === "MONTHLY" && rateMinor !== null
+        ? monthViolations({
+            month, monthlyMinor: rateMinor, graceMinutes: employee.lateGraceMinutes, daysOff: employee.daysOff,
+            history: mine(history), manual: mine(manualHistory).map((v) => ({ id: v.id, day: v.day, code: v.code, waived: v.waived, note: v.note })),
+          })
+        : null;
+      rows.push({
+        employee, rateMinor,
+        slip: payslip({
+          kind: employee.kind,
+          salaryMinor: employee.kind === "MONTHLY" ? rateMinor : null,
+          days: workedDays(employee, month) ?? { worked: 0, of: 1 },
+          weeksMinor: myWeeks.map((w) => w.amountMinor),
+          policy: { shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes },
+          adjustments: myAdj,
+          attendance: myAtt,
+          penalties: regs?.capped,
+          paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((sum, l) => sum + l.amountMinor, 0),
+        }),
+        adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt })),
+        attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived })),
+        violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
+        article80: regs?.article80 ?? [],
+        weeks: myWeeks.map((w) => ({ id: w.id, weekStart: w.weekStart, minutes: w.minutes, amountMinor: w.amountMinor, note: w.note })),
+        links: myLinks,
+        loanMinor: loans.get(employee.id) ?? 0,
+      });
+    }
+    return { month, rows };
+  });
 }
 
 async function loadLinks(conn: Conn, where: ReturnType<typeof sql>): Promise<LinkView[]> {
@@ -227,7 +247,7 @@ export async function loadEmployeeLinks(employeeId: string, conn: Conn = db): Pr
 
 /** شهورُ الموظّف: المستحقّ والمحوَّل والباقي لكلّ شهرٍ عمل فيه — لصفحته. */
 export async function loadEmployeeHistory(employeeId: string, months: readonly string[]): Promise<{ month: string; slip: Payslip }[]> {
-  const sheets = await Promise.all(months.map((m) => loadPayrollMonth(m)));
+  const sheets = await loadPayrollMonths(months);
   return sheets.flatMap((sheet) => {
     const row = sheet.rows.find((r) => r.employee.id === employeeId);
     return row ? [{ month: sheet.month, slip: row.slip }] : [];
@@ -609,43 +629,64 @@ export async function setPenaltyWaived(id: string, waived: boolean, actorId: str
  * يوزّع حوالةً (أو جزءاً منها) على موظّفٍ بغرضها. المبلغُ إن لم يُكتب = ما بقي من الحوالة
  * غيرَ موزَّع. وشهرُ الحوالة المقفل يردّه الحارسُ هنا والمؤثِّرُ في القاعدة.
  */
-export async function linkTransfer(input: { employeeId: string; month: string; purpose: PayrollLinkPurpose; bankTransactionId: string; amountMinor: number | null; note: string | null }, actorId: string): Promise<number> {
+export interface LinkPart {
+  employeeId: string;
+  month: string;
+  purpose: PayrollLinkPurpose;
+  /** `null`: ما بقي من الحوالة. */
+  amountMinor: number | null;
+  note: string | null;
+}
+
+export async function linkTransfer(input: LinkPart & { bankTransactionId: string }, actorId: string): Promise<number> {
+  const { bankTransactionId, ...part } = input;
+  const [amount] = await splitTransfer(bankTransactionId, [part], actorId);
+  return amount;
+}
+
+/**
+ * يقسم حوالةً واحدة على عدّة موظّفين بأغراضهم وأشهرهم — **كلُّها أو لا شيء**، في معاملةٍ واحدة:
+ * تحويلُ المالك لنفسه ١١٬٤٥٣ يصير ستّة رواتب بضغطة، ولا يبقى نصفُ توزيعٍ إن رُفض جزء.
+ * المجموعُ لا يتجاوز ما بقي من الحوالة (هنا ثمّ في مؤثِّر القاعدة)، وكلُّ جزءٍ يمرّ بحرّاسه.
+ */
+export async function splitTransfer(bankTransactionId: string, parts: readonly LinkPart[], actorId: string): Promise<number[]> {
+  if (parts.length === 0) throw new PayrollRefused("أضف سطراً واحداً على الأقل.");
+  if (parts.filter((p) => p.amountMinor === null).length > 1) throw new PayrollRefused("اكتب مبلغ كل سطر، وسطراً واحداً على الأكثر يأخذ الباقي.");
   return db.transaction(async (t) => {
-    await assertEmployee(t, input.employeeId);
-    const [emp] = await t.select({ name: employees.name, bankBeneficiaryId: employees.bankBeneficiaryId }).from(employees).where(eq(employees.id, input.employeeId)).limit(1);
     const tx = (await t.execute<{ amount_minor: number; direction: string; category: string; month: string; linked: string; description: string | null; beneficiary: string | null }>(sql`
       select bt.amount_minor, bt.direction::text as direction, bt.category::text as category,
              bt.description, bt.beneficiary_raw as beneficiary,
              to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM') as month,
              coalesce((select sum(pl.amount_minor) from payroll_links pl where pl.bank_transaction_id = bt.id and pl.voided_at is null), 0)::bigint as linked
-        from bank_transactions bt where bt.id = ${input.bankTransactionId}
+        from bank_transactions bt where bt.id = ${bankTransactionId}
     `)).rows[0];
     if (!tx || tx.direction !== "DEBIT") throw new PayrollRefused("الحوالة غير موجودة أو ليست خارجة.");
     if (tx.category !== "SALARY" && tx.category !== "PERSONAL") throw new PayrollRefused("صنّف الحركة «راتب» أو «تحويل لحساب المالك» أولاً من «حركة البنك».");
-    /*
-      حوالةٌ إلى حساب شخصٍ لا تُنسب لغيره: حوالةُ صالح لا تُحسب راتباً للوليد. تحويلُ المالك لنفسه
-      وحده يُقسم على من شاء — هو من دفع لهم.
-    */
-    if (tx.category !== "PERSONAL") {
-      const ben = beneficiaryIdOf(tx.description, tx.beneficiary);
-      if (ben && emp.bankBeneficiaryId && ben !== emp.bankBeneficiaryId) {
-        const [owner] = await t.select({ name: employees.name }).from(employees).where(eq(employees.bankBeneficiaryId, ben)).limit(1);
-        throw new PayrollRefused(`هذه الحوالة لحساب ${owner ? `«${owner.name}»` : `«${beneficiaryNameOf(tx.beneficiary, tx.description) ?? ben}»`} لا لحساب ${emp.name}.`);
-      }
-      if (ben) {
-        const [owner] = await t.select({ id: employees.id, name: employees.name }).from(employees).where(eq(employees.bankBeneficiaryId, ben)).limit(1);
-        if (owner && owner.id !== input.employeeId) throw new PayrollRefused(`هذه الحوالة لحساب «${owner.name}» لا لحساب ${emp.name}.`);
-      }
-    }
     await assertMonthsOpen(t, [tx.month]);
     const free = tx.amount_minor - Number(tx.linked);
     if (free <= 0) throw new PayrollRefused("هذه الحوالة موزّعة كلها من قبل.");
-    const amountMinor = input.amountMinor ?? free;
-    if (!(amountMinor > 0)) throw new PayrollRefused("اكتب المبلغ رقماً أكبر من صفر.");
-    if (amountMinor > free) throw new PayrollRefused("المبلغ أكبر مما بقي من الحوالة غير موزّع.");
-    const [row] = await t.insert(payrollLinks).values({ ...input, amountMinor, createdById: actorId }).returning({ id: payrollLinks.id });
-    await recordAudit({ actorId, action: "PAYROLL_LINKED", entityType: "payroll_link", entityId: row.id, before: null, after: { ...input, amountMinor } }, t);
-    return amountMinor;
+    const fixed = parts.reduce((s, p) => s + (p.amountMinor ?? 0), 0);
+    const amounts = parts.map((p) => p.amountMinor ?? free - fixed);
+    if (amounts.some((a) => !(a > 0))) throw new PayrollRefused("كل مبلغ يجب أن يكون أكبر من صفر.");
+    const total = amounts.reduce((s, a) => s + a, 0);
+    if (total > free) throw new PayrollRefused(`المجموع ${formatRiyalsDisplay(total)} أكبر مما بقي من الحوالة (${formatRiyalsDisplay(free)}).`);
+    const ben = tx.category !== "PERSONAL" ? beneficiaryIdOf(tx.description, tx.beneficiary) : null;
+    const [benOwner] = ben ? await t.select({ id: employees.id, name: employees.name }).from(employees).where(eq(employees.bankBeneficiaryId, ben)).limit(1) : [];
+    for (const [i, p] of parts.entries()) {
+      const [emp] = await t.select({ name: employees.name, bankBeneficiaryId: employees.bankBeneficiaryId }).from(employees).where(eq(employees.id, p.employeeId)).limit(1);
+      if (!emp) throw new PayrollRefused("أحد الموظفين غير موجود. حدّث الصفحة.");
+      /*
+        حوالةٌ إلى حساب شخصٍ لا تُنسب لغيره: حوالةُ صالح لا تُحسب راتباً للوليد. تحويلُ المالك لنفسه
+        وحده يُقسم على من شاء — هو من دفع لهم.
+      */
+      if (ben && ((emp.bankBeneficiaryId && emp.bankBeneficiaryId !== ben) || (benOwner && benOwner.id !== p.employeeId))) {
+        const to = benOwner?.name ?? beneficiaryNameOf(tx.beneficiary, tx.description) ?? ben;
+        throw new PayrollRefused(`هذه الحوالة لحساب «${to}» لا لحساب ${emp.name}.`);
+      }
+      const [row] = await t.insert(payrollLinks).values({ ...p, bankTransactionId, amountMinor: amounts[i], createdById: actorId }).returning({ id: payrollLinks.id });
+      await recordAudit({ actorId, action: "PAYROLL_LINKED", entityType: "payroll_link", entityId: row.id, before: null, after: { ...p, bankTransactionId, amountMinor: amounts[i] } }, t);
+    }
+    return amounts;
   });
 }
 

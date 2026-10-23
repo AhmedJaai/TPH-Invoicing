@@ -98,5 +98,15 @@
   "لم يبدأ دوامه": "Shift not started",
   "اعرض": "Show",
   "يوم آخر": "Another day",
-  "أضف المستفيد موظفاً": "Add payee as employee"
+  "أضف المستفيد موظفاً": "Add payee as employee",
+  "سطر آخر": "Another line",
+  "وزّع على جزأين": "Assign in two parts",
+  "الباقي": "Remainder",
+  "الحوالة كلها موزّعة": "Transfer fully assigned",
+  "الشهر": "Month",
+  "المخالفات": "Violations",
+  "الحوالات": "Transfers",
+  "السجل": "History",
+  "البيانات": "Details",
+  "الأشهر": "Months"
 }

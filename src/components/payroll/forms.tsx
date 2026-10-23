@@ -6,9 +6,10 @@
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calculator, Copy, Link2, MessageCircle, Plus } from "lucide-react";
+import { Calculator, Copy, Link2, MessageCircle, Plus, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
-import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
+import { formatRiyals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
+import { countNoun, EMPLOYEE } from "@/lib/arabic";
 import {
   ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
@@ -297,45 +298,122 @@ export function WeekForm({ employeeId, defaultDay, suggestedHours }: { employeeI
 
 export interface LinkOption { id: string; name: string }
 
-export function LinkTransferForm({ tx, employees, defaults }: {
-  tx: { id: string; freeText: string; viaOwner: boolean };
+/** ما بقي لكلّ موظّفٍ عن شهر — لملء التوزيع منه. */
+export type OwedByMonth = Readonly<Record<string, readonly { employeeId: string; remainingMinor: number }[]>>;
+
+interface Part { key: number; employeeId: string; purpose: PayrollLinkPurpose; month: string; amount: string }
+
+/**
+ * توزيعُ حوالةٍ على موظّفٍ أو أكثر — سطرٌ لكلّ جزء، والمجموعُ يُرى وهو يُكتب أمام باقي الحوالة.
+ * يُرسَل كلُّه مرّةً واحدة والخادمُ يكتبه كلَّه أو يردّه كلَّه (`splitTransfer`). المبالغُ نصوصٌ هنا،
+ * وما يُجمع للعين يُقرأ هللاتٍ صحيحة.
+ */
+export function LinkTransferForm({ tx, employees, defaults, owed }: {
+  tx: { id: string; freeMinor: number; freeText: string; viaOwner: boolean };
   employees: readonly LinkOption[];
   defaults: { employeeId: string; month: string; purpose: PayrollLinkPurpose };
+  owed?: OwedByMonth;
 }) {
-  const [employeeId, setEmployeeId] = useState(defaults.employeeId);
-  const [month, setMonth] = useState(defaults.month);
-  const [purpose, setPurpose] = useState<PayrollLinkPurpose>(defaults.purpose);
-  const [amount, setAmount] = useState("");
+  const [parts, setParts] = useState<Part[]>([{ key: 0, employeeId: defaults.employeeId, purpose: defaults.purpose, month: defaults.month, amount: "" }]);
   const [note, setNote] = useState("");
-  const { busy, error, send } = useSend();
-  const amountMinor = amount.trim() ? parseRiyals(amount) : null;
+  const { busy, error, send, setError } = useSend();
+  const nextKey = () => Math.max(0, ...parts.map((p) => p.key)) + 1;
+  const update = (key: number, patch: Partial<Part>) => setParts((xs) => xs.map((p) => (p.key === key ? { ...p, ...patch } : p)));
+  const parsed = parts.map((p) => (p.amount.trim() ? parseRiyals(p.amount) : null));
+  const badAmount = parts.some((p, i) => p.amount.trim() !== "" && (parsed[i] === null || parsed[i]! <= 0));
+  const blanks = parts.filter((p) => !p.amount.trim()).length;
+  const typed = parsed.reduce<number>((s, a) => s + (a ?? 0), 0);
+  /* سطرٌ واحد بلا مبلغ يأخذ الباقي */
+  const total = blanks === 1 ? tx.freeMinor : typed;
+  const left = tx.freeMinor - total;
+  const over = left < 0 || (blanks === 1 && typed >= tx.freeMinor);
+  const ready = parts.every((p) => p.employeeId && p.month) && !badAmount && blanks <= 1 && !over && total > 0;
+  const fillMonth = parts[0]?.month ?? defaults.month;
+  const owedRows = (owed?.[fillMonth] ?? []).filter((o) => o.remainingMinor > 0);
+
+  /** يملأ السطور بما بقي لكلّ موظّفٍ عن الشهر، حتى ينفد باقي الحوالة. */
+  function fillOwed() {
+    let room = tx.freeMinor;
+    const rows: Part[] = [];
+    let key = 0;
+    for (const o of owedRows) {
+      if (room <= 0) break;
+      const take = Math.min(room, o.remainingMinor);
+      rows.push({ key: key++, employeeId: o.employeeId, purpose: "SALARY", month: fillMonth, amount: formatRiyals(take) });
+      room -= take;
+    }
+    if (rows.length > 0) setParts(rows);
+    else setError("لا مستحقات باقية لهذا الشهر.");
+  }
+
+  async function save() {
+    const r = await send("/api/payroll/link", {
+      action: "split", bankTransactionId: tx.id,
+      parts: parts.map((p) => ({ employeeId: p.employeeId, month: p.month, purpose: p.purpose, amount: p.amount.trim() || undefined, note })),
+    });
+    if (r) { setParts([{ key: 0, employeeId: "", purpose: "SALARY", month: defaults.month, amount: "" }]); setNote(""); }
+  }
+
   return (
-    <form className="space-y-3" onSubmit={async (e) => {
-      e.preventDefault();
-      if (await send("/api/payroll/link", { action: "link", employeeId, month, purpose, bankTransactionId: tx.id, amount: amount || undefined, note })) { setAmount(""); setNote(""); }
-    }}>
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className={label}>لمن
-          <select className={`${field} mt-1.5`} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
-            <option value="">— اختر —</option>
-            {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-        </label>
-        <label className={label}>الغرض
-          <select className={`${field} mt-1.5`} value={purpose} onChange={(e) => setPurpose(PURPOSES.find((p) => p === e.target.value) ?? "SALARY")}>
-            {PURPOSES.map((p) => <option key={p} value={p}>{PURPOSE_LABEL[p]}</option>)}
-          </select>
-        </label>
-        <label className={label}>عن شهر<input type="month" dir="ltr" className={`${field} mt-1.5`} value={month} onChange={(e) => setMonth(e.target.value)} required /></label>
-        <label className={label}>المبلغ (ريال) <span className="font-normal text-muted">(فارغ = الباقي {tx.freeText})</span>
-          <input className={`${field} nums mt-1.5 text-end`} dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={tx.freeText} />
-        </label>
+    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (ready) void save(); }}>
+      <div className="flex flex-wrap items-center gap-2">
+        {owedRows.length > 0 && (
+          <button type="button" className={buttonClass("subtle", "sm")} onClick={fillOwed}>
+            املأ بما بقي لهم عن الشهر ({countNoun(owedRows.length, EMPLOYEE)})
+          </button>
+        )}
+        <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setParts((xs) => [...xs, { key: nextKey(), employeeId: "", purpose: xs[xs.length - 1]?.purpose ?? "SALARY", month: xs[xs.length - 1]?.month ?? defaults.month, amount: "" }])}>
+          <Plus className="h-3.5 w-3.5" aria-hidden />سطر آخر
+        </button>
       </div>
-      <label className={label}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={purpose === "INVOICE" ? "فاتورة المراعي رقم …" : ""} /></label>
-      <p className="text-[11px] leading-relaxed text-muted">{PURPOSE_HINT[purpose]}</p>
-      {amount.trim() && amountMinor === null && <p className="text-[11px] font-bold text-danger">المبلغ غير مفهوم.</p>}
+
+      <ul className="space-y-2">
+        {parts.map((p, i) => (
+          <li key={p.key} className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border border-line bg-sunken/40 p-2.5 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <label className={label}>{i === 0 ? "لمن" : <span className="sm:sr-only">لمن</span>}
+              <select className={`${field} mt-1`} value={p.employeeId} onChange={(e) => update(p.key, { employeeId: e.target.value })} required>
+                <option value="">— اختر —</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </label>
+            <label className={label}>{i === 0 ? "الغرض" : <span className="sm:sr-only">الغرض</span>}
+              <select className={`${field} mt-1`} value={p.purpose} onChange={(e) => update(p.key, { purpose: PURPOSES.find((x) => x === e.target.value) ?? "SALARY" })}>
+                {PURPOSES.map((x) => <option key={x} value={x}>{PURPOSE_LABEL[x]}</option>)}
+              </select>
+            </label>
+            <label className={label}>{i === 0 ? "عن شهر" : <span className="sm:sr-only">عن شهر</span>}
+              <input type="month" dir="ltr" className={`${field} mt-1`} value={p.month} onChange={(e) => update(p.key, { month: e.target.value })} required />
+            </label>
+            <label className={label}>{i === 0 ? "المبلغ (ريال)" : <span className="sm:sr-only">المبلغ</span>}
+              <input className={`${field} nums mt-1 text-end ${p.amount.trim() && (parsed[i] === null || parsed[i]! <= 0) ? "border-danger" : ""}`} dir="ltr" inputMode="decimal"
+                value={p.amount} onChange={(e) => update(p.key, { amount: e.target.value })} placeholder={parts.length === 1 ? tx.freeText : "0"} />
+            </label>
+            <span className="flex gap-1 sm:pb-0.5">
+              {!p.amount.trim() || left !== 0 ? (
+                <button type="button" className={buttonClass("quiet", "sm")} title="الباقي لهذا السطر"
+                  onClick={() => update(p.key, { amount: formatRiyals(Math.max(0, tx.freeMinor - (typed - (parsed[i] ?? 0)))) })}>الباقي</button>
+              ) : null}
+              {parts.length > 1 && (
+                <button type="button" className={buttonClass("quiet", "sm")} aria-label={`احذف السطر ${i + 1}`} onClick={() => setParts((xs) => xs.filter((x) => x.key !== p.key))}><X className="h-3.5 w-3.5" aria-hidden /></button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${over ? "bg-danger-bg text-danger" : left === 0 ? "bg-ok-bg text-ok" : "bg-sunken text-ink-soft"}`} role="status">
+        <span>وُزّع <span className="nums">{formatRiyalsDisplay(Math.max(0, total))}</span> من <span className="nums">{tx.freeText}</span></span>
+        <span>{over ? `زاد ${formatRiyalsDisplay(-left)} على الحوالة` : left === 0 ? "الحوالة كلها موزّعة" : tx.viaOwner ? `يبقى ${formatRiyalsDisplay(left)} لك شخصياً` : `يبقى ${formatRiyalsDisplay(left)} غير موزّع`}</span>
+      </div>
+
+      <label className={label}>ملاحظة <span className="font-normal text-muted">(اختياري، لكل السطور)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={parts.some((p) => p.purpose === "INVOICE") ? "فاتورة المراعي رقم …" : ""} /></label>
+      {parts.length === 1 && <p className="text-[11px] leading-relaxed text-muted">{PURPOSE_HINT[parts[0].purpose]}</p>}
+      {badAmount && <p className="text-[11px] font-bold text-danger">مبلغ غير مفهوم في أحد السطور.</p>}
+      {blanks > 1 && <p className="text-[11px] font-bold text-warn">اكتب مبلغ كل سطر، أو اترك سطراً واحداً فارغاً ليأخذ الباقي.</p>}
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !employeeId || !month} aria-busy={busy}><Link2 className="h-3.5 w-3.5" aria-hidden />وزّع</button>
+      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !ready} aria-busy={busy}>
+        <Link2 className="h-3.5 w-3.5" aria-hidden />{parts.length === 1 ? "وزّع" : parts.length === 2 ? "وزّع على جزأين" : `وزّع على ${parts.length} أجزاء`}
+      </button>
     </form>
   );
 }
