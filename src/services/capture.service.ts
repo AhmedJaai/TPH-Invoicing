@@ -435,11 +435,6 @@ async function labelRecordedCaptures(
   );
 }
 
-export async function pendingCaptureCount(): Promise<number> {
-  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(captures).where(eq(captures.status, "PENDING"));
-  return Number(row?.n ?? 0);
-}
-
 /** بايتاتُ الصورة المنتظِرة — لشاشة الرفع. */
 export async function loadCaptureFile(id: string): Promise<{ data: Buffer; mimeType: string; fileName: string; sender: string } | null> {
   const [row] = await db

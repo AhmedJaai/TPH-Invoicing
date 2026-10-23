@@ -44,10 +44,6 @@ export function warmDetector() {
   getWorker();
 }
 
-export function detectorModelState(): ModelState {
-  return modelState;
-}
-
 /** إطارٌ مصغّرٌ إلى `side` (أطولُ ضلع) — نسخةٌ جديدة تُنقل إلى العامل */
 function shrink(frame: Raster, side: number): { raster: Raster; scale: number } {
   const scale = Math.min(1, side / Math.max(frame.width, frame.height));
