@@ -17,7 +17,7 @@ import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from 
 import type { PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
 import { buttonClass, fieldClass } from "../ui-tokens";
-import { toast } from "../ui-client";
+import { ConfirmAction, toast } from "../ui-client";
 
 /* ─────────────── أداةٌ مشتركة ─────────────── */
 
@@ -81,6 +81,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
             <option value="MONTHLY">دوام كامل، راتب شهري</option>
             <option value="PART_TIME">جزئي، بالساعة ويُحوَّل أسبوعياً</option>
           </select>
+          {!isNew && v.kind !== initial.kind && <span className="mt-1 block text-[11px] font-bold text-warn">تغيير النوع يجعل الرواتب المكتوبة {v.kind === "PART_TIME" ? "أجر ساعة" : "راتباً شهرياً"}. راجعها بعد الحفظ.</span>}
         </label>
         <label className={label}>المسمى الوظيفي <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={v.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} maxLength={60} placeholder="باريستا" /></label>
         {isNew && (
@@ -429,5 +430,39 @@ export function AttendancePlaceForm({ current }: { current: { lat: string; lng: 
       <ErrorLine error={error} />
       <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !ready} aria-busy={busy}>احفظ الموقع</button>
     </form>
+  );
+}
+
+/* ─────────────── حذفُ موظّفٍ أُضيف خطأً ─────────────── */
+
+export function DeleteEmployeeButton({ employeeId, name }: { employeeId: string; name: string }) {
+  const router = useRouter();
+  return (
+    <ConfirmAction
+      label="احذف الموظف"
+      title={`حذف ${name}`}
+      consequence="يُحذف الموظف ورواتبه المكتوبة. لا يُحذف من له حوالات أو بنود أو حضور: لمن ترك العمل اكتب يوم خروجه بدلاً من الحذف."
+      acknowledgement="أضفته خطأً، وليس له سجلّ"
+      confirmLabel="احذفه"
+      onConfirm={async () => {
+        const r = await postJson<{ message?: string }>("/api/payroll/employee", { action: "delete", id: employeeId });
+        if (!r.ok) { toast({ tone: "danger", title: r.error }); return false; }
+        toast({ tone: "ok", title: r.data.message ?? "حُذف" });
+        router.push("/payroll/employees");
+        return true;
+      }}
+    />
+  );
+}
+
+/* ─────────────── حوالةُ «راتب» ليست لموظّف ─────────────── */
+
+export function NotPayrollButton({ txId }: { txId: string }) {
+  const { busy, send } = useSend();
+  return (
+    <button type="button" className={buttonClass("quiet", "sm")} disabled={busy} aria-busy={busy}
+      onClick={() => void send("/api/signal", { key: `payroll-tx:${txId}`, action: "dismiss" }, "أُخفيت الحوالة. تعيدها من «ما قرّرته»")}>
+      ليست لموظف — أخفها
+    </button>
   );
 }

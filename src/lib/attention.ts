@@ -1,5 +1,5 @@
 import {
-  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun, type NounForms,
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import type { Capability } from "./permissions";
@@ -232,7 +232,7 @@ export interface AttentionFacts {
   financeRentLumps?: { day: string; amountMinor: number }[];
   financeLastMonthMissing?: { month: string; rent: boolean; salary: boolean } | null;
   /** الموظّفون (084): حوالاتُ رواتب لم تُوزَّع، وحضورٌ بلا شاهد، وموظّفٌ بلا راتب. */
-  payroll?: { unlinkedSalary: { count: number; amountMinor: number }; unreviewedCheckins: number; missingRates: string[] };
+  payroll?: { unlinkedSalary: { count: number; amountMinor: number }; unreviewedCheckins: number; missingRates: string[]; owed?: { month: string; remainingMinor: number; people: number } | null };
   stockLinksReady?: { count: number; valueMinor: number };
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
   foodicsStaleHours?: number | null;
@@ -900,6 +900,24 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
 
   /* الموظّفون: ما يُكمل المسيّرَ وما يحتاج حكمَ صاحبه — للمالك وحده (`needs`) */
   const pay = f.payroll;
+  /* الرواتبُ الباقية — «ماذا أحتاج أن أفعل اليوم؟» في أوّل الشهر وآخره */
+  if (pay?.owed) {
+    const o = pay.owed;
+    out.push({
+      id: "payroll-owed",
+      area: "PAYMENTS",
+      severity: "HIGH",
+      title: `رواتب ${formatMonth(o.month)}: باقٍ ${formatRiyalsDisplay(o.remainingMinor)} ريال لم يُحوَّل`,
+      detail: `${o.people === 1 ? "موظف واحد" : `${o.people} موظفين`} لم يصلهم مستحقهم كاملاً بعد الخصومات والسلف. وإن كنت حوّلت فالحوالة لم توزَّع على أصحابها بعد.`,
+      action: "حوّل الباقي، ثم وزّع الحوالات على أصحابها من المسيّر.",
+      actionLabel: "افتح المسيّر",
+      href: `/payroll?month=${o.month}`,
+      count: o.people,
+      impact: { kind: "OWED", amountMinor: o.remainingMinor },
+      evidence: [],
+      needs: "payroll:view",
+    });
+  }
   if (pay && pay.unreviewedCheckins > 0) {
     out.push({
       id: "payroll-checkins",
@@ -922,7 +940,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "OPPORTUNITY",
       title: pay.unlinkedSalary.count > 0
-        ? `${countNoun(pay.unlinkedSalary.count, TRANSACTION)} رواتب في الكشف لم تُنسب لموظف`
+        ? `${countNoun(pay.unlinkedSalary.count, TRANSFER)} رواتب في الكشف لم تُنسب لموظف`
         : `${pay.missingRates.length === 1 ? pay.missingRates[0] : `${pay.missingRates.length} موظفين`} بلا راتب مكتوب`,
       detail: [
         pay.unlinkedSalary.count > 0 ? "بدون نسبتها لا يعرف المسيّر ما حُوّل لكل موظف، ولا كم بقي له." : null,

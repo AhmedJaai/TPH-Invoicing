@@ -73,6 +73,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "foodics-stale": RefreshCw,
   "foodics-till-gap": Banknote,
   "finance-incomplete": HandCoins,
+  "payroll-owed": HandCoins,
   "payroll-checkins": CalendarClock,
   "payroll-open": Users,
   "stock-links-ready": Link2,

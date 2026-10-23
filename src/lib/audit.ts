@@ -111,6 +111,7 @@ export type AuditAction =
   /* المساحةُ الماليّة: إقرارُ المالك عمّا لا يراه الكشف، وتجميدُ تقرير الشهر المقفل */
   /* الموظّفون والرواتب (084) */
   | "EMPLOYEE_SAVED"
+  | "EMPLOYEE_DELETED"
   | "EMPLOYEE_RATE_SET"
   | "EMPLOYEE_RATE_REMOVED"
   | "PAYROLL_ADJUSTMENT_ADDED"

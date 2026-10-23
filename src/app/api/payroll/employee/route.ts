@@ -7,7 +7,7 @@ import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, saveEmployee, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, saveEmployee, setRate,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -37,6 +37,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rate-remove"), rateId: Id }).strict(),
   z.object({ action: z.literal("link-issue"), id: Id }).strict(),
   z.object({ action: z.literal("link-revoke"), id: Id }).strict(),
+  z.object({ action: z.literal("delete"), id: Id }).strict(),
 ]);
 
 function shiftMinutes(text: string | undefined): number | null {
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
     if (b.action === "link-issue") {
       const token = await issueCheckinLink(b.id, user.id);
       return NextResponse.json({ ok: true, token, message: "أُنشئ رابط الحضور. أرسله للموظف، والرابط القديم لم يعد يعمل" });
+    }
+    if (b.action === "delete") {
+      const done = await deleteEmployee(b.id, user.id);
+      return NextResponse.json({ ok: true, message: done ? "حُذف الموظف" : "حُذف من قبل" });
     }
     if (b.action === "link-revoke") {
       const done = await revokeCheckinLink(b.id, user.id);

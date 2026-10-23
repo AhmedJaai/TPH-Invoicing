@@ -29,6 +29,7 @@ export const SIGNAL_PREFIXES = [
   "price-rise",
   "statement-gap",
   "vat-risk",
+  "payroll-tx",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -52,6 +53,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "price-rise": "ارتفاع سعر صنف عند مورّده",
   "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
   "vat-risk": "ضريبة فاتورة لا تُخصم",
+  "payroll-tx": "حوالة راتب ليست لموظف",
 };
 
 /*

@@ -7,14 +7,14 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
-import { LinkSuggestedButton, LinkTransferForm } from "@/components/payroll/forms";
+import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton } from "@/components/payroll/forms";
 import { Badge, buttonClass, Callout, DataTable, EmptyState, LinkButton, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, EMPLOYEE, TRANSFER } from "@/lib/arabic";
-import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL } from "@/lib/payroll/calc";
+import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
-import { loadBankPayees, loadPayrollMonth, loadOpenTransfers, transfersSince, type PayrollRow } from "@/services/payroll.service";
+import { loadBankPayees, loadEmployees, loadPayrollMonth, loadOpenTransfers, transfersSince, type PayrollRow, type TransferView } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
 
@@ -50,15 +50,20 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const current = currentMonthRiyadh();
   const month = q.month && MONTH_RE.test(q.month) ? q.month : current;
 
-  const [sheet, open, payees] = await Promise.all([
+  const [sheet, open, payees, staff] = await Promise.all([
     loadPayrollMonth(month),
     loadOpenTransfers(transfersSince(month)),
     loadBankPayees(),
+    loadEmployees(),
   ]);
   const totals = payrollTotals(sheet.rows.map((r) => r.slip));
-  const firstMonth = sheet.rows.reduce((m, r) => (r.employee.hiredOn.slice(0, 7) < m ? r.employee.hiredOn.slice(0, 7) : m), month < "2026-05" ? month : "2026-05");
-  const months = monthsBetween(firstMonth, current > month ? current : month).reverse().slice(0, 8);
-  const people = sheet.rows.map((r) => ({ id: r.employee.id, name: r.employee.name }));
+  /* الأشهرُ من أوّل مباشرةٍ مسجّلة — لا من تاريخٍ مكتوب في الشيفرة */
+  const firstMonth = staff.reduce((m, e) => (e.hiredOn.slice(0, 7) < m ? e.hiredOn.slice(0, 7) : m), month < current ? month : current);
+  const months = monthsBetween(firstMonth, current > month ? current : month).reverse().slice(0, 12);
+  /* الحوالةُ قد تكون لمن ترك العمل أو لم يبدأ شهرَه — فالقائمةُ كلُّ الموظّفين، العاملون أوّلاً */
+  const people = [...staff].sort((a, b) => Number(Boolean(a.leftOn)) - Number(Boolean(b.leftOn))).map((e) => ({ id: e.id, name: e.leftOn ? `${e.name} (ترك العمل)` : e.name }));
+  const salaryOpen = open.filter((o) => !o.viaOwner);
+  const ownerOpen = open.filter((o) => o.viaOwner);
   const suggested = open.filter((o) => o.suggestion && !o.viaOwner);
   const notInPnl = open.filter((o) => o.notInPnl);
   const allLinks = sheet.rows.flatMap((r) => r.links.map((l) => ({ ...l, name: r.employee.name })));
@@ -130,8 +135,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <>
           <div className="mt-5">
             <StatGrid>
-              <Stat label="المستحق للشهر" minor={totals.dueMinor} sub={totals.unknown > 0 ? `ومعه ${countNoun(totals.unknown, EMPLOYEE)} بلا راتب مكتوب، فالمجموع ناقص` : countNoun(sheet.rows.length, EMPLOYEE)} tone={totals.unknown > 0 ? "warn" : undefined} />
-              <Stat label="حُوّل من الرواتب" minor={totals.paidMinor} sub="ما وُزّع من الحوالات راتباً أو سلفة على الراتب" />
+              <Stat label={month === current ? "المستحق عن الشهر كاملاً" : "المستحق للشهر"} minor={totals.dueMinor} sub={totals.unknown > 0 ? `ومعه ${countNoun(totals.unknown, EMPLOYEE)} بلا راتب مكتوب، فالمجموع ناقص` : countNoun(sheet.rows.length, EMPLOYEE)} tone={totals.unknown > 0 ? "warn" : undefined} />
+              <Stat label="حُوّل من الرواتب" minor={totals.paidMinor} sub="ما وُزّع من الحوالات راتباً أو سلفة، وما دُفع خارج الكشف" />
               <Stat label="الباقي للتحويل" minor={totals.remainingMinor} tone={totals.remainingMinor > 0 ? "warn" : "ok"} sub={totals.overpaidMinor > 0 ? `وحُوّل زيادةً ${formatRiyalsDisplay(totals.overpaidMinor)} لبعضهم` : "هذا ما يلزمك تحويله الآن"} />
             </StatGrid>
           </div>
@@ -146,8 +151,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         id="transfers"
         title="حوالات لم توزَّع بعد"
         icon={ArrowLeftRight}
-        count={open.length}
-        hint="كل حوالات «راتب» التي لم توزَّع، وتحويلاتك لحسابك منذ أول الشهر السابق. وزّع كل واحدة على صاحبها وغرضها: ليس كل ما حُوّل لموظف راتباً، وليس كل ما حوّلته لنفسك شخصياً."
+        count={salaryOpen.length}
+        hint="حوالات «راتب» في الكشف لم توزَّع بعد. وزّع كل واحدة على صاحبها وغرضها، فليس كل ما حُوّل لموظف راتباً. وما ليس لموظف أصلاً فأخفه."
         action={canEdit && suggested.length > 0 ? <LinkSuggestedButton month={month} txIds={suggested.map((o) => o.id)} /> : undefined}
       >
         {notInPnl.length > 0 && (
@@ -156,45 +161,23 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             <LinkButton href="/money/expenses" variant="secondary" size="sm" className="mt-2">افتح المصروفات</LinkButton>
           </Callout>
         )}
-        {open.length === 0 ? (
-          <EmptyState icon={Link2} title="كل الحوالات موزّعة." hint="حين تصل حوالة رواتب جديدة في الكشف تظهر هنا." />
+        {salaryOpen.length === 0 ? (
+          <EmptyState compact icon={Link2} title="كل حوالات الرواتب موزّعة." hint="حين تصل حوالة رواتب جديدة في الكشف تظهر هنا." />
         ) : (
           <ul className="space-y-2">
-            {open.map((o) => (
-              <li key={o.id} className="rounded-xl border border-line bg-raised shadow-raised">
-                <details className="group">
-                  <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                    <span className="min-w-0 flex-1 basis-56">
-                      <span className="text-sm font-bold">{o.viaOwner ? "تحويل لحسابك" : o.payeeName ?? "حوالة راتب"}</span>
-                      <span className="block text-[11px] text-muted">
-                        {formatDay(o.day)}
-                        {o.suggestion && <> · يبدو أنها لـ<strong className="text-ink-soft">{o.suggestion.employeeName}</strong> عن {formatMonth(o.suggestion.month)}</>}
-                        {!o.suggestion && o.beneficiaryId && !o.viaOwner && <> · مستفيد غير مسجّل موظفاً</>}
-                      </span>
-                    </span>
-                    <span className="text-end">
-                      <Money minor={o.amountMinor} currency />
-                      {o.freeMinor < o.amountMinor && <span className="block text-[11px] text-warn">باقٍ {formatRiyalsDisplay(o.freeMinor)}</span>}
-                    </span>
-                    {o.viaOwner ? <Badge tone="muted">من حسابك</Badge> : <Badge tone="accent">راتب</Badge>}
-                  </summary>
-                  {canEdit && (
-                    <div className="border-t border-line px-4 py-4">
-                      {people.length === 0 ? (
-                        <p className="text-xs text-muted">أضف الموظف أولاً من <Link className="underline" href="/payroll/employees">صفحة الموظفين</Link>.</p>
-                      ) : (
-                        <LinkTransferForm
-                          tx={{ id: o.id, freeText: formatRiyalsDisplay(o.freeMinor), viaOwner: o.viaOwner }}
-                          employees={people}
-                          defaults={{ employeeId: o.suggestion?.employeeId ?? "", month: o.suggestion?.month ?? month, purpose: "SALARY" }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </details>
-              </li>
-            ))}
+            {salaryOpen.map((o) => <TransferItem key={o.id} o={o} canEdit={canEdit} people={people} month={month} />)}
           </ul>
+        )}
+        {ownerOpen.length > 0 && (
+          <details className="mt-4 rounded-xl border border-line bg-sunken/40">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">
+              تحويلاتك لحسابك منذ أول الشهر السابق ({ownerOpen.length})
+              <span className="block text-[11px] font-normal text-muted">أغلبها شخصي ويبقى كما هو. افتح منها ما دفعت منه رواتب أو فواتير، ووزّع ذلك الجزء وحده.</span>
+            </summary>
+            <ul className="space-y-2 px-3 pb-3">
+              {ownerOpen.map((o) => <TransferItem key={o.id} o={o} canEdit={canEdit} people={people} month={month} />)}
+            </ul>
+          </details>
         )}
       </Section>
 
@@ -217,5 +200,49 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         )}
       </Section>
     </PageShell>
+  );
+}
+
+/** حوالةٌ لم تُوزَّع — تُفتح فيُختار صاحبُها وغرضُها، أو تُخفى إن لم تكن لموظّف. */
+function TransferItem({ o, canEdit, people }: { o: TransferView; canEdit: boolean; people: { id: string; name: string }[]; month: string }) {
+  return (
+    <li className="rounded-xl border border-line bg-raised shadow-raised">
+      <details>
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+          <span className="min-w-0 flex-1 basis-56">
+            <span className="text-sm font-bold">{o.viaOwner ? "تحويل لحسابك" : o.payeeName ?? "حوالة راتب"}</span>
+            <span className="block text-[11px] text-muted">
+              {formatDay(o.day)}
+              {o.suggestion && <> · يبدو أنها لـ<strong className="text-ink-soft">{o.suggestion.employeeName}</strong> عن {formatMonth(o.suggestion.month)}</>}
+              {!o.suggestion && o.beneficiaryId && !o.viaOwner && <> · مستفيد غير مسجّل موظفاً</>}
+            </span>
+          </span>
+          <span className="text-end">
+            <Money minor={o.amountMinor} currency />
+            {o.freeMinor < o.amountMinor && <span className="block text-[11px] text-warn">باقٍ {formatRiyalsDisplay(o.freeMinor)}</span>}
+          </span>
+          {o.viaOwner ? <Badge tone="muted">من حسابك</Badge> : <Badge tone="accent">راتب</Badge>}
+        </summary>
+        {canEdit && (
+          <div className="space-y-3 border-t border-line px-4 py-4">
+            {people.length === 0 ? (
+              <p className="text-xs text-muted">أضف الموظف أولاً من <Link className="underline" href="/payroll/employees">صفحة الموظفين</Link>.</p>
+            ) : (
+              <LinkTransferForm
+                tx={{ id: o.id, freeText: formatRiyalsDisplay(o.freeMinor), viaOwner: o.viaOwner }}
+                employees={people}
+                defaults={{ employeeId: o.suggestion?.employeeId ?? "", month: o.suggestion?.month ?? suggestedPayMonth(o.day), purpose: "SALARY" }}
+              />
+            )}
+            {!o.viaOwner && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[11px] text-muted">
+                {!o.suggestion && o.beneficiaryId && <Link className="font-bold text-accent underline" href="/payroll/employees">أضف المستفيد موظفاً</Link>}
+                <NotPayrollButton txId={o.id} />
+              </div>
+            )}
+          </div>
+        )}
+      </details>
+    </li>
   );
 }

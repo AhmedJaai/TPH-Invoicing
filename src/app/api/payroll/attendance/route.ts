@@ -17,7 +17,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("place-clear") }).strict(),
   z.object({ action: z.literal("network") }).strict(),
   z.object({ action: z.literal("network-clear") }).strict(),
-  z.object({ action: z.literal("review"), id: Id, decision: z.enum(["ACCEPTED", "REJECTED"]) }).strict(),
+  z.object({ action: z.literal("review"), id: Id, decision: z.enum(["ACCEPTED", "REJECTED"]), manipulation: z.boolean().optional() }).strict(),
 ]);
 
 export async function POST(request: Request) {
@@ -43,8 +43,8 @@ export async function POST(request: Request) {
         await saveCafeNetwork(null, user.id);
         return NextResponse.json({ ok: true, message: "أُزيلت شبكة المقهى" });
       case "review": {
-        const done = await reviewCheckin(b.id, b.decision, user.id);
-        return NextResponse.json({ ok: true, message: !done ? "لم يُوجد التسجيل" : b.decision === "ACCEPTED" ? "قُبل التسجيل" : "رُدّ التسجيل" });
+        const done = await reviewCheckin(b.id, b.decision, user.id, b.manipulation === true);
+        return NextResponse.json({ ok: true, message: !done ? "لم يُوجد التسجيل" : b.decision === "ACCEPTED" ? "قُبل التسجيل" : b.manipulation ? "رُدّ التسجيل، وسُجّلت مخالفة التلاعب في الحضور" : "رُدّ التسجيل، وسقط ما حُسب منه" });
       }
     }
   } catch (e) {

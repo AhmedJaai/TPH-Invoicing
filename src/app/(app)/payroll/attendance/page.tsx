@@ -4,6 +4,7 @@ import { CalendarDays, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-re
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
 import { PostAction } from "@/components/post-action";
 import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/forms";
 import { Badge, Callout, Card, DataTable, EmptyState, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
@@ -63,7 +64,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       workday: employee.kind === "MONTHLY" && isWorkday(day, employee.daysOff),
     };
   });
-  const missing = board.filter((b) => b.workday && b.ins.length === 0 && !b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE"));
+  /* اليومَ لا يُعدّ غائباً من لم يبدأ دوامُه بعد */
+  const clock = day === today ? riyadhClock(new Date()) : "24:00";
+  const started = (b: BoardRow) => !b.employee.shiftStart || b.employee.shiftStart <= clock;
+  /* «لم يسجّل» لمن معه رابطُ حضور — ومن لا رابطَ له لم يُطلب منه التسجيل، فغيابُ تسجيله ليس غياباً */
+  const missing = board.filter((b) => b.workday && started(b) && b.employee.hasCheckinLink && b.ins.length === 0 && !b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE"));
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
 
   const columns: Column<BoardRow>[] = [
@@ -82,7 +87,9 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     },
     {
       key: "status", header: "الحال",
-      cell: (b) => b.status.length === 0 ? (b.workday && b.ins.length === 0 ? <Badge tone="warn">لم يسجّل</Badge> : <span className="text-muted">—</span>) : (
+      cell: (b) => b.status.length === 0 ? (b.workday && b.ins.length === 0
+        ? (!b.employee.hasCheckinLink ? <Badge tone="muted">بلا رابط حضور</Badge> : started(b) ? <Badge tone="warn">لم يسجّل</Badge> : <Badge tone="muted">لم يبدأ دوامه</Badge>)
+        : <span className="text-muted">—</span>) : (
         <span className="flex flex-wrap gap-1">{b.status.map((s, i) => (
           <Badge key={i} tone={s.kind === "LEAVE" ? "muted" : "danger"}>
             {s.kind === "LATE" ? `تأخر ${s.minutes} د` : s.kind === "EARLY" ? `خرج مبكراً ${s.minutes} د` : s.kind === "ABSENT" ? "غائب" : "إجازة"}
@@ -92,7 +99,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     },
     ...(canEdit ? [{
       key: "act", header: "", wrap: true,
-      cell: (b: BoardRow) => b.ins.length > 0 || b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE") ? null : (
+      cell: (b: BoardRow) => b.ins.length > 0 || !b.workday || b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE") ? null : (
         <span className="flex flex-wrap gap-1">
           <PostAction url="/api/payroll/entry" body={{ action: "day", employeeId: b.employee.id, day, kind: "ABSENT" }} variant="quiet" done="سُجّل غائباً">غائب</PostAction>
           <PostAction url="/api/payroll/entry" body={{ action: "day", employeeId: b.employee.id, day, kind: "LEAVE" }} variant="quiet" done="سُجّلت إجازة">إجازة</PostAction>
@@ -113,13 +120,18 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
       <div className="mt-4">
         <LinkTabs label="اليوم" items={days.map((d) => ({ href: `/payroll/attendance?day=${d}`, label: d === today ? "اليوم" : `${WEEKDAY_LABEL[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${Number(d.slice(8))}`, active: d === day }))} />
+        <form method="get" className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+          <label htmlFor="att-day">يوم آخر</label>
+          <input id="att-day" type="date" name="day" dir="ltr" max={today} defaultValue={day} className="min-h-10 rounded-lg border border-line-input bg-raised px-2" />
+          <button type="submit" className="min-h-10 rounded-lg border border-line px-3 font-bold hover:bg-hover">اعرض</button>
+        </form>
       </div>
 
       <Section title={day === today ? "اليوم" : formatDay(day)} icon={CalendarDays} count={board.length} hint={missing.length > 0 ? `${missing.length} لم يسجّلوا حضوراً في يوم عملهم. إن غاب أحدهم فاضغط «غائب» ليُخصم يومه، أو «إجازة» فلا يُخصم.` : undefined}>
         {board.length === 0 ? <EmptyState icon={Users} title="لا موظفين يعملون في هذا اليوم." /> : <DataTable columns={columns} rows={board} keyOf={(b) => b.employee.id} hrefOf={(b) => `/payroll/employee/${b.employee.id}?month=${month}`} />}
       </Section>
 
-      <Section id="review" title="تسجيلات تحتاج حكمك" icon={ShieldCheck} count={unreviewed.length} hint="سُجّلت والجوال بعيد عن المقهى، أو بلا موقع، ولم يكن على شبكة المقهى. اقبلها إن كان في المقهى فعلاً، أو ردّها فلا تُحسب.">
+      <Section id="review" title="تسجيلات تحتاج حكمك" icon={ShieldCheck} count={unreviewed.length} hint="سُجّلت والجوال بعيد عن المقهى، أو بلا موقع، ولم يكن على شبكة المقهى. اقبلها إن كان في المقهى فعلاً، أو ردّها فلا تُحسب ويسقط ما حُسب منها. وإن سجّل وهو خارج المقهى عمداً فهي مخالفة «التلاعب في إثبات الحضور» (البند ٢/٧).">
         {unreviewed.length === 0 ? <EmptyState compact icon={ShieldCheck} title="لا شيء ينتظر." /> : (
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {unreviewed.map((c) => (
@@ -129,9 +141,10 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <span className="block text-[11px] text-muted">{VERDICT_LABEL[c.verdict]}{c.distanceM !== null && ` · على بعد ${c.distanceM >= 1000 ? `${Math.round(c.distanceM / 100) / 10} كم` : `${c.distanceM} م`}`}{c.accuracyM !== null && ` · دقة القراءة ${c.accuracyM} م`}</span>
                 </span>
                 {canEdit && (
-                  <span className="flex gap-1">
+                  <span className="flex flex-wrap gap-1">
                     <PostAction url="/api/payroll/attendance" body={{ action: "review", id: c.id, decision: "ACCEPTED" }} variant="secondary" done="قُبل">اقبل</PostAction>
                     <PostAction url="/api/payroll/attendance" body={{ action: "review", id: c.id, decision: "REJECTED" }} variant="danger" done="رُدّ">ردّ</PostAction>
+                    <PostAction url="/api/payroll/attendance" body={{ action: "review", id: c.id, decision: "REJECTED", manipulation: true }} variant="quiet" done="رُدّ وسُجّلت المخالفة">ردّ وسجّل تلاعباً</PostAction>
                   </span>
                 )}
               </li>
@@ -147,7 +160,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <li key={r.employee.id}>
                 <Link href={`/payroll/employee/${r.employee.id}?month=${month}`} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm hover:bg-hover">
                   <span className="min-w-0 flex-1 font-bold">{r.employee.name}</span>
-                  <span className="text-xs text-ink-soft">تأخير <span className="nums">{r.slip.lateMinutes + r.slip.earlyMinutes}</span> د · غياب <span className="nums">{r.slip.absentDays}</span> · إجازة <span className="nums">{r.slip.leaveDays}</span></span>
+                  <span className="text-xs text-ink-soft">تأخير <span className="nums">{r.slip.lateMinutes + r.slip.earlyMinutes}</span> د · غياب <span className="nums">{r.slip.absentDays}</span> · إجازة <span className="nums">{r.slip.leaveDays}</span>{r.slip.warnings > 0 && <> · <span className="nums">{r.slip.warnings}</span> إنذار</>}{r.slip.penaltiesMinor > 0 && <> · جزاءات <Money minor={r.slip.penaltiesMinor} /></>}</span>
                 </Link>
               </li>
             ))}

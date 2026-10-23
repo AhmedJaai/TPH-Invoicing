@@ -25,7 +25,8 @@ import {
 import {
   DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhDay, type CafePlace,
 } from "@/lib/payroll/attendance";
-import { addDays, monthEndDay } from "@/lib/riyadh-time";
+import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { silencedKeys } from "@/lib/signal-decisions";
 import {
   damageCapMinor, isViolationCode, loanCapMinor, monthViolations, REPEAT_WINDOW_DAYS, type AssessedViolation,
 } from "@/lib/payroll/saudi-rules";
@@ -226,13 +227,11 @@ export async function loadEmployeeLinks(employeeId: string, conn: Conn = db): Pr
 
 /** شهورُ الموظّف: المستحقّ والمحوَّل والباقي لكلّ شهرٍ عمل فيه — لصفحته. */
 export async function loadEmployeeHistory(employeeId: string, months: readonly string[]): Promise<{ month: string; slip: Payslip }[]> {
-  const out: { month: string; slip: Payslip }[] = [];
-  for (const month of months) {
-    const m = await loadPayrollMonth(month);
-    const row = m.rows.find((r) => r.employee.id === employeeId);
-    if (row) out.push({ month, slip: row.slip });
-  }
-  return out;
+  const sheets = await Promise.all(months.map((m) => loadPayrollMonth(m)));
+  return sheets.flatMap((sheet) => {
+    const row = sheet.rows.find((r) => r.employee.id === employeeId);
+    return row ? [{ month: sheet.month, slip: row.slip }] : [];
+  });
 }
 
 /* ─────────────────────────── الحوالات ─────────────────────────── */
@@ -256,8 +255,11 @@ export interface TransferView {
  * حوالاتُ «راتب» وتحويلاتُ المالك لنفسه التي بقي منها ما لم يُوزَّع — من `since` فما بعد.
  * وحوالةٌ إلى رقمِ مستفيدٍ معروف تأتي باقتراحها.
  */
+/** حوالةُ «راتب» قال صاحبُها إنّها ليست لموظّف (سالم باحاج…) — تخرج من القائمة وتُعاد من «ما قرّرته». */
+export const notPayrollKey = (txId: string) => `payroll-tx:${txId}`;
+
 export async function loadOpenTransfers(since: string, conn: Conn = db, salarySince = "2000-01-01"): Promise<TransferView[]> {
-  const [list, txs] = await Promise.all([
+  const [list, txs, hidden] = await Promise.all([
     conn.select({ id: employees.id, name: employees.name, ben: employees.bankBeneficiaryId }).from(employees),
     conn.execute<{ id: string; day: string; amount_minor: number; linked: string; category: string; beneficiary: string | null; description: string | null; has_expense: boolean }>(sql`
       select bt.id, to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day, bt.amount_minor,
@@ -270,12 +272,14 @@ export async function loadOpenTransfers(since: string, conn: Conn = db, salarySi
            or (bt.category = 'SALARY' and to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') >= ${salarySince}))
        order by bt.value_date desc
     `),
+    conn.execute<{ key: string; decision: string }>(sql`select key, decision from alert_resolutions where key like 'payroll-tx:%'`),
   ]);
+  const silenced = silencedKeys(hidden.rows, todayInRiyadh());
   const byBen = new Map(list.filter((e) => e.ben).map((e) => [e.ben, e]));
   const out: TransferView[] = [];
   for (const t of txs.rows) {
     const freeMinor = t.amount_minor - Number(t.linked);
-    if (freeMinor <= 0) continue;
+    if (freeMinor <= 0 || silenced.has(notPayrollKey(t.id))) continue;
     const beneficiaryId = beneficiaryIdOf(t.description, t.beneficiary);
     const viaOwner = t.category === "PERSONAL";
     /* رسومُ «راتب» بعشرين ريالاً بلا مستفيد ليست حوالةً لأحد */
@@ -400,6 +404,30 @@ export async function saveEmployee(id: string | null, input: EmployeeInput, firs
   });
 }
 
+/**
+ * حذفُ موظّفٍ أُضيف خطأً — ما دام لا أثرَ له: لا حوالةٌ وُزّعت عليه، ولا بندٌ، ولا حضور. ومن له أثرٌ
+ * لا يُحذف بل يُكتب يومُ خروجه، فيبقى ما دُفع له في سجلّه.
+ */
+export async function deleteEmployee(id: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const [before] = await t.select().from(employees).where(eq(employees.id, id)).for("update");
+    if (!before) return false;
+    const { rows } = await t.execute<{ n: number }>(sql`
+      select (select count(*) from payroll_links where employee_id = ${id})
+           + (select count(*) from payroll_adjustments where employee_id = ${id})
+           + (select count(*) from payroll_attendance where employee_id = ${id})
+           + (select count(*) from payroll_weeks where employee_id = ${id})
+           + (select count(*) from payroll_violations where employee_id = ${id})
+           + (select count(*) from attendance_checkins where employee_id = ${id}) as n`);
+    if (Number(rows[0]?.n ?? 0) > 0) throw new PayrollRefused("له سجلّ (حوالات أو بنود أو حضور)، فلا يُحذف. اكتب يوم خروجه بدلاً من ذلك.");
+    await t.delete(employees).where(eq(employees.id, id));
+    const { checkinTokenHash: _hidden, ...shown } = before;
+    void _hidden;
+    await recordAudit({ actorId, action: "EMPLOYEE_DELETED", entityType: "employee", entityId: id, before: shown, after: null }, t);
+    return true;
+  });
+}
+
 /** «من سبتمبر ٣٥٠٠» — وإن كان للشهر نفسه راتبٌ استُبدل. */
 export async function setRate(employeeId: string, fromMonth: string, amountMinor: number, actorId: string): Promise<void> {
   if (!(amountMinor > 0)) throw new PayrollRefused("اكتب الراتب رقماً أكبر من صفر.");
@@ -462,6 +490,10 @@ export async function voidAdjustment(id: string, actorId: string): Promise<boole
     const done = await t.update(payrollAdjustments).set({ voidedAt: new Date(), voidedById: actorId })
       .where(and(eq(payrollAdjustments.id, id), isNull(payrollAdjustments.voidedAt))).returning();
     if (done.length === 0) return false;
+    /* سلفةٌ سُدّد منها لا تُسحب: يصير رصيدُه سالباً — اسحب الأقساط أوّلاً */
+    if (done[0].kind === "LOAN_GIVEN" && ((await loadLoanBalances(t)).get(done[0].employeeId) ?? 0) < 0) {
+      throw new PayrollRefused("سُدّد من هذه السلفة أقساط، فسحبها يجعل رصيده سالباً. اسحب الأقساط أولاً.");
+    }
     await recordAudit({ actorId, action: "PAYROLL_ADJUSTMENT_VOIDED", entityType: "payroll_adjustment", entityId: id, before: done[0], after: null }, t);
     return true;
   });
@@ -644,6 +676,10 @@ export async function unlinkTransfer(id: string, actorId: string): Promise<boole
   return db.transaction(async (t) => {
     const [link] = await t.select().from(payrollLinks).where(and(eq(payrollLinks.id, id), isNull(payrollLinks.voidedAt))).limit(1);
     if (!link) return false;
+    if (link.purpose === "LOAN") {
+      const balance = (await loadLoanBalances(t)).get(link.employeeId) ?? 0;
+      if (balance - link.amountMinor < 0) throw new PayrollRefused("سُدّد من هذه السلفة أقساط، فإلغاء ربطها يجعل رصيده سالباً. اسحب الأقساط أولاً.");
+    }
     const tx = (await t.execute<{ month: string }>(sql`select to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') as month from bank_transactions where id = ${link.bankTransactionId}`)).rows[0];
     await assertMonthsOpen(t, [tx?.month]);
     await t.update(payrollLinks).set({ voidedAt: new Date(), voidedById: actorId }).where(eq(payrollLinks.id, id));
@@ -859,13 +895,32 @@ async function writeDerived(t: Conn, employeeId: string, day: string, kind: "LAT
   await t.insert(payrollAttendance).values({ employeeId, day, kind, minutes: Math.min(960, minutes), source: "CHECKIN", note: "من تسجيل الحضور" });
 }
 
-/** قبولُ تسجيلٍ مشكوك أو ردُّه. والمردودُ لا يُحسب في ساعات الجزئيّ. */
-export async function reviewCheckin(id: string, decision: "ACCEPTED" | "REJECTED", actorId: string): Promise<boolean> {
+/**
+ * قبولُ تسجيلٍ مشكوك أو ردُّه. المردودُ لا يُحسب في ساعات الجزئيّ، ويسقط ما حُسب منه (تأخيرٌ من حضورٍ
+ * مردود، أو انصرافٌ مبكّر من انصرافٍ مردود) ما لم يبقَ في اليوم تسجيلٌ آخر من نوعه. و`manipulation`:
+ * ردٌّ مع مخالفة «التلاعب في إثبات الحضور والانصراف» (البند ٢/٧).
+ */
+export async function reviewCheckin(id: string, decision: "ACCEPTED" | "REJECTED", actorId: string, manipulation = false): Promise<boolean> {
   return db.transaction(async (t) => {
     const done = await t.update(attendanceCheckins).set({ review: decision, reviewedById: actorId, reviewedAt: new Date() })
-      .where(eq(attendanceCheckins.id, id)).returning({ employeeId: attendanceCheckins.employeeId, at: attendanceCheckins.at, verdict: attendanceCheckins.verdict });
+      .where(eq(attendanceCheckins.id, id)).returning({ employeeId: attendanceCheckins.employeeId, at: attendanceCheckins.at, verdict: attendanceCheckins.verdict, kind: attendanceCheckins.kind, day: attendanceCheckins.day });
     if (done.length === 0) return false;
-    await recordAudit({ actorId, action: "ATTENDANCE_CHECKIN_REVIEWED", entityType: "attendance_checkin", entityId: id, before: done[0], after: { decision } }, t);
+    const c = done[0];
+    if (decision === "REJECTED") {
+      const [other] = await t.select({ id: attendanceCheckins.id }).from(attendanceCheckins)
+        .where(and(eq(attendanceCheckins.employeeId, c.employeeId), eq(attendanceCheckins.day, c.day), eq(attendanceCheckins.kind, c.kind),
+          sql`${attendanceCheckins.id} <> ${id}`, sql`coalesce(${attendanceCheckins.review}, '') <> 'REJECTED'`)).limit(1);
+      if (!other) {
+        await t.update(payrollAttendance).set({ voidedAt: new Date() })
+          .where(and(eq(payrollAttendance.employeeId, c.employeeId), eq(payrollAttendance.day, c.day), eq(payrollAttendance.kind, c.kind === "IN" ? "LATE" : "EARLY"),
+            eq(payrollAttendance.source, "CHECKIN"), isNull(payrollAttendance.voidedAt)));
+      }
+      if (manipulation) {
+        const [v] = await t.insert(payrollViolations).values({ employeeId: c.employeeId, day: c.day, code: "2/7", note: "تسجيل حضور من خارج المقهى ردّه صاحب العمل", createdById: actorId }).returning({ id: payrollViolations.id });
+        await recordAudit({ actorId, action: "PAYROLL_VIOLATION_ADDED", entityType: "payroll_violation", entityId: v.id, before: null, after: { code: "2/7", day: c.day } }, t);
+      }
+    }
+    await recordAudit({ actorId, action: "ATTENDANCE_CHECKIN_REVIEWED", entityType: "attendance_checkin", entityId: id, before: { verdict: c.verdict }, after: { decision, manipulation } }, t);
     return true;
   });
 }
@@ -879,6 +934,11 @@ export interface PayrollAttentionFacts {
   unreviewedCheckins: number;
   /** موظّفون يعملون هذا الشهر بلا راتبٍ مكتوب. */
   missingRates: string[];
+  /**
+   * رواتبُ لم تُحوَّل كاملة: الشهرُ الماضي من أوّل الشهر، والجاري من يوم ٢٥ — موعدُ الرواتب.
+   * `null`: لا شيء باقٍ.
+   */
+  owed: { month: string; remainingMinor: number; people: number } | null;
 }
 
 export async function loadPayrollAttentionFacts(today: string, conn: Conn = db): Promise<PayrollAttentionFacts> {
@@ -890,15 +950,25 @@ export async function loadPayrollAttentionFacts(today: string, conn: Conn = db):
       loadEmployees(conn),
     ]);
     const salary = open.filter((o) => !o.viaOwner);
+    /* من يوم ٢٥ يُسأل عن رواتب الشهر الجاري، وقبله عن الماضي */
+    const owedMonth = Number(today.slice(8, 10)) >= 25 ? month : addDays(`${month}-01`, -1).slice(0, 7);
+    let owed: PayrollAttentionFacts["owed"] = null;
+    if (list.some((e) => activeIn(e, owedMonth))) {
+      const sheet = await loadPayrollMonth(owedMonth, conn);
+      const left = sheet.rows.filter((r) => (r.slip.remainingMinor ?? 0) > 0);
+      const remainingMinor = left.reduce((s, r) => s + (r.slip.remainingMinor ?? 0), 0);
+      if (remainingMinor > 0) owed = { month: owedMonth, remainingMinor, people: left.length };
+    }
     return {
       unlinkedSalary: { count: salary.length, amountMinor: salary.reduce((s, o) => s + o.freeMinor, 0) },
       unreviewedCheckins: unreviewed.rows[0]?.n ?? 0,
       missingRates: list.filter((e) => activeIn(e, month) && rateFor(e.rates, month) === null).map((e) => e.name),
+      owed,
     };
   } catch (e) {
     /* جدولٌ لم تُطبَّق هجرتُه بعد لا يُسقط «يحتاج قرارك» */
     if (pgErrorCode(e) === "42P01") {
-      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [] };
+      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [], owed: null };
     }
     throw e;
   }

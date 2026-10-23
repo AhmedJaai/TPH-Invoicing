@@ -9,12 +9,12 @@ import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { ObligationForm } from "@/components/obligation-form";
 import {
-  AdjustmentForm, CheckinLinkPanel, DayForm, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
+  AdjustmentForm, CheckinLinkPanel, DayForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
 } from "@/components/payroll/forms";
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, endOfService, formatMinutes, PURPOSE_LABEL, rateFor } from "@/lib/payroll/calc";
+import { ADJUSTMENT_LABEL, endOfService, formatMinutes, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
 import { WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
@@ -247,7 +247,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 </summary>
                 <div className="border-t border-line p-4">
                   <LinkTransferForm tx={{ id: o.id, freeText: formatRiyalsDisplay(o.freeMinor), viaOwner: o.viaOwner }} employees={[{ id, name: employee.name }]}
-                    defaults={{ employeeId: id, month: o.suggestion?.month ?? month, purpose: "SALARY" }} />
+                    defaults={{ employeeId: id, month: o.suggestion?.month ?? (o.viaOwner ? month : suggestedPayMonth(o.day)), purpose: "SALARY" }} />
                 </div>
               </details>
             ))}
@@ -347,6 +347,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 hiredOn: employee.hiredOn, leftOn: employee.leftOn ?? "", shiftStart: employee.shiftStart ?? "",
                 shiftHours: formatMinutes(employee.shiftMinutes), lateGraceMinutes: String(employee.lateGraceMinutes), daysOff: employee.daysOff, note: employee.note ?? "",
               }} />
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[11px] text-muted">
+                أضفته خطأً؟ <DeleteEmployeeButton employeeId={id} name={employee.name} />
+              </div>
             </div>
           </details>
         </Section>

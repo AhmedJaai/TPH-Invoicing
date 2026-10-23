@@ -156,6 +156,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   SALES_IMPORTED: "استيراد ملفّ مبيعات",
   SUPPLIER_FOODICS_LINKED: "ربط مورّد فودكس بمورّد",
   EMPLOYEE_SAVED: "حفظ بيانات موظف",
+  EMPLOYEE_DELETED: "حذف موظف أُضيف خطأً",
   EMPLOYEE_RATE_SET: "تحديد راتب موظف",
   EMPLOYEE_RATE_REMOVED: "حذف تغيير في راتب موظف",
   PAYROLL_ADJUSTMENT_ADDED: "إضافة خصم أو سلفة أو مكافأة",
