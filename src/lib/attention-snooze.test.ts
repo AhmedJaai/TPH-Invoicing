@@ -48,3 +48,12 @@ describe("تأجيل بند الطابور", () => {
     expect(snoozeOptions("2026-10-31").map((o) => o.day)).toEqual(["2026-11-01", "2026-11-03", "2026-11-07"]);
   });
 });
+
+describe("«علمت، لا تظهره» على البند كلّه", () => {
+  it("يبقى خارج العدد بلا يوم عودة، ويعود إن تغيّر مبلغه أو عدده", () => {
+    const rows = [{ key: snoozeKey(item()), decision: "DISMISSED", note: null }];
+    expect(partitionSnoozed([item()], rows, "2027-06-01").snoozed).toEqual([{ item: item(), until: null, note: null }]);
+    expect(partitionSnoozed([item({ amountMinor: 1_900_00 })], rows, "2026-10-12").active).toHaveLength(1);
+    expect(partitionSnoozed([item({ count: 4 })], rows, "2026-10-12").active).toHaveLength(1);
+  });
+});

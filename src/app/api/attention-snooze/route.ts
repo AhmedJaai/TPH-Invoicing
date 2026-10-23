@@ -15,15 +15,15 @@ import { readJson } from "@/lib/request-body";
 import { recordAudit } from "@/lib/audit";
 import { attentionSplit } from "@/lib/work";
 import { snoozeKey, snoozePrefix, validSnoozeDay } from "@/lib/attention-snooze";
-import { snoozedUntil } from "@/lib/signal-decisions";
+import { DISMISSED, snoozedUntil } from "@/lib/signal-decisions";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 
 const Body = z.object({
   itemId: z.string().regex(/^[a-z][a-z-]{2,48}$/, "بند غير معروف"),
-  /** يومُ العودة — `null` يعيده الآن. */
-  until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  /** يومُ العودة — `null` يعيده الآن، و«dismiss»: علمت، لا تظهره حتى يتغيّر مبلغه أو عدده. */
+  until: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("dismiss")]).nullable(),
   note: z.string().trim().max(300).optional(),
 });
 
@@ -50,7 +50,8 @@ export async function POST(request: Request) {
     }
 
     const today = todayInRiyadh();
-    if (!validSnoozeDay(until, today)) {
+    const dismiss = until === "dismiss";
+    if (!dismiss && !validSnoozeDay(until, today)) {
       return NextResponse.json({ error: "يجب أن يكون يوم العودة بعد اليوم وخلال شهر على الأكثر، فالتأجيل الأبعد يُنسى" }, { status: 400 });
     }
     const split = await attentionSplit();
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "لم يعد هذا البند في القائمة، فربما قُرّر فيه. حدّث الصفحة." }, { status: 409 });
     }
     const key = snoozeKey(item);
-    const decision = snoozedUntil(until);
+    const decision = dismiss ? DISMISSED : snoozedUntil(until);
     await db.transaction(async (t) => {
       const [before] = await t.select().from(alertResolutions).where(eq(alertResolutions.key, key)).for("update");
       await t.insert(alertResolutions)
@@ -68,10 +69,15 @@ export async function POST(request: Request) {
       await recordAudit({
         actorId: user.id, action: "ALERT_RESOLVED", entityType: "alert", entityId: key,
         before: before ? { القرار: before.decision, الملاحظة: before.note } : null,
-        after: { القرار: `أجّل إلى ${until}`, البند: item.title, الملاحظة: note, المبلغ_بالهللات: item.amountMinor ?? null },
+        after: { القرار: dismiss ? "علمت به، لا يظهر حتى يتغيّر" : `أجّل إلى ${until}`, البند: item.title, الملاحظة: note, المبلغ_بالهللات: item.amountMinor ?? null },
       }, t);
     });
-    return NextResponse.json({ ok: true, message: `أُجّل إلى ${formatDay(until)}. يعود البند تلقائياً في ذلك اليوم، أو قبله إن تغيّر مبلغه.` });
+    return NextResponse.json({
+      ok: true,
+      message: dismiss
+        ? "لن يظهر هذا البند مرة أخرى إلا إن تغيّر مبلغه أو عدده. تجده في «مؤجّل أو علمت به» إن أردت إعادته."
+        : `أُجّل إلى ${formatDay(until)}. يعود البند تلقائياً في ذلك اليوم، أو قبله إن تغيّر مبلغه.`,
+    });
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

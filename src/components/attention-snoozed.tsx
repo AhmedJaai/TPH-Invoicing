@@ -14,14 +14,16 @@ export function SnoozedList({ snoozed, canEdit }: { snoozed: readonly SnoozedIte
   return (
     <details className="mt-8">
       <summary className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft hover:text-ink">
-        <T s="{0}مؤجّل: {1}، وخارج العدد حتى موعده" a={[<AlarmClock key="0" className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />, countNoun(snoozed.length, ITEM)]} /></summary>
+        <T s="{0}مؤجّل أو علمت به: {1}، وخارج العدد" a={[<AlarmClock key="0" className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />, countNoun(snoozed.length, ITEM)]} /></summary>
       <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
         {snoozed.map(({ item, until, note }) => (
           <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
             <span className="min-w-0 flex-1 basis-56">
               <span className="block text-[13px] font-bold leading-snug">{item.title}</span>
               <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
-                <T s="يعود {0}{1}" a={[formatDay(until), note ? ` — «${note}»` : ""]} /></span>
+                {until === null
+                  ? <T s="علمت به، ويعود إن تغيّر مبلغه أو عدده{0}" a={[note ? ` — «${note}»` : ""]} />
+                  : <T s="يعود {0}{1}" a={[formatDay(until), note ? ` — «${note}»` : ""]} />}</span>
             </span>
             {item.amountMinor !== undefined && <span className="text-sm font-bold"><Money minor={item.amountMinor} /></span>}
             {canEdit && (

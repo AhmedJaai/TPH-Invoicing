@@ -9,7 +9,7 @@
  * جديدة) تغيّر المفتاح **وعاد البندُ قبل يومه** — تأجيلُ ما كان لا يُسكت ما استجدّ.
  */
 import type { AttentionItem } from "./attention";
-import { snoozeDay } from "./signal-decisions";
+import { DISMISSED, snoozeDay } from "./signal-decisions";
 import { addDays, isoDay } from "@/lib/riyadh-time";
 
 /** أبعدُ تأجيل: شهر — ما يُؤجَّل أبعدَ منه يُنسى، وذلك حسمٌ لا تأجيل. */
@@ -32,8 +32,11 @@ export interface SnoozeRow {
 
 export interface SnoozedItem {
   item: AttentionItem;
-  /** يومُ العودة `YYYY-MM-DD` — يعود صباحَه. */
-  until: string;
+  /**
+   * يومُ العودة `YYYY-MM-DD` — يعود صباحَه. و`null`: «علمت، لا تظهره» — لا يعود إلّا إن
+   * تغيّر مبلغُه أو عدده (المفتاحُ يحملهما)، أو أُعيد بيد.
+   */
+  until: string | null;
   note: string | null;
 }
 
@@ -49,7 +52,8 @@ export function partitionSnoozed(
   for (const item of items) {
     const row = byKey.get(snoozeKey(item));
     const until = row ? snoozeDay(row.decision) : null;
-    if (row && until !== null && today < until) snoozed.push({ item, until, note: row.note });
+    if (row?.decision === DISMISSED) snoozed.push({ item, until: null, note: row.note });
+    else if (row && until !== null && today < until) snoozed.push({ item, until, note: row.note });
     else active.push(item);
   }
   return { active, snoozed };

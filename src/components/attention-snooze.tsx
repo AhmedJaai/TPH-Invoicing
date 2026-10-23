@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlarmClock, CircleAlert } from "lucide-react";
+import { AlarmClock, BellOff, CircleAlert } from "lucide-react";
 import { buttonClass } from "./ui";
 import { Popover, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
@@ -48,7 +48,7 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
     <Popover
       buttonLabel="أجّل هذا البند"
       buttonClassName={buttonClass("quiet", "md")}
-      button={<><T s="{0}أجّله" a={[<AlarmClock key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>}
+      button={<><T s="{0}أجّله أو علمت" a={[<AlarmClock key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>}
       width="19rem"
     >
       {(close) => (
@@ -78,6 +78,16 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            disabled={busy !== null}
+            aria-busy={busy === "dismiss"}
+            onClick={() => void snooze("dismiss", close)}
+            className={`${buttonClass("quiet", "sm")} mt-2 w-full justify-center`}
+          >
+            <BellOff className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            علمت، لا تظهره حتى يتغيّر
+          </button>
           {error && (
             <p role="alert" className="mt-2 flex items-start gap-1.5 text-[11px] font-bold text-danger">
               <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
