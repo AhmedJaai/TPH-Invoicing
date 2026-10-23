@@ -40,6 +40,8 @@ export type AuditAction =
   /* تصحيحُ حقلٍ قرأه النموذج خطأً — بقيمته قبلَه وبعدَه */
   | "INVOICE_FIELDS_CORRECTED"
   | "INVOICE_REPLACED"
+  /* نسخةٌ مكرّرة دُمجت في أختها — أُسقطت وعاد سدادها رصيداً */
+  | "INVOICE_MERGED"
   | "SUPPLIER_ALIAS_LEARNED"
   | "STATEMENT_RECONCILED"
   | "PRODUCT_LINKED"

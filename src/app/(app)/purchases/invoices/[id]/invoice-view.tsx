@@ -25,6 +25,7 @@ import { RejectDocument } from "@/components/reject-document";
 import { loadInvoiceProfile, neighbours } from "@/services/invoice-profile.service";
 import { evaluateInvoice, missingPillars } from "@/lib/invoice-findings";
 import { InvoiceRejudge } from "@/components/invoice-rejudge";
+import { InvoiceMerge } from "@/components/invoice-merge";
 import { firstClosedMonth } from "@/services/month-guard";
 import { ISSUE } from "@/lib/issue-codes";
 import { FIELD_LABEL, LOW_CONFIDENCE, amountsAddUp, invoiceHref, weakFields } from "@/lib/invoice-profile";
@@ -285,7 +286,19 @@ export async function InvoiceView({
       {(stale || doc.origin === "STATEMENT_LINE" || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
         <ul className="mt-4 space-y-2" aria-label="تنبيهات تستحق انتباهك">
           {p.twins.map((t) => (
-            <Notice key={t.id} tone="warn" icon={Copy} href={invoiceHref(t.id)} cta="قارنها">
+            <Notice
+              key={t.id}
+              tone="warn"
+              icon={Copy}
+              href={invoiceHref(t.id)}
+              cta="قارنها"
+              extra={canEdit && (
+                <InvoiceMerge
+                  current={{ id: inv.id, number: inv.number, fileName: doc.fileName, driveFileId: doc.driveFileId, older: isOlder(inv, t) }}
+                  twin={{ id: t.id, number: t.number, fileName: t.fileName, driveFileId: t.driveFileId, older: !isOlder(inv, t) }}
+                />
+              )}
+            >
               <T s="توجد فاتورة أخرى من {0} بالإجمالي نفسه ({1}) بتاريخ {2}، ورقمها {3}. قد يكونان طلبين مختلفين أو فاتورة مكررة، فقارن بنودهما قبل أن تسدّد الاثنتين." a={[supplier.nameAr, formatRiyalsDisplay(t.totalMinor), formatDay(t.date), <bdi key="3" className="nums">{t.number}</bdi>]} /></Notice>
           ))}
           {doc.origin === "STATEMENT_LINE" && (
@@ -598,13 +611,15 @@ function trimQty(qty: string | null): string {
 }
 
 function Notice({
-  tone, icon: Icon, href, cta, children,
+  tone, icon: Icon, href, cta, children, extra,
 }: {
   tone: "warn" | "danger";
   icon: typeof CircleAlert;
   href: string;
   cta: string;
   children: React.ReactNode;
+  /** فعلٌ بجانب التنبيه نفسه — كالدمج تحت التوأم */
+  extra?: React.ReactNode;
 }) {
   return (
     <li
@@ -619,8 +634,14 @@ function Notice({
       <Link href={href} className="inline-flex min-h-11 shrink-0 items-center font-bold text-ink underline underline-offset-4 sm:min-h-0">
         {cta} ←
       </Link>
+      {extra && <div className="flex w-full flex-wrap">{extra}</div>}
     </li>
   );
+}
+
+/** أيُّ القيدين أقدم — كما يحكم الخادم (`invoice-merge.service.ts`) */
+function isOlder(a: { id: string; createdAt: Date }, b: { id: string; createdAt: Date }): boolean {
+  return a.createdAt.getTime() - b.createdAt.getTime() < 0 || (a.createdAt.getTime() === b.createdAt.getTime() && a.id < b.id);
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

@@ -124,6 +124,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   DOCUMENT_STATUS_CHANGED: "تغيير حالة مستند",
   INVOICE_FIELDS_CORRECTED: "تصحيح حقول فاتورة",
   INVOICE_REPLACED: "فاتورة مصحّحة حلّت محل الفاتورة المسجّلة",
+  INVOICE_MERGED: "نسخة مكرّرة دُمجت في هذه الفاتورة",
   DOCUMENT_REREAD: "إعادة قراءة مستند",
   DOCUMENT_RECORDED_BY_HAND: "تسجيل فاتورة من مستند يدوياً",
   ALERT_RESOLVED: "إغلاق تنبيه",
