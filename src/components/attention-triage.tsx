@@ -3,6 +3,8 @@ import {
   Activity, ArrowDown, ArrowLeft, Ban, Banknote, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap, type LucideIcon,
 } from "lucide-react";
 import { Money, Prose } from "./money";
+import { SignalControls } from "./signal-controls";
+import { IssueWaive } from "./issue-waive";
 import { Badge, DoneMark, FlowItem, Kbd, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, countBySeverity,
@@ -572,6 +574,12 @@ function EvidenceRow({ e }: { e: AttentionEvidence }) {
           <p className="text-[13px] font-medium" dir="auto">{e.label}</p>
         )}
         {e.sub && <p className="mt-0.5 text-[11px] leading-relaxed text-muted"><Prose text={e.sub} /></p>}
+        {(e.signalKey || e.issueId) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            {e.signalKey && <SignalControls signalKey={e.signalKey} dismissLabel="علمت، لا تظهرها" />}
+            {e.issueId && <IssueWaive issueId={e.issueId} />}
+          </div>
+        )}
       </div>
       {e.amountMinor !== undefined && (
         <span className="nums-col shrink-0 pt-px text-[13px] font-bold">

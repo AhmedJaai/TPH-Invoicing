@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "./riyadh-time";
-import { DISMISSED, isSilenced, signalPrefix, silencedKeys, snoozeDay, snoozedUntil } from "./signal-decisions";
+import { DISMISSED, isSilenced, priceRiseKey, signalPrefix, silencedKeys, snoozeDay, snoozedUntil, statementGapKey } from "./signal-decisions";
 
 describe("signal-decisions", () => {
   it("المفتاح يقبل ببادئته المعروفة وحدها", () => {
@@ -40,5 +40,19 @@ describe("signal-decisions", () => {
 
   it("addDays يعبر الشهر والسنة", () => {
     expect(addDays("2026-12-30", 7)).toBe("2027-01-06");
+  });
+});
+
+describe("مفتاحا «علمت» لارتفاع السعر وفرق الكشف", () => {
+  it("يقبلهما مسارُ القرار، ولا مسافة فيهما مع وصفٍ عربيّ", () => {
+    const k = priceRiseKey("3a04d2fa-9bba-43e3-a96b-04f39648169f", "حليب كامل الدسم 1.75 لتر", 27_30);
+    expect(signalPrefix(k)).toBe("price-rise");
+    expect(signalPrefix(statementGapKey("Hungry Man", "2026-06-05", 80_00, 0))).toBe("statement-gap");
+  });
+
+  it("السعرُ الأعلى ثانيةً والفرقُ المتغيّر مفتاحٌ آخر — فيعود السؤال", () => {
+    expect(priceRiseKey("s", "حليب", 27_30)).not.toBe(priceRiseKey("s", "حليب", 30_00));
+    expect(priceRiseKey("s", "حليب", 27_30)).not.toBe(priceRiseKey("s", "لبن", 27_30));
+    expect(statementGapKey("x", "2026-06-05", 80_00, 0)).not.toBe(statementGapKey("x", "2026-06-05", 80_00, 80_00));
   });
 });

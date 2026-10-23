@@ -26,6 +26,8 @@ export const SIGNAL_PREFIXES = [
   "stock-link",
   "stock-gap",
   "repeat-delivery",
+  "price-rise",
+  "statement-gap",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -46,7 +48,32 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "stock-link": "بند فاتورة ليس من المخزون",
   "stock-gap": "فرق متكرر في صنف مخزون",
   "repeat-delivery": "توريد يبدو مسجّلاً مرتين",
+  "price-rise": "ارتفاع سعر صنف عند مورّده",
+  "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
 };
+
+/*
+  «علمتُ، لا تُظهرها» لما يحسبه «يحتاج قرارك» (أحمد، ٢٣ أكتوبر ٢٠٢٦): حليبُ نادك ٩٫١٠ ← ٢٧٫٣٠،
+  وكشفُ هنقري مان بثمانين ريالاً. والمفتاحُ يحمل الأرقام: إن ارتفع السعرُ ثانيةً أو تغيّر
+  الفرقُ عاد السؤال — فالإسكاتُ لما رآه صاحبه لا لما لم يره.
+*/
+export function priceRiseKey(supplierId: string, normalizedDescription: string, nowPriceMinor: number): string {
+  return `price-rise:${supplierId}:${shortHash(normalizedDescription)}:${nowPriceMinor}`;
+}
+
+export function statementGapKey(slug: string, day: string, theirsMinor: number, oursMinor: number): string {
+  return `statement-gap:${encodeURIComponent(slug).slice(0, 80)}:${day}:${theirsMinor}:${oursMinor}`;
+}
+
+/** بصمةٌ قصيرة ثابتة لنصٍّ قد يحوي مسافاتٍ وحروفاً عربيّة — FNV-1a، لا للأمان بل للمفتاح. */
+function shortHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (const ch of text) {
+    h ^= ch.codePointAt(0) ?? 0;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;
 

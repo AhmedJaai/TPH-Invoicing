@@ -51,6 +51,10 @@ export interface AttentionEvidence {
   amountMinor?: number;
   /** موضعُ إصلاح هذا السطر بعينه — لا الصفحةُ الجامعة. */
   href?: string;
+  /** ملاحظةٌ محسوبة تُسكَت بـ«علمت» (`signal-decisions.ts`) — مفتاحُها يحمل أرقامَ الحدث */
+  signalKey?: string;
+  /** تنبيهٌ مانعٌ مفتوح يُتجاوز بسبب (`/api/issue-waive`) */
+  issueId?: string;
 }
 
 /**
@@ -107,6 +111,8 @@ export interface AttentionItem {
 export interface AttentionFacts {
   /** تنبيهات مانعة مفتوحة */
   openBlockers: number;
+  /** كلُّ مانعٍ مفتوح باسم ملفّه ورابطه — العددُ وحده لا يُعالَج */
+  openBlockerEvidence?: AttentionEvidence[];
   /** مستندات لم يُبتّ فيها */
   pendingDocuments: number;
   /** صورُ فواتيرٍ ورقيّة أرسلها الفريق من روابطه وتنتظر الاعتماد (081). الغائبُ: لم يُسأل. */
@@ -154,7 +160,7 @@ export interface AttentionFacts {
   heldBankRows: number;
 
   /** مورّدون يخالف آخرُ كشفٍ منهم دفترَنا (`latestStatementGaps`) — ما يطالبوننا به غيرُ ما ندين به */
-  statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number }[];
+  statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number; key?: string }[];
 
   /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
   misplacedFiles?: { label: string; sub: string; href: string }[];
@@ -232,7 +238,7 @@ export interface AttentionFacts {
    */
   expiringObligations?: { title: string; kindLabel: string; expiresOn: string; daysLeft: number }[];
   /** خصمٌ متكرّر تكرّر في شهره أو ارتفع عن عادته (`lib/recurring-detect.ts`) — والمبلغُ الزائد. */
-  recurringAnomalies?: { label: string; kind: "TWICE" | "ROSE"; amountMinor: number; day: string }[];
+  recurringAnomalies?: { key?: string; label: string; kind: "TWICE" | "ROSE"; amountMinor: number; day: string }[];
   bouncedPayments?: AttentionEvidence[];
   bouncedPaymentMinor?: number;
   firstBouncedTransactionId?: string | null;
@@ -532,13 +538,13 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "CRITICAL",
       title: `${countNoun(f.openBlockers, BLOCKER)} لم يُعالَج`,
-      detail: "يمنع إقفال الشهر، ويشوّه أرقامه.",
-      action: "عالجه، أو تجاوزه مع كتابة السبب.",
-      actionLabel: "راجع المستندات",
-      href: "/documents?status=NEEDS_REVIEW",
+      detail: "يمنع إقفال الشهر. كل سطر أدناه فاتورة ومانعها.",
+      action: "افتح الفاتورة وصحّحها، أو اضغط «تجاوزه» واكتب السبب إن كنت تعرف أنها سليمة.",
+      actionLabel: "افتح أولها",
+      href: f.openBlockerEvidence?.[0]?.href ?? "/documents",
       count: f.openBlockers,
       impact: { kind: "BLOCKED", amountMinor: null },
-      evidence: [],
+      evidence: f.openBlockerEvidence ?? [],
     });
   }
 
@@ -1029,6 +1035,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         label: a.label.slice(0, 45),
         sub: `${a.kind === "TWICE" ? "خُصم مرتين" : "ارتفع"} · ${formatDay(a.day)}`,
         amountMinor: a.amountMinor,
+        signalKey: a.key,
       })),
     });
   }
@@ -1096,6 +1103,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         sub: `في كشفه ${formatRiyalsDisplay(g.theirsMinor)} يوم ${formatDay(g.day)} · وفي سجلاتنا ${g.oursMinor >= 0 ? formatRiyalsDisplay(g.oursMinor) : `رصيد لنا عنده ${formatRiyalsDisplay(-g.oursMinor)}`}`,
         amountMinor: Math.abs(g.gapMinor),
         href: `/statements?supplier=${encodeURIComponent(g.slug)}`,
+        signalKey: g.key,
       })),
     });
   }

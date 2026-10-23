@@ -25,6 +25,8 @@ import { latestStatementGaps } from "@/services/statement-reconcile.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
+import { priceRiseKey, silencedKeys, statementGapKey } from "./signal-decisions";
+import { todayInRiyadh } from "./riyadh-time";
 import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
 
 interface Row {
@@ -123,7 +125,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           آخر سنة، بحساب القاعدة العشريّ لا بعدد عائم. وكان «× ٢٠»: عشرون
           شراءً في السنة لكلّ صنف مفترضةً بيد — رقم مخترع يعرض مالاً.
         */
-        select p.name_ar, p.description, p.now_price, p.then_price,
+        select p.supplier_id, p.normalized_description, p.name_ar, p.description, p.now_price, p.then_price,
                round((p.now_price - p.then_price) * coalesce((
                  select sum(l.qty) from invoice_lines l
                   where l.supplier_id = p.supplier_id
@@ -137,7 +139,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         */
         where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
           and p.now_price <= 3 * p.then_price
-        order by annual_minor desc, (p.now_price - p.then_price) desc limit 10
+        order by annual_minor desc, (p.now_price - p.then_price) desc limit 40
       `),
     db.execute<{ start: string | null; end: string | null }>(sql`
         select to_char(min(value_date), 'YYYY-MM-DD') as start,
@@ -277,14 +279,18 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
    * والمقارنة داخل المورّد الواحد عمداً — الانتقال من مورّد غالٍ إلى رخيص
    * ليس «انخفاض سعر».
    */
-  const rises = (
-    q6
-  ).rows;
+  /* «علمتُ» على صنفٍ يُخرجه من البند حتى يرتفع سعرُه ثانيةً (`priceRiseKey`) */
+  const silenced = silencedKeys((await db.execute<{ key: string; decision: string }>(sql`
+    select key, decision from alert_resolutions where key like 'price-rise:%' or key like 'statement-gap:%'`)).rows, todayInRiyadh());
+  const rises = q6.rows
+    .filter((r) => !silenced.has(priceRiseKey(String(r.supplier_id), String(r.normalized_description), Number(r.now_price))))
+    .slice(0, 10);
 
   const priceRises = rises.map<AttentionEvidence>((r) => ({
     label: String(r.description).slice(0, 40),
     sub: `${r.name_ar ?? "—"} · ${formatRiyalsDisplay(Number(r.then_price))} ← ${formatRiyalsDisplay(Number(r.now_price))}`,
     amountMinor: Number(r.now_price) - Number(r.then_price),
+    signalKey: priceRiseKey(String(r.supplier_id), String(r.normalized_description), Number(r.now_price)),
   }));
   const priceRiseAnnualMinor = rises.reduce((sum, r) => sum + Number(r.annual_minor), 0);
 
@@ -526,7 +532,21 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     heldBankRows: Number(counts?.held_rows ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
-    statementGaps: await latestStatementGaps(),
+    statementGaps: (await latestStatementGaps())
+      .map((g) => ({ ...g, key: statementGapKey(g.slug, g.day, g.theirsMinor, g.oursMinor) }))
+      .filter((g) => !silenced.has(g.key)),
+    /* المانعُ المفتوح باسمه وموضعه — كان عدداً يُحيل إلى «تنتظر المراجعة» والمستندُ مؤرشف */
+    openBlockerEvidence: (await db.execute<{ id: string; message: string; doc_id: string; file_name: string; invoice_id: string | null }>(sql`
+      select i.id, i.message, d.id as doc_id, d.file_name,
+             (select v.id from invoices v where v.document_id = d.id limit 1) as invoice_id
+        from issues i join documents d on d.id = i.entity_id
+       where i.status = 'OPEN' and i.severity = 'BLOCKER' order by d.period_month, i.created_at limit 30`)).rows
+      .map((r) => ({
+        label: r.file_name.slice(0, 60),
+        sub: r.message,
+        href: r.invoice_id ? invoiceHref(r.invoice_id) : documentHref(r.doc_id),
+        issueId: r.id,
+      })),
     misplacedFiles: (await db.execute<{ id: string; message: string; file_name: string }>(sql`
       select d.id, i.message, d.file_name from issues i join documents d on d.id = i.entity_id
        where i.code = 'FILE_IN_WRONG_MONTH' and i.status = 'OPEN' order by i.created_at desc limit 20`)).rows

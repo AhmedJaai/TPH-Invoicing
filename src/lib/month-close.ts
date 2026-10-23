@@ -43,6 +43,8 @@ export interface MonthFacts {
   unpostedCount: number;
   fixedAssetCount: number;
   openBlockerIssues: number;
+  /** نصُّ أحد الموانع — يُقال باسمه لا بعدده وحده */
+  openBlockerSample?: string | null;
   documentsNeedingReview: number;
   /** مورّدون لهم فواتير في الشهر */
   suppliersWithInvoices: number;
@@ -91,7 +93,7 @@ const riyals = formatRiyalsDisplay;
 export function fixHref(id: string, month: string): string {
   switch (id) {
     case "has-invoices": return "/upload";
-    case "no-blockers": return "/attention";
+    case "no-blockers": return "/attention?item=open-blockers";
     case "no-pending-review": return "/documents?status=NEEDS_REVIEW";
     case "tax-unknown": return `/purchases/invoices?tax=UNKNOWN&month=${month}`;
     case "tax-valid": return `/purchases/invoices?tax=INVALID&month=${month}`;
@@ -132,8 +134,8 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.openBlockerIssues === 0
         ? "لا شيء يمنع الإقفال"
-        : `${countNoun(facts.openBlockerIssues, WARNING)} مانع لم يُعالَج`,
-    action: facts.openBlockerIssues === 0 ? undefined : "عالجها، أو تجاوزها مع كتابة السبب",
+        : `${countNoun(facts.openBlockerIssues, WARNING)} مانع لم يُعالَج${facts.openBlockerSample ? `، منها: «${facts.openBlockerSample}»` : ""}`,
+    action: facts.openBlockerIssues === 0 ? undefined : "افتحها من «أصلح»: كل فاتورة باسمها، فصحّحها أو تجاوزها مع كتابة السبب",
   });
 
   items.push({

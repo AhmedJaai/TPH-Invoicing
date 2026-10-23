@@ -64,7 +64,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
 
   // التنبيهات المانعة المفتوحة على مستندات هذا الشهر
   const blockersP = db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)::int`, first: sql<string | null>`min(${issues.message})` })
     .from(issues)
     .where(sql`${issues.status} = 'OPEN' and ${issues.severity} = 'BLOCKER' and exists (
       select 1 from documents d where d.id = ${issues}.entity_id and d.period_month = ${month}
@@ -208,6 +208,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     unpostedCount: Number(inv?.unpostedCount ?? 0),
     fixedAssetCount: Number(inv?.fixedAssetCount ?? 0),
     openBlockerIssues: Number(blockers?.n ?? 0),
+    openBlockerSample: blockers?.first ?? null,
     documentsNeedingReview: Number(docs?.needingReview ?? 0),
     suppliersWithInvoices: Number(inv?.suppliersWithInvoices ?? 0),
     suppliersWithStatement: Number(stmt?.n ?? 0),

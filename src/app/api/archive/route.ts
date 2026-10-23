@@ -497,7 +497,9 @@ export async function POST(request: Request) {
         ...(body.findings ?? [])
           .filter((f) => f.code === "LOW_CONFIDENCE_FIELD")
           .map((f) => ({ code: f.code as never, severity: "WARN" as const, message: f.message })),
-      ]);
+      ], review.overridden.length > 0
+        ? { codes: review.overridden.map((b) => b.code), actorId: user.id, reason: "أقرّ صاحب العمل عند الأرشفة أن الفاتورة له رغم المانع" }
+        : undefined);
 
       return docId;
     }).catch(async (e: unknown) => {

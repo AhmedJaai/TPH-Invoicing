@@ -107,19 +107,30 @@ export async function createDocument(tx: Tx, input: CreateDocumentInput): Promis
   return doc.id;
 }
 
-/** التنبيهات غير المانعة تبقى مفتوحة لتُتابَع لا لتُنسى. */
+/**
+ * التنبيهات غير المانعة تبقى مفتوحة لتُتابَع لا لتُنسى.
+ *
+ * وما أقرّ به صاحبُ العمل عند الأرشفة (`waived`) يُكتب متجاوَزاً باسمه وسببه — كان يُكتب
+ * مفتوحاً مانعاً، فبقيت ثماني فواتير أوسكا اعتمدها أحمد بإقراره تمنع إقفال أربعة أشهر
+ * بلا اسمٍ ولا رابط (٢٣ أكتوبر ٢٠٢٦).
+ */
 export async function recordFindings(
   tx: Tx,
   documentId: string,
   findings: readonly Finding[],
+  waived?: { codes: readonly string[]; actorId: string; reason: string },
 ): Promise<void> {
   for (const f of findings) {
+    const isWaived = waived?.codes.includes(f.code) ?? false;
     await tx.insert(issues).values({
       code: f.code,
       severity: f.severity,
       entityType: "document",
       entityId: documentId,
       message: f.message,
+      ...(isWaived && waived
+        ? { status: "WAIVED" as const, resolvedById: waived.actorId, resolvedAt: new Date(), waiverReason: waived.reason }
+        : {}),
     });
   }
 }
