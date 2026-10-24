@@ -79,3 +79,13 @@ export function monthBalancesFromStatement(rows: readonly BalanceRow[]): MonthBa
   }
   return out.sort((a, b) => a.month.localeCompare(b.month));
 }
+
+/**
+ * يومُ الرصيد الختاميّ: آخرُ حركةٍ في فترته إن وُجدت، وإلّا آخرُ الفترة ما لم
+ * يكن بعد اليوم — فرصيدٌ أُدخل بيدٍ لشهرٍ لم ينتهِ لا يُنسَب إلى يومٍ لم يأتِ،
+ * ويُعرَض بلا تاريخ (`null`) لا بتاريخٍ كاذب.
+ */
+export function balanceAsOf(periodEnd: string, lastTransactionDay: string | null, today: string): string | null {
+  if (lastTransactionDay !== null && lastTransactionDay <= periodEnd) return lastTransactionDay;
+  return periodEnd <= today ? periodEnd : null;
+}

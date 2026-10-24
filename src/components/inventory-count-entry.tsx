@@ -364,7 +364,7 @@ export function InventoryCountEntry({
       )}
 
       {editable && (
-        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 mt-5 lg:bottom-4">
+        <div className="sticky bottom-(--above-tabbar) z-10 mt-5">
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-overlay/95 px-4 py-3 shadow-overlay backdrop-blur">
             <p className="min-w-0 flex-1 text-[13px]">
               {dirty.length === 0

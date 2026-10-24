@@ -54,3 +54,81 @@ describe("الشبكة المتجاوبة لها عمود صريح على الج
     expect(implicitGridColumns('<div className="grid h-7 w-7 place-items-center">')).toEqual([]);
   });
 });
+
+/*
+ * ── ما يلتصق بحافّة الشاشة يحسب حافّتها الآمنة وأشرطةَ القشرة ──
+ *
+ * `viewport-fit=cover` يمدّ الصفحةَ تحت ساعة الآيفون وشريط المنزل. وكانت
+ * المقاساتُ أرقاماً في كلّ صفحة: `top-14` (الشريطُ العلويّ بلا الساعة) و`bottom-20`
+ * (أقصرُ من شريط الألسنة مع شريط المنزل) — فانزلق الشريطُ تحت الساعة، ووقع شريطُ
+ * التحديد تحت الألسنة وزرِّ الكاميرا. فالمقاسُ من رموز `globals.css` وحدها:
+ * `top-(--app-header)` و`bottom-(--above-tabbar)` و`pb-(--content-end)`.
+ */
+export function hardCodedShellOffsets(source: string): string[] {
+  const out: string[] = [];
+  for (const m of source.matchAll(/className=\{?[`"]([^`"]*)[`"]/g)) {
+    const toks = m[1].split(/\s+/);
+    if (!toks.includes("sticky") && !toks.includes("fixed")) continue;
+    for (const t of toks) {
+      /* لاصقٌ تحت الشريط العلويّ بارتفاعه المكتوب — بلا الحافّة الآمنة */
+      if (/^(lg:)?top-(14|\[60px\])$/.test(t)) out.push(t);
+      /* لاصقٌ فوق شريط الجوّال بارتفاعٍ مكتوب — على الجوّال وحده (`lg:` للحاسوب بلا شريط) */
+      if (/^bottom-(\d+|\[calc\(.*safe-area.*\)\])$/.test(t) && t !== "bottom-0") out.push(t);
+    }
+  }
+  return out;
+}
+
+describe("اللاصقُ بحافّة الشاشة يأخذ مقاسه من رموز القشرة", () => {
+  for (const file of walk("src")) {
+    const source = readFileSync(file, "utf8");
+    if (!/sticky|fixed/.test(source)) continue;
+    it(file, () => {
+      expect(hardCodedShellOffsets(source)).toEqual([]);
+    });
+  }
+
+  it("والحارس يمسك الشكل الخاطئ", () => {
+    expect(hardCodedShellOffsets('<div className="sticky top-14 z-10 lg:top-[60px]">')).toEqual(["top-14", "lg:top-[60px]"]);
+    expect(hardCodedShellOffsets('<div className="no-print sticky bottom-20 z-20 lg:bottom-4">')).toEqual(["bottom-20"]);
+    expect(hardCodedShellOffsets('<footer className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10">')).toHaveLength(1);
+  });
+
+  it("ولا يمسك الصواب", () => {
+    expect(hardCodedShellOffsets('<div className="sticky top-(--app-header) z-10">')).toEqual([]);
+    expect(hardCodedShellOffsets('<div className="sticky bottom-(--above-tabbar) z-10 lg:bottom-4">')).toEqual([]);
+    expect(hardCodedShellOffsets('<div className="fixed inset-x-0 bottom-0 z-30">')).toEqual([]);
+  });
+
+  it("الشريطُ العلويّ يحشو الحافّةَ الآمنة، والمحتوى يترك ما تحت شريط الجوّال", () => {
+    expect(readFileSync("src/components/topbar.tsx", "utf8")).toMatch(/sticky top-0[^"]*pt-\(--safe-top\)/);
+    expect(readFileSync("src/components/page-shell.tsx", "utf8")).toContain("pb-(--content-end)");
+    const css = readFileSync("src/app/globals.css", "utf8");
+    for (const token of ["--app-header", "--tabbar", "--above-tabbar", "--content-end"]) {
+      expect(css).toContain(`${token}:`);
+    }
+  });
+});
+
+/*
+ * ── `hidden` لا يُخفي زرّاً من `buttonClass` ──
+ *
+ * `buttonClass` يحمل `inline-flex`، وفي ترتيب Tailwind يغلب `hidden` — فبقي زرُّ
+ * «يحتاج قرارك» ظاهراً على الجوّال وقد أُريد إخفاؤه، وأخذ نصفَ الصفّ وقصّ العنوان.
+ * يُخفى الغلافُ لا الزرّ.
+ */
+const HIDDEN_BUTTON = /\$\{buttonClass\([^)]*\)\}[^`]*(?<![:\w-])hidden\b/;
+
+describe("الزرُّ لا يُخفى بـ`hidden` على صنفه", () => {
+  for (const file of walk("src")) {
+    const source = readFileSync(file, "utf8");
+    if (!source.includes("buttonClass")) continue;
+    it(file, () => {
+      expect(source.match(HIDDEN_BUTTON)?.[0] ?? null).toBeNull();
+    });
+  }
+  it("والحارس يمسك الشكل الخاطئ ولا يمسك المتغيّرَ بنقطة", () => {
+    expect(HIDDEN_BUTTON.test('className={`${buttonClass("secondary", "sm")} hidden sm:inline-flex`}')).toBe(true);
+    expect(HIDDEN_BUTTON.test('className={`${buttonClass("primary")} cursor-pointer sm:hidden`}')).toBe(false);
+  });
+});

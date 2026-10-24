@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { overflowSide, revealDelta, type OverflowSide } from "@/lib/scroll-edge";
 
 /**
  * وعاءٌ يُمرَّر عرضاً، ويقول إن كان وراء حافّته مزيد.
@@ -26,28 +27,69 @@ export function ScrollX({
   className?: string;
 } & React.HTMLAttributes<HTMLDivElement>) {
   const ref = useRef<HTMLDivElement>(null);
-  const [side, setSide] = useState<"none" | "start" | "end" | "both">("none");
+  const side = useOverflowEdge(ref);
+  return (
+    <div
+      ref={ref}
+      className={`scroll-x ${className}`}
+      data-overflow={side === "none" ? undefined : side}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * شريطُ ألسنةٍ يُمرَّر عرضاً (`<nav>`): حافّتُه المتدرّجة تقول إنّ وراءه ألسنة،
+ * واللسانُ المختار (`aria-current`) يُمرَّر إلى الوسط عند الرسم — كان «فودكس»
+ * مقصوصاً على الجوّال، واللسانُ المفتوح قد يقع خارج الشاشة فلا يُعرَف أين أنت.
+ */
+export function ScrollStrip({
+  children,
+  className = "",
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+} & React.HTMLAttributes<HTMLElement>) {
+  const ref = useRef<HTMLElement>(null);
+  const side = useOverflowEdge(ref);
+  const revealed = useRef<Element | null>(null);
+  /* كلَّ رسمٍ يُسأل: أتغيّر اللسانُ المختار؟ فإن لم يتغيّر لا يُنازَع من مرّر الشريطَ بيده */
+  useEffect(() => {
+    const el = ref.current;
+    const active = el?.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"], [aria-selected="true"]');
+    if (!el || !active || revealed.current === active) return;
+    revealed.current = active;
+    const delta = revealDelta(el.getBoundingClientRect(), active.getBoundingClientRect());
+    /* `scrollLeft` لا `scrollIntoView`: هذا لا يحرّك الصفحةَ عموديّاً */
+    if (delta !== 0) el.scrollLeft += delta;
+  });
+  return (
+    <nav
+      ref={ref}
+      className={`scroll-x ${className}`}
+      data-overflow={side === "none" ? undefined : side}
+      {...rest}
+    >
+      {children}
+    </nav>
+  );
+}
+
+/**
+ * يُقاس الفيض بعد التركيب وعند التمرير وعند تغيّر المقاس، وتُراقَب الأبعاد
+ * بـ`ResizeObserver` لأنّ المحتوى قد يصل بعد التركيب.
+ */
+function useOverflowEdge(ref: React.RefObject<HTMLElement | null>): OverflowSide {
+  const [side, setSide] = useState<OverflowSide>("none");
 
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-
-    /*
-      في الاتّجاه من اليمين إلى اليسار يكون `scrollLeft` سالباً أو صفراً
-      في المتصفّحات الحديثة، فيؤخذ مطلقه. والسماح ببكسلٍ واحد لأنّ القياس
-      كسريّ عند بعض مستويات التكبير، فيبقى فرقٌ لا يُرى ويُنتج حافّةً كاذبة.
-    */
-    const max = el.scrollWidth - el.clientWidth;
-    if (max <= 1) {
-      setSide("none");
-      return;
-    }
-    const at = Math.abs(el.scrollLeft);
-    const atStart = at <= 1;
-    const atEnd = at >= max - 1;
-
-    setSide(atStart ? "end" : atEnd ? "start" : "both");
-  }, []);
+    setSide(overflowSide(el.scrollWidth, el.clientWidth, el.scrollLeft));
+  }, [ref]);
 
   useEffect(() => {
     const el = ref.current;
@@ -65,16 +107,7 @@ export function ScrollX({
       el.removeEventListener("scroll", measure);
       ro.disconnect();
     };
-  }, [measure]);
+  }, [measure, ref]);
 
-  return (
-    <div
-      ref={ref}
-      className={`scroll-x ${className}`}
-      data-overflow={side === "none" ? undefined : side}
-      {...rest}
-    >
-      {children}
-    </div>
-  );
+  return side;
 }

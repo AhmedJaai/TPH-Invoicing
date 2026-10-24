@@ -3,7 +3,7 @@ import { Suspense, ViewTransition, useId } from "react";
 import { ArrowDown, ArrowUp, Check, Inbox, Minus, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Money, Prose } from "./money";
 import { LiveMoney } from "./live-money";
-import { ScrollX } from "./scroll-x";
+import { ScrollStrip, ScrollX } from "./scroll-x";
 import { LinkPending, RowLink, SelectAll, SelectBox, SortHeader, SortSelect, TableFilter } from "./ui-client";
 import { parseSort, sortRows, type SortValue } from "@/lib/table-sort";
 
@@ -257,6 +257,7 @@ export function Stat({
 export function KeyFigure({
   icon: Icon,
   label,
+  period,
   value,
   sub,
   href,
@@ -266,12 +267,15 @@ export function KeyFigure({
   className = "",
 }: {
   icon: LucideIcon;
+  /** سطرٌ واحد قصير («المشتريات») — والفترةُ في `period` لا فيه. */
   label: string;
+  /** الفترةُ تحت التسمية بخطٍّ أصغر («نوفمبر 2026») — كانت في التسمية فالتفّت ثلاثة أسطر في عمودٍ من اثنين. */
+  period?: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
   href?: string;
   tone?: "warn" | "danger" | "ok";
-  /** نسبةُ التغيّر بجانب التسمية — `null` «بلا مقارنة». */
+  /** التغيّرُ بجانب التسمية — `null` «بلا مقارنة». */
   delta?: number | null;
   children?: React.ReactNode;
   className?: string;
@@ -284,14 +288,17 @@ export function KeyFigure({
   const ink = tone ? TONE_TEXT[tone] : "";
   const body = (
     <>
-      <span className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs font-bold text-muted">
+      <span className="flex items-start justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-muted">
           <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${chip}`}>
             <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
           </span>
-          {label}
+          <span className="min-w-0">
+            <span className="block truncate">{label}</span>
+            {period && <span className="block truncate text-[11px] font-medium">{period}</span>}
+          </span>
         </span>
-        {delta !== undefined && <Delta pct={delta} />}
+        {delta !== undefined && <span className="shrink-0"><Delta pct={delta} /></span>}
       </span>
       {/* الرقمُ الكبير نصفُ غامق — الثقةُ في الحجم لا في الوزن (Stripe) */}
       <span className="@container mt-4 block">
@@ -326,24 +333,41 @@ export function isNumeric(value: React.ReactNode): boolean {
  * بمقاس الوعاء لا الشاشة (`@container` في `PageShell` ولوح الفحص).
  */
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">{children}</div>;
+  return <div className={STAT_GRID}>{children}</div>;
 }
+
+/**
+ * عمودان على الجوّال، وعمودٌ واحد في وعاءٍ أضيق من ‎22rem‎ (آيفون صغير) — والبطاقةُ
+ * الأخيرة الوحيدة في صفّها تأخذه كلَّه لا نصفَه (كانت الثالثةُ تقبع وحدها على اليمين).
+ * `col-span-full` لا `col-span-2`: في شبكةٍ من عمودٍ واحد يُنشئ الثاني عموداً خفيّاً.
+ */
+const STAT_GRID =
+  "grid grid-cols-2 gap-3 @max-[22rem]:grid-cols-1 @max-3xl:[&>:last-child:nth-child(odd)]:col-span-full @3xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]";
 
 /**
  * اتّجاهُ التغيّر: سهمٌ ونسبة، واللونُ لمن يُعرف أهو في صالحه.
  * ارتفاعُ المشتريات لا لون له — قد يكون نموّاً وقد يكون تسرّباً.
  */
-export function Delta({ pct, favourable }: { pct: number | null; favourable?: boolean | null }) {
+export function Delta({ pct: ratio, favourable, abs }: {
+  pct: number | null;
+  favourable?: boolean | null;
+  /** الفرقُ عدداً بدل النسبة — لأساسٍ صغير (`countDelta` في `lib/changes.ts`). */
+  abs?: number | null;
+}) {
+  const pct = abs !== undefined && abs !== null ? abs : ratio;
   if (pct === null) return <span className="text-[11px] text-muted">بدون مقارنة</span>;
   const up = pct > 0;
   const tone = favourable === true ? "text-ok bg-ok-bg" : favourable === false ? "text-warn bg-warn-bg" : "text-ink-soft bg-sunken";
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[11px] font-bold ${tone}`}>
       {/* أيقوناتُ lucide لا حروفٌ بخطّ النظام: «▲▼» تختلف وزناً بين الأجهزة وقد تصير رمزاً ملوَّناً */}
-      {up ? <ArrowUp className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : pct < 0 ? <ArrowDown className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : <Minus className="h-3 w-3" strokeWidth={2.5} aria-hidden />}
+      {/* الفرقُ عدداً يحمل إشارته («+55») — فلا سهمَ معه */}
+      {(abs === undefined || abs === null) && (up ? <ArrowUp className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : pct < 0 ? <ArrowDown className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : <Minus className="h-3 w-3" strokeWidth={2.5} aria-hidden />)}
       <span className="sr-only">{up ? "ارتفاع" : pct < 0 ? "انخفاض" : "ثبات"}</span>
       {/* «٪» حرفٌ عربيّ يقلب موضعَ الرقم بجوار نصٍّ لاتينيّ — يُعزَل الاثنان معاً */}
-      <bdi dir="rtl"><span className="nums nums-count">{Math.abs(Math.round(pct))}</span>٪</bdi>
+      {abs !== undefined && abs !== null
+        ? <bdi dir="ltr" className="nums nums-count">{abs > 0 ? `+${abs}` : abs < 0 ? `−${-abs}` : "0"}</bdi>
+        : <bdi dir="rtl"><span className="nums nums-count">{Math.abs(Math.round(pct))}</span>٪</bdi>}
     </span>
   );
 }
@@ -689,7 +713,7 @@ export function LinkTabs({
   label: string;
 }) {
   return (
-    <nav aria-label={label} className="scroll-x -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+    <ScrollStrip aria-label={label} className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
       {items.map((t) => (
         <Link
           key={t.href}
@@ -713,7 +737,7 @@ export function LinkTabs({
           <LinkPending />
         </Link>
       ))}
-    </nav>
+    </ScrollStrip>
   );
 }
 
@@ -757,6 +781,12 @@ export interface Column<T> {
   secondary?: boolean;
   /** عنوان البطاقة على الجوّال — يُعرَض بارزاً بلا تسمية. */
   primary?: boolean;
+  /**
+   * قيمةٌ تُقرأ بلا تسميتها — تاريخٌ أو شارةُ حالة. على الجوّال تجتمع في سطرٍ
+   * واحد تحت العنوان (وتسميتُها لقارئ الشاشة)، لا خانةً بتسميتها في شبكة: كانت
+   * بطاقةُ حركة البنك ثلاثمئة بكسل، نصفُها «التاريخ» و«الحالة».
+   */
+  meta?: boolean;
   /**
    * خليّةٌ لا تُقصّ على الجوّال — ما كانت خليّتُه فعلاً لا نصّاً
    * (لوحُ إقرارٍ يُفتح داخلها) لا يُبتلَع بـ`overflow: hidden`.
@@ -851,7 +881,8 @@ export function DataTable<T>({
   const rest = columns.filter((c) => c !== primary);
   /* بطاقةُ الجوّال: أوّلُ عمودِ مالٍ (لا فعلٍ ولا لوح) يُرفع إلى سطر العنوان */
   const amount = rest.find((c) => c.numeric && !c.reveal && !c.wrap && c.header);
-  const main = rest.filter((c) => c !== amount && !c.secondary);
+  const meta = rest.filter((c) => c !== amount && c.meta && !c.secondary);
+  const main = rest.filter((c) => c !== amount && !c.secondary && !c.meta);
   const extra = rest.filter((c) => c !== amount && c.secondary);
   const long = rows.length > LONG_TABLE;
   const searchable = !!searchOf && rows.length > 8;
@@ -957,7 +988,7 @@ export function DataTable<T>({
             <li key={keyOf(row)} data-filter={searchOf ? searchOf(row) : undefined}>
               <div
                 data-href={href}
-                className={`rounded-xl border border-line bg-raised p-4 shadow-raised transition-[background-color,transform] ${href ? "card-rows relative active:scale-[0.99] active:bg-hover" : ""}`}
+                className={`rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-[background-color,transform] ${href ? "card-rows relative active:scale-[0.99] active:bg-hover" : ""}`}
               >
                 {href && (
                   <RowLink href={href} className="absolute inset-0 rounded-xl" />
@@ -969,11 +1000,22 @@ export function DataTable<T>({
                     <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{primary.cell(row)}</p>
                     {amount && (
                       <p className="shrink-0 text-end">
-                        <span className="block text-[11px] text-muted">{amount.header}</span>
+                        {/* المبلغُ في موضعه يُعرف بلا تسمية — والتسميةُ لقارئ الشاشة */}
+                        <span className="sr-only">{amount.header}: </span>
                         <span className="block text-[15px] font-bold leading-snug">{amount.cell(row)}</span>
                       </p>
                     )}
                   </div>
+                  {meta.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+                      {meta.map((c) => (
+                        <span key={c.key} className={c.wrap ? "min-w-0" : "min-w-0 truncate"}>
+                          <span className="sr-only">{c.header}: </span>
+                          {c.cell(row)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {main.length > 0 && (
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
                       {main.map((c) => (

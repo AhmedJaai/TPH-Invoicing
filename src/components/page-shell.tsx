@@ -75,7 +75,7 @@ export function AppShell({
       </aside>
 
       {/* `app-content`: لوحُ الفحص على الجوّال يُخمِله ريثما يُفتح فوقه */}
-      <div id="app-content" className="min-w-0">
+      <div id="app-content" className="safe-sides min-w-0">
         <TrialBanner />
         <Topbar role={user.role} controls={<ViewControls />} />
         {/* الهيكلُ (`loading.tsx`) يقرأ الدورَ والاسمَ من هنا — ألسنتُه وتحيّتُه كالتي ستصل */}
@@ -120,7 +120,7 @@ export function AppShell({
 
 /** موضعُ المحتوى بعرضه — تقرؤه الصفحةُ وهيكلُ تحميلها معاً، فلا يقفز المحتوى حين يصل. */
 export function mainClass(width: ShellWidth = "page"): string {
-  return `mx-auto w-full ${WIDTH[width]} px-4 pb-32 pt-6 sm:px-6 lg:px-8 lg:pb-16 lg:pt-8`;
+  return `mx-auto w-full ${WIDTH[width]} px-4 pb-(--content-end) pt-6 sm:px-6 lg:px-8 lg:pt-8`;
 }
 
 /**

@@ -69,7 +69,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           icon={Landmark}
           label="آخر رصيد معروف"
           value={balanceKnown ? <Money minor={o.balanceMinor as number} /> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={balanceKnown ? `في ${formatDay(o.balanceAsOf)}، ولا يشمل ما دخل أو خرج بعده` : "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد، أو أدخل الرصيد عند الإقفال."}
+          sub={balanceKnown ? o.balanceAsOf ? `في ${formatDay(o.balanceAsOf)}، ولا يشمل ما دخل أو خرج بعده` : "أُدخل لشهرٍ لم ينتهِ، ولا يُعرف يومُه" : "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد، أو أدخل الرصيد عند الإقفال."}
           href={balanceKnown ? "/bank" : "/bank#import"}
         >
           {/* سطرٌ يُحسب بعد الرسم، وعطبُه لا يُسقط الصفحة */}

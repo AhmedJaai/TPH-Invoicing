@@ -24,6 +24,7 @@ import { LinkPending, Sheet, toast } from "./ui-client";
 import { useShellPath } from "./use-shell-path";
 import { useShellCounts } from "./shell-counts";
 import { T } from "@/components/i18n/t";
+import { ScrollStrip } from "./scroll-x";
 
 /**
  * التنقّل حول عمل صاحب المقهى لا حول جداول القاعدة.
@@ -168,8 +169,8 @@ export function AreaTabs({ role }: { role: Role }) {
   const child = activeChild(pathname, area);
 
   return (
-    <nav
-      className="scroll-x -mb-px flex items-center gap-6 overflow-x-auto border-b border-line"
+    <ScrollStrip
+      className="-mb-px flex items-center gap-6 overflow-x-auto border-b border-line"
       aria-label={area.label}
     >
       {children.map((c) => {
@@ -195,7 +196,7 @@ export function AreaTabs({ role }: { role: Role }) {
           </Link>
         );
       })}
-    </nav>
+    </ScrollStrip>
   );
 }
 
@@ -232,8 +233,8 @@ export function MobileTabBar({
   return (
     <>
       {/* `data-under-inspector`: لوحُ الفحص على الجوّال يُخمِله — كان يبقى في ترتيب Tab خلف لوحٍ يعلن أنّه `aria-modal` */}
-      <div data-under-inspector="" className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-        <nav className="mx-auto flex max-w-lg items-stretch" aria-label="المساحات">
+      <div data-under-inspector="" className="no-print safe-sides fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised/95 backdrop-blur-md lg:hidden">
+        <nav className="mx-auto flex max-w-lg items-stretch pb-(--safe-bottom)" aria-label="المساحات">
           {left.map((a) => (
             <Tab key={a.href} role={role} area={a} current={area?.href === a.href} counts={counts} />
           ))}

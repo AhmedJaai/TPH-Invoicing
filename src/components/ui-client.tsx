@@ -922,7 +922,7 @@ export function Toaster() {
       onMouseLeave={resume}
       onFocus={pause}
       onBlur={resume}
-      className="no-print pointer-events-none fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[70] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-6 sm:end-6 sm:items-end lg:bottom-6"
+      className="no-print pointer-events-none fixed inset-x-3 bottom-[calc(var(--above-tabbar)+0.5rem)] z-[70] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-6 sm:end-6 sm:items-end lg:bottom-6"
     >
       {items.map((t) => {
         const tone = t.state === "undo-failed" ? "danger" : t.state === "undone" ? "info" : t.tone ?? "ok";
@@ -1078,9 +1078,10 @@ export function Sheet({
             <X className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+        {/* بلا تذييل: آخرُ صفٍّ فوق شريط المنزل وشريطِ سفاري الطافي لا تحتهما */}
+        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-4 ${footer ? "pb-4" : "pb-[calc(1.5rem+var(--safe-bottom))]"}`}>{children}</div>
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-sunken/50 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-sunken/50 px-5 py-3 pb-[calc(0.75rem+var(--safe-bottom))]">
             {footer}
           </div>
         )}
@@ -1221,7 +1222,7 @@ export function BulkBar({ children }: {
         <div
           role="region"
           aria-label="إجراءات على المحدد"
-          className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
+          className="no-print sticky bottom-(--above-tabbar) z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay"
         >
           <p className="text-[13px] font-bold"><T s="المحدد: {0}" a={[<span key="0" className="nums nums-count">{ids.length}</span>]} /></p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children(selected, clear)}</div>

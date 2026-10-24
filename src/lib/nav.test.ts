@@ -356,6 +356,17 @@ describe("نقطة المساحة من وجهات بنود الطابور", () =
   });
 });
 
+describe("صفحةُ المساحة تسمّي ما وراء عددها", () => {
+  it("البندُ الذي يُعَدّ للبنك هو الذي تعرضه صفحةُ البنك — بالقاعدة نفسها", async () => {
+    const { areaCounts, countedArea } = await import("./nav");
+    const hrefs = ["/bank#import", "/money/pos#missing", "/bank/tx/abc", "/close", "/attention?item=x", "/"];
+    const onBankPage = hrefs.filter((h) => countedArea(h) === "/bank");
+    expect(onBankPage.length).toBe(areaCounts(hrefs)["/bank"]);
+    expect(countedArea("/attention?item=x")).toBeNull();
+    expect(countedArea("/")).toBeNull();
+  });
+});
+
 describe("عددُ البنود في كلّ لسان", () => {
   it("البندُ يُنسب إلى اللسان الذي يفتحه رابطُه، والرابطُ بلا لسانٍ لا يُعدّ", () => {
     const n = tabCounts(["/bank#queue", "/bank?x=1", "/money/pos", "/money/recurring", "/attention?item=x", "/"]);

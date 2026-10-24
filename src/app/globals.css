@@ -301,13 +301,55 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+  /* القفزُ إلى مرساةٍ (`#resolve`) يقف تحت الشريط العلويّ لا خلفه */
+  scroll-padding-top: calc(var(--app-header) + 0.5rem);
+}
+
+/*
+ * ── هندسةُ القشرة على الجوّال: الحوافُّ الآمنة والأشرطة ──
+ *
+ * `viewport-fit=cover` (في `layout.tsx`) يمدّ الصفحةَ تحت ساعة الآيفون وشريط
+ * المنزل؛ فكلُّ ما يلتصق بحافّةٍ يحسب حافّتها الآمنة من هنا لا برقمٍ في صفحة.
+ * كان الشريطُ العلويّ ينزلق تحت الساعة حين يطوي سفاري شريطَه، وشريطُ التحديد
+ * الجماعيّ (`bottom-20`) يقع تحت شريط الألسنة على آيفونٍ له شريطُ منزل.
+ *
+ *   --app-header   ارتفاعُ الشريط العلويّ اللاصق بحافّته — `top` لكلّ لاصقٍ تحته
+ *   --tabbar       ارتفاعُ شريط الجوّال السفليّ بحافّته
+ *   --above-tabbar `bottom` لكلّ شريط أفعالٍ لاصقٍ أسفلَ الصفحة: فوق الشريط وزرِّ الكاميرا
+ *   --content-end  ما يُترك أسفلَ المحتوى فلا يختبئ آخرُه خلفهما
+ *
+ * والجانبان (الآيفون بالعرض): `.safe-sides` على الوعاء لا على العنصر ذي الحشوة —
+ * صفرٌ بالطول، وبالعرض لا يقع شيءٌ تحت النتوء. (وعلى الوعاء لأنّ هذه القاعدةَ
+ * خارج طبقات Tailwind فتغلب `px-*` لو وُضعت معها.)
+ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-header: calc(3.5rem + var(--safe-top));
+  --tabbar: calc(3.5rem + var(--safe-bottom));
+  /* زرُّ الكاميرا يعلو الشريط بـ‎1.25rem‎ (`-mt-5`) */
+  --fab-overhang: 1.25rem;
+  --above-tabbar: calc(var(--tabbar) + var(--fab-overhang) + 0.5rem);
+  --content-end: calc(var(--tabbar) + var(--fab-overhang) + 2.5rem);
+}
+@media (min-width: 1024px) {
+  :root {
+    --app-header: calc(60px + var(--safe-top));
+    --tabbar: 0px;
+    --fab-overhang: 0px;
+    --above-tabbar: 1rem;
+    --content-end: 4rem;
+  }
 }
 
 body {
   background: var(--surface);
   color: var(--ink);
-  /* مساحة آمنة أسفل شاشات الآيفون ذات الشريط السفلي */
-  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-sides {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 ::selection {
@@ -443,6 +485,16 @@ body {
 [data-overflow="both"] {
   mask-image: linear-gradient(to left, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
   -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+}
+
+/* بالإنجليزيّة (LTR) البدايةُ يساراً والنهايةُ يميناً — فينقلب اتّجاهُ التدرّج */
+[data-overflow="start"]:dir(ltr) {
+  mask-image: linear-gradient(to right, transparent 0, #000 2rem);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 2rem);
+}
+[data-overflow="end"]:dir(ltr) {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
 }
 
 /* رابط التخطّي: يقفز فوق القشرة، ولا يظهر إلّا لمن يحتاجه */
