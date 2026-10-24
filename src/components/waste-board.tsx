@@ -4,6 +4,7 @@ import { Money } from "./money";
 import { BarList, Callout, Card, EmptyState, Section } from "./ui";
 import { TIME, countNoun } from "@/lib/arabic";
 import { BOARD_REASON_LABEL } from "@/lib/inventory/waste-board";
+import { milliToDecimal } from "@/lib/inventory/units";
 import { formatDay } from "@/lib/riyadh-time";
 import { loadWasteBoard, WASTE_BOARD_WEEKS } from "@/services/waste-board.service";
 import { T } from "@/components/i18n/t";
@@ -14,7 +15,8 @@ import { T } from "@/components/i18n/t";
  */
 /** عددُ المشروبات من المِلّي — بلا كسرٍ إن لم يكن */
 function trimUnits(milli: number): string {
-  return String(Math.round(milli / 10) / 100);
+  /* بالعدد الصحيح لا بالقسمة العائمة: «3.500» ← «3.5»، و«2.000» ← «2» */
+  return milliToDecimal(milli).replace(/\.?0+$/, "");
 }
 
 export async function WasteBoardSection() {
