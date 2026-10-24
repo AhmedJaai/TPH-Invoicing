@@ -336,7 +336,7 @@ async function supplierRows(): Promise<ChoiceRow[]> {
   return out;
 }
 
-async function ruleRows(): Promise<ChoiceRow[]> {
+async function ruleRows(hideSalaries: boolean): Promise<ChoiceRow[]> {
   const rows = (await db.execute<{
     id: string; pattern: string; category: string; supplier: string | null; note: string | null;
     created_on: string; n: number; total: string;
@@ -351,14 +351,16 @@ async function ruleRows(): Promise<ChoiceRow[]> {
   `)).rows;
   return rows.map((r): ChoiceRow => {
     const n = Number(r.n);
+    /* قاعدةٌ لباب الرواتب مجموعُها راتبُ أحد — للمالك وحده (`lib/payroll/visibility.ts`) */
+    const masked = hideSalaries && r.category === "SALARY";
     return {
       id: `rule:${r.id}`,
       group: "rule",
       subject: `«${r.pattern}»`,
       choice: `${isTxCategory(r.category) ? CATEGORY_LABEL[r.category] : r.category}${r.supplier ? ` — ${r.supplier}` : ""}`,
       decidedOn: r.created_on,
-      effectMinor: n > 0 ? Number(r.total) : null,
-      effectLabel: n > 0 ? `صُنّفت بها ${countNoun(n, TRANSACTION)}` : null,
+      effectMinor: n > 0 && !masked ? Number(r.total) : null,
+      effectLabel: n > 0 ? `صُنّفت بها ${countNoun(n, TRANSACTION)}${masked ? " (مبلغها للمالك وحده)" : ""}` : null,
       /* قاعدةٌ لم تُصنَّف بها حركةٌ واحدة قائمةٌ ولا تعمل — تُقال كذلك */
       state: n > 0 ? "APPLIED" : "NOT_APPLIED",
       reason: n > 0 ? r.note : "لم تُصنَّف بها أي حركة بعد. ربما لا يطابق نصها وصف البنك، أو سبقتها قاعدة أخرى",
@@ -395,9 +397,10 @@ async function waiverRows(): Promise<ChoiceRow[]> {
   }));
 }
 
-export async function loadChoiceLedger(): Promise<ChoiceLedger> {
+/** `hideSalaries`: من لا يملك `payroll:view` لا يرى مجموعَ قاعدةٍ لباب الرواتب. */
+export async function loadChoiceLedger(hideSalaries = false): Promise<ChoiceLedger> {
   const [vat, cash, holds, alerts, sups, rules, waivers] = await Promise.all([
-    vatChoiceRows(), cashRows(), holdRows(), alertRows(), supplierRows(), ruleRows(), waiverRows(),
+    vatChoiceRows(), cashRows(), holdRows(), alertRows(), supplierRows(), ruleRows(hideSalaries), waiverRows(),
   ]);
   return {
     ...summarizeChoices([...vat.rows, ...cash, ...holds, ...alerts, ...sups, ...rules, ...waivers]),

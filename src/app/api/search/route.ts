@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   const { intent, hits } = await search(q, {
     amounts: can(user.role, "amounts:view"),
     bank: can(user.role, "bank:view"),
+    salaries: can(user.role, "payroll:view"),
   });
   return NextResponse.json({ intent: intent?.kind ?? null, hits });
 }

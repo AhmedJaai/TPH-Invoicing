@@ -356,7 +356,7 @@ describe("الكتالوج يقوّم الفرق حين لا فاتورة", () =
     ‏١٣–١٩. فخرج ١٧٠٦ سطرَ بيعٍ من ١٧١٧ من الحساب. وأوّلُ نسخةٍ تسري
     منذ البداية، فتغطّيه.
   */
-  it("بنّ إثيوبيا: ‏٥٫٧١٥ كجم — ولو رفع الكتالوج بسريان بعد الأسبوع", () =>
+  it("بنّ إثيوبيا: ‏٥٫٨٧٥ كجم (المرتجَعُ المحضَّر مستهلَك) — ولو رفع الكتالوج بسريان بعد الأسبوع", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -379,11 +379,11 @@ describe("الكتالوج يقوّم الفرق حين لا فاتورة", () =
       const line = report.lines.find((l) => l.productId === String(coffee.id))!;
 
       /*
-        «Iced V60 Ethiopia» ٢٧٦ كوباً مصنوعاً × ٢٠ جراماً = ‏٥٬٥٢٠،
-        و«Hot V60 Ethiopia» ١٣ × ١٥ = ‏١٩٥. والمجموع ‏٥٫٧١٥ كجم.
+        «Iced V60 Ethiopia» (٢٧٦ صُنعت وبيعت + ٨ صُنعت وأُرجعت) = ٢٨٤ × ٢٠ جراماً = ‏٥٬٦٨٠
+        (والملغاةُ قبل التحضير لا تُحسب)، و«Hot V60 Ethiopia» ١٣ × ١٥ = ‏١٩٥. والمجموع ‏٥٫٨٧٥ كجم.
         ووصفتان مختلفتان لصنفٍ واحد تجتمعان في سطرٍ واحد من الجرد.
       */
-      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.715);
+      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.875);
 
       /*
         ── ٨٨ ريالاً للكيلو، ووحدةُ الصنف الجرام ──

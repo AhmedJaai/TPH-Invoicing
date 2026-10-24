@@ -50,6 +50,19 @@ describe("لوحة الهدر", () => {
   });
 
   it("بلا سجلّات: لوحة فارغة", () => {
-    expect(buildWasteBoard([], rates)).toEqual({ recordCount: 0, knownCostMinor: 0, unknownCount: 0, byReason: [], topProducts: [], repeatedExpiry: [] });
+    expect(buildWasteBoard([], rates)).toEqual({
+      recordCount: 0, knownCostMinor: 0, unknownCount: 0, byReason: [], topProducts: [], repeatedExpiry: [],
+      returnedAfterPrep: { lines: 0, unitsMilli: 0, costMinor: 0, unknownCount: 0 },
+    });
+  });
+
+  it("المرتجعُ بعد التحضير سببٌ محسوب يُعَدّ بمشروباته، وكلفتُه من مكوّناته", () => {
+    const b = buildWasteBoard([], rates, {
+      lines: 2, unitsMilli: 3000,
+      ingredients: [{ productId: [...rates.keys()][0], productName: "مكوّن", quantityMilli: 36_000, unit: rates.get([...rates.keys()][0])!.baseUnit }],
+    });
+    expect(b.byReason.map((r) => [r.reason, r.count])).toEqual([["RETURNED_AFTER_PREP", 2]]);
+    expect(b.returnedAfterPrep.lines).toBe(2);
+    expect(b.recordCount).toBe(0);
   });
 });

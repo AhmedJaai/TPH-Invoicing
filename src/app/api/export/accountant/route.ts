@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { sheets, input } = await loadAccountantPack(month);
+    const { sheets, input } = await loadAccountantPack(month, user.role);
 
     const body = sheetsToXlsx(sheets);
 

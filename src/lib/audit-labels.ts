@@ -155,6 +155,9 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   /* الجرد وتسوية المخزون */
   SALES_IMPORTED: "استيراد ملفّ مبيعات",
   SUPPLIER_FOODICS_LINKED: "ربط مورّد فودكس بمورّد",
+  SUPPLIER_MERGED: "دمج مورّد في مورّد آخر",
+  SUPPLIER_MERGE_UNDONE: "تراجع عن دمج مورّد",
+  SUPPLIER_DELETED: "حذف مورّد بلا مال",
   EMPLOYEE_SAVED: "حفظ بيانات موظف",
   EMPLOYEE_DELETED: "حذف موظف أُضيف خطأً",
   EMPLOYEE_RATE_SET: "تحديد راتب موظف",

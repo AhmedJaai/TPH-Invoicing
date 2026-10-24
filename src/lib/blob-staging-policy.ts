@@ -2,7 +2,7 @@
  * الملفّ الكبير: محطّةٌ مؤقّتة في Vercel Blob — سياستُها خالصةً تُختبَر.
  *
  * حدُّ المنصّة لجسم الطلب ٤٫٥ ميجابايت، فما فوق ٣ ميجابايت كان يُردّ «صغّره». فإن
- * وُجد مخزن Blob (`BLOB_READ_WRITE_TOKEN`) رفعه المتصفّحُ إليه مباشرةً، ثمّ قرأه
+ * وُجد مخزن Blob (`BLOB_READ_WRITE_TOKEN`، أو `BLOB_STORE_ID` بـOIDC) رفعه المتصفّحُ إليه مباشرةً، ثمّ قرأه
  * الخادمُ من هناك بمفتاحه، وفحص بصمتَه كما يفحص المرفوعَ عادةً، وحذفه بعد الأرشفة أو
  * الرفض. فهو **محطّةٌ لا أرشيف**: الأرشيفُ الدرايف وحده.
  *
@@ -34,6 +34,36 @@ export function storeIdOf(token: string | undefined): string | null {
 }
 
 /**
+ * كيف يُصادَق على المخزن — من متغيّرات البيئة وحدها، بلا حزمة Blob:
+ *
+ *   «token»  `BLOB_READ_WRITE_TOKEN` موجود — الطريقُ الأصليّ، ويغلب إن وُجد معه غيرُه.
+ *   «oidc»   لا مفتاح، و`BLOB_STORE_ID` موجود — Vercel تعطي الدالّةَ `VERCEL_OIDC_TOKEN`،
+ *            والرفعُ من المتصفّح برابطٍ موقَّع (`handleUploadPresigned`) لا بإذن العميل.
+ *   `null`   لا هذا ولا ذاك — الطريقُ مطفأ والشاشةُ تقول حدَّ ٣ ميجابايت.
+ */
+export type BlobAuthMode = "token" | "oidc";
+
+type Env = Readonly<Record<string, string | undefined>>;
+
+const present = (v: string | undefined): string | null => (v && v.trim() !== "" ? v.trim() : null);
+
+export function blobAuthMode(env: Env): BlobAuthMode | null {
+  if (present(env.BLOB_READ_WRITE_TOKEN)) return "token";
+  if (present(env.BLOB_STORE_ID)) return "oidc";
+  return null;
+}
+
+/** معرّفُ المخزن لمقابلة مضيف الرابط: من المفتاح إن وُجد، وإلّا من `BLOB_STORE_ID` (بلا «store_»). */
+export function storeIdFromEnv(env: Env): string | null {
+  const token = present(env.BLOB_READ_WRITE_TOKEN);
+  if (token) return storeIdOf(token);
+  const id = present(env.BLOB_STORE_ID);
+  if (!id) return null;
+  const bare = id.startsWith("store_") ? id.slice("store_".length) : id;
+  return /^[A-Za-z0-9]+$/.test(bare) ? bare.toLowerCase() : null;
+}
+
+/**
  * رابطٌ من محطّتنا نحن؟ الخادمُ لا يجلب رابطاً أرسله المتصفّح إلّا إن كان مخزنَ Blob،
  * ومخزنَنا (إن عُرف معرّفه)، وتحت `staging/` — فلا يُستعمل الخادم لجلب غيره.
  */
@@ -52,9 +82,13 @@ export function isStagingUrl(raw: string, storeId: string | null): boolean {
 }
 
 /** اسمٌ في المحطّة لملفٍّ مرفوع: تحت `staging/`، بلا مجلّدات ولا رموز */
-export function stagingPathname(fileName: string): string {
+export function stagingPathname(fileName: string, uniqueSuffix?: string): string {
   const base = fileName.replace(/[/\\\u0000-\u001f]/g, "_").replace(/\.{2,}/g, "_").slice(-120) || "file";
-  return `${STAGING_PREFIX}${base}`;
+  if (!uniqueSuffix) return `${STAGING_PREFIX}${base}`;
+  /* اللاحقةُ قبل الامتداد — فيبقى النوعُ مقروءاً من الاسم */
+  const tag = uniqueSuffix.replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? `${STAGING_PREFIX}${base.slice(0, dot)}-${tag}${base.slice(dot)}` : `${STAGING_PREFIX}${base}-${tag}`;
 }
 
 /**

@@ -65,7 +65,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
   for (let m = previousMonth(current), i = 0; i < 6; i++, m = previousMonth(m)) recent.push(m);
   if (!recent.includes(month)) recent.push(month);
 
-  const { input } = await loadAccountantPack(month);
+  const { input } = await loadAccountantPack(month, user.role);
   const s = summarize(input);
   const unclear = input.bank.filter(unexplained);
   const outflow = outflowByCategory(input);

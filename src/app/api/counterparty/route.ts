@@ -48,7 +48,7 @@ export const MAX_GROUP = 100;
 
 const KINDS: readonly TxCategory[] = [
   "SUPPLIER", "SALARY", "RENT", "ZAKAT", "UTILITY", "GOVERNMENT",
-  "PERSONAL", "INTERNAL", "OTHER", "BANK_FEE",
+  "PERSONAL", "INTERNAL", "OTHER", "BANK_FEE", "OTHER_SALES",
 ];
 
 const Body = z.object({
@@ -124,6 +124,10 @@ export async function POST(request: Request) {
 
   if (rows.length === 0) {
     return NextResponse.json({ error: "هذه الحركات غير موجودة" }, { status: 404 });
+  }
+  /* ثمنُ البيع مالٌ داخل — حوالةٌ صادرة لا تكون مبيعاً (خطأٌ يقينيّ لا اختيار) */
+  if (kind === "OTHER_SALES" && rows.some((r) => r.direction !== "CREDIT")) {
+    return NextResponse.json({ error: "«مبيعات خارج فودكس» للحوالات الواردة وحدها، وفي المختار حوالة صادرة." }, { status: 400 });
   }
 
   /*

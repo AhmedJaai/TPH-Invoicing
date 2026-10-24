@@ -49,7 +49,8 @@ export const VALUATION_LABEL: Record<ValuationBasis, string> = {
  * تُرفَع كلّما تغيّر **معنى** رقمٍ يُحسَب هنا — لا كلّما عُدّل سطر.
  * وهي جزءٌ من أصول التقرير: «حُسب بالنسخة الأولى» خبرٌ يُقرأ.
  */
-export const ENGINE_VERSION = "inventory-1";
+/** «inventory-2» (٢٤ أكتوبر ٢٠٢٦): المرتجَعُ المحضَّر استهلاكٌ وهدر لا نقصانُ استهلاك. */
+export const ENGINE_VERSION = "inventory-2";
 
 export interface CountedProduct {
   id: string;
@@ -249,6 +250,12 @@ export interface EngineReport {
      * منه — لا مجموعٌ ناقصٌ يبدو تامّاً. وغائبٌ في تقريرٍ أُقفل قبله.
      */
     complimentary?: { lines: number; unitsMilli: number; costMinor: number | null };
+    /**
+     * مرتجعٌ بعد التحضير — صُنع ثمّ رُدّ، فهو **في الاستهلاك المتوقَّع** وهدرٌ معاً
+     * (أحمد، ٢٤ أكتوبر ٢٠٢٦). يُعرَض ليُعرَف لماذا لم يُنقص المرتجَعُ الاستهلاك.
+     * وغائبٌ في تقريرٍ أُقفل قبله.
+     */
+    returnedAfterPrep?: { lines: number; unitsMilli: number; costMinor: number | null };
   };
   consumption: ConsumptionResult;
   purchases: PurchaseSummary;
@@ -300,6 +307,7 @@ export function reconcile(input: EngineInput): EngineReport {
 
   let varianceCostTotal = 0;
   let complimentaryCost: number | null = 0;
+  let returnedCost: number | null = 0;
   let linesWithKnownCost = 0;
   let linesCounted = 0;
   let linesWithVariance = 0;
@@ -427,6 +435,13 @@ export function reconcile(input: EngineInput): EngineReport {
       complimentaryCost = cost === null || complimentaryCost === null ? null : complimentaryCost + cost;
     }
 
+    const returnedMilli = used && used.unitConflict === null && sameUnitFamily(used.unit, product.baseUnit)
+      ? used.fromReturnedWasteMilli : 0;
+    if (returnedMilli !== 0) {
+      const cost = varianceCostMinor(returnedMilli, rate, product.baseUnit);
+      returnedCost = cost === null || returnedCost === null ? null : returnedCost + cost;
+    }
+
     const varianceCost = varianceCostMinor(result.varianceMilli, rate, product.baseUnit);
     if (varianceCost !== null) {
       varianceCostTotal += varianceCost;
@@ -503,6 +518,10 @@ export function reconcile(input: EngineInput): EngineReport {
       purchasesTotalMinor,
       summary: summariseVariance(lines),
       complimentary: complimentaryTotals(input.soldLines, complimentaryCost),
+      returnedAfterPrep: {
+        ...consumption.returnedAfterPrep,
+        costMinor: consumption.returnedAfterPrep.lines === 0 ? 0 : returnedCost,
+      },
     },
     consumption,
     purchases,

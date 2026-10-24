@@ -40,6 +40,8 @@ export interface SearchResult {
 export interface SearchAccess {
   amounts: boolean;
   bank: boolean;
+  /** حوالاتُ «راتب أو أجر» — لمن يملك `payroll:view` وحده. وغيابُه = لا تُبحث. */
+  salaries?: boolean;
 }
 
 /*
@@ -52,7 +54,7 @@ export function stripAmount(text: string): string {
 
 export async function search(
   raw: string,
-  access: SearchAccess = { amounts: true, bank: true },
+  access: SearchAccess = { amounts: true, bank: true, salaries: true },
 ): Promise<SearchResult> {
   const intent = parseSearch(raw);
   if (!intent) return { intent: null, hits: [] };
@@ -64,7 +66,7 @@ export async function search(
   if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like, access.amounts));
   if (intent.targets.includes("suppliers")) jobs.push(findSuppliers(intent, like, access.amounts));
   if (intent.targets.includes("products")) jobs.push(findProducts(like));
-  if (access.bank && intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like));
+  if (access.bank && intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like, access.salaries === true));
   if (intent.targets.includes("documents")) jobs.push(findDocuments(intent, like));
 
   const hits = (await Promise.all(jobs)).flat()
@@ -223,7 +225,7 @@ async function findProducts(like: string): Promise<SearchHit[]> {
   }));
 }
 
-async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit[]> {
+async function findBankTx(intent: SearchIntent, like: string, salaries: boolean): Promise<SearchHit[]> {
   const clauses = [];
   if (intent.kind === "TEXT" || intent.kind === "NUMBER") {
     clauses.push(likeNormalized(bankTransactions.description, like));
@@ -251,7 +253,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
       direction: bankTransactions.direction,
     })
     .from(bankTransactions)
-    .where(or(...clauses))
+    .where(salaries ? or(...clauses) : and(or(...clauses), sql`${bankTransactions.category} <> 'SALARY'`))
     .orderBy(desc(bankTransactions.valueDate), asc(bankTransactions.id))
     .limit(PER_KIND);
 

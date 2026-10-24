@@ -8,8 +8,12 @@
  * ── الحالاتُ الثلاث التي تُفرَّق ولا تُجمَع ──
  *
  *   **الملغى**   يُستبعَد كلّه — لم يُصنَع أصلاً، فلا شيءَ خرج من الرفّ.
- *   **المرتجَع** يُنقص الاستهلاك — صُنع ثمّ رُدَّ (وما رُدَّ لا يُباع ثانيةً
- *                غالباً، لكنّ كمّيّته ليست استهلاكَ بيعٍ جديد).
+ *   **المرتجَع** نوعان (أحمد، ٢٤ أكتوبر ٢٠٢٦):
+ *                — **ما حُضِّر** (وصفتُه فيها مكوّنٌ يوزَن أو يُكال): صُنع ثمّ رُدّ،
+ *                  فمكوّناتُه **استُهلكت وهُدرت** — لا يُنقص الاستهلاكَ (بيعتُه الأصليّة
+ *                  حسبته)، ويُعَدّ هدراً بسبب «مرتجع بعد التحضير» (`fromReturnedWasteMilli`).
+ *                — **الجاهزُ** (مكوّناتُه كلُّها بالحبّة: قارورةٌ، قطعةٌ مغلّفة): يعود إلى
+ *                  الرفّ فيُنقص الاستهلاك كما كان.
  *   **المجانيّ** يُحسَب استهلاكاً — صُنع فعلاً وخرجت مكوّناتُه — **ويُعرَض
  *                على حدة**، فهو يفسّر جزءاً من الفرق بلا أن يكون فاقداً.
  *
@@ -76,6 +80,11 @@ export interface IngredientConsumption {
   fromSalesMilli: number;
   fromComplimentaryMilli: number;
   fromRefundsMilli: number;
+  /**
+   * مرتجعٌ بعد التحضير — ما خرج في مشروبٍ صُنع ثمّ رُدّ. **داخلٌ في الاستهلاك**
+   * (حسبته بيعتُه الأصليّة) ويُعرَض هدراً على حدة، فلا يُضاف إلى `canonicalMilli`.
+   */
+  fromReturnedWasteMilli: number;
   /** نسخُ الوصفات التي أسهمت — أصلُ الرقم، ويُحفَظ في اللقطة. */
   recipeVersionIds: string[];
   /**
@@ -101,6 +110,8 @@ export interface ExcludedLine {
 export interface ConsumptionResult {
   /** بمفتاح `productId` للمكوّن. */
   byIngredient: Map<string, IngredientConsumption>;
+  /** المرتجعُ بعد التحضير: كم سطراً وكم وحدة — يُعرَض هدراً، والاستهلاكُ حسبه. */
+  returnedAfterPrep: { lines: number; unitsMilli: number };
   included: {
     lines: number;
     unitsMilli: number;
@@ -157,6 +168,15 @@ export function ingredientForSale(
 }
 
 /**
+ * أحُضِّرت هذه الوصفة؟ — فيها مكوّنٌ يوزَن أو يُكال (بنّ، حليب، شراب).
+ * والجاهزُ مكوّناتُه كلُّها بالحبّة أو العبوة (قارورة ماء، قطعةُ كيكٍ وعلبتُها)
+ * فيعود المرتجَعُ منه إلى الرفّ.
+ */
+export function isPreparedRecipe(version: Pick<RecipeVersionInput, "ingredients">): boolean {
+  return version.ingredients.some((i) => i.unit !== "PIECE" && i.unit !== "PACK");
+}
+
+/**
  * الاستهلاك المتوقَّع لكلّ مكوّن، ومعه **ما لم يُحسَب ولماذا**.
  *
  * والثاني ليس أقلّ أهمّيّةً من الأوّل: تقريرٌ يقول «الفرق ٢٫٥ كجم»
@@ -172,6 +192,8 @@ export function computeConsumption(
   let includedLines = 0;
   let includedUnits = 0;
   let includedTotal = 0;
+  let returnedLines = 0;
+  let returnedUnits = 0;
 
   const exclude = (line: SoldLineInput, reason: ExclusionReason) => {
     excluded.push({
@@ -222,12 +244,21 @@ export function computeConsumption(
       yieldMilli = version.yieldQuantityMilli;
     }
 
-    /* المرتجَع يُنقص، والمجانيّ يُزيد ويُعَدّ على حدة */
+    /*
+      المرتجَعُ المحضَّر لا يُنقص (استُهلك ثمّ هُدر)، والجاهزُ يعود إلى الرفّ فيُنقص.
+      والمجانيّ يُزيد ويُعَدّ على حدة. ومبلغُ المرتجَع يُنقص المبيعات في الحالين.
+    */
+    const returnedMade = line.isRefund && isPreparedRecipe(version);
     const sign = line.isRefund ? -1 : 1;
+    const useSign = returnedMade ? 0 : sign;
 
     includedLines++;
     includedUnits += sign * line.quantityMilli;
     includedTotal += sign * line.lineTotalMinor;
+    if (returnedMade) {
+      returnedLines++;
+      returnedUnits += line.quantityMilli;
+    }
 
     const present = new Set(line.modifierExternalIds ?? []);
 
@@ -247,7 +278,7 @@ export function computeConsumption(
         yieldMilli,
         ing.prepLossBp,
         toCanonical(1, ing.unit),
-      ) * sign;
+      );
 
       let acc = byIngredient.get(ing.productId);
       if (!acc) {
@@ -258,6 +289,7 @@ export function computeConsumption(
           fromSalesMilli: 0,
           fromComplimentaryMilli: 0,
           fromRefundsMilli: 0,
+          fromReturnedWasteMilli: 0,
           recipeVersionIds: [],
           unitConflict: null,
         };
@@ -266,8 +298,9 @@ export function computeConsumption(
         acc.unitConflict = ing.unit;
       }
 
-      acc.canonicalMilli += canonical;
-      if (line.isRefund) acc.fromRefundsMilli += canonical;
+      acc.canonicalMilli += canonical * useSign;
+      if (returnedMade) acc.fromReturnedWasteMilli += canonical;
+      else if (line.isRefund) acc.fromRefundsMilli -= canonical;
       else if (line.isComplimentary) acc.fromComplimentaryMilli += canonical;
       else acc.fromSalesMilli += canonical;
 
@@ -277,6 +310,7 @@ export function computeConsumption(
 
   return {
     byIngredient,
+    returnedAfterPrep: { lines: returnedLines, unitsMilli: returnedUnits },
     included: { lines: includedLines, unitsMilli: includedUnits, totalMinor: includedTotal },
     excluded,
     excludedTotals: {

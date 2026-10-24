@@ -282,12 +282,19 @@ export interface Ledger {
   total: number;
   counts: Record<TxView, number>;
   months: string[];
+  /** حوالاتُ رواتب حُجبت عمّن لا يملك `payroll:view` — عددُها وحده (`lib/payroll/visibility.ts`). */
+  hiddenSalary: number;
 }
 
 /** حدُّ نتائج البحث — يبحث في الحركات كلِّها، ويُقال إن زادت المطابِقاتُ عليه. */
 export const SEARCH_LIMIT = 300;
 
-export async function loadLedger(view: TxView, month: string | null, search: LedgerSearch | null = null): Promise<Ledger> {
+export async function loadLedger(
+  view: TxView, month: string | null, search: LedgerSearch | null = null,
+  /** لمن لا يرى الرواتب: حوالاتُ «راتب أو أجر» لا تُرسم ولا تُبحث ولا تُعدّ في الألسنة */
+  hideSalaries = false,
+): Promise<Ledger> {
+  const noSalary = hideSalaries ? sql`${bankTransactions.category} <> 'SALARY'` : undefined;
   const inMonth = month ? sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${month}` : undefined;
   /*
     البحثُ في الخادم لا في الصفوف المرسومة: نصُّ البنك واسمُ المستفيد، أو المبلغ إن
@@ -299,9 +306,9 @@ export async function loadLedger(view: TxView, month: string | null, search: Led
           ? sql` or ${bankTransactions.amountMinor} between ${search.amount.fromMinor} and ${search.amount.toMinor}`
           : sql``})`
     : undefined;
-  const where = and(viewWhere(view), inMonth, matches);
+  const where = and(viewWhere(view), inMonth, matches, noSalary);
 
-  const [rows, countRows, monthRows, matchedRows] = await Promise.all([
+  const [rows, countRows, monthRows, matchedRows, hiddenRows] = await Promise.all([
     db.select({
       id: bankTransactions.id,
       valueDate: bankTransactions.valueDate,
@@ -334,6 +341,7 @@ export async function loadLedger(view: TxView, month: string | null, search: Led
         count(*)::int                                                                       as all
         from bank_transactions
        where ${month ? sql`to_char(value_date, 'YYYY-MM') = ${month}` : sql`true`}
+         ${hideSalaries ? sql`and category <> 'SALARY'` : sql``}
     `),
 
     db.execute<{ m: string }>(sql`
@@ -343,6 +351,10 @@ export async function loadLedger(view: TxView, month: string | null, search: Led
     /* عددُ ما طابق البحثَ كلّه — كي يُقال «أوّلُ ٣٠٠ من N» ولا تُقصّ القائمة بصمت */
     search
       ? db.select({ n: sql<number>`count(*)::int` }).from(bankTransactions).where(where)
+      : Promise.resolve(null),
+
+    hideSalaries
+      ? db.select({ n: sql<number>`count(*)::int` }).from(bankTransactions).where(and(inMonth, sql`${bankTransactions.category} = 'SALARY'`))
       : Promise.resolve(null),
   ]);
 
@@ -380,6 +392,7 @@ export async function loadLedger(view: TxView, month: string | null, search: Led
     total: matchedRows ? Number(matchedRows[0]?.n ?? rows.length) : counts[view],
     counts,
     months: monthRows.rows.map((r) => r.m),
+    hiddenSalary: hiddenRows ? Number(hiddenRows[0]?.n ?? 0) : 0,
   };
 }
 
@@ -399,7 +412,10 @@ export interface FocusedTx {
   match: MatchExplanation;
 }
 
-export async function loadFocusedTx(id: string): Promise<FocusedTx | null> {
+/** حوالةُ راتبٍ طُلبت ممّن لا يرى الرواتب — تُقال ولا تُعرض. */
+export const HIDDEN_SALARY_TX = "HIDDEN_SALARY" as const;
+
+export async function loadFocusedTx(id: string, hideSalaries = false): Promise<FocusedTx | typeof HIDDEN_SALARY_TX | null> {
   const [t] = await db.select({
     id: bankTransactions.id,
     valueDate: bankTransactions.valueDate,
@@ -421,6 +437,7 @@ export async function loadFocusedTx(id: string): Promise<FocusedTx | null> {
     .where(eq(bankTransactions.id, id))
     .limit(1);
   if (!t) return null;
+  if (hideSalaries && t.category === "SALARY") return HIDDEN_SALARY_TX;
   return {
     id: t.id,
     valueDate: t.valueDate,

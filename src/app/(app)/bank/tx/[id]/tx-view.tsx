@@ -13,7 +13,8 @@ import { CategoryBadge, DirectionIcon } from "@/components/bank-bits";
 import { MatchExplain } from "@/components/match-explain";
 import { AccountReview } from "@/components/account-review";
 import { loadHandPaymentLinks } from "@/services/account-review.service";
-import { loadFocusedTx, loadTxAllocations } from "@/services/bank-view.service";
+import { HIDDEN_SALARY_TX, loadFocusedTx, loadTxAllocations } from "@/services/bank-view.service";
+import { seesSalaries } from "@/lib/payroll/visibility";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
 import { formatDay } from "@/lib/riyadh-time";
@@ -39,7 +40,14 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
     );
   }
 
-  const tx = await loadFocusedTx(id);
+  const tx = await loadFocusedTx(id, !seesSalaries(user.role));
+  if (tx === HIDDEN_SALARY_TX) {
+    return (
+      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="حوالة رواتب">
+        <NoAccess what="الرواتب" />
+      </DetailFrame>
+    );
+  }
   if (!tx) {
     return (
       <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="الحركة غير موجودة">

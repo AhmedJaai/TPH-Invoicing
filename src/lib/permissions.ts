@@ -30,6 +30,11 @@ export type Capability =
   | "document:view"
   | "supplier:view"
   | "supplier:edit"
+  /**
+   * دمجُ مورّدٍ في آخر وحذفُ مورّدٍ بلا مال — للمالك وحده (أحمد، ٢٤ أكتوبر ٢٠٢٦):
+   * ينقل مالاً تاريخيّاً بين حسابين، فلا يُعار من «تعديل المورّدين».
+   */
+  | "supplier:merge"
   | "amounts:view"
   /**
    * تصحيحُ مبالغ الفاتورة ومورّدها — كتابةٌ لا تُعار من «رؤية المبالغ».
@@ -74,7 +79,7 @@ export type Capability =
 
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
-    "document:upload", "document:view", "supplier:view", "supplier:edit",
+    "document:upload", "document:view", "supplier:view", "supplier:edit", "supplier:merge",
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view", "payroll:edit",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
@@ -119,6 +124,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "document:view": "عرض المستندات",
   "supplier:view": "عرض المورّدين",
   "supplier:edit": "تعديل المورّدين والأصناف",
+  "supplier:merge": "دمج المورّدين وحذفهم",
   "amounts:view": "رؤية المبالغ",
   "invoice:edit": "تصحيح مبالغ الفاتورة ومورّدها",
   "reports:view": "عرض التقارير",

@@ -55,7 +55,7 @@ interface UnknownTx {
 /** التصنيفات المعروضة — بلا UNKNOWN فهي الحالة لا خياراً. */
 const CATEGORY_OPTIONS: TxCategory[] = [
   "SUPPLIER", "SALARY", "RENT", "ZAKAT", "UTILITY",
-  "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
+  "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER", "OTHER_SALES",
 ];
 
 /** حصيلة المزامنة — ما الجديد قبل ما المعنى. */

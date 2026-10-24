@@ -109,6 +109,10 @@ export type AuditAction =
   | "SALES_IMPORTED"
   /* مورّدُ فودكس رُبط بمورّدنا أو فُكّ — قرارُ إنسانٍ تقوم عليه مقارنةُ المشتريات */
   | "SUPPLIER_FOODICS_LINKED"
+  /* دمجُ مورّدٍ في آخر وتراجعُه وحذفُ مورّدٍ بلا مال (أحمد، ٢٤ أكتوبر ٢٠٢٦) — `supplier-merge.service.ts` */
+  | "SUPPLIER_MERGED"
+  | "SUPPLIER_MERGE_UNDONE"
+  | "SUPPLIER_DELETED"
   /* المساحةُ الماليّة: إقرارُ المالك عمّا لا يراه الكشف، وتجميدُ تقرير الشهر المقفل */
   /* الموظّفون والرواتب (084) */
   | "EMPLOYEE_SAVED"

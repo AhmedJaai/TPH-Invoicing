@@ -2,10 +2,10 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٩٢
+## الجداول — ٩٣
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
-`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
+`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` `month_seals` · `job_state` `daily_figures` `daily_checks`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`
@@ -136,6 +136,8 @@
 | `087_daily_figures.sql` | `daily_figures` — لقطةُ أرقام كلّ يوم (المستحقّ، عدد «يحتاج قرارك»، النقد أو فراغُه) تكتبها المهمّةُ اليوميّة مرّةً لكلّ يوم |
 | `088_month_lock_coverage.sql` | مؤثِّراتٌ: قفلُ الفاتورة يشمل الخصم والرسوم والحال الضريبيّ والأصل الثابت؛ `expenses_month_lock`؛ `bank_transactions_month_lock` (المبلغ والاتّجاه والتاريخ)؛ و`payment_month` صريحةً بتوقيت الرياض |
 | `089_month_seals.sql` | `month_seals` — أرقامُ الشهر مختومةً عند إقفاله (المستحقّ لكلّ مورّد، ختامُ البنك ووارده وصادره، ضريبةُ المخرجات والمدخلات)، تُضاف ولا تُعدَّل؛ و`daily_checks` — نتيجةُ فحص الصباح (افتراقُ الختم · رصيدُ القراءة) |
+| `090_other_sales_category.sql` | `tx_category`: قيمةٌ جديدة `OTHER_SALES` — «مبيعات خارج فودكس» للوارد وحده |
+| `091_supplier_merge.sql` | `suppliers.merged_into_id` · `merged_at` · `merged_by_id`، و`supplier_merges` — ما نُقل وما حُذف وما نُسخ في كلّ دمج، للتراجع |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

@@ -14,7 +14,7 @@ import { can } from "@/lib/permissions";
 import { inboxCount } from "@/lib/work";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { T } from "@/components/i18n/t";
-import { largeUploadsEnabled } from "@/lib/blob-staging";
+import { blobUploadMode, largeUploadsEnabled } from "@/lib/blob-staging";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +62,7 @@ export default async function UploadPage() {
           suppliers={rows}
           team={team.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
           largeUploads={largeUploadsEnabled()}
+          presignedUploads={blobUploadMode() === "oidc"}
         />
       </div>
 

@@ -98,6 +98,12 @@ export interface PnlInput {
     coveredDays: number;
     expectedDays: number;
   } | null;
+  /**
+   * مبيعاتٌ خارج فودكس — حوالاتٌ واردة صنّفها صاحبُ المقهى «مبيعات خارج فودكس» (أحمد،
+   * ٢٤ أكتوبر ٢٠٢٦: «سبعة جرة» يشتري منّا). بمبلغها كما وصل: أفيها ضريبةٌ أم لا سؤالٌ
+   * للمحاسب، فلا يُطرح منها شيءٌ هنا ويُقال ذلك بجانبها. غائبٌ في لقطةٍ أقدم.
+   */
+  otherSales?: { grossMinor: number; count: number } | null;
   cogs: {
     purchasesMinor: number;
     purchasesInvoices: number;
@@ -114,6 +120,11 @@ export interface PnlInput {
     wasteMinor: number;
     /** مشروباتُ الموظّفين بتكلفتها — داخلةٌ في النظريّة؛ تُسمّى لأنّها استهلاكٌ بلا إيراد. */
     staffMinor: number | null;
+    /**
+     * مشروباتٌ حُضّرت ثمّ أُرجعت بتكلفتها — داخلةٌ في النظريّة منذ ٢٤ أكتوبر ٢٠٢٦ (كانت
+     * تُنقصها). تُسمّى لأنّ الرقمَ تغيّر بقرارٍ ويُقال لماذا. غائبٌ في لقطةٍ أقدم.
+     */
+    returnedMinor?: number | null;
   };
   opex: readonly OpexRow[];
   excluded: readonly ExcludedRow[];
@@ -177,7 +188,10 @@ export function buildPnl(input: PnlInput): Pnl {
   const lines: PnlLine[] = [];
 
   /* ── الإيراد ── */
-  const revenueMinor = input.revenue ? input.revenue.paidMinor - input.revenue.vatMinor : null;
+  const foodicsNetMinor = input.revenue ? input.revenue.paidMinor - input.revenue.vatMinor : null;
+  const other = input.otherSales && input.otherSales.count > 0 ? input.otherSales : null;
+  /* فودكس المجهول يجعل الإيرادَ مجهولاً — والمبيعُ خارجه لا يملأ الفراغ */
+  const revenueMinor = foodicsNetMinor === null ? null : foodicsNetMinor + (other?.grossMinor ?? 0);
   if (input.revenue === null) {
     gaps.push({ id: "NO_REVENUE", label: "لا مبيعات مقروءة من فودكس لهذا الشهر", action: "زامن فودكس", href: "/money/foodics" });
   } else if (!input.open && input.revenue.coveredDays < input.revenue.expectedDays) {
@@ -186,7 +200,16 @@ export function buildPnl(input: PnlInput): Pnl {
   }
   if (input.open) gaps.push({ id: "OPEN", label: "الشهر لم ينتهِ بعد، وأرقامه حتى آخر يوم مقروء", action: "تكتمل حين ينتهي الشهر", href: `/finance?month=${month}` });
 
-  lines.push({ id: "revenue", label: "الإيراد: ما دفعه الزبائن دون الضريبة", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "لا مبيعات مقروءة" : undefined });
+  if (other) {
+    lines.push({ id: "revenue-foodics", label: "مبيعات فودكس: ما دفعه الزبائن دون الضريبة", amountMinor: foodicsNetMinor, kind: "item", note: input.revenue === null ? "لا مبيعات مقروءة" : undefined });
+    lines.push({
+      id: "revenue-other", label: `مبيعات خارج فودكس: ${other.count} حوالة واردة صنّفتها بيعاً، بمبلغها كما وصل`, amountMinor: other.grossMinor, kind: "item",
+      note: "إن كانت فيها ضريبة فهي داخل هذا المبلغ ولم تُطرح. اسأل محاسبك عن معاملتها في الإقرار",
+    });
+    lines.push({ id: "revenue", label: "الإيراد", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "مبيعات فودكس غير مقروءة" : undefined });
+  } else {
+    lines.push({ id: "revenue", label: "الإيراد: ما دفعه الزبائن دون الضريبة", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "لا مبيعات مقروءة" : undefined });
+  }
 
   /* ── تكلفةُ المبيعات ── */
   const c = input.cogs;
@@ -293,6 +316,7 @@ export function buildPnl(input: PnlInput): Pnl {
   const viaStaffMinor = input.excluded.filter((x) => x.kind === "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);
   if (viaStaffMinor > 0) lines.push({ id: "excluded-purchases", label: "مبالغ أعطيتها موظفين ليسددوا فواتير مورّدين، محسوبة في المشتريات لا في المصروفات", amountMinor: viaStaffMinor, kind: "memo" });
   if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروبات الموظفين بتكلفتها، وهي داخلة في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
+  if (c.returnedMinor != null && c.returnedMinor > 0) lines.push({ id: "returned-after-prep", label: "مشروبات حُضّرت ثم أُرجعت بتكلفتها: داخلة في تكلفة المبيعات وتُعدّ هدراً (لم تعد تُنقص التكلفة منذ ٢٤ أكتوبر ٢٠٢٦)", amountMinor: c.returnedMinor, kind: "memo" });
 
   return {
     month,

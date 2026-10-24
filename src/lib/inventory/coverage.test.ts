@@ -24,6 +24,7 @@ function consumption(
 ): ConsumptionResult {
   return {
     byIngredient: new Map(),
+    returnedAfterPrep: { lines: 0, unitsMilli: 0 },
     included,
     excluded: excludedLines,
     excludedTotals: {

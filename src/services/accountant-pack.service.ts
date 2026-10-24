@@ -7,14 +7,16 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { buildAccountantPack, type PackInput, type Sheet } from "@/lib/accountant-pack";
+import { buildAccountantPack, redactPackSalaries, type PackInput, type Sheet } from "@/lib/accountant-pack";
+import type { Role } from "@/lib/permissions";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import { formatMonth, todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 
 /* اليومُ يُرجعه الاستعلامُ نصّاً بتوقيت الرياض — كان يُقطع من UTC فتُكتب دفعةُ فجر ١ أكتوبر «٣٠ سبتمبر» */
 const day = (v: unknown): string => (v instanceof Date ? isoDay(v) : String(v ?? "").slice(0, 10));
 
-export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet[]; input: PackInput }> {
+/** `role`: من يُنزِّل — والرواتبُ فرادى لمن يملك `payroll:view` وحده (`redactPackSalaries`). */
+export async function loadAccountantPack(month: string, role: Role): Promise<{ sheets: Sheet[]; input: PackInput }> {
   const [invoices, payments, expenses, bank, closed] = await Promise.all([
     db.execute<{
       number: string; date: string; supplier: string | null; seller_vat: string | null;
@@ -61,7 +63,7 @@ export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet
     db.execute<{ n: number }>(sql`select count(*)::int as n from month_closes where month = ${month} and status = 'CLOSED'`),
   ]);
 
-  const input: PackInput = {
+  const raw: PackInput = {
     month,
     monthLabel: formatMonth(month),
     generatedAt: todayInRiyadh(),
@@ -105,5 +107,6 @@ export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet
     })),
   };
 
+  const input = redactPackSalaries(raw, role);
   return { sheets: buildAccountantPack(input), input };
 }

@@ -264,6 +264,15 @@ export function InventoryWorkspace({
               : <><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.complimentary.costMinor} />]} /></>
           )]} /></p>
       )}
+      {/* المرتجعُ المحضَّر: رقمٌ تغيّر بقرار أحمد (٢٤ أكتوبر ٢٠٢٦) — يُقال لماذا */}
+      {(report.totals.returnedAfterPrep?.lines ?? 0) > 0 && report.totals.returnedAfterPrep && (
+        <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
+          <T s="{0} {1} وحدة حُضّرت ثم أُرجعت{2}. تُحسب مستهلكة وهدراً معاً («مرتجع بعد التحضير»)، فلم تعد تُنقص الاستهلاك المتوقع كما كانت قبل ٢٤ أكتوبر ٢٠٢٦. والجاهز الذي يعود إلى الرف ما زال يُنقصه." a={[<strong key="0" className="text-ink">مرتجع بعد التحضير:</strong>, <span key="1" className="nums">{trim(report.totals.returnedAfterPrep.unitsMilli / 1000)}</span>, showAmounts && (
+            report.totals.returnedAfterPrep.costMinor === null
+              ? <>، وتكلفة مكوناتها غير معروفة كلها</>
+              : <><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.returnedAfterPrep.costMinor} />]} /></>
+          )]} /></p>
+      )}
 
       <Callout tone="muted" icon={ShieldCheck} title="هذا فرق جرد، لا هدر">
         قد يكون سبب الفرق جرعة أكبر مما في الوصفة، أو ميزاناً غير معايَر، أو كمية دخلت ولم تُسجَّل، أو نقلاً لم يُسجَّل، أو عدّاً مستعجلاً. راجعه قبل أن تعدّه فاقداً، وما تعرف سببه سجّله هدراً أدناه ليخرج من «الفرق غير المفسَّر».
