@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyHomography, homography, insetQuad, isConvexQuad, orderQuad, outputSize, warpQuad, type Point, type Quad, type Raster } from "./geometry";
 import { detectDocument, otsuThreshold } from "./detect";
 import { enhanceScan } from "./enhance";
 import { assessQuality } from "./quality";
+
+/* صورٌ كاملة الحجم تُعالَج بكسلاً بكسلاً: ثانيةٌ محلّيّاً، وستٌّ على خادم CI مع قياس التغطية — فالمهلةُ للملفّ كلّه */
+vi.setConfig({ testTimeout: 30_000 });
 
 /** صورةٌ اصطناعيّة: كاونترٌ داكن، وعليه ورقةٌ مائلة فيها أسطرُ «نصّ». */
 function photo(width: number, height: number, paper: Quad, opts: { light?: (x: number, y: number) => number } = {}): Raster {
@@ -226,8 +229,7 @@ function expectNear(q: Quad | null, truth: Quad, tol: number) {
   });
 }
 
-/* صورٌ كاملة الحجم تُعالَج بكسلاً بكسلاً: ثانيةٌ محلّيّاً، وستٌّ على خادم CI مع قياس التغطية */
-describe("اكتشافُ الورقة من خطوطها — حيث يفشل اللون", { timeout: 30_000 }, () => {
+describe("اكتشافُ الورقة من خطوطها — حيث يفشل اللون", () => {
   const W = 900;
   const H = 1200;
   const tilted: Quad = [{ x: 140, y: 110 }, { x: 760, y: 150 }, { x: 790, y: 1080 }, { x: 100, y: 1050 }];
