@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { request } from "@/lib/http-client";
 import { ArrowLeft, CircleAlert, CircleCheck, Copy, FileSpreadsheet, Loader2, TriangleAlert, Upload, type LucideIcon } from "lucide-react";
 import { buttonClass } from "./ui";
+import { BusyStatus } from "./ui-client";
 import { formatWeek } from "./inventory-ui";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { MAX_SALES_FILE_BYTES, SALES_FILE_TOO_LARGE } from "@/lib/sales/file-import";
@@ -132,6 +133,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                   {busy ? <><T s="{0}يقرأ الملف…" a={[<Loader2 key="0" className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />]} /></> : <><T s="{0}استورد الملف" a={[<Upload key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>}
                 </button>
                 <button type="button" onClick={reset} disabled={busy} className={buttonClass("quiet")}>غيّر الملف</button>
+                <BusyStatus busy={busy} text="يقرأ ملف الجرد ويطابق أصنافه…" className="basis-full" />
               </div>
             </div>
           ) : (

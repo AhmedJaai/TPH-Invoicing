@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCheck } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { BusyStatus, toast } from "./ui-client";
 
 /**
  * «اعتمد ما اجتمعت فيه الشروط» — لما انتظر قبل أن توجد القاعدة.
@@ -39,6 +39,7 @@ export function ConfirmEligible({ count }: { count: number }) {
         <CheckCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
         {count === 1 ? "اعتمده" : "اعتمدها كلها"}
       </button>
+      <BusyStatus busy={busy} text="يعيد الحكم على كل مستند ثم يسجّله ويعتمده…" />
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>
   );

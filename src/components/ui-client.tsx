@@ -7,6 +7,7 @@ import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useRe
 import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert, CircleCheck, Info, RotateCw, Search, TriangleAlert, Undo2, X } from "lucide-react";
 import { buttonClass, fieldClass, type ButtonVariant } from "./ui-tokens";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
+import { SECOND, countNoun } from "@/lib/arabic";
 import { shortcutKey } from "@/lib/shortcut-keys";
 import { formatSort, nextSort, parseSort, type SortDir } from "@/lib/table-sort";
 import { T } from "@/components/i18n/t";
@@ -204,6 +205,7 @@ export function ActionButton({
   className = "",
   showDone = true,
   label,
+  busyText,
 }: {
   onAction: () => Promise<unknown> | unknown;
   children: React.ReactNode;
@@ -215,10 +217,13 @@ export function ActionButton({
   showDone?: boolean;
   /** اسمٌ يُقرأ حين يكون الزرُّ رمزاً بلا نصّ. */
   label?: string;
+  /** لفعلٍ يأخذ ثوانيَ: ما يجري الآن بنصّه بجانب الزرّ، ومدّتُه (`BusyStatus`). */
+  busyText?: string;
 }) {
   const running = useRef(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
   const reasonId = useId();
 
   useEffect(() => {
@@ -235,6 +240,7 @@ export function ActionButton({
     if (running.current) return;
     running.current = true;
     setBusy(true);
+    setFailed(false);
     let ok = true;
     try {
       ok = (await onAction()) !== false;
@@ -244,6 +250,7 @@ export function ActionButton({
       running.current = false;
       setBusy(false);
       if (ok && showDone) setDone(true);
+      setFailed(!ok);
     }
   }
 
@@ -265,8 +272,43 @@ export function ActionButton({
         {children}
       </button>
       {disabled && reason && <span id={reasonId} className="sr-only">{reason}</span>}
-      <span className="sr-only" aria-live="polite">{busy ? "ينفّذ" : done ? "تم" : ""}</span>
+      {busyText ? <BusyStatus busy={busy} text={busyText} /> : null}
+      {/* البدءُ والنهاية يُقالان لقارئ الشاشة — والفشلُ أيضاً: الدوّارةُ إن توقّفت بلا كلمة لا يُعرف ما وقع */}
+      <span className="sr-only" aria-live="polite">{busy ? (busyText ? "" : "ينفّذ") : done ? "تم" : failed ? "لم يتم" : ""}</span>
     </>
+  );
+}
+
+/**
+ * ما يجري الآن، بجانب زرٍّ يأخذ ثوانيَ — مزامنة، إعادةُ قراءة، إقفال، استيراد.
+ *
+ * الدوّارةُ داخل الزرّ تقول «وصلت الضغطة» ولا تقول ماذا يجري ولا كم بقي، فيُضغط ثانيةً
+ * أو تُغلق الصفحة في منتصف العمل. فيُكتب بجانبه ما يجري بنصّه، ومدّتُه بعد ثلاث ثوانٍ،
+ * وبعد خمسَ عشرةَ «لا تُغلق الصفحة». ومنطقةٌ حيّة دائمة الوجود: يُقرأ البدءُ لقارئ الشاشة.
+ * والنتيجةُ عند من ناداه (إشعارٌ أو سطرُ خطأ) — هو يعرف ما يقول.
+ */
+export function BusyStatus({ busy, text, className = "" }: { busy: boolean; text: string; className?: string }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    const start = Date.now();
+    const t = window.setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => {
+      window.clearInterval(t);
+      setSeconds(0);
+    };
+  }, [busy]);
+  return (
+    <span role="status" aria-live="polite" className={`text-[11px] leading-relaxed text-muted ${busy ? "inline-flex flex-wrap items-center gap-x-1.5" : "sr-only"} ${className}`}>
+      {busy && (
+        <>
+          <span className="font-bold text-ink-soft">{text}</span>
+          {/* المدّةُ لا تُقرأ كلَّ ثانية — تُرى ولا تُعلَن */}
+          {seconds >= 3 && <span aria-hidden><T s="منذ {0}" a={[countNoun(seconds, SECOND)]} /></span>}
+          {seconds >= 15 && <span>لا تُغلق الصفحة حتى ينتهي.</span>}
+        </>
+      )}
+    </span>
   );
 }
 

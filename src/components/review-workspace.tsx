@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
-import { toast } from "./ui-client";
+import { BusyStatus, toast } from "./ui-client";
 import { countNoun, SUGGESTION, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
@@ -394,6 +394,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
             >
               {recordBatch(Math.min(50, confirmable.length))}
             </button>
+            <BusyStatus busy={busy} text="يعيد حساب كل مطابقة على الفواتير كما هي الآن ثم يحفظها…" />
           </div>
 
           {result && (

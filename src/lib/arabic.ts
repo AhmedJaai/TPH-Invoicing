@@ -187,6 +187,15 @@ export const DAY: NounForms = {
   zero: "لا أيّام",
 };
 
+/** مدّةُ الانتظار عند زرٍّ يعمل («منذ ١٢ ثانية») — `BusyStatus`. */
+export const SECOND: NounForms = {
+  one: "ثانية واحدة",
+  two: "ثانيتين",
+  few: "ثوانٍ",
+  many: "ثانية",
+  zero: "لحظة",
+};
+
 export const ALIAS: NounForms = {
   one: "اسم بديل واحد",
   two: "اسمان بديلان",

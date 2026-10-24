@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY, FIELD, GAP, ITEM, INVOICE, OPPORTUNITY, QUOTATION, TIME, countNoun, nounForm } from "./arabic";
+import { DAY, FIELD, GAP, ITEM, INVOICE, OPPORTUNITY, QUOTATION, SECOND, TIME, countNoun, nounForm } from "./arabic";
 
 describe("nounForm", () => {
   it("الواحد والاثنان لهما صيغتاهما", () => {
@@ -90,5 +90,13 @@ describe("الصيغ التي كانت ناقصة", () => {
     expect(countNoun(1, QUOTATION)).toBe("عرض سعر واحد");
     expect(countNoun(2, QUOTATION)).toBe("عرضا سعر");
     expect(countNoun(6, QUOTATION)).toBe("6 عروض أسعار");
+  });
+});
+
+describe("SECOND — مدّةُ الانتظار بجانب الزرّ", () => {
+  it("«منذ ثانيتين» و«منذ ٥ ثوانٍ» و«منذ ١٢ ثانية»", () => {
+    expect(countNoun(2, SECOND)).toBe("ثانيتين");
+    expect(countNoun(5, SECOND)).toBe("5 ثوانٍ");
+    expect(countNoun(12, SECOND)).toBe("12 ثانية");
   });
 });

@@ -8,7 +8,7 @@ import {
   TriangleAlert, Unlock, Wallet, type LucideIcon,
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
-import { ConfirmAction, toast } from "./ui-client";
+import { BusyStatus, ConfirmAction, toast } from "./ui-client";
 import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { postJson } from "@/lib/http-client";
@@ -130,6 +130,10 @@ export function MonthClose({
           </select>]} /></label>
         <button aria-busy={busy === "checking"} onClick={() => void call("check", month)} disabled={busy !== null} className={buttonClass("secondary", "sm")}>
           <T s="{0}أعد الفحص" a={[<RotateCw key="0" className={`h-3.5 w-3.5 ${busy === "checking" ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />]} /></button>
+        <BusyStatus
+          busy={busy !== null}
+          text={busy === "closing" ? "يُقفل الشهر ويُعدّ حزمة المحاسب…" : busy === "reopening" ? "يعيد فتح الشهر…" : busy === "balancing" ? "يحفظ الرصيدين ويعيد الفحص…" : "يفحص الشهر…"}
+        />
       </div>
 
       {error && (

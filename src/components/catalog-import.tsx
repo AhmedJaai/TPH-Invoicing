@@ -6,6 +6,7 @@ import { request } from "@/lib/http-client";
 import Link from "next/link";
 import { ArrowLeft, CircleAlert, CircleCheck, Eye, FileSpreadsheet, Files, Loader2, PlugZap } from "lucide-react";
 import { buttonClass } from "./ui";
+import { BusyStatus } from "./ui-client";
 import { T } from "@/components/i18n/t";
 
 /**
@@ -200,6 +201,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               </button>
             )}
             {files.length === 0 && !fromFoodics && !committed && <span className="text-[11px] text-muted">لا يُحفظ شيء قبل أن ترى ما سيحدث.</span>}
+            <BusyStatus busy={busy !== null} text={busy === "commit" ? "يحفظ الكتالوج…" : "يقرأ الكتالوج ويحسب ما سيتغيّر…"} className="basis-full" />
           </div>
 
           {error && (
