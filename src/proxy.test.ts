@@ -87,3 +87,13 @@ describe("الخروج يمسح خزين المتصفّح", () => {
   });
 });
 
+describe("التشغيلُ المجدول", () => {
+  it("يبلغ مسارَه بلا جلسة — سرُّ CRON_SECRET إذنُه ويفحصه المسار (`cronGuard`)", () => {
+    /* كان الحارسُ يردّه «يجب تسجيل الدخول» قبل أن يرى السرّ، فلم يجرِ تشغيلٌ مجدولٌ واحد */
+    expect(proxy(post({ authorization: "Bearer x" }, "/api/cron/foodics")).status).toBe(200);
+  });
+
+  it("ولا يفتح ما يشبهه اسماً", () => {
+    expect(proxy(post({}, "/api/cronx")).status).toBe(401);
+  });
+});
