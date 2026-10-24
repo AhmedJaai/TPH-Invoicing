@@ -1,10 +1,13 @@
 /*
- * عاملُ الخدمة — مكتوبٌ باليد، بلا مكتبة، ولشيئين لا ثالث لهما:
+ * عاملُ الخدمة — مكتوبٌ باليد، بلا مكتبة، ولثلاثة أشياء لا رابع لها:
  *
  * ١. **بلا شبكة:** التطبيقُ المثبَّت كان يفتح صفحةَ خطأ المتصفّح الرماديّة حين
  *    تضعف الشبكة في المخزن. فيُعرَض بدلها «أنت بلا اتّصال» بالعربيّة وزرُّ إعادة.
  * ٢. **هدفُ المشاركة:** «شارِك إلى ذا بوبليك هاوس» من واتساب — الملفُّ يُحفَظ
  *    هنا لحظةً ثمّ تُفتح صفحةُ الرفع فتقرؤه (`src/lib/shared-inbox.ts`).
+ * ٣. **إشعارُ الصباح:** النداءُ يصل فارغاً (`src/lib/push/web-push.ts`)، فيُسأل الخادمُ
+ *    بجلسة صاحب الجهاز عن نصّه (`/api/push/brief`) ويُعرض. وإن تعذّر السؤال (جلسةٌ
+ *    منتهية، شبكة) عُرض «افتح التطبيق» — المتصفّحُ يُلزم بإشعارٍ لكلّ نداء.
  *
  * **ولا يخزّن شيئاً من التطبيق:** لا صفحةً ولا ردَّ `/api` ولا ملفّاً ثابتاً. كلُّ
  * طلبٍ يذهب إلى الشبكة كما كان، ولا يُعترَض إلّا التنقّلُ (ليُعرَف أنّه فشل)
@@ -106,4 +109,52 @@ self.addEventListener("fetch", (event) => {
   if (request.method === "GET" && request.mode === "navigate") {
     event.respondWith(fetch(request).catch(() => offlinePage()));
   }
+});
+
+/* ── إشعارُ الصباح ── */
+const BRIEF_FALLBACK = { title: "إحاطة الصباح", body: "إحاطة اليوم جاهزة. افتح التطبيق لتراها.", url: "/" };
+
+async function morningBrief() {
+  try {
+    const res = await fetch("/api/push/brief", { credentials: "same-origin", cache: "no-store" });
+    if (!res.ok) return BRIEF_FALLBACK;
+    const data = await res.json();
+    if (!data || typeof data.title !== "string" || typeof data.body !== "string") return BRIEF_FALLBACK;
+    /* الوجهةُ داخل التطبيق وحدها */
+    const url = typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url : "/";
+    return { title: data.title, body: data.body, url };
+  } catch {
+    return BRIEF_FALLBACK;
+  }
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    morningBrief().then((b) =>
+      self.registration.showNotification(b.title, {
+        body: b.body,
+        lang: "ar",
+        dir: "rtl",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: "morning-brief",
+        data: { url: b.url },
+      }),
+    ),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (new URL(c.url).origin === self.location.origin && "focus" in c) {
+          return c.focus().then((w) => (w && "navigate" in w ? w.navigate(target) : w));
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
 });

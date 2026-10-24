@@ -29,6 +29,7 @@ import type { DriveSyncBody } from "./drive-sync.service";
 import type { SweepOutcome } from "./backlog-sweep.service";
 import type { DayFigures } from "./daily-figures.service";
 import type { SealCheckSummary } from "./month-seal.service";
+import type { MorningPushResult } from "./push.service";
 import { balanceIsLow, formatAiBalance, type AiBalance } from "@/lib/ai/balance";
 
 /**
@@ -272,6 +273,11 @@ export interface DailyCronDeps {
   checkSeals: () => Promise<SealCheckSummary>;
   /** رصيدُ القراءة الذكيّة عند المزوّد — لا يرمي، والمجهولُ مجهول. */
   checkAiBalance: () => Promise<AiBalance>;
+  /**
+   * إشعارُ الصباح (`sendMorningPush`) — يُرسَل حين تُكتب لقطةُ اليوم وحدها: التشغيلُ الثاني
+   * في اليوم نفسه (إعادةُ GitHub) لا يوقظ أحداً مرّتين. وبلا مفتاحين لا سطرَ له.
+   */
+  pushBrief?: () => Promise<MorningPushResult>;
 }
 
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
@@ -316,6 +322,13 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
   parts.push(balance.known
     ? `رصيد القراءة الذكية ${formatAiBalance(balance)}${balanceIsLow(balance) ? " (ينفد)" : ""}`
     : `رصيد القراءة الذكية غير معروف: ${balance.reason}`);
+
+  if (written && deps.pushBrief) {
+    /* الإشعارُ تابعٌ لا شرط: تعذُّره يُقال ولا يُسقط ما كُتب قبله */
+    const push = await deps.pushBrief().catch((e: unknown) => e instanceof Error ? e : new Error(String(e)));
+    if (push instanceof Error) parts.push(`تعذّر إرسال إشعار الصباح: ${push.message.split("\n")[0].slice(0, 120)}`);
+    else if (push.enabled) parts.push(`إشعار الصباح: وصل إلى ${push.sent}${push.failed ? ` · تعذّر ${push.failed}` : ""}${push.gone ? ` · انتهى اشتراك ${push.gone}` : ""}`);
+  }
 
   return { ok, record: true, result: parts.join(" · ") };
 }

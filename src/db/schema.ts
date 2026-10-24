@@ -1848,6 +1848,24 @@ export const dailyChecks = pgTable("daily_checks", {
   payload: jsonb("payload").notNull(),
 }, (t) => [index("daily_checks_kind_idx").on(t.kind, t.checkedAt)]);
 
+/**
+ * اشتراكاتُ إشعار الصباح (Web Push) — جهازٌ بعد جهاز (هجرة معلّقة: ui__push_subscriptions).
+ * خاملٌ بلا `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`. والإشعارُ بلا محتوى: عاملُ الخدمة
+ * يسأل `/api/push/brief` بجلسة صاحبه — فلا يمرّ رقمٌ بمزوّد الإشعار.
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: now(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  failures: integer("failures").notNull().default(0),
+}, (t) => [index("push_subscriptions_user_idx").on(t.userId)]);
+
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
   bankImport: one(bankImports, { fields: [bankTransactions.bankImportId], references: [bankImports.id] }),
   matchedPayment: one(payments, { fields: [bankTransactions.matchedPaymentId], references: [payments.id] }),

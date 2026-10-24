@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, CalendarClock, Camera, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { Activity, BellRing, CalendarClock, Camera, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
 import { CaptureLinks } from "@/components/capture-links";
 import { listLinks } from "@/services/capture.service";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
@@ -27,6 +27,8 @@ import { dailyBudgetMicroUsd, formatUsd } from "@/lib/ai/usage-ledger";
 import { listUsersForAdmin } from "@/services/user-admin.service";
 import { cookies } from "next/headers";
 import { LanguageSwitch } from "@/components/i18n/language-switch";
+import { PushSettings } from "@/components/push-settings";
+import { pushPublicKey } from "@/services/push.service";
 import { asLocale, LOCALE_COOKIE } from "@/lib/i18n/locale";
 import { T } from "@/components/i18n/t";
 
@@ -123,6 +125,7 @@ export default async function SettingsPage() {
   const toc = [
     { id: "account", label: "الحساب", icon: UserRound },
     { id: "language", label: "اللغة", icon: Languages },
+    ...(showMoney ? [{ id: "push", label: "إشعار الصباح", icon: BellRing }] : []),
     ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
     ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكررة", icon: Repeat }] : []),
     ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
@@ -168,6 +171,12 @@ export default async function SettingsPage() {
           <Section id="language" title="اللغة" icon={Languages} hint="لغة الواجهة على هذا الجهاز. أسماء المورّدين ونصوص المستندات تبقى كما هي.">
             <LanguageSwitch current={locale} />
           </Section>
+
+          {showMoney && (
+            <Section id="push" title="إشعار الصباح" icon={BellRing} hint="على هذا الجهاز وحده. وكل جهاز تفعّله منفصلاً.">
+              <PushSettings publicKey={pushPublicKey()} />
+            </Section>
+          )}
 
           {can(user.role, "reports:view") && (
             <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتح الوثائق</LinkButton>}>

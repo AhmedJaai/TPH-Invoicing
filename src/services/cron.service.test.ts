@@ -263,6 +263,25 @@ describe("لقطةُ اليوم", () => {
     checkAiBalance: async (): Promise<AiBalance> => ({ known: true, currency: "USD", cents: 42_00, available: true }),
   };
 
+  it("إشعارُ الصباح مع لقطة اليوم وحدها — التشغيلُ الثاني لا يوقظ أحداً مرّتين", async () => {
+    let calls = 0;
+    const pushBrief = async () => { calls++; return { enabled: true as const, sent: 2, gone: 1, failed: 0 }; };
+    const first = await dailyCronJob({ ...quietDeps, pushBrief });
+    expect(first.result).toContain("إشعار الصباح: وصل إلى 2 · انتهى اشتراك 1");
+    const again = await dailyCronJob({ ...quietDeps, write: async () => false, pushBrief });
+    expect(calls).toBe(1);
+    expect(again.result).not.toContain("إشعار الصباح");
+  });
+
+  it("بلا مفتاحين لا سطرَ للإشعار، وتعذُّرُه يُقال ولا يُسقط التشغيل", async () => {
+    const off = await dailyCronJob({ ...quietDeps, pushBrief: async () => ({ enabled: false as const }) });
+    expect(off.ok).toBe(true);
+    expect(off.result).not.toContain("إشعار");
+    const broken = await dailyCronJob({ ...quietDeps, pushBrief: async () => { throw new Error("relation push_subscriptions does not exist"); } });
+    expect(broken.ok).toBe(true);
+    expect(broken.result).toContain("تعذّر إرسال إشعار الصباح");
+  });
+
   it("وفحصا الصباح في سطر النتيجة: الأشهرُ كما خُتمت، والرصيدُ بمبلغه", async () => {
     const r = await dailyCronJob(quietDeps);
     expect(r.ok).toBe(true);

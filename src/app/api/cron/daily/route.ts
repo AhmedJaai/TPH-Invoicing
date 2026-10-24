@@ -5,6 +5,7 @@
  *
  * مرّةً في يوم الرياض: التشغيلُ الثاني (إعادةُ GitHub أو تشغيلٌ بيد) لا يغيّر اللقطة،
  * ويعيد الفحصين (قراءةٌ وصفٌّ جديد). بسرّ `CRON_SECRET` وحده وباسم المالك.
+ * ومع اللقطة الأولى إشعارُ الصباح إلى الأجهزة المشتركة (خاملٌ بلا مفاتيح VAPID).
  */
 import { cronGuard, cronRefused, dailyCronJob, runCron } from "@/services/cron.service";
 import { writeDailyFigures, type DayFigures } from "@/services/daily-figures.service";
@@ -15,6 +16,7 @@ import { snapshotDay } from "@/lib/cron";
 import { withDeadline } from "@/lib/ai/deadline";
 import { runSealCheck } from "@/services/month-seal.service";
 import { checkAiBalance } from "@/services/daily-checks.service";
+import { sendMorningPush } from "@/services/push.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -42,5 +44,7 @@ export async function POST(request: Request) {
     checkSeals: () => runSealCheck(actorId),
     /* نداءُ المزوّد تحت موعدٍ معلَن — والمجهولُ يُحفظ مجهولاً */
     checkAiBalance: () => withDeadline(12_000, () => checkAiBalance()),
+    /* خاملٌ بلا `VAPID_*` — وإلّا فنداءٌ فارغ إلى كلّ جهازٍ مشترك */
+    pushBrief: () => withDeadline(30_000, () => sendMorningPush()),
   }));
 }
