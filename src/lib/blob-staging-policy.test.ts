@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  isStagingUrl, MAX_STAGED_BYTES, STAGED_TYPES, stagingPathname, stagingTokenDecision, storeIdOf,
+  blobAuthMode, storeIdFromEnv, isStagingUrl, MAX_STAGED_BYTES, STAGED_TYPES, stagingPathname, stagingTokenDecision, storeIdOf,
 } from "./blob-staging-policy";
 
 /**
@@ -60,5 +60,30 @@ describe("إذنُ الرفع", () => {
     /* اسمٌ يبدأ بنقطتين يُنظَّف لا يُردّ — فلا يُحرَم صاحبُه الرفع */
     expect(stagingPathname("../../x.pdf")).toBe("staging/____x.pdf");
     expect(stagingTokenDecision(stagingPathname("../../x.pdf"), "application/pdf").ok).toBe(true);
+  });
+});
+
+describe("طريقُ المصادقة من البيئة — الحالاتُ الثلاث", () => {
+  it("لا مفتاح ولا مخزن: مطفأ، ولا معرّف", () => {
+    expect(blobAuthMode({})).toBeNull();
+    expect(blobAuthMode({ BLOB_READ_WRITE_TOKEN: "  ", BLOB_STORE_ID: "" })).toBeNull();
+    expect(storeIdFromEnv({})).toBeNull();
+  });
+
+  it("المخزنُ وحده (OIDC): مفعَّل، والمعرّفُ بلا «store_» وبحروفٍ صغيرة", () => {
+    expect(blobAuthMode({ BLOB_STORE_ID: "store_AbC123" })).toBe("oidc");
+    expect(storeIdFromEnv({ BLOB_STORE_ID: "store_AbC123" })).toBe("abc123");
+    expect(storeIdFromEnv({ BLOB_STORE_ID: "store_a.b" })).toBeNull();
+  });
+
+  it("المفتاحُ يغلب إن وُجدا معاً — ومعرّفُه من المفتاح", () => {
+    const env = { BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_Key9_secret", BLOB_STORE_ID: "store_other" };
+    expect(blobAuthMode(env)).toBe("token");
+    expect(storeIdFromEnv(env)).toBe("key9");
+  });
+
+  it("اسمُ الرابط الموقَّع فريدٌ ويبقى تحت staging/ بامتداده", () => {
+    expect(stagingPathname("فاتورة.pdf", "ab12-cd")).toBe("staging/فاتورة-ab12cd.pdf");
+    expect(stagingTokenDecision(stagingPathname("x.pdf", "zz"), "application/pdf").ok).toBe(true);
   });
 });

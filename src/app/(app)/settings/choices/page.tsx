@@ -89,7 +89,7 @@ export default async function ChoicesPage() {
     );
   }
 
-  const ledger = await loadChoiceLedger();
+  const ledger = await loadChoiceLedger(!can(user.role, "payroll:view"));
 
   return (
     <PageShell

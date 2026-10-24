@@ -133,9 +133,36 @@ export const suppliers = pgTable("suppliers", {
   ibanSetById: text("iban_set_by_id").references(() => users.id),
 
   isActive: boolean("is_active").notNull().default(true),
+  /**
+   * دُمج في مورّدٍ آخر (هجرة decisions__supplier_merge): الصفُّ يبقى شاهداً — معطَّلاً، ولا
+   * يشير إليه شيءٌ بعد الدمج — كي يُقرأ ما سُجّل عنه في السجلّ، ويُتراجَع عن الدمج.
+   */
+  mergedIntoId: text("merged_into_id").references((): AnyPgColumn => suppliers.id),
+  mergedAt: timestamp("merged_at", { withTimezone: true }),
+  mergedById: text("merged_by_id").references(() => users.id),
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("suppliers_active_idx").on(t.isActive)]);
+
+/**
+ * دمجُ مورّدٍ في آخر — ما انتقل بمعرّفاته، وما حُذف بنصّه، كي يُتراجَع عنه واحداً بواحد.
+ * (`supplier-merge.service.ts`)
+ */
+export const supplierMerges = pgTable("supplier_merges", {
+  id: id(),
+  sourceId: text("source_id").notNull().references(() => suppliers.id),
+  targetId: text("target_id").notNull().references(() => suppliers.id),
+  /** `{ invoices: [ids], payments: [...], … }` — ما نُقل من المصدر إلى الهدف */
+  moved: jsonb("moved").notNull(),
+  /** ما حُذف لأنّ الهدف يحمل مثله (اسمٌ بديل · صنفٌ بالوصف نفسه) — بصفوفه كاملة */
+  removed: jsonb("removed").notNull(),
+  /** ما نُسخ إلى الهدف من المصدر (الرقمُ الضريبيّ · الآيبان) حين خلا منه */
+  copied: jsonb("copied").notNull(),
+  mergedById: text("merged_by_id").references(() => users.id),
+  mergedAt: timestamp("merged_at", { withTimezone: true }).notNull().defaultNow(),
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
+  undoneById: text("undone_by_id").references(() => users.id),
+}, (t) => [index("supplier_merges_source_idx").on(t.sourceId), index("supplier_merges_target_idx").on(t.targetId)]);
 
 export const aliasKindEnum = pgEnum("alias_kind", [
   "BANK_BENEFICIARY", // اسم المستفيد في كشف البنك
@@ -543,6 +570,7 @@ export const txCategoryEnum = pgEnum("tx_category", [
   "OTHER",
   "UNKNOWN",
   "POS_SETTLEMENT", "POS_FEE", "POS_VAT", "BANK_FEE",
+  "OTHER_SALES", // مبيعاتٌ خارج فودكس — حوالةٌ واردة ثمنَ بيع (هجرة decisions__other_sales_category)
 ]);
 
 export const ruleSourceEnum = pgEnum("rule_source", ["MANUAL", "SUGGESTED"]);

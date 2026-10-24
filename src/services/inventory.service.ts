@@ -1652,6 +1652,7 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     }) as EngineReport["totals"],
     consumption: {
       byIngredient: new Map(),
+      returnedAfterPrep: { lines: 0, unitsMilli: 0 },
       included: { lines: 0, unitsMilli: 0, totalMinor: 0 },
       excluded: [],
       excludedTotals: { lines: 0, unitsMilli: 0, totalMinor: 0 },

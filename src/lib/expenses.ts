@@ -52,9 +52,10 @@ export interface BankTx {
  * `INTERNAL` حركة بين حسابَي المنشأة، لا مال خرج منها.
  * `PERSONAL` سحب المالك، وهو توزيع لا مصروف تشغيليّ.
  * `UNKNOWN` لم يُعرف وجهه — والمجهول لا يُقيَّد بابَ حساب.
+ * `OTHER_SALES` مالٌ داخلٌ ثمنَ بيع — إيرادٌ لا مصروف.
  */
 export const NOT_AN_EXPENSE: readonly TxCategory[] = [
-  "SUPPLIER", "INTERNAL", "PERSONAL", "UNKNOWN",
+  "SUPPLIER", "INTERNAL", "PERSONAL", "UNKNOWN", "OTHER_SALES",
 ];
 
 export function isExpenseCategory(c: TxCategory): boolean {

@@ -167,6 +167,13 @@ export const NO_VAT_DEBIT_CATEGORIES: ReadonlySet<string> = new Set(["SALARY", "
 
 /** بابٌ لا ضريبةَ فيه غالباً — يُنبَّه عليه ولا يُمنع. */
 export function txCaution(tx: Pick<VatTx, "direction" | "category">): string | null {
+  /*
+    مبيعاتٌ خارج فودكس: لا تُضمّ من نفسها كسائر الوارد غير الشبكة (كما كان قبلها)، والسؤالُ
+    يُقال ولا يُحسم هنا — صدرت بها فاتورةٌ ضريبيّة أم لا يعرفه صاحبُها ومحاسبُه.
+  */
+  if (tx.direction === "CREDIT" && tx.category === "OTHER_SALES") {
+    return "مبيعات خارج فودكس: إن أصدرت بها فاتورة ضريبية فضريبتها مستحقة. احسبها، أو اسأل محاسبك";
+  }
   return tx.direction === "DEBIT" && NO_VAT_DEBIT_CATEGORIES.has(tx.category)
     ? "غالباً لا ضريبة في هذا البند. احسبها إن كان شراءً بفاتورة ضريبية"
     : null;

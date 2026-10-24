@@ -11,7 +11,7 @@ import { OPEX_SOURCE_LABEL } from "@/lib/finance/pnl";
 import { formatShare } from "@/lib/finance/format";
 import { formatDay, formatMoment, formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
-import { loadPnl, loadPurchaseInvoices } from "@/services/profit.service";
+import { loadPnl, loadPurchaseInvoices, visibleOpexRows } from "@/services/profit.service";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,8 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
   if (!q.month || !MONTH_RE.test(q.month)) redirect("/finance");
   const month = q.month;
   const [view, invoices] = await Promise.all([loadPnl(month), loadPurchaseInvoices(`${month}-01`, monthEndDay(month))]);
+  /* الرواتبُ سطراً واحداً لمن لا يملك `payroll:view` */
+  const opexShown = visibleOpexRows(view.opexRows, user.role);
   const p = view.pnl;
   const c = view.input.cogs;
   const th = "border-b border-line-strong px-2 py-1.5 text-start text-[11px] font-bold";
@@ -90,11 +92,11 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
 
       <section aria-label="المصروفات" className="mt-6">
         <h2 className="mb-2 text-sm font-bold">المصروفات التشغيلية بالتفصيل</h2>
-        {view.opexRows.length === 0 ? <p className="text-[12px] text-muted">لا توجد مصروفات مسجّلة لهذا الشهر.</p> : (
+        {opexShown.length === 0 ? <p className="text-[12px] text-muted">لا توجد مصروفات مسجّلة لهذا الشهر.</p> : (
           <table className="w-full border-collapse">
             <thead><tr><th className={th}>الوصف</th><th className={th}>التصنيف</th><th className={th}>المصدر</th><th className={`${th} text-end`}>المبلغ</th></tr></thead>
             <tbody>
-              {view.opexRows.filter((r) => r.category !== "POS_FEE" && r.category !== "BANK_FEE").map((r) => (
+              {opexShown.filter((r) => r.category !== "POS_FEE" && r.category !== "BANK_FEE").map((r) => (
                 <tr key={r.id}>
                   <td className={td}>{r.label}{r.occurredOn && <span className="ms-2 text-[10px] text-muted"><bdi>{formatDay(r.occurredOn)}</bdi></span>}</td>
                   <td className={td}>{CATEGORY_LABEL[r.category]}</td>

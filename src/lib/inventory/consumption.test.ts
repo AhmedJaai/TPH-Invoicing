@@ -132,7 +132,7 @@ describe("الملغى والمرتجع والمجانيّ — ثلاثة لا �
     expect(r.included.lines).toBe(0);
   });
 
-  it("والمرتجع ينقص الاستهلاك", () => {
+  it("المرتجَعُ المحضَّر استهلاكٌ وهدر: لا ينقص الاستهلاك، ويُعَدّ «مرتجعاً بعد التحضير»", () => {
     const r = computeConsumption(
       [
         sold({ quantityMilli: 10 * 1000 }),
@@ -141,9 +141,42 @@ describe("الملغى والمرتجع والمجانيّ — ثلاثة لا �
       versions,
     );
     const coffee = r.byIngredient.get(COFFEE)!;
-    /* ٨ مشروباتٍ صافية × ١٨ جراماً = ١٤٤ جراماً */
-    expect(canonicalToQuantity(coffee.canonicalMilli, "G")).toBe(144);
-    expect(coffee.fromRefundsMilli).toBe(-36_000);
+    /* عشرةٌ حُضّرت × ١٨ جراماً = ١٨٠ جراماً — المرتجعان صُنعا ثمّ هُدرا */
+    expect(canonicalToQuantity(coffee.canonicalMilli, "G")).toBe(180);
+    expect(coffee.fromRefundsMilli).toBe(0);
+    expect(coffee.fromReturnedWasteMilli).toBe(36_000);
+    expect(r.returnedAfterPrep).toEqual({ lines: 1, unitsMilli: 2000 });
+    /* ومبلغُ المرتجَع ما زال يُنقص المبيعات */
+    expect(r.included.totalMinor).toBe(0);
+  });
+
+  it("والجاهزُ (مكوّناتُه بالحبّة) يعود إلى الرفّ فينقص الاستهلاك كما كان", () => {
+    const WATER = "p-water";
+    const shelf = indexRecipeVersions([version({ ingredients: [{ productId: WATER, quantityMilli: 1000, unit: "PIECE", prepLossBp: null }] })]);
+    const r = computeConsumption(
+      [sold({ quantityMilli: 10 * 1000 }), sold({ quantityMilli: 2 * 1000, isRefund: true })],
+      shelf,
+    );
+    const water = r.byIngredient.get(WATER)!;
+    expect(canonicalToQuantity(water.canonicalMilli, "PIECE")).toBe(8);
+    expect(water.fromRefundsMilli).toBe(-2000);
+    expect(water.fromReturnedWasteMilli).toBe(0);
+    expect(r.returnedAfterPrep.lines).toBe(0);
+  });
+
+  it("وصنفٌ بلا وصفة يبقى خارج الحساب مرتجَعاً أو مباعاً — لا يُخترَع له هدر", () => {
+    const r = computeConsumption([sold({ menuProductId: AMERICANO, isRefund: true })], versions);
+    expect(r.excluded[0].reason).toBe("NO_RECIPE");
+    expect(r.returnedAfterPrep.lines).toBe(0);
+  });
+
+  it("وإعادةُ المزامنة لا تضاعف الهدر: يُحسَب من أسطر البيع ولا يُكتَب سطراً", () => {
+    /* المزامنةُ تُحدِّث السطرَ بمفتاحه الطبيعيّ — فالأسطرُ نفسُها تعطي الجوابَ نفسه */
+    const lines = [sold({ lineId: "a", quantityMilli: 3000 }), sold({ lineId: "b", quantityMilli: 1000, isRefund: true })];
+    const once = computeConsumption(lines, versions);
+    const twice = computeConsumption(lines.map((l) => ({ ...l })), versions);
+    expect(twice.byIngredient.get(COFFEE)).toEqual(once.byIngredient.get(COFFEE));
+    expect(twice.returnedAfterPrep).toEqual({ lines: 1, unitsMilli: 1000 });
   });
 
   it("والمجانيّ يستهلك ويعدّ على حدة — صنع فعلاً وخرجت مكوّناته", () => {

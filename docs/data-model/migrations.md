@@ -2,10 +2,10 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٩٢
+## الجداول — ٩٣
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
-`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
+`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` `month_seals` · `job_state` `daily_figures` `daily_checks`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`

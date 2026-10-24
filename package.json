@@ -67,7 +67,9 @@
     "finance:report": "tsx --env-file=.env scripts/finance-report.ts",
     "finance:reading-eval": "tsx --env-file=.env scripts/finance-reading-eval.ts",
     "docs:handbook": "tsx scripts/build-handbook.ts",
-    "ui:crawl": "tsx scripts/ui-crawl.ts"
+    "ui:crawl": "tsx scripts/ui-crawl.ts",
+    "backup:local": "tsx --env-file=.env scripts/backup-local.ts",
+    "backup:install": "sh scripts/backup-install.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

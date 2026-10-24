@@ -22,6 +22,7 @@ const TO_CATEGORY: Record<TxKind, TxCategory> = {
   GOVERNMENT: "GOVERNMENT",
   ZAKAT: "ZAKAT",
   EXPENSE: "OTHER",
+  OTHER_SALES: "OTHER_SALES",
   UNKNOWN: "UNKNOWN",
 };
 
@@ -65,6 +66,7 @@ const FROM_CATEGORY: Record<TxCategory, TxKind> = {
   POS_VAT: "POS_VAT",
   BANK_FEE: "BANK_FEE",
   BANK_VAT: "BANK_VAT",
+  OTHER_SALES: "OTHER_SALES",
 };
 
 export function fromCategory(category: TxCategory): TxKind {

@@ -10,7 +10,7 @@ vi.mock("@vercel/blob", () => ({
   list: (...a: unknown[]) => listMock(...a),
 }));
 
-import { discardStaged, largeUploadsEnabled, readStaged, StagedFileError, sweepStaleStaged } from "./blob-staging";
+import { blobAuthOptions, blobUploadMode, discardStaged, largeUploadsEnabled, readStaged, StagedFileError, sweepStaleStaged } from "./blob-staging";
 
 const OURS = "https://store1.private.blob.vercel-storage.com/staging/inv-x1.pdf";
 const streamOf = (...parts: Uint8Array[]) => new ReadableStream<Uint8Array>({
@@ -23,13 +23,51 @@ afterEach(() => vi.unstubAllEnvs());
 describe("بلا مفتاح المخزن", () => {
   it("الطريقُ مطفأ، والقراءةُ تُردّ، والحذفُ والكنسُ لا يلمسان شيئاً", async () => {
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    vi.stubEnv("BLOB_STORE_ID", "");
     expect(largeUploadsEnabled()).toBe(false);
+    expect(blobUploadMode()).toBeNull();
+    expect(blobAuthOptions()).toBeNull();
     await expect(readStaged(OURS)).rejects.toBeInstanceOf(StagedFileError);
     await discardStaged(OURS);
     expect(await sweepStaleStaged()).toBe(0);
     expect(getMock).not.toHaveBeenCalled();
     expect(delMock).not.toHaveBeenCalled();
     expect(listMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("بـOIDC: المخزنُ وحده بلا مفتاح", () => {
+  beforeEach(() => { vi.stubEnv("BLOB_READ_WRITE_TOKEN", ""); vi.stubEnv("BLOB_STORE_ID", "store_Store1"); });
+
+  it("مفعَّل، ويُمرَّر معرّفُ المخزن لا مفتاحٌ فارغ", async () => {
+    expect(largeUploadsEnabled()).toBe(true);
+    expect(blobUploadMode()).toBe("oidc");
+    getMock.mockResolvedValue({ statusCode: 200, stream: streamOf(new Uint8Array([1])), blob: { size: 1 } });
+    await readStaged(OURS);
+    const opts = getMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(opts.storeId).toBe("store_Store1");
+    expect("token" in opts).toBe(false);
+    await discardStaged(OURS);
+    expect(delMock.mock.calls[0][1]).toEqual({ storeId: "store_Store1" });
+  });
+
+  it("ورابطُ مخزنٍ آخر لا يُجلب", async () => {
+    await expect(readStaged("https://other.private.blob.vercel-storage.com/staging/x.pdf")).rejects.toBeInstanceOf(StagedFileError);
+    expect(getMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("المفتاحُ والمخزنُ معاً — المفتاحُ يغلب", () => {
+  beforeEach(() => { vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_store1_secret"); vi.stubEnv("BLOB_STORE_ID", "store_store1"); });
+
+  it("يقرأ بالمفتاح وحده", async () => {
+    expect(blobUploadMode()).toBe("token");
+    expect(blobAuthOptions()).toEqual({ token: "vercel_blob_rw_store1_secret" });
+    getMock.mockResolvedValue({ statusCode: 200, stream: streamOf(new Uint8Array([1])), blob: { size: 1 } });
+    await readStaged(OURS);
+    const opts = getMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(opts.token).toBe("vercel_blob_rw_store1_secret");
+    expect("storeId" in opts).toBe(false);
   });
 });
 

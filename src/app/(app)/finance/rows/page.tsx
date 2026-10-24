@@ -10,7 +10,7 @@ import { OPEX_SOURCE_LABEL } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay, formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { LINE, countNoun } from "@/lib/arabic";
-import { loadPnl, loadPurchaseInvoices, type ExpenseRowView, type PurchaseInvoiceRow } from "@/services/profit.service";
+import { loadPnl, loadPurchaseInvoices, visibleOpexRows, type ExpenseRowView, type PurchaseInvoiceRow } from "@/services/profit.service";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -56,10 +56,12 @@ export default async function FinanceRowsPage({ searchParams }: { searchParams: 
   const line: Line = LINES.find((l) => l === q.line) ?? "opex";
   const category = q.category && isTxCategory(q.category) ? q.category : null;
   const view = await loadPnl(month);
+  /* الرواتبُ سطراً واحداً لمن لا يملك `payroll:view` */
+  const opexShown = visibleOpexRows(view.opexRows, user.role);
   const back = <LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}><T s="قائمة دخل {0}" a={[formatMonth(month)]} /></LinkButton>;
 
   if (line === "opex" || line === "excluded") {
-    const rows = line === "opex" ? view.opexRows.filter((r) => category === null || r.category === category) : [];
+    const rows = line === "opex" ? opexShown.filter((r) => category === null || r.category === category) : [];
     const total = rows.reduce((s, r) => s + r.amountMinor, 0);
     return (
       <PageShell user={user} width="wide" title={category ? `${CATEGORY_LABEL[category]} — ${formatMonth(month)}` : `${TITLE[line]} — ${formatMonth(month)}`} actions={back}

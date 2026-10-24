@@ -25,6 +25,7 @@ export type TxKind =
   | "GOVERNMENT"
   | "ZAKAT"
   | "EXPENSE"
+  | "OTHER_SALES"        // ثمنُ بيعٍ وارد لم يمرّ بفودكس
   | "UNKNOWN";
 
 export const KIND_LABEL: Record<TxKind, string> = {
@@ -42,6 +43,7 @@ export const KIND_LABEL: Record<TxKind, string> = {
   GOVERNMENT: "حكومي · تأمينات · ضريبة",
   ZAKAT: "زكاة أو صدقة",
   EXPENSE: "مصروف",
+  OTHER_SALES: "مبيعات خارج فودكس",
   UNKNOWN: "غير معروفة",
 };
 

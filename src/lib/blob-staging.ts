@@ -3,23 +3,42 @@
  * السياسةُ (الحدّ · النوع · الرابط المقبول) في `blob-staging-policy.ts`.
  *
  * للخادم وحده — المفتاحُ `BLOB_READ_WRITE_TOKEN` لا يغادره.
+ *
+ * وطريقان للمصادقة (`blobAuthMode`): المفتاحُ إن وُجد، وإلّا OIDC بـ`BLOB_STORE_ID`.
+ * ويُمرَّر للحزمة ما يُعرف صراحةً — المفتاحُ أو معرّفُ المخزن — ولا `token: undefined` أبداً،
+ * فلا تختار الحزمةُ طريقاً لمخزنٍ آخر.
  */
 import { del, get, list } from "@vercel/blob";
 import {
-  isStagingUrl, MAX_STAGED_BYTES, STAGED_TTL_MS, STAGING_PREFIX, storeIdOf,
+  blobAuthMode, isStagingUrl, MAX_STAGED_BYTES, STAGED_TTL_MS, STAGING_PREFIX, storeIdFromEnv, type BlobAuthMode,
 } from "./blob-staging-policy";
 
-/** المفتاحُ صراحةً — لا يُترك للحزمة أن تختار طريقاً آخر (OIDC) لمخزنٍ آخر */
-const token = () => process.env.BLOB_READ_WRITE_TOKEN;
+/** طريقُ المصادقة اليوم — `null` لا مخزن */
+export function blobUploadMode(): BlobAuthMode | null {
+  return blobAuthMode(process.env);
+}
+
+/**
+ * خياراتُ المصادقة لكلّ نداء: `{ token }` بالمفتاح، أو `{ storeId }` بـOIDC (والرمزُ
+ * `VERCEL_OIDC_TOKEN` تقرؤه الحزمة من دالّة Vercel). ولا مخزن = `null`.
+ */
+export function blobAuthOptions(): { token: string } | { storeId: string } | null {
+  const mode = blobUploadMode();
+  if (mode === "token") return { token: (process.env.BLOB_READ_WRITE_TOKEN ?? "").trim() };
+  if (mode === "oidc") return { storeId: (process.env.BLOB_STORE_ID ?? "").trim() };
+  return null;
+}
 
 /** مخزنُ Blob موصول؟ وغيابُه يعني: لا طريقَ للملفّ الكبير، والشاشةُ تقول حدَّ اليوم */
 export function largeUploadsEnabled(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return blobUploadMode() !== null;
 }
 
-/** رابطٌ من محطّتنا نحن — بمعرّف المخزن من المفتاح */
+/** رابطٌ من محطّتنا نحن — بمعرّف المخزن من المفتاح أو من `BLOB_STORE_ID` */
 function isOurStagingUrl(url: string): boolean {
-  return isStagingUrl(url, storeIdOf(process.env.BLOB_READ_WRITE_TOKEN));
+  /* معرّفٌ لا يُقرأ = لا نعرف مخزننا، فلا يُجلب شيء — لا «أيُّ مخزنٍ» */
+  const store = storeIdFromEnv(process.env);
+  return store !== null && isStagingUrl(url, store);
 }
 
 /** سببُ تعذّر القراءة من المحطّة — يُقال لصاحب الملفّ بنصّه */
@@ -30,9 +49,10 @@ export class StagedFileError extends Error {}
  * ما ليس من محطّتنا لا يُجلب.
  */
 export async function readStaged(url: string): Promise<Buffer> {
-  if (!largeUploadsEnabled()) throw new StagedFileError("رفع الملفات الكبيرة غير مفعّل.");
+  const auth = blobAuthOptions();
+  if (!auth) throw new StagedFileError("رفع الملفات الكبيرة غير مفعّل.");
   if (!isOurStagingUrl(url)) throw new StagedFileError("رابط الملف المؤقت غير مقبول.");
-  const got = await get(url, { access: "private", useCache: false, token: token() }).catch(() => null);
+  const got = await get(url, { access: "private", useCache: false, ...auth }).catch(() => null);
   if (!got || got.statusCode !== 200 || !got.stream) {
     throw new StagedFileError("لم يعد الملف المؤقت موجوداً (يُحذف بعد يوم). أعد اختيار الملف من جهازك.");
   }
@@ -57,15 +77,17 @@ export async function readStaged(url: string): Promise<Buffer> {
 
 /** يحذف ملفّاً من المحطّة — وتعذُّرُ الحذف لا يُسقط ما قبله (الكنسُ يلتقطه) */
 export async function discardStaged(url: string | undefined): Promise<void> {
-  if (!url || !largeUploadsEnabled() || !isOurStagingUrl(url)) return;
-  await del(url, { token: token() }).catch(() => undefined);
+  const auth = blobAuthOptions();
+  if (!url || !auth || !isOurStagingUrl(url)) return;
+  await del(url, auth).catch(() => undefined);
 }
 
 /** المتروكُ في المحطّة أكثرَ من يوم يُحذف — بطاقةٌ لم تُؤرشف ولم تُزل */
 export async function sweepStaleStaged(now = Date.now()): Promise<number> {
-  if (!largeUploadsEnabled()) return 0;
-  const page = await list({ prefix: STAGING_PREFIX, limit: 200, token: token() });
+  const auth = blobAuthOptions();
+  if (!auth) return 0;
+  const page = await list({ prefix: STAGING_PREFIX, limit: 200, ...auth });
   const stale = page.blobs.filter((b) => now - new Date(b.uploadedAt).getTime() > STAGED_TTL_MS).map((b) => b.url);
-  if (stale.length > 0) await del(stale, { token: token() });
+  if (stale.length > 0) await del(stale, auth);
   return stale.length;
 }

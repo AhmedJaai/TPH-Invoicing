@@ -35,6 +35,7 @@ import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
+import { SupplierOwnerActions } from "@/components/supplier-owner-actions";
 import { SupplierPolicy } from "@/components/supplier-policy";
 import { SupplierEdit } from "@/components/supplier-edit";
 import { SUPPLIER_CATEGORY_LABEL, pastDueOf, whatsappHref } from "@/lib/supplier-edit";
@@ -87,14 +88,17 @@ export async function SupplierView({
   mode,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; merge?: string }>;
   mode: DetailMode;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/suppliers");
 
   const { slug } = await params;
-  const wantedTab = (await searchParams).tab;
+  const sp = await searchParams;
+  /* «ادمج» من تلميح التكرار يفتح إجراءات المالك في لسان بياناته ومعاينتها جاهزة */
+  const mergeTarget = sp.merge && /^[A-Za-z0-9_-]{1,64}$/.test(sp.merge) ? sp.merge : null;
+  const wantedTab = mergeTarget ? "profile" : sp.tab;
   const tab: Tab = TABS.find((t) => t.id === wantedTab)?.id ?? "invoices";
   const showAmounts = can(user.role, "amounts:view");
 
@@ -288,6 +292,18 @@ export async function SupplierView({
   const overAlert = s.balanceAlertMinor !== null && balance > s.balanceAlertMinor;
 
   const canAnalyze = can(user.role, "supplier:edit");
+  /* الدمجُ والحذف للمالك وحده — والمورّدون الباقون هدفاً، بلا المدموجين */
+  const canMerge = can(user.role, "supplier:merge");
+  const [mergeTargets, mergedInto] = await Promise.all([
+    canMerge && tab === "profile" && !s.mergedIntoId
+      ? db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)
+        .where(sql`${suppliers.id} <> ${s.id} and ${suppliers.mergedIntoId} is null and ${suppliers.isActive}`)
+        .orderBy(suppliers.nameAr)
+      : Promise.resolve([]),
+    s.mergedIntoId
+      ? db.select({ name: suppliers.nameAr, slug: suppliers.slug }).from(suppliers).where(eq(suppliers.id, s.mergedIntoId)).then((r) => r[0] ?? null)
+      : Promise.resolve(null),
+  ]);
   const canApprove = can(user.role, "payment:approve");
   const findings: FindingView[] = findingsRaw.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
@@ -384,7 +400,7 @@ export async function SupplierView({
             </Link>
           )}
           {s.paperInvoices && <Badge>فواتيره ورقية</Badge>}
-          {!s.isActive && <Badge tone="danger">معطّل</Badge>}
+          {mergedInto ? <Badge tone="danger"><T s="مدموج في «{0}»" a={[mergedInto.name]} /></Badge> : !s.isActive && <Badge tone="danger">معطّل</Badge>}
         </span>
       }
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
@@ -878,6 +894,15 @@ export async function SupplierView({
 
           {tab === "profile" && (
             <div className="space-y-4">
+              {canMerge && (
+                <SupplierOwnerActions
+                  supplierId={s.id}
+                  supplierName={s.nameAr}
+                  targets={mergeTargets}
+                  initialTargetId={mergeTarget && mergeTargets.some((t) => t.id === mergeTarget) ? mergeTarget : null}
+                  mergedInto={mergedInto}
+                />
+              )}
               {/* السياسةُ أوّلاً: هي وحدها في هذا اللسان ما **يُغيَّر**، وما تحتها عرضٌ وتقييم. */}
               <SupplierPolicy
                 supplierId={s.id}
@@ -895,8 +920,12 @@ export async function SupplierView({
                   <T s="المستحق له {0} والحد {1}. يمكنك رفع الحد أو حذفه من «عدّل بياناته» أدناه." a={[<Money key="0" minor={balance} />, <Money key="1" minor={s.balanceAlertMinor} />]} /></Callout>
               )}
               {showAmounts && pastDue && pastDue.count > 0 && (
-                <Callout tone="warn" title={`${countNoun(pastDue.count, INVOICE)} تجاوزت موعد سدادها`}>
-                  <T s="المتبقي عليها {0}، وأقدمها تأخر عن استحقاقه {1}، بحسب أجل السداد المسجّل لهذا المورّد ({2})." a={[<Money key="0" minor={pastDue.totalMinor} />, countNoun(pastDue.oldestDays, DAY), s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)]} /></Callout>
+                /*
+                  للعلم لا للتنبيه (أحمد، ٢٤ أكتوبر ٢٠٢٦): المورّدون يُسدَّدون آخرَ كلّ شهر في دفعة الشهر،
+                  فأجلُ المورّد لا يصنع «متأخّراً» في «يحتاج قرارك» ولا في مجموع الدفعة — هنا وحده.
+                */
+                <Callout tone="info" title={`للعلم: ${countNoun(pastDue.count, INVOICE)} تجاوزت أجل هذا المورّد`}>
+                  <T s="المتبقي عليها {0}، وأقدمها تجاوز الأجل المسجّل ({2}) بـ{1}. أنت تسدّد المورّدين آخر كل شهر، فهذا للعلم فقط ولا يدخل في دفعة آخر الشهر ولا في «يحتاج قرارك»." a={[<Money key="0" minor={pastDue.totalMinor} />, countNoun(pastDue.oldestDays, DAY), s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)]} /></Callout>
               )}
 
               <Card>

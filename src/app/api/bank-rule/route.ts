@@ -22,7 +22,7 @@ export const runtime = "nodejs";
 
 const CATEGORIES: readonly TxCategory[] = [
   "SUPPLIER", "SALARY", "RENT", "ZAKAT", "UTILITY",
-  "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
+  "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER", "OTHER_SALES",
 ];
 
 const Body = z.object({

@@ -35,7 +35,9 @@ import { previousMonth, stockWindow, type StockWindow } from "@/lib/finance/stoc
 import { addDays, currentMonthRiyadh, daysBetween, daysInMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { recordAudit } from "@/lib/audit";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { INVOICE, ITEM, TRANSACTION, countNoun } from "@/lib/arabic";
+import { collapseSalaryRows, HIDDEN_SALARY_LABEL } from "@/lib/payroll/visibility";
+import type { Role } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { catalogCosts, latestInvoiceUnitCosts, loadSoldForReport, loadWaste } from "./inventory.service";
 import { loadRecipeVersions } from "./recipe.service";
@@ -223,7 +225,7 @@ export async function loadRates(asOf: string, baseUnitOf: ReadonlyMap<string, St
   return out;
 }
 
-interface DayCost { minor: number; staffMinor: number; unpricedMilli: number }
+interface DayCost { minor: number; staffMinor: number; returnedMinor: number; unpricedMilli: number }
 
 function dailyTheoretical(
   lines: readonly SoldLineInput[],
@@ -239,7 +241,7 @@ function dailyTheoretical(
   const out = new Map<string, DayCost>();
   for (const [day, dayLines] of byDay) {
     const used = computeConsumption(dayLines, versions);
-    const acc: DayCost = { minor: 0, staffMinor: 0, unpricedMilli: 0 };
+    const acc: DayCost = { minor: 0, staffMinor: 0, returnedMinor: 0, unpricedMilli: 0 };
     for (const ing of used.byIngredient.values()) {
       const base = baseUnitOf.get(ing.productId);
       const rate = rates.get(ing.productId) ?? null;
@@ -248,6 +250,7 @@ function dailyTheoretical(
       if (cost === null) { acc.unpricedMilli += ing.canonicalMilli; continue; }
       acc.minor += cost;
       acc.staffMinor += varianceCostMinor(ing.fromComplimentaryMilli, rate, base) ?? 0;
+      acc.returnedMinor += varianceCostMinor(ing.fromReturnedWasteMilli, rate, base) ?? 0;
     }
     out.set(day, acc);
   }
@@ -378,6 +381,17 @@ export interface ExpenseRowView extends OpexRow {
   occurredOn: string | null;
   bankTransactionId: string | null;
   declarationId: string | null;
+}
+
+/**
+ * تفصيلُ المصروفات كما يراه هذا الدور: الرواتبُ سطراً واحداً بمجموعها لمن لا يملك
+ * `payroll:view` (`lib/payroll/visibility.ts`) — ولا يتغيّر المجموع.
+ */
+export function visibleOpexRows(rows: readonly ExpenseRowView[], role: Role | null | undefined): ExpenseRowView[] {
+  return collapseSalaryRows(rows, role, (totalMinor, count) => ({
+    id: "salary-hidden", category: "SALARY", label: `${HIDDEN_SALARY_LABEL} — ${countNoun(count, ITEM)}`,
+    amountMinor: totalMinor, source: "BANK", occurredOn: null, bankTransactionId: null, declarationId: null,
+  }));
 }
 
 async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
@@ -538,7 +552,7 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
   const to = window.to > monthEnd ? window.to : monthEnd;
 
   const rates = await loadRates(monthEnd < today ? monthEnd : today, shared.basics.baseUnitOf, conn);
-  const [soldLines, purchases, waste, coverage, opexData, foodics] = await Promise.all([
+  const [soldLines, purchases, waste, coverage, opexData, foodics, otherSales] = await Promise.all([
     loadSoldForReport(from, to, shared.rawVersions, conn),
     loadPurchaseDays(from, to, conn),
     loadWaste(monthStart, monthEnd, null, conn),
@@ -548,6 +562,13 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
       select (select sum(case when kind = 9 then -cost_micro when kind = 8 then cost_micro else 0 end)
                 from foodics_item_moves where business_date >= ${monthStart} and business_date <= ${monthEnd})::text as cost,
              (select count(*) from foodics_move_days where business_date >= ${monthStart} and business_date <= ${monthEnd})::int as days
+    `),
+    /* مبيعاتٌ خارج فودكس: حوالاتٌ واردة صُنّفت بيعاً، بشهرها بتوقيت الرياض */
+    conn.execute<{ gross: string | null; n: number }>(sql`
+      select coalesce(sum(amount_minor), 0)::bigint::text as gross, count(*)::int as n
+        from bank_transactions
+       where category = 'OTHER_SALES' and direction = 'CREDIT'
+         and to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}
     `),
   ]);
   const theoretical = dailyTheoretical(soldLines, shared.versions, rates, shared.basics.baseUnitOf);
@@ -569,6 +590,7 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
   const input: PnlInput = {
     month, open,
     revenue: revenue ? { paidMinor: revenue.paidMinor, vatMinor: revenue.vatMinor, coveredDays: covered, expectedDays: expected } : null,
+    otherSales: { grossMinor: Number(otherSales.rows[0]?.gross ?? 0), count: Number(otherSales.rows[0]?.n ?? 0) },
     cogs: {
       purchasesMinor: inMonth.reduce((s, p) => s + p.netMinor, 0),
       purchasesInvoices: inMonth.reduce((s, p) => s + p.invoices, 0),
@@ -580,6 +602,7 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
         ? Math.round(Number(foodics.rows[0].cost) / 1000) : null,
       wasteMinor,
       staffMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.staffMinor) : null,
+      returnedMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.returnedMinor) : null,
     },
     opex: opexData.opex, excluded: opexData.excluded, declaredNone: opexData.declaredNone,
     bankGapDays: coverage[0]?.gapDays ?? null,

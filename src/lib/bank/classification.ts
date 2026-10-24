@@ -187,6 +187,8 @@ export function classify(
   for (const identity of identities) {
     const known = memory.get(identity.key);
     if (!known) continue;
+    /* ثمنُ البيع واردٌ وحده — حوالةٌ صادرة إلى من يشتري منّا (ردُّ مبلغ) لا تُصنَّف مبيعاً */
+    if (known.kind === "OTHER_SALES" && tx.direction !== "CREDIT") continue;
     return {
       kind: known.kind,
       layer: "LEARNED",

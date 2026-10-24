@@ -65,3 +65,6 @@ docs/handbook/handbook.html
 
 # اختبارُ الطفرات — مجلّدُه المؤقّت (التقاريرُ في reports/)
 .stryker-tmp/
+
+# نسخُ العمل المؤقّتة للوكلاء
+.claude/worktrees/

@@ -4,7 +4,7 @@ import { SectionBoundary } from "@/components/ui-client";
 import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, FileWarning, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
+import { Clock, FileWarning, GitMerge, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -20,6 +20,8 @@ import { loadInvoiceRequestMarks, loadUnbackedPayments } from "@/services/suppli
 import { RequestInvoiceLink } from "@/components/request-invoice-link";
 import { loadBalanceTotals, loadOpenInvoiceAges, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadSupplierDirectory } from "@/services/supplier-intel.service";
+import { loadDuplicateHints } from "@/services/supplier-merge.service";
+import { DUPLICATE_REASON_LABEL } from "@/lib/supplier-merge";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatDay } from "@/lib/riyadh-time";
@@ -70,13 +72,15 @@ export default async function SuppliersPage({
   const unbackedView = params.unbacked === "1";
   const wanted = VIEWS.find((v) => v === params.view) ?? "all";
 
-  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory] = await Promise.all([
+  const canMerge = can(user.role, "supplier:merge");
+  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory, dupHints] = await Promise.all([
     loadBalanceTotals(),
     showAmounts ? loadOverdueBalances() : Promise.resolve([]),
     loadOpenInvoiceAges(),
     showAmounts ? loadUnbackedPayments() : Promise.resolve([]),
     showAmounts ? listOpenFindings() : Promise.resolve([]),
     loadSupplierDirectory(),
+    canMerge ? loadDuplicateHints() : Promise.resolve([]),
   ]);
 
   if (directory.length === 0) {
@@ -415,6 +419,24 @@ export default async function SuppliersPage({
               <p className={needContract.length > 0 ? "mt-1" : ""}>
                 <T s="{0}: فاتورته في يدك، وكل المطلوب أن تصوّرها وترفعها: {1}." a={[<span key="0" className="font-bold text-ink"><T s="{0} فواتيره ورقية" a={[countNoun(paperOnly.length, SUPPLIER)]} /></span>, paperOnly.map((r) => r.nameAr).join(" · ")]} /></p>
             )}
+          </Callout>
+        )}
+
+        {/* تلميحٌ للقراءة لا دمج: الاسمُ ليس هويّة، والدمجُ معاينةٌ ثمّ تأكيدٌ من صفحة المورّد */}
+        {canMerge && view === "all" && dupHints.length > 0 && (
+          <Callout tone="info" icon={GitMerge} className="mb-3" title={`مورّدون قد يكونون واحداً: ${dupHints.length}`}>
+            <p>للعلم فقط، ولا يُدمج شيء من نفسه. «ادمج» يفتح معاينة ما سينتقل قبل أن تؤكد.</p>
+            <ul className="mt-2 space-y-1">
+              {dupHints.map((h) => (
+                <li key={`${h.a.id}|${h.b.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Link href={`/suppliers/${h.a.slug}`} className="font-bold hover:underline">{h.a.nameAr}</Link>
+                  <span className="text-muted">و</span>
+                  <Link href={`/suppliers/${h.b.slug}`} className="font-bold hover:underline">{h.b.nameAr}</Link>
+                  <span className="text-[11px] text-muted">({DUPLICATE_REASON_LABEL[h.reason]})</span>
+                  <Link href={`/suppliers/${h.a.slug}?merge=${h.b.id}#owner-actions`} className="text-[12px] font-bold text-accent hover:underline">ادمج</Link>
+                </li>
+              ))}
+            </ul>
           </Callout>
         )}
 

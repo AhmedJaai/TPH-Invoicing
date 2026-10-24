@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
+import { seesSalaries } from "@/lib/payroll/visibility";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Badge, DataTable, EmptyState, LinkButton, LinkTabs, NoAccess, Section, buttonClass } from "@/components/ui";
@@ -80,7 +81,7 @@ export default async function BankPage({
   const [coverage, queue, ledger, doublePaid, handLinks, held] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
-    loadLedger(view, month, search),
+    loadLedger(view, month, search, !seesSalaries(user.role)),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
     loadOpenHeldRows(),
@@ -245,6 +246,10 @@ export default async function BankPage({
               </p>
             )}
 
+            {ledger.hiddenSalary > 0 && (
+              <p className="mb-3 text-xs text-muted" role="note">
+                <T s="{0} محجوبة هنا: الرواتب للمالك وحده، ومجموعها في قائمة الدخل." a={[countNoun(ledger.hiddenSalary, TRANSACTION) + " رواتب"]} /></p>
+            )}
             <DataTable
               rows={ledger.rows}
               keyOf={(t) => t.id}

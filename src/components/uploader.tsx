@@ -690,9 +690,12 @@ export function Uploader({
   suppliers: initialSuppliers = [],
   team = [],
   largeUploads = false,
+  presignedUploads = false,
 }: {
   /** مخزنُ الملفّات الكبيرة موصول — ما فوق ٣ ميجابايت يُرفع إلى المحطّة المؤقّتة لا يُردّ */
   largeUploads?: boolean;
+  /** المخزنُ بـOIDC لا بمفتاح — الرفعُ برابطٍ موقَّع (`uploadPresigned`) واسمٍ فريد */
+  presignedUploads?: boolean;
   canSeeAmounts?: boolean;
   canCreateSupplier?: boolean;
   suppliers?: SupplierOption[];
@@ -816,8 +819,9 @@ export function Uploader({
       let r: Awaited<ReturnType<typeof request<AnalysisResponse>>>;
       if (staged) {
         try {
-          const { upload } = await import("@vercel/blob/client");
-          const put = await upload(stagingPathname(file.name), file, {
+          const { upload, uploadPresigned } = await import("@vercel/blob/client");
+          /* الرابطُ الموقَّع لاسمٍ بعينه — فاللاحقةُ الفريدة من هنا لا من الخادم */
+          const put = await (presignedUploads ? uploadPresigned : upload)(stagingPathname(file.name, presignedUploads ? crypto.randomUUID().slice(0, 8) : undefined), file, {
             access: "private",
             handleUploadUrl: "/api/upload/blob",
             ...(file.type ? { contentType: file.type, clientPayload: JSON.stringify({ contentType: file.type }) } : {}),
@@ -862,7 +866,7 @@ export function Uploader({
     } catch (e) {
       setItems((prev) => prev.map((it) => (it.id === id ? failed((e as Error).message) : it)));
     }
-  }, [largeUploads]);
+  }, [largeUploads, presignedUploads]);
 
   /*
     ── طابورُ القراءة ──

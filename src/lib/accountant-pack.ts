@@ -14,6 +14,8 @@
  */
 import { formatRiyals } from "./money";
 import { METHOD_LABEL, paymentStatusLabel } from "./payment-state";
+import type { Role } from "./permissions";
+import { HIDDEN_SALARY_LABEL, SALARY_CATEGORY, withoutSalaryRows } from "./payroll/visibility";
 import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
 import { TAX_STATUS_LABEL, type InputVatStatus, type TaxStatus } from "./validation";
 
@@ -67,6 +69,25 @@ export interface PackInput {
   payments: PackPayment[];
   expenses: PackExpense[];
   bank: PackBankRow[];
+}
+
+/**
+ * الرواتبُ لمن يملك `payroll:view` وحده (`lib/payroll/visibility.ts`): لغيره تصير حوالاتُ
+ * باب «راتب أو أجر» ومصروفاتُه **سطراً واحداً بمجموعها** في كلّ ورقة — فتتوازن الحزمة
+ * ويُقيَّد مصروفُ الرواتب، ولا يخرج من النظام اسمُ موظّفٍ ولا راتبُه.
+ */
+export function redactPackSalaries(p: PackInput, role: Role | null | undefined): PackInput {
+  const bank = withoutSalaryRows(p.bank, role, (b) => (b.direction === "DEBIT" ? b.amountMinor : -b.amountMinor));
+  const expenses = withoutSalaryRows(p.expenses, role, (e) => e.amountMinor);
+  return {
+    ...p,
+    bank: bank.hidden.count === 0 ? bank.rows : [...bank.rows, {
+      date: p.month, description: HIDDEN_SALARY_LABEL, direction: "DEBIT", amountMinor: bank.hidden.totalMinor, category: SALARY_CATEGORY, matched: false,
+    }],
+    expenses: expenses.hidden.count === 0 ? expenses.rows : [...expenses.rows, {
+      date: p.month, category: SALARY_CATEGORY, label: HIDDEN_SALARY_LABEL, amountMinor: expenses.hidden.totalMinor, source: "—",
+    }],
+  };
 }
 
 /** خليّةٌ مكتوبة: نصٌّ، أو مبلغٌ بالريال (يُكتب عدداً بتنسيق المال)، أو فراغٌ معلَن. */

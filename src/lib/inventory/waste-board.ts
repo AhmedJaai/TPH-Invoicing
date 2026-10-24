@@ -24,6 +24,21 @@ export const WASTE_REASON_LABEL: Record<WasteReason, string> = {
   OTHER: "سبب آخر",
 };
 
+/**
+ * أسبابُ اللوحة: أسبابُ السجلّ، ومعها «مرتجع بعد التحضير» — **محسوبٌ** من أسطر البيع
+ * المرتجَعة لصنفٍ محضَّر (`consumption.ts`)، لا سطرٌ في `waste_records`. فلا يُبطَل
+ * ولا يتكرّر بإعادة المزامنة: يتبع أسطرَ البيع.
+ */
+export type BoardReason = WasteReason | "RETURNED_AFTER_PREP";
+
+export const BOARD_REASON_LABEL: Record<BoardReason, string> = {
+  ...WASTE_REASON_LABEL,
+  RETURNED_AFTER_PREP: "مرتجع بعد التحضير",
+};
+
+/** مكوّنُ مرتجعٍ بعد التحضير — بلا سبب، فسببُه واحد. */
+export type ReturnedIngredient = Omit<WasteEntry, "reason">;
+
 export interface WasteEntry {
   productId: string;
   productName: string;
@@ -45,7 +60,9 @@ export interface WasteBoard {
   knownCostMinor: number;
   /** سجلّاتٌ لا سعرَ لصنفها — خارج المجموع، معدودةٌ بجانبه. */
   unknownCount: number;
-  byReason: { reason: WasteReason; count: number; costMinor: number; unknownCount: number }[];
+  byReason: { reason: BoardReason; count: number; costMinor: number; unknownCount: number }[];
+  /** المرتجعُ بعد التحضير: كم مشروباً (بالمِلّي) — يُعَدّ بعدد المشروبات لا المكوّنات. */
+  returnedAfterPrep: { lines: number; unitsMilli: number; costMinor: number; unknownCount: number };
   topProducts: { productId: string; productName: string; count: number; costMinor: number }[];
   /** أصنافٌ «انتهت صلاحيّتُها» أكثر من مرّة في النافذة. */
   repeatedExpiry: { productId: string; productName: string; count: number }[];
@@ -60,8 +77,12 @@ export function entryCostMinor(e: WasteEntry, rate: WasteRate | undefined): numb
   return varianceCostMinor(toCanonical(e.quantityMilli, e.unit), rate.rateMilliMinor, rate.baseUnit);
 }
 
-export function buildWasteBoard(entries: readonly WasteEntry[], rates: ReadonlyMap<string, WasteRate>): WasteBoard {
-  const reasons = new Map<WasteReason, { count: number; costMinor: number; unknownCount: number }>();
+export function buildWasteBoard(
+  entries: readonly WasteEntry[],
+  rates: ReadonlyMap<string, WasteRate>,
+  returned: { lines: number; unitsMilli: number; ingredients: readonly ReturnedIngredient[] } = { lines: 0, unitsMilli: 0, ingredients: [] },
+): WasteBoard {
+  const reasons = new Map<BoardReason, { count: number; costMinor: number; unknownCount: number }>();
   const products = new Map<string, { productName: string; count: number; costMinor: number }>();
   const expiry = new Map<string, { productName: string; count: number }>();
   let known = 0;
@@ -87,8 +108,27 @@ export function buildWasteBoard(entries: readonly WasteEntry[], rates: ReadonlyM
     }
   }
 
+  /* المرتجعُ بعد التحضير سطرٌ واحد في الأسباب، يُعَدّ بمشروباته؛ وكلفتُه من مكوّناته */
+  let retCost = 0;
+  let retUnknown = 0;
+  for (const i of returned.ingredients) {
+    const cost = entryCostMinor({ ...i, reason: "OTHER" }, rates.get(i.productId));
+    if (cost === null) { retUnknown++; continue; }
+    retCost += cost;
+    known += cost;
+    const p = products.get(i.productId) ?? { productName: i.productName, count: 0, costMinor: 0 };
+    p.count++;
+    p.costMinor += cost;
+    products.set(i.productId, p);
+  }
+  unknown += retUnknown;
+  if (returned.lines > 0) {
+    reasons.set("RETURNED_AFTER_PREP", { count: returned.lines, costMinor: retCost, unknownCount: retUnknown });
+  }
+
   return {
     recordCount: entries.length,
+    returnedAfterPrep: { lines: returned.lines, unitsMilli: returned.unitsMilli, costMinor: retCost, unknownCount: retUnknown },
     knownCostMinor: known,
     unknownCount: unknown,
     byReason: [...reasons].map(([reason, v]) => ({ reason, ...v }))

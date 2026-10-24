@@ -15,7 +15,9 @@ import { distinctiveTokens } from "./match";
 export type TxCategory =
   | "SUPPLIER" | "SALARY" | "RENT" | "ZAKAT" | "UTILITY"
   | "GOVERNMENT" | "PERSONAL" | "INTERNAL" | "OTHER" | "UNKNOWN"
-  | "POS_SETTLEMENT" | "POS_FEE" | "POS_VAT" | "BANK_FEE" | "BANK_VAT";
+  | "POS_SETTLEMENT" | "POS_FEE" | "POS_VAT" | "BANK_FEE" | "BANK_VAT"
+  /** حوالةٌ واردة ثمنَ بيعٍ لم يمرّ بفودكس (أحمد، ٢٤ أكتوبر ٢٠٢٦: «سبعة جرة» يشتري منّا) */
+  | "OTHER_SALES";
 
 export const CATEGORY_LABEL: Record<TxCategory, string> = {
   SUPPLIER: "سداد مورّد",
@@ -33,6 +35,7 @@ export const CATEGORY_LABEL: Record<TxCategory, string> = {
   POS_VAT: "ضريبة رسوم الشبكة",
   BANK_FEE: "رسوم بنكية",
   BANK_VAT: "ضريبة رسوم البنك",
+  OTHER_SALES: "مبيعات خارج فودكس",
 };
 
 /** نصُّ الباب من القاعدة — يُفحص ولا يُفرَض بـ`as`؛ وما ليس باباً معروفاً «غير مصنَّفة». */

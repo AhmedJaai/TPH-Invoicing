@@ -7,6 +7,7 @@ import {
 import { db } from "@/db";
 import { expenses, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
+import { isSalaryRow, seesSalaries } from "@/lib/payroll/visibility";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
@@ -136,17 +137,26 @@ export default async function ExpensesPage({
     recurringExpenseId: r.recurringExpenseId,
   });
 
-  const actual = rows.map(toExpense);
-  const duplicates = findDuplicateExpenses(recent.map(toExpense));
-  const variance = expectedVsActual(recurring, actual, month);
+  /*
+    الرواتبُ للمالك وحده (`lib/payroll/visibility.ts`): لغيره يبقى بابُ الرواتب مجموعاً في
+    الأبواب والمجموع، ولا يُعرض قيدٌ منه ولا مصروفٌ متكرّر باسم موظّف.
+  */
+  const hideSalaries = !seesSalaries(user.role);
+  const visible = <T extends { category: string }>(xs: readonly T[]): T[] => (hideSalaries ? xs.filter((x) => !isSalaryRow(x)) : [...xs]);
+  const allActual = rows.map(toExpense);
+  const actual = visible(allActual);
+  const shownRecurring = visible(recurring);
+  const duplicates = findDuplicateExpenses(visible(recent.map(toExpense)));
+  const variance = expectedVsActual(shownRecurring, actual, month);
   const suspects = suspectedSupplierExpenses(actual, supplierRows.map((s) => s.nameAr));
-  const unmet = unmetRecurring(recurring, actual, month);
-  const actualTotal = totalActual(actual, month);
+  const unmet = unmetRecurring(shownRecurring, actual, month);
+  const actualTotal = totalActual(allActual, month);
   const expectedTotal = totalExpected(recurring);
+  const hiddenSalaryRows = allActual.length - actual.length;
 
   /* الأبوابُ في الشهر — من القيود نفسها التي تحتها، لا من استعلامٍ ثانٍ */
   const byCategory = new Map<string, { label: string; minor: number; n: number }>();
-  for (const e of actual) {
+  for (const e of allActual) {
     const b = byCategory.get(e.category) ?? { label: CATEGORY_LABEL[e.category] ?? e.category, minor: 0, n: 0 };
     b.minor += e.amountMinor;
     b.n++;
@@ -345,6 +355,10 @@ export default async function ExpensesPage({
 
         {/* ── القيود ── */}
         <Section title="القيود" icon={ListChecks} className="mt-0!" count={actual.length || undefined}>
+          {hiddenSalaryRows > 0 && (
+            <p className="mb-3 text-xs text-muted" role="note">
+              <T s="{0} من باب الرواتب محجوبة هنا: الرواتب للمالك وحده، ومجموعها في الأبواب أعلاه." a={[countNoun(hiddenSalaryRows, ITEM)]} /></p>
+          )}
           <DataTable
             rows={actual}
             keyOf={(e) => e.id}

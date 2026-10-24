@@ -116,6 +116,7 @@ const KINDS: { value: string; label: string }[] = [
   { value: "PERSONAL", label: "تحويل شخصي" },
   { value: "INTERNAL", label: "تحويل داخلي" },
   { value: "BANK_FEE", label: "رسوم بنكية" },
+  { value: "OTHER_SALES", label: "مبيعات خارج فودكس (حوالة واردة)" },
   { value: "OTHER", label: "أخرى" },
 ];
 
