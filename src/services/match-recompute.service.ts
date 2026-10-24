@@ -10,9 +10,11 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, invoices, supplierAliases, suppliers } from "@/db/schema";
-import { runReconciliation, type ReconcileResult } from "@/services/reconcile.service";
+import { candidateKey, runReconciliation, type ReconcileResult } from "@/services/reconcile.service";
+import { Conflict, NotFound } from "@/lib/domain-error";
+import type { Conn } from "./types";
 
-export { candidateKey, pickCandidate } from "@/services/reconcile.service";
+export { pickCandidate } from "@/services/reconcile.service";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import type { SupplierIdentity } from "@/lib/bank/entities";
@@ -27,7 +29,7 @@ export interface Recomputed {
 }
 
 /** كم مرشّحاً يُعرَض ليُختار بينهم — وما بعدها ضجيج. */
-export const MAX_SHOWN_CANDIDATES = 3;
+const MAX_SHOWN_CANDIDATES = 3;
 
 /**
  * الفواتيرُ التي بقي عليها شيء — تُصفّى في القاعدة لا بعد جلبها.
@@ -119,4 +121,62 @@ export async function recomputeMatches(
   });
 
   return { engine, invoiceById: new Map(open.map((i) => [i.id, i])) };
+}
+
+/**
+ * مرشّحو حركةٍ واحدة — ليُختار بينهم (`/api/match-candidates`).
+ *
+ * «مرشّحان متقاربان» كانت تُعرَض بسببها وحده: لا الفاتورتان جنباً إلى جنب
+ * ولا وسيلةَ لاختيار إحداهما. والمرشّحون لا يُحفَظون مع الحركة عمداً —
+ * ما حُسب لحظةَ الاستيراد قد سُدّدت فاتورتُه بعده — فيُحسَبون هنا **الآن**
+ * على الفواتير كما هي، وهي القائمةُ نفسها التي يتحقّق منها الإقرار.
+ *
+ * قراءةٌ لا تكتب شيئاً.
+ */
+export async function matchCandidates(transactionId: string, conn: Conn = db) {
+  const [tx] = await conn
+    .select()
+    .from(bankTransactions)
+    .where(eq(bankTransactions.id, transactionId));
+  if (!tx) throw new NotFound("هذه الحركة غير موجودة");
+  if (tx.matchedPaymentId) throw new Conflict("سُجّل لهذه الحركة سداد من قبل");
+
+  const { engine, invoiceById } = await recomputeMatches([tx]);
+  const result = engine.results.find((r) => r.key === tx.id);
+  const settled = result?.candidate ? candidateKey(result.candidate.invoiceIds) : null;
+  const top = (engine.candidatesByKey.get(tx.id) ?? []).slice(0, MAX_SHOWN_CANDIDATES);
+
+  return {
+    ok: true as const,
+    transactionId: tx.id,
+    amountMinor: tx.amountMinor,
+    supplierId: result?.supplierId ?? null,
+    candidates: top.map((c) => ({
+      key: candidateKey(c.invoiceIds),
+      invoiceIds: c.invoiceIds,
+      /* ما رسا عليه المحرّك — يُعلَّم ولا يُفرَض */
+      recommended: candidateKey(c.invoiceIds) === settled,
+      outcome: c.outcome,
+      score: Math.round(c.score * 100),
+      /* الأبعادُ الأربعة من مئة — المرجعُ `null` حين لا يُقاس، لا صفراً */
+      parts: {
+        supplier: Math.round(c.parts.supplier * 100),
+        amount: Math.round(c.parts.amount * 100),
+        date: Math.round(c.parts.date * 100),
+        reference: c.parts.reference > 0 ? Math.round(c.parts.reference * 100) : null,
+      },
+      allocatedMinor: c.allocatedMinor,
+      evidence: c.evidence,
+      invoices: c.invoiceIds.map((id) => {
+        const inv = invoiceById.get(id);
+        return {
+          id,
+          number: inv?.invoiceNumber ?? null,
+          date: inv ? inv.invoiceDate.toISOString() : null,
+          totalMinor: inv?.totalMinor ?? null,
+          outstandingMinor: inv?.outstandingMinor ?? null,
+        };
+      }),
+    })),
+  };
 }

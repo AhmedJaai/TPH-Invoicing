@@ -24,8 +24,22 @@ export async function guard(route: string, capability: Capability): Promise<Curr
   return user;
 }
 
+/**
+ * عطبٌ في موضعٍ كان المسارُ يختمه بـ`failWith` — تحمله الخدمةُ إلى بابها بسببه
+ * واسمِ مسارِه، فيُقال كما كان: رسالتُنا بنصّها (400)، وعطبُ الخادم برقم مرجع (500).
+ *
+ * لا يُرمى إلّا حيث كان `failWith` بعينه، فلا يتّسع ختمُه لما كان يُرمى خامّاً.
+ */
+export class FailWithError extends Error {
+  constructor(readonly failure: unknown, readonly route: string) {
+    super("failWith", { cause: failure });
+    this.name = "FailWithError";
+  }
+}
+
 /** يترجم أخطاء الحراسة المشتركة إلى ردّ، أو `null` إن لم يكن الخطأ منها. */
 export function respondTo(e: unknown): NextResponse | null {
+  if (e instanceof FailWithError) return failWith(e.failure, e.route);
   if (e instanceof UnauthenticatedError) {
     return NextResponse.json({ error: e.message }, { status: 401 });
   }

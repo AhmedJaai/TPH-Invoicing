@@ -9,7 +9,7 @@ vi.mock("./rate-limit.service", () => ({
   RateLimitedError: class RateLimitedError extends Error { retryAfterSeconds = 1; },
 }));
 
-import { answer, failWith, respondTo } from "./guard";
+import { FailWithError, answer, failWith, respondTo } from "./guard";
 import { ForbiddenError } from "@/lib/permissions";
 import { Conflict, DomainError, NotFound, Refused, Unreadable } from "@/lib/domain-error";
 import { MonthClosedError } from "./validation.service";
@@ -114,5 +114,18 @@ describe("answer", () => {
   it("وما لا يُعرَف يُرمى كما كان — لا يُبدَّل برسالة", async () => {
     const boom = new Error("connection reset");
     await expect(answer(async () => { throw boom; })).rejects.toBe(boom);
+  });
+});
+
+describe("FailWithError: ختمُ failWith حيث كان بعينه", () => {
+  it("رسالتُنا بنصّها ٤٠٠، وعطبُ الخادم ٥٠٠ برقم مرجع — كما كان المسار يختم", async () => {
+    const own = respondTo(new FailWithError(new Error("لا يمكن فك هذه الدفعة"), "match-undo"))!;
+    expect(own.status).toBe(400);
+    expect(await own.json()).toEqual({ error: "لا يمكن فك هذه الدفعة" });
+
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const raw = respondTo(new FailWithError(new Error("connection reset"), "match-undo"))!;
+    expect(raw.status).toBe(500);
+    expect((await raw.json()).ref).toMatch(/^[0-9a-f]{8}$/);
   });
 });
