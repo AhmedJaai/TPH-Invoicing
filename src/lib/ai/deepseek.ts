@@ -28,6 +28,7 @@ import {
 } from "./models";
 import { aiBudgetVerdict, recordAiUsage } from "@/services/ai-usage.service";
 import { createRedactor } from "./redact";
+import { parseBalanceReply, type AiBalance } from "./balance";
 
 export type DeepseekFailureKind =
   | "NOT_CONFIGURED"
@@ -451,4 +452,27 @@ export async function mapWithConcurrency<T, R>(
 
   await Promise.all(workers);
   return results;
+}
+
+/**
+ * رصيدُ الحساب عند المزوّد (`GET /user/balance`) — بالمفتاح نفسه، وتحت موعد المسار
+ * (`withDeadline`). لا يرمي: ما تعذّر «غير معروف» بسببه، لا صفر.
+ */
+export async function fetchDeepseekBalance(): Promise<AiBalance> {
+  const key = deepseekKey();
+  if (!key) return { known: false, reason: "مفتاح DEEPSEEK_API_KEY غير مضبوط" };
+  const timeout = attemptTimeout(8_000, currentDeadline());
+  if (timeout === null) return { known: false, reason: "لم يبقَ من وقت الطلب ما يكفي لسؤال المزوّد" };
+  try {
+    const res = await fetch(`${deepseekBaseUrl()}/user/balance`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (!res.ok) return { known: false, reason: `ردّ المزوّد ${res.status}` };
+    let data: unknown = null;
+    try { data = JSON.parse(await res.text()); } catch { return { known: false, reason: "ردّ المزوّد بما لا يُقرأ" }; }
+    return parseBalanceReply(data);
+  } catch (e) {
+    return { known: false, reason: e instanceof Error && e.name === "TimeoutError" ? "لم يردّ المزوّد في وقته" : "تعذّر الاتصال بالمزوّد" };
+  }
 }

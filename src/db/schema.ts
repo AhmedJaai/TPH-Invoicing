@@ -1795,6 +1795,31 @@ export const dailyFigures = pgTable("daily_figures", {
   writtenAt: timestamp("written_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * أرقامُ الشهر كما حُسبت لحظةَ إقفاله (`services/month-seal.service.ts`) — تُضاف ولا تُعدَّل
+ * ولا تُحذف (مؤثِّرٌ يرفض). إعادةُ الإقفال بعد فتحٍ تكتب ختماً جديداً، والختمُ الصالح هو
+ * آخرُ ما كُتب بعد آخر إقفال. `BACKFILL`: شهرٌ أُقفل قبل وجود الختم، خُتم عند أوّل فحص.
+ */
+export const monthSeals = pgTable("month_seals", {
+  id: id(),
+  month: text("month").notNull(),
+  origin: text("origin").$type<"CLOSE" | "BACKFILL">().notNull(),
+  figures: jsonb("figures").notNull(),
+  sealedAt: timestamp("sealed_at", { withTimezone: true }).notNull().defaultNow(),
+  sealedById: text("sealed_by_id").references(() => users.id),
+}, (t) => [index("month_seals_month_idx").on(t.month, t.sealedAt)]);
+
+/**
+ * فحوصُ الصباح — ما وجده التشغيلُ اليوميّ (أرقامُ الأشهر المقفلة، ورصيدُ القراءة الذكيّة)
+ * صفّاً لكلّ فحص، فتقرؤه «يحتاج قرارك» ولا تعيد الحسابَ أو النداءَ مع كلّ صفحة.
+ */
+export const dailyChecks = pgTable("daily_checks", {
+  id: id(),
+  kind: text("kind").$type<"SEAL_DRIFT" | "AI_BALANCE">().notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  payload: jsonb("payload").notNull(),
+}, (t) => [index("daily_checks_kind_idx").on(t.kind, t.checkedAt)]);
+
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
   bankImport: one(bankImports, { fields: [bankTransactions.bankImportId], references: [bankImports.id] }),
   matchedPayment: one(payments, { fields: [bankTransactions.matchedPaymentId], references: [payments.id] }),

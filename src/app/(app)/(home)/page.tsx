@@ -22,7 +22,10 @@ import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
 import { DAY, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
 import { previousMonth } from "@/lib/filing";
-import { currentMonthRiyadh, formatDay, formatMonth, formatWeekday } from "@/lib/riyadh-time";
+import { addDays, currentMonthRiyadh, formatDay, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
+import { sinceYesterday } from "@/lib/since-yesterday";
+import { loadDayFigures } from "@/services/daily-figures.service";
+import { SinceYesterdayLine } from "@/components/since-yesterday";
 import { loadStartState } from "@/services/start.service";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
@@ -69,7 +72,9 @@ export default async function HomePage() {
     const rises = a.find((i) => i.id === "price-rises");
     return { count: rises?.count ?? 0, amountMinor: rises?.impact.amountMinor ?? 0 };
   }));
-  const [attention, balances, overdue, start, run, cash, recurring, facts] = await Promise.all([
+  /* «منذ صباح أمس» من لقطة أمس المحفوظة — لا إعادةُ حسابٍ لأمس */
+  const yesterday = addDays(todayInRiyadh(), -1);
+  const [attention, balances, overdue, start, run, cash, recurring, facts, snap] = await Promise.all([
     attentionP,
     loadBalanceTotals(),
     loadOverdueBalances(),
@@ -78,11 +83,16 @@ export default async function HomePage() {
     canBank ? loadCashPosition() : Promise.resolve(null),
     canPay || canBank ? loadRecurringInputs() : Promise.resolve([]),
     factsP,
+    loadDayFigures(yesterday),
   ]);
   /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر، كما في «النقد القادم» */
   const week = run ? weekDue(run, recurring) : null;
 
   const { totals } = balances;
+  const owedSince = sinceYesterday(totals.owedMinor, snap ? snap.owedMinor : undefined, yesterday);
+  const cashSince = cash ? sinceYesterday(cash.balanceMinor, snap ? snap.cashMinor : undefined, yesterday) : null;
+  /* اللقطةُ تعدّ ما يراه المالك — ولغيره عددٌ آخر، فلا يُقارَن بها */
+  const attentionSince = user.role === "OWNER" ? sinceYesterday(attention.length, snap ? snap.attentionCount : undefined, yesterday) : null;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
   const changes = notable(buildChanges(facts)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
@@ -187,6 +197,7 @@ export default async function HomePage() {
             {totals.creditLeftMinor > 0 && (
               <p className="text-xs text-ink-soft"><T s="ولك عندهم رصيد {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></p>
             )}
+            {!start.knowsNothing && <SinceYesterdayLine s={owedSince} kind="money" />}
             {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
             <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
           </KeyFigure>
@@ -217,6 +228,7 @@ export default async function HomePage() {
               value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
               sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : `آخر رصيد معروف · ${formatDay(cash.asOf)}`}
             >
+              {cashSince && <SinceYesterdayLine s={cashSince} kind="money" />}
               {cash.balanceMinor !== null && week && week.totalMinor > 0 && (
                 cash.balanceMinor >= week.totalMinor ? (
                   <p className="text-xs text-ink-soft"><T s="يكفي لمدفوعات هذا الأسبوع، ويتبقى {0}" a={[<Money key="0" minor={cash.balanceMinor - week.totalMinor} />]} /></p>
@@ -257,6 +269,7 @@ export default async function HomePage() {
             ) : undefined
           }
         >
+          {attentionSince && !start.knowsNothing && <div className="-mt-1 mb-2"><SinceYesterdayLine s={attentionSince} kind="count" /></div>}
           {attention.length > 0 ? (
             <>
               <TaskList items={top} />

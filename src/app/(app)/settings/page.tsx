@@ -20,6 +20,9 @@ import { Callout, KeyValue, LinkButton, Meter, NoAccess, Section } from "@/compo
 import { ALIAS, countNoun, timeAgo } from "@/lib/arabic";
 import { UserAdmin } from "@/components/user-admin";
 import { aiSpendThisMonth } from "@/services/ai-usage.service";
+import { latestDailyCheck, readAiBalance } from "@/services/daily-checks.service";
+import { balanceIsLow, formatAiBalance } from "@/lib/ai/balance";
+import { formatMoment } from "@/lib/riyadh-time";
 import { dailyBudgetMicroUsd, formatUsd } from "@/lib/ai/usage-ledger";
 import { listUsersForAdmin } from "@/services/user-admin.service";
 import { cookies } from "next/headers";
@@ -111,6 +114,9 @@ export default async function SettingsPage() {
   const spend = showMoney ? await aiSpendThisMonth() : null;
   const aiSpend = spend && spend.calls > 0 ? spend : null;
   const aiBudget = dailyBudgetMicroUsd(process.env.AI_DAILY_BUDGET_USD);
+  /* رصيدُ المزوّد كما وجده فحصُ الصباح — والمجهولُ «غير معروف» لا صفر */
+  const balanceCheck = showMoney ? await latestDailyCheck("AI_BALANCE") : null;
+  const aiBalance = balanceCheck ? readAiBalance(balanceCheck.payload) : null;
   const managedUsers = can(user.role, "users:manage") && !isAuthBypassed() ? await listUsersForAdmin() : null;
   const captureLinks = can(user.role, "users:manage") ? await listLinks() : null;
   const locale = asLocale((await cookies()).get(LOCALE_COOKIE)?.value);
@@ -286,6 +292,14 @@ export default async function SettingsPage() {
                       ? "إنفاقه هذا الشهر غير معروف، لأنه لم تُسجَّل أي عملية قراءة بعد"
                       : <><T s="إنفاقه التقديري هذا الشهر: {0} عن {1} عملية قراءة" a={[<bdi key="0" dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi>, <span key="1" className="nums">{aiSpend.calls}</span>]} /></>}
                     {aiBudget !== null && <> <T s=" · الحد اليومي {0}" a={[<bdi key="0" dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi>]} /></>}
+                  </p>
+                )}
+                {showMoney && (
+                  <p className={`mt-1 text-[11px] leading-relaxed ${aiBalance && balanceIsLow(aiBalance) ? "font-bold text-danger" : "text-ink-soft"}`}>
+                    {!balanceCheck || !aiBalance
+                      ? "رصيده عند المزوّد غير معروف، لأن فحص الصباح لم يسأل عنه بعد"
+                      : <T s="رصيده عند المزوّد: {0} · فحص {1}" a={[<bdi key="0" dir="ltr" className="nums font-bold">{formatAiBalance(aiBalance)}</bdi>, formatMoment(balanceCheck.checkedAt)]} />}
+                    {aiBalance && balanceIsLow(aiBalance) && <> <T s="· ينفد، اشحنه من {0}" a={[<bdi key="0" dir="ltr">platform.deepseek.com</bdi>]} /></>}
                   </p>
                 )}
               </div>

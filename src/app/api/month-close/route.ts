@@ -25,6 +25,7 @@ import { WARNING, countNoun } from "@/lib/arabic";
 import { monthEndDay } from "@/lib/riyadh-time";
 import { describeError, logEvent } from "@/lib/log";
 import { freezePnl } from "@/services/profit.service";
+import { sealMonth } from "@/services/month-seal.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -236,10 +237,22 @@ export async function POST(request: Request) {
     logEvent("finance.freeze_failed", { month: body.month, ...describeError(e) });
   }
 
+  /*
+    وأرقامُه تُختم الآن كما تقولها الشاشات (`month_seals`): «عليك» في آخره، ورصيدُ كلّ حساب،
+    والضريبة — ويقارنها فحصُ كلّ صباح. وتعثّرُ الختم لا يُسقط الإقفال: يختمه الفحصُ القادم.
+  */
+  let sealed = true;
+  try {
+    await sealMonth(body.month, { actorId: user.id, origin: "CLOSE" });
+  } catch (e) {
+    sealed = false;
+    logEvent("month.seal_failed", { month: body.month, ...describeError(e) });
+  }
+
   return NextResponse.json({
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}`,
+    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
   });
 }

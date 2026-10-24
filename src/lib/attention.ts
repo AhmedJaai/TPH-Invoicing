@@ -6,6 +6,10 @@ import type { Capability } from "./permissions";
 import { formatDay, formatMonth } from "./riyadh-time";
 import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
+import { driftLine, driftMagnitude } from "./month-seal";
+
+/** «رقم» لما تغيّر من أرقام الشهر المقفل. */
+const FIGURE: NounForms = { one: "رقم واحد", two: "رقمان", few: "أرقام", many: "رقماً" };
 
 /** «وثيقة» لما له تاريخُ انتهاء — غيرُ «مستند» الفواتير والكشوف. */
 const PAPER: NounForms = { one: "وثيقة", two: "وثيقتان", few: "وثائق", many: "وثيقةً" };
@@ -236,6 +240,13 @@ export interface AttentionFacts {
   stockLinksReady?: { count: number; valueMinor: number };
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
   foodicsStaleHours?: number | null;
+  /**
+   * أرقامُ شهرٍ مقفل تغيّرت بعد إقفاله — ما وجده فحصُ الصباح (`month-seal.service.ts`) وما زال
+   * قائماً على ختمه. `checkedAt` وقتُ الفحص مكتوباً («اليوم 05:31»).
+   */
+  sealDrift?: { checkedAt: string; findings: { month: string; figure: string; sealedMinor: number | null; nowMinor: number | null }[] } | null;
+  /** رصيدُ القراءة الذكيّة دون حدّه في آخر فحص (`daily-checks.service.ts`). */
+  aiBalanceLow?: { display: string; available: boolean; checkedAt: string } | null;
   stockRecurringGaps?: { productId: string; name: string; kind: "SHORTAGE" | "OVER_AVAILABLE"; months: number; totalMinor: number; byWitness: boolean }[];
   /**
    * وثائقُ انتهت أو دخلت مهلةَ تذكيرها (`lib/obligations.ts`) — يكتبها صاحبُها بيده.
@@ -865,6 +876,53 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "اضغط «زامن الآن». وإن رفض فودكس المفتاح فقد أُلغي من «Authorized Apps»، فاطلب مفتاحاً جديداً.",
       actionLabel: "زامن فودكس",
       href: "/money/foodics",
+      count: 1,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+    });
+  }
+
+  /*
+    الإقفالُ شهادة، وأرقامُها خُتمت يومَه. فإن قال الحسابُ الآن غيرَها — فاتورةٌ قُيّدت في شهرٍ
+    قبله، أو اختيارٌ ضريبيّ، أو حركةٌ أُعيد تصنيفها — فما قيل للمحاسب لم يعد ما في الدفاتر.
+    تنبيهٌ لا منع: قد يكون التغيير صحيحاً، فيُعاد الإقفالُ ليُختم من جديد، أو «علمت».
+  */
+  const drift = f.sealDrift?.findings ?? [];
+  if (drift.length > 0) {
+    const months = [...new Set(drift.map((d) => d.month))].sort();
+    const first = drift[0];
+    out.push({
+      id: "sealed-month-drift",
+      area: "DATA",
+      severity: "HIGH",
+      title: "أرقام شهر مقفل تغيّرت بعد إقفاله",
+      detail: `${months.map(formatMonth).join(" و")}: ${first.figure} ${driftLine(first)}${drift.length > 1 ? `، و${countNoun(drift.length - 1, FIGURE)} غيره` : ""}. فحص ${f.sealDrift?.checkedAt ?? ""}.`,
+      action: "افتح الشهر وانظر ما تغيّر. إن كان التغيير صحيحاً فأعد فتح الشهر ثم أقفله لتُختم أرقامه من جديد، وإن لم يكن فصحّح ما غيّره.",
+      actionLabel: "افتح إقفال الشهر",
+      href: "/close",
+      count: drift.length,
+      /* بصمةُ التغيّر: إن تحرّك رقمٌ آخر عاد البندُ بعد «علمت» */
+      amountMinor: driftMagnitude(drift),
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: drift.slice(0, 8).map((d) => ({ label: `${formatMonth(d.month)} · ${d.figure}`, sub: driftLine(d) })),
+      needs: "month:close",
+    });
+  }
+
+  /* القراءةُ الذكيّة تقف حين ينفد رصيدُها، ولا يعلم أحدٌ حتى تسقط أوّلُ فاتورة */
+  const ai = f.aiBalanceLow ?? null;
+  if (ai) {
+    out.push({
+      id: "ai-balance-low",
+      area: "DATA",
+      severity: ai.available ? "HIGH" : "CRITICAL",
+      title: "رصيد القراءة الذكيّة ينفد",
+      detail: ai.available
+        ? `بقي ${ai.display} عند DeepSeek (فحص ${ai.checkedAt}). حين ينفد تقف قراءة الفواتير والكشوف وتنتظر المراجعة اليدوية.`
+        : `يقول المزوّد إن الرصيد لا يكفي (${ai.display}، فحص ${ai.checkedAt}). قراءة الفواتير والكشوف متوقفة حتى يُشحن.`,
+      action: "اشحن رصيد حساب DeepSeek من platform.deepseek.com. يُعاد الفحص كل صباح.",
+      actionLabel: "اعرض الرصيد",
+      href: "/settings#system",
       count: 1,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],

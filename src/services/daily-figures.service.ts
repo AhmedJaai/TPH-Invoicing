@@ -3,10 +3,12 @@
  * يجمعها `/api/cron/daily`: «عليك» من `loadBalanceTotals`، و«يحتاج قرارك» من `workCount`
  * (عددُ الشريط نفسه)، والنقدُ من `loadCashPosition` (المجهولُ `null`). لا حسابَ هنا.
  *
- * لا شاشةَ تقرؤها بعد: هي ماضٍ يُجمَع من اليوم، فلا يُبنى «منذ أمس» على إعادة حسابٍ
- * من دفاترٍ تغيّرت. والكتابةُ الثانية في اليوم نفسه لا تغيّر شيئاً.
+ * هي ماضٍ يُجمَع من اليوم، فلا يُبنى «منذ صباح أمس» على إعادة حسابٍ من دفاترٍ تغيّرت:
+ * تقرؤها الرئيسيّة و«لماذا هذا الرقم؟» (`lib/since-yesterday.ts`). والكتابةُ الثانية في
+ * اليوم نفسه لا تغيّر شيئاً.
  */
 import { db } from "@/db";
+import { eq } from "drizzle-orm";
 import { dailyFigures } from "@/db/schema";
 import type { Conn } from "./types";
 
@@ -24,4 +26,13 @@ export async function writeDailyFigures(day: string, figures: DayFigures, conn: 
     .onConflictDoNothing({ target: dailyFigures.day })
     .returning({ day: dailyFigures.day });
   return rows.length > 0;
+}
+
+/** لقطةُ يومٍ بعينه — `null` لم تُكتب (أوّلُ يوم، أو تعثّر التشغيلُ يومَها). */
+export async function loadDayFigures(day: string, conn: Conn = db): Promise<DayFigures | null> {
+  const [row] = await conn.select({
+    owedMinor: dailyFigures.owedMinor, attentionCount: dailyFigures.attentionCount,
+    cashMinor: dailyFigures.cashMinor, cashAsOf: dailyFigures.cashAsOf,
+  }).from(dailyFigures).where(eq(dailyFigures.day, day)).limit(1);
+  return row ?? null;
 }

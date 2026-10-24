@@ -5,7 +5,7 @@
  * أرقامها باستعلامٍ واحد لكلّ المورّدين (أو لمورّدٍ بعينه).
  */
 import { cache } from "react";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   SETTLED_TOLERANCE_MINOR,
@@ -52,15 +52,43 @@ export async function loadSupplierBalances(
   return queryBalances(executor, supplierId);
 }
 
-async function queryBalances(executor: Executor, supplierId?: string): Promise<SupplierBalance[]> {
+/**
+ * «عليك» كما كان في آخر يومٍ من شهرٍ مضى — بالمعادلة نفسها، على ما يقع في الشهر وقبله وحده:
+ * فواتيرُ شهرُها المحاسبيّ (`period_month`) حتى الشهر، ودفعاتٌ شهرُها (`payment_month` في
+ * القاعدة: شهرُ ما تُنسب إليه، وإلّا شهرُ دفعها بتوقيت الرياض) حتى الشهر، وتخصيصٌ بين
+ * الاثنين وحدهما. وهي الأشهرُ التي يقفلها مؤثِّرُ الشهر — فرقمُ شهرٍ مقفلٍ لا يتحرّك إلّا إن
+ * تحرّك ما قبله. تختمه شهادةُ الإقفال (`month-seal.service.ts`).
+ */
+export async function loadSupplierBalancesAsOf(month: string, executor: Executor = db): Promise<SupplierBalance[]> {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error(`شهر غير صالح: ${month}`);
+  return queryBalances(executor, undefined, month);
+}
+
+/** شهرُ الدفعة كما يحسبه مؤثِّرُ القفل (`payment_month`، ٠٨٨) — نصّاً هنا كي لا يُفترض وجودُ الدالّة. */
+const paymentMonthSql = (alias: string) =>
+  sql.raw(`coalesce(${alias}.applies_to_month, to_char(${alias}.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM'))`);
+
+async function queryBalances(executor: Executor, supplierId?: string, asOfMonth?: string): Promise<SupplierBalance[]> {
   /*
     رصيدُ مورّدٍ واحد لا يجمع جدولَ التخصيصات كلَّه: الشرطُ يدخل كلَّ جزءٍ من
     الاستعلام — كان يُبنى المجموعان على الجدول كلّه ثمّ يُصفّى في آخر سطر.
   */
-  const ofInvoices = supplierId ? sql`where invoice_id in (select id from invoices where supplier_id = ${supplierId})` : sql``;
-  const ofPayments = supplierId ? sql`where payment_id in (select id from payments where supplier_id = ${supplierId})` : sql``;
-  const invoiceOwner = supplierId ? sql`i.supplier_id = ${supplierId}` : sql`i.supplier_id is not null`;
-  const paymentOwner = supplierId ? sql`p.supplier_id = ${supplierId}` : sql`p.supplier_id is not null`;
+  /* وفي آخر شهرٍ مضى: التخصيصُ بين فاتورةٍ ودفعةٍ تقعان فيه أو قبله وحده */
+  const asOfAlloc = asOfMonth ? [
+    sql`invoice_id in (select ai.id from invoices ai where ai.period_month <= ${asOfMonth})`,
+    sql`payment_id in (select ap.id from payments ap where ${paymentMonthSql("ap")} <= ${asOfMonth})`,
+  ] : [];
+  const where = (conds: SQL[]) => conds.length > 0 ? sql`where ${sql.join(conds, sql` and `)}` : sql``;
+  const ofInvoices = where([
+    ...(supplierId ? [sql`invoice_id in (select id from invoices where supplier_id = ${supplierId})`] : []), ...asOfAlloc,
+  ]);
+  const ofPayments = where([
+    ...(supplierId ? [sql`payment_id in (select id from payments where supplier_id = ${supplierId})`] : []), ...asOfAlloc,
+  ]);
+  const invoiceOwner = sql`${supplierId ? sql`i.supplier_id = ${supplierId}` : sql`i.supplier_id is not null`}${
+    asOfMonth ? sql` and i.period_month <= ${asOfMonth}` : sql``}`;
+  const paymentOwner = sql`${supplierId ? sql`p.supplier_id = ${supplierId}` : sql`p.supplier_id is not null`}${
+    asOfMonth ? sql` and ${paymentMonthSql("p")} <= ${asOfMonth}` : sql``}`;
   const rows = (
     await executor.execute<Row>(sql`
       with alloc_by_invoice as (

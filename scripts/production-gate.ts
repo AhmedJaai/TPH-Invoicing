@@ -17,6 +17,7 @@ import {
 } from "@/lib/ops/production-gate";
 import { checkBalance } from "@/lib/bank/balance-equation";
 import { countNoun, DAY } from "@/lib/arabic";
+import { checkSealedMonths } from "@/services/month-seal.service";
 
 /**
  * الهجرات المتوقَّعة تُقرأ من المجلّد لا تُكتَب عدداً.
@@ -285,13 +286,39 @@ async function main() {
       select count(*)::int as closed from month_closes where status = 'CLOSED'
     `)
   ).rows;
+  /*
+    والشهرُ المقفل تبقى أرقامُه كما خُتمت يومَ إقفاله (`month-seal.service.ts`) — قراءةٌ تعيد
+    الحساب وتقارن، لا تكتب. وشهرٌ مقفلٌ بلا ختمٍ «لم يُفحَص» حتى يختمه فحصُ الصباح.
+  */
+  const closedCount = Number(close?.closed ?? 0);
+  const [sealTable] = (await db.execute<{ ok: boolean }>(sql`select to_regclass('month_seals') is not null as ok`)).rows;
+  const seals = closedCount > 0 && sealTable?.ok
+    ? await checkSealedMonths().catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }))
+    : null;
+  const drifted = seals && "findings" in seals ? [...new Set(seals.findings.map((f) => f.month))] : [];
   add(
     "month_close",
-    Number(close?.closed ?? 0) > 0 ? "PASS" : "UNKNOWN",
-    Number(close?.closed ?? 0) > 0
-      ? `${Number(close?.closed ?? 0)} شهراً مقفلاً`
-      : "لم يُقفَل شهرٌ بعد — لم يُثبَت أنّ المسار يعمل",
-    "أقفل أغسطس ٢٠٢٦ من /close",
+    closedCount === 0 ? "UNKNOWN"
+      : seals === null || "error" in seals ? "UNKNOWN"
+      : drifted.length > 0 ? "FAIL"
+      : seals.unsealed.length > 0 ? "UNKNOWN"
+      : "PASS",
+    closedCount === 0
+      ? "لم يُقفَل شهرٌ بعد — لم يُثبَت أنّ المسار يعمل"
+      : seals === null
+        ? `${closedCount} شهراً مقفلاً — وجدولُ الأرقام المختومة غير موجود، فلم تُقارَن`
+        : "error" in seals
+          ? `${closedCount} شهراً مقفلاً — وتعذّرت مقارنةُ أرقامها بختمها: ${seals.error.slice(0, 120)}`
+          : [
+              `${closedCount} شهراً مقفلاً`,
+              drifted.length > 0
+                ? `تغيّر ${seals.findings.length} من أرقام ${drifted.join("، ")} بعد إقفاله: ${seals.findings.slice(0, 3).map((f) => f.figure).join("، ")}`
+                : `أرقامُ ${seals.months} منها كما خُتمت`,
+              seals.unsealed.length > 0 ? `بلا ختم: ${seals.unsealed.join("، ")}` : "",
+            ].filter(Boolean).join(" · "),
+    closedCount === 0 ? "أقفل أغسطس ٢٠٢٦ من /close"
+      : drifted.length > 0 ? "افتح «يحتاج قرارك»: أعد إقفال الشهر إن كان التغيير صحيحاً، أو صحّح ما غيّره"
+      : "يختم فحصُ الصباح (/api/cron/daily) ما لم يُختم",
   );
 
   /* ── ٩ · مسار المراجعة: كلّ إقرارٍ له أثرٌ في تاريخ القرار ── */

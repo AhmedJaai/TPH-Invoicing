@@ -33,6 +33,8 @@ export const ATTENTION_IDS = [
   "foodics-purchase-differs",
   "foodics-purchase-missing",
   "foodics-stale",
+  "sealed-month-drift",
+  "ai-balance-low",
   "foodics-till-gap",
   "finance-incomplete",
   "payroll-owed",
@@ -91,6 +93,8 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "stock-gap-shortage",
   "stock-gap-over",
   "recurring-anomalies",
+  /* رقمٌ شُهد عليه بالإقفال تحرّك بعده — مالٌ في شهرٍ قيل إنّه تمّ */
+  "sealed-month-drift",
 ]);
 
 export function isSignal(item: Pick<AttentionItem, "id">): boolean {

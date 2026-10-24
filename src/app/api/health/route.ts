@@ -18,6 +18,9 @@ import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
 import { requiresPooler } from "@/lib/ops/db-identity";
 import { checkEnv, describeEnvProblem } from "@/lib/env-check";
+import { fetchDeepseekBalance } from "@/lib/ai/deepseek";
+import { withDeadline } from "@/lib/ai/deadline";
+import { balanceIsLow, formatAiBalance } from "@/lib/ai/balance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,6 +133,18 @@ export async function GET() {
   }
 
   /*
+    والرصيد: المفتاحُ يعمل والرصيدُ ينفد — فلا يُعرف حتى تسقط القراءة (`NO_BALANCE`).
+    للمخوَّل وحده، تحت موعدٍ معلَن. والمجهولُ «غير معروف» لا صفر.
+  */
+  let aiBalance: { known: boolean; display: string; low: boolean; available?: boolean; reason?: string } | undefined;
+  if (detailed && provider === "deepseek" && providerKeyPresent) {
+    const b = await withDeadline(10_000, () => fetchDeepseekBalance());
+    aiBalance = b.known
+      ? { known: true, display: formatAiBalance(b), low: balanceIsLow(b), available: b.available }
+      : { known: false, display: formatAiBalance(b), low: false, reason: b.reason };
+  }
+
+  /*
     ورمزُ الدرايف: كان منتهياً والمزامنة تقول «لا جديد» والفحص أخضر.
     فللمخوَّل وحده يُجدَّد رمزُه — قراءةٌ لا تمسّ الأرشيف.
   */
@@ -175,11 +190,13 @@ export async function GET() {
   const envProblems = checkEnv(process.env).map(describeEnvProblem);
 
   /* المستطلِع يقرأ الرمز لا الجسم: قارئٌ معطَّل أو رمزُ درايف منتهٍ = 503 */
-  const overall = healthy && !tokenKeyMissing && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true);
+  /* رصيدٌ نفد (المزوّد يقول «غير متاح») يوقف القراءة كما يوقفها مفتاحٌ مُلغى */
+  const overall = healthy && !tokenKeyMissing && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true)
+    && aiBalance?.available !== false;
   return NextResponse.json(
     {
       healthy: overall,
-      checks: { ...checks, providerReachable, driveToken },
+      checks: { ...checks, providerReachable, aiBalance, driveToken },
       ...(tokenKeyMissing
         ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر)، فيُحفظ رمز الدرايف بلا تشفير. اضبطه في Vercel، ثم سجّل الخروج وادخل من جديد."] }
         : {}),

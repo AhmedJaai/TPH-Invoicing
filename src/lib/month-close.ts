@@ -387,25 +387,37 @@ export interface BalancePeriod {
 export function monthBalances(
   periods: readonly BalancePeriod[],
 ): { openingMinor: number | null; closingMinor: number | null } {
+  const byAccount = balancesByAccount(periods);
+  if (byAccount.size === 0) return { openingMinor: null, closingMinor: null };
+
+  let opening: number | null = 0;
+  let closing: number | null = 0;
+  for (const b of byAccount.values()) {
+    opening = opening === null || b.openingMinor === null ? null : opening + b.openingMinor;
+    closing = closing === null || b.closingMinor === null ? null : closing + b.closingMinor;
+  }
+  return { openingMinor: opening, closingMinor: closing };
+}
+
+/** افتتاحيُّ أُولى فترات كلّ حساب وختاميُّ أخراها — قبل الجمع. وتختمه شهادةُ الإقفال حساباً حساباً. */
+export function balancesByAccount(
+  periods: readonly BalancePeriod[],
+): Map<string, { openingMinor: number | null; closingMinor: number | null }> {
   const byAccount = new Map<string, BalancePeriod[]>();
   for (const p of periods) {
     const list = byAccount.get(p.bankAccountId) ?? [];
     list.push(p);
     byAccount.set(p.bankAccountId, list);
   }
-  if (byAccount.size === 0) return { openingMinor: null, closingMinor: null };
-
-  let opening: number | null = 0;
-  let closing: number | null = 0;
-  for (const list of byAccount.values()) {
+  const out = new Map<string, { openingMinor: number | null; closingMinor: number | null }>();
+  for (const [account, list] of byAccount) {
     const first = [...list].sort((a, b) =>
       a.periodStart.localeCompare(b.periodStart) || Number(b.reviewed) - Number(a.reviewed)
       || b.periodEnd.localeCompare(a.periodEnd))[0];
     const last = [...list].sort((a, b) =>
       b.periodEnd.localeCompare(a.periodEnd) || Number(b.reviewed) - Number(a.reviewed)
       || a.periodStart.localeCompare(b.periodStart))[0];
-    opening = opening === null || first.openingMinor === null ? null : opening + first.openingMinor;
-    closing = closing === null || last.closingMinor === null ? null : closing + last.closingMinor;
+    out.set(account, { openingMinor: first.openingMinor, closingMinor: last.closingMinor });
   }
-  return { openingMinor: opening, closingMinor: closing };
+  return out;
 }
