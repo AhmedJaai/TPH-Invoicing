@@ -33,7 +33,7 @@ import { applyCreditEverywhere } from "@/services/document-review.service";
 import { allocate, claimBankTransaction, refreshPaymentStatus, reversePayment } from "@/services/payment.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import type { Conn, Tx } from "@/services/types";
-import { isoDay } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, isoDay } from "@/lib/riyadh-time";
 import { monthOf } from "@/lib/filing";
 
 export interface EchoView extends PaymentEcho {
@@ -108,7 +108,7 @@ export async function mergePaymentEcho(
     .some((e) => e.manualId === input.manualId && e.bankId === input.bankId);
   if (!still) throw new EchoMergeRefused("تغيّرت الدفعتان منذ المعاينة. حدّث صفحة المراجعة");
 
-  await assertMonthsOpen(tx, [manual.appliesToMonth, monthOf(manual.paidAt)]);
+  await assertMonthsOpen(tx, [manual.appliesToMonth, currentMonthRiyadh(manual.paidAt)]);
 
   const reversal = await reversePayment(tx, {
     paymentId: manual.id,
@@ -176,7 +176,7 @@ export async function mergeIntoCredit(tx: Tx, manualId: string, actorId: string)
   const echo = (await creditEchoesOf(tx, manual.supplierId)).find((e) => e.manualId === manualId);
   if (!echo) throw new EchoMergeRefused("تغيّرت الدفعات منذ المعاينة. حدّث صفحة المراجعة");
 
-  await assertMonthsOpen(tx, [manual.appliesToMonth, monthOf(manual.paidAt)]);
+  await assertMonthsOpen(tx, [manual.appliesToMonth, currentMonthRiyadh(manual.paidAt)]);
   const reversal = await reversePayment(tx, {
     paymentId: manualId,
     kind: "VOID",
@@ -342,7 +342,7 @@ export async function linkHandPayment(
   const [t] = await tx.select({
     valueDate: bankTransactions.valueDate, beneficiaryRaw: bankTransactions.beneficiaryRaw, description: bankTransactions.description,
   }).from(bankTransactions).where(eq(bankTransactions.id, link.transferId));
-  await assertMonthsOpen(tx, [p.appliesToMonth, monthOf(p.paidAt), monthOf(t.valueDate)]);
+  await assertMonthsOpen(tx, [p.appliesToMonth, currentMonthRiyadh(p.paidAt), monthOf(t.valueDate)]);
 
   /*
     الزائدُ في حدّ رسم التحويل رسمٌ لا رصيد (`splitBankFee`) — ٣٬٠٠٥٫٧٥ على سدادٍ

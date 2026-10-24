@@ -62,3 +62,6 @@ docs/handbook/handbook.html
 
 # ملفّاتُ onnxruntime-web تُنسخ من الحزمة بعد التثبيت (scripts/copy-ort.mjs)
 /public/ort/
+
+# اختبارُ الطفرات — مجلّدُه المؤقّت (التقاريرُ في reports/)
+.stryker-tmp/

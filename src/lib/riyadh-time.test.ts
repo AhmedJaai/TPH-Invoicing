@@ -1,7 +1,7 @@
 import { timeAgo } from "./arabic";
 import { describe, expect, it } from "vitest";
 import {
-  currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMoment, formatMonth, formatRange, formatWeekday, todayInRiyadh,
+  currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMoment, formatMonth, formatRange, formatWeekday, paymentMonthOf, todayInRiyadh,
 } from "./riyadh-time";
 
 describe("الشهر بتوقيت الرياض", () => {
@@ -217,5 +217,14 @@ describe("حساب الأيّام والأشهر: المالك الواحد يط
   it("ما لا يقرأ لا يصير رقماً", () => {
     expect(Number.isNaN(dayNumber("غير تاريخ"))).toBe(true);
     expect(Number.isNaN(dayNumber(""))).toBe(true);
+  });
+});
+
+describe("paymentMonthOf — شهرُ الدفعة كما تحسبه payment_month في القاعدة", () => {
+  it("الشهرُ المذكور يغلب، وإلّا شهرُ السداد بتوقيت الرياض", () => {
+    const late = new Date("2026-08-31T21:30:00Z"); // الرياض: ١ سبتمبر ٠٠:٣٠
+    expect(paymentMonthOf(null, late)).toBe("2026-09");
+    expect(paymentMonthOf(undefined, new Date("2026-08-31T20:59:00Z"))).toBe("2026-08");
+    expect(paymentMonthOf("2026-07", late)).toBe("2026-07");
   });
 });

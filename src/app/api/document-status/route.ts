@@ -6,7 +6,6 @@
  * (فيها قراءة الحقول وتأكيدها)، أمّا الرفض فقرارٌ بسيط: هذا ليس مستنداً
  * يُقيَّد. ويُسجَّل بسببه ومن رفضه، ولا يُحذف الملفّ من الدرايف.
  */
-import { backlogFingerprint, isDue, markRan } from "@/services/job-state.service";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
@@ -14,23 +13,17 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
+import { runBacklogSweep } from "@/services/backlog-sweep.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { recordAudit } from "@/lib/audit";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { renameArchived } from "@/services/drive-rename.service";
-import { processDocumentBacklog } from "@/services/document-review.service";
-import { isAutoPaused } from "@/services/auto-process.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { driveForUser } from "@/lib/drive";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { DOCUMENT, FILE, INVOICE, PAYMENT, TRANSACTION, countNoun } from "@/lib/arabic";
-import { linkExactHandPayments, mergeExactEchoes } from "@/services/account-review.service";
-
-/** حدُّ ما يُترك الاستدراكُ الخلفيّ بلا تشغيلٍ وإن لم يتغيّر شيء — لسياسات الأيّام */
-const BACKLOG_MAX_AGE_MS = 6 * 60 * 60_000;
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -68,56 +61,16 @@ export async function POST(request: Request) {
     اليدويّ تماماً (خصمُ رصيد المورّد، والأثر)، ويُسمّى ما اعتُمد.
   */
   if (body.action === "confirm-eligible") {
-    if (!can(user.role, "amounts:view")) {
-      return NextResponse.json({ error: "الاعتماد يحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
-    }
-    let drive = null;
-    if (driveWritesAllowed(process.env)) {
-      const token = await refreshTokenFor(user.id).catch(() => null);
-      if (token) drive = driveForUser(token);
-    }
-    /*
-      الخلفيُّ لا يُعاد ما لم تتغيّر بصمةُ ما يعمل عليه أو تمضِ ستُّ ساعات — كان
-      يجري كلَّ عشر دقائق لكلّ جهاز ولو لم يتغيّر صفّ (`job-state.service.ts`).
-    */
-    /*
-      موقوفٌ بيد صاحبه: الخلفيُّ لا يقيّد ولا يعتمد حتى يشغّله. والضغطُ بيدٍ يجري —
-      من ضغط «أكّد المؤهَّل» طلب العملَ بعينه.
-    */
-    if (body.background && await isAutoPaused()) {
+    /* التنفيذُ في `backlog-sweep.service.ts` — يمرّ به التشغيلُ المجدول أيضاً */
+    const out = await runBacklogSweep(user, { background: body.background === true });
+    if (out.kind === "forbidden") return NextResponse.json({ error: out.error }, { status: 403 });
+    if (out.kind === "skipped") {
       return NextResponse.json({
-        ok: true, skipped: true, paused: true, message: "العمل الآلي موقوف",
+        ok: true, skipped: true, paused: out.reason === "paused", busy: out.reason === "busy", message: out.message,
         recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
       });
     }
-    const fingerprint = await backlogFingerprint();
-    if (body.background && !(await isDue("backlog", fingerprint, BACKLOG_MAX_AGE_MS))) {
-      return NextResponse.json({
-        ok: true, skipped: true, message: "لا جديد منذ آخر مراجعة آلية",
-        recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
-      });
-    }
-    const r = await processDocumentBacklog(user.id, drive);
-    /*
-      حوالةٌ في طابور البنك وسدادُها قيّده صاحبُ العمل بيد بالمبلغ نفسه — تُربط
-      هنا أيضاً لا عند الاستيراد وحده: ما استُورد قبل وجود الربط (مختبرات القهوة
-      ٦٣٨) كان يبقى في «يحتاج قرارك» حتى يُضغط زرّ. والسياسةُ سياسةُ الاستيراد.
-    */
-    const handLinked = can(user.role, "bank:edit") ? await linkExactHandPayments(user.id, r.notes) : 0;
-    /* والدفعةُ التي قُيِّدت مرّتين بالمبلغ نفسه — حوالةٌ وإقرارٌ عنها — تُدمج بالسياسة نفسها */
-    const echoesMerged = can(user.role, "payment:approve") ? await mergeExactEchoes(user.id, r.notes) : 0;
-    const parts = [
-      echoesMerged > 0 ? `دُمجت ${countNoun(echoesMerged, PAYMENT)} سُجّلت مرتين` : null,
-      handLinked > 0 ? `رُبطت ${countNoun(handLinked, TRANSACTION)} بنكية بسداد سجّلته يدوياً` : null,
-      r.recorded > 0 ? `سُجّلت من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
-      r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
-      r.renamed.length > 0 ? `وسُمّي ${countNoun(r.renamed.length, FILE)}` : null,
-      r.reread > 0 ? `وأُعيدت قراءة ${countNoun(r.reread, INVOICE)}` : null,
-      r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
-    ].filter(Boolean);
-    const message = parts.length === 0 ? "لا يوجد الآن مستند تتوفر فيه الشروط" : parts.join(" · ");
-    await markRan("backlog", await backlogFingerprint());
-    return NextResponse.json({ ok: true, message, ...r, handLinked: handLinked + echoesMerged });
+    return NextResponse.json({ ok: true, message: out.message, ...out.counts });
   }
 
   if (typeof body.documentId !== "string" || !body.documentId) {

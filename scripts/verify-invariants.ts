@@ -288,13 +288,14 @@ async function main() {
        update invoices set subtotal_minor = 10000, vat_minor = 1500, total_minor = 20000 where id = '${inv.id}'`,
       { code: "23514", constraint: "invoices_parts_sum_to_total" }),
 
+    /* شهرٌ بعيد: أشهرُ الإنتاج المقفلة يردّها قفلُ الشهر قبل أن يُسأل القيد */
     await mustFail("مصروف بمبلغ سالب",
       `insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
-       values ('t-exp', '2026-08', '2026-08-01', 'RENT', 'اختبار', -1, 'MANUAL')`,
+       values ('t-exp', '2099-08', '2099-08-01', 'RENT', 'اختبار', -1, 'MANUAL')`,
       { code: "23514" }),
     await mustFail("مصروف شهره يخالف تاريخه",
       `insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
-       values ('t-exp2', '2026-07', '2026-08-01', 'RENT', 'اختبار', 100, 'MANUAL')`,
+       values ('t-exp2', '2099-07', '2099-08-01', 'RENT', 'اختبار', 100, 'MANUAL')`,
       { code: "23514", constraint: "expenses_period_matches_date" }),
 
     /*
@@ -323,6 +324,33 @@ async function main() {
       `insert into month_closes (id, month, status) values ('t-mc4', '2099-03', 'CLOSED');
        update payments set status = status where id = (select id from payments limit 1)`),
 
+    /* قفلُ الشهر يغطّي ما كان يفلت من ٠٢٨: الحالُ الضريبيّ والخصم، والمصروف، وحركةُ البنك */
+    await mustFail("تعديلُ الأصل الثابت أو الحال الضريبيّ لفاتورةٍ في شهرٍ مقفل",
+      `insert into month_closes (id, month, status) values ('t-mc5', '${inv.period_month}', 'CLOSED')
+         on conflict (month) do update set status = 'CLOSED';
+       update invoices set is_fixed_asset = not is_fixed_asset where id = '${inv.id}'`,
+      { code: "P0001", message: /مقفل/ }),
+    await mustFail("مصروفٌ في شهرٍ مقفل",
+      `insert into month_closes (id, month, status) values ('t-mc6', '2099-05', 'CLOSED');
+       insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
+         values ('t-exp-mc', '2099-05', '2099-05-02', 'RENT', 'اختبار', 100, 'MANUAL')`,
+      { code: "P0001", message: /مقفل/ }),
+    await mustPass("والمصروفُ نفسه بعد إعادة فتح الشهر مقبول",
+      `insert into month_closes (id, month, status) values ('t-mc7', '2099-05', 'OPEN');
+       insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
+         values ('t-exp-mo', '2099-05', '2099-05-02', 'RENT', 'اختبار', 100, 'MANUAL')`),
+    ...(tx ? [await mustFail("حركةُ بنكٍ في شهرٍ مقفل",
+      `insert into month_closes (id, month, status) values ('t-mc8', '2099-06', 'CLOSED');
+       insert into bank_transactions (id, bank_import_id, value_date, description, amount_minor, direction, occurrence, identity_key)
+       select 't-bt-mc', bank_import_id, '2099-06-15'::timestamptz, description, amount_minor, direction, 0, 't-bt-mc-identity'
+         from bank_transactions where id = '${tx.id}'`,
+      { code: "P0001", message: /مقفل/ })] : []),
+    ...(tx ? [await mustPass("وتصنيفُ حركةٍ في شهرٍ مقفل مقبول — لا يغيّر المال، وإعادةُ الكشف تُثريها",
+      `insert into month_closes (id, month, status)
+         select 't-mc9', to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM'), 'CLOSED' from bank_transactions where id = '${tx.id}'
+         on conflict (month) do update set status = 'CLOSED';
+       update bank_transactions set category = category, operation_ref = operation_ref where id = '${tx.id}'`)] : []),
+
     /*
       مرجعُ العمليّة: فريدٌ **داخل الحساب** لا في النظام كلّه.
     */
@@ -330,7 +358,7 @@ async function main() {
       `insert into bank_transactions
          (id, bank_import_id, value_date, description, amount_minor, direction,
           occurrence, bank_account_id, operation_ref, identity_key)
-       select 't-ref-same', bank_import_id, value_date, description, amount_minor,
+       select 't-ref-same', bank_import_id, '2099-06-15'::timestamptz, description, amount_minor,
               direction, occurrence + 77, bank_account_id, operation_ref,
               't-ref-same-identity'
        from bank_transactions where operation_ref is not null limit 1`,
@@ -342,7 +370,7 @@ async function main() {
        insert into bank_transactions
          (id, bank_import_id, value_date, description, amount_minor, direction,
           occurrence, bank_account_id, operation_ref, identity_key)
-       select 't-ref-other', bank_import_id, value_date, description, amount_minor,
+       select 't-ref-other', bank_import_id, '2099-06-15'::timestamptz, description, amount_minor,
               direction, occurrence, 't-acct', operation_ref, 't-ref-other-identity'
        from bank_transactions where operation_ref is not null limit 1`)] : []),
 
@@ -352,7 +380,7 @@ async function main() {
          values ('t-p-two', '${inv.supplier_id}', now(), 100, 'BANK_TRANSFER', 'UNAPPLIED');
        insert into bank_transactions
          (id, bank_import_id, value_date, description, amount_minor, direction, occurrence, identity_key, matched_payment_id)
-       select 't-two-' || n, bank_import_id, value_date, description, amount_minor, direction,
+       select 't-two-' || n, bank_import_id, '2099-06-15'::timestamptz, description, amount_minor, direction,
               occurrence + 900 + n, 't-two-identity-' || n, 't-p-two'
          from bank_transactions, generate_series(1, 2) as n
         where id = (select id from bank_transactions limit 1)`,
@@ -362,7 +390,7 @@ async function main() {
       `insert into bank_transactions
          (id, bank_import_id, value_date, description, transaction_type, beneficiary_raw,
           amount_minor, direction, external_id, occurrence, bank_account_id, identity_key)
-       select 't-dup-identity', bank_import_id, value_date, description, transaction_type,
+       select 't-dup-identity', bank_import_id, '2099-06-15'::timestamptz, description, transaction_type,
               beneficiary_raw, amount_minor, direction, 't-dup-id-fp', occurrence + 99,
               bank_account_id, identity_key
        from bank_transactions where id = '${tx.id}' and identity_key is not null`,

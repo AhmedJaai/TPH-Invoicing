@@ -1,9 +1,14 @@
 /**
  * قياس: كم ملفّاً في الأرشيف يُقرأ رمزُه الضريبيّ (QR)؟ وكم يحمل XML مضمَّناً؟
  *
- *   npm run measure:zatca                 ← كلّ مستندٍ له ملفّ في الدرايف
+ *   npm run measure:zatca                 ← كلّ مستندٍ له ملفّ في الدرايف (حتى ٢٠٠٠)
  *   npm run measure:zatca -- --limit 40
  *   npm run measure:zatca -- --kind TAX_INVOICE
+ *   npm run measure:zatca -- --resume     ← يكمل من حيث وقف: ما فُحص لا يُنزَّل ثانيةً
+ *
+ * كلُّ ملفٍّ فُحص يُكتب سطراً في `.bench/zatca-progress.jsonl` (محلّيّ، متجاهَل)،
+ * فانقطاعُ الشبكة أو الإيقافُ في منتصفه لا يُضيع ما مضى. وبلا `--resume` يبدأ من
+ * جديد. وما تعذّر تنزيلُه لا يُكتب — فيُعاد في الإكمال.
  *
  * **للقراءة فقط**: ينزّل الملفّ ويفحصه في الذاكرة. لا يكتب في القاعدة ولا في
  * الدرايف، ولا يستدعي نموذجاً — فلا كلفة ولا يخرج ملفٌّ إلى أحد.
@@ -23,7 +28,7 @@
  *      أيستحقّ قارئ UBL أن يُبنى.
  *   ٤. كم ملفّاً «نصّيّاً» نصُّه في الحقيقة طبقةُ ماسحٍ مخفيّة.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { downloadFile, driveFromEnv } from "@/lib/drive";
@@ -45,6 +50,37 @@ interface Row {
   vat_minor: number | null;
   supplier_name: string | null;
   supplier_vat: string | null;
+}
+
+/** ما خرج من فحص ملفٍّ واحد — يُكتب في نقطة الاستئناف ويُجمع منه الملخّص. */
+interface RowResult {
+  id: string;
+  kind: string;
+  source: string;
+  status: string;
+  xml: string | null;
+  hiddenOcr: string | null;
+  vatLearn: [string, string] | null;
+  /** فاتورةٌ مقيَّدة فُكّ رمزُها — و«يطابقها» إن لم يُخالفها في شيء */
+  invoice: { agrees: boolean } | null;
+  mismatches: { file: string; invoice: string | null; field: string; recorded: string; qr: string }[];
+}
+
+const PROGRESS = ".bench/zatca-progress.jsonl";
+
+function loadProgress(): Map<string, RowResult> {
+  const done = new Map<string, RowResult>();
+  if (!existsSync(PROGRESS)) return done;
+  for (const line of readFileSync(PROGRESS, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const r = JSON.parse(line) as RowResult;
+      if (typeof r.id === "string") done.set(r.id, r);
+    } catch {
+      /* سطرٌ نصفُه كُتب عند الانقطاع — يُفحص ملفُّه ثانيةً */
+    }
+  }
+  return done;
 }
 
 interface Tally { files: number; found: number; notZatca: number; none: number; skipped: number }
@@ -85,11 +121,20 @@ async function main() {
   const args = process.argv.slice(2);
   const limitAt = args.indexOf("--limit");
   const limit = limitAt >= 0 ? Number(args[limitAt + 1]) : 2000;
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    console.error("--limit يحتاج عدداً صحيحاً موجباً، مثل: --limit 40");
+    process.exit(2);
+  }
   const kindAt = args.indexOf("--kind");
   const kind = kindAt >= 0 ? args[kindAt + 1] : null;
+  const resume = args.includes("--resume");
+
+  mkdirSync(".bench", { recursive: true });
+  const done = resume ? loadProgress() : new Map<string, RowResult>();
+  if (!resume) writeFileSync(PROGRESS, "");
 
   /* العمود "created_at" لا "uploaded_at" — مساعد now() يسمّيه كذلك */
-  const rows = (
+  const fetched = (
     await db.execute(sql`
       select d.id, d.file_name, d.drive_file_id, d.mime_type, d.kind::text as kind, d.text_source,
              i.invoice_number, i.total_minor, i.vat_minor,
@@ -101,79 +146,97 @@ async function main() {
         and d.status::text <> 'REJECTED'
         ${kind ? sql`and d.kind::text = ${kind}` : sql``}
       order by d.created_at desc
-      limit ${limit}
+      limit ${limit + done.size}
     `)
   ).rows as unknown as Row[];
+  /* ما فُحص في تشغيلٍ سابق لا يُنزَّل ثانيةً، والحدُّ لما بقي */
+  const rows = fetched.filter((r) => !done.has(r.id)).slice(0, limit);
+  const carried = fetched.flatMap((r) => { const prev = done.get(r.id); return prev ? [prev] : []; });
 
-  console.log(`الملفّات المفحوصة: ${rows.length} — للقراءة فقط، بلا نموذج`);
-  if (rows.length === 0) return;
+  console.log(`الملفّات المفحوصة الآن: ${rows.length}${resume ? ` · ومن تشغيلٍ سابق: ${carried.length}` : ""} — للقراءة فقط، بلا نموذج`);
+  if (rows.length === 0 && carried.length === 0) return;
 
-  const drive = driveFromEnv();
-  const byKind = new Map<string, Tally>();
-  const bySource = new Map<string, Tally>();
-  const all = blank();
+  const drive = rows.length > 0 ? driveFromEnv() : null;
+  const results: RowResult[] = [...carried];
   const downloadFailed: string[] = [];
-  const withXml: string[] = [];
-  const hiddenOcr: string[] = [];
-  /** فواتير مقيَّدة يخالفها رمزُها */
-  const mismatches: { file: string; invoice: string | null; field: string; recorded: string; qr: string }[] = [];
-  /** مورّدون يُعرف رقمُهم الضريبيّ من الرمز ولا رقمَ مسجَّلاً لهم */
-  const vatLearnable = new Map<string, string>();
-  let invoicesWithQr = 0;
-  let invoicesAgreeing = 0;
 
-  let done = 0;
+  let n = 0;
   await mapWithConcurrency(rows, 3, async (row) => {
     let file: { data: Buffer; mimeType: string };
     try {
+      if (!drive) return;
       file = await downloadFile(drive, row.drive_file_id);
     } catch (e) {
       downloadFailed.push(`${row.file_name} — ${(e as Error).message}`);
-      console.error(`  [${++done}/${rows.length}] ✗ تنزيل: ${row.file_name.slice(0, 44)}`);
+      console.error(`  [${++n}/${rows.length}] ✗ تنزيل: ${row.file_name.slice(0, 44)}`);
       return;
     }
     const mimeType = file.mimeType || row.mime_type;
     const reading = await readZatcaQr(file.data, mimeType);
 
-    const kindKey = row.kind ?? "UNKNOWN";
-    const sourceKey = row.text_source ?? "غير معروف";
-    for (const tally of [all, tallyFor(byKind, kindKey), tallyFor(bySource, sourceKey)]) {
-      tally.files++;
-      if (reading.status === "FOUND") tally.found++;
-      else if (reading.status === "NOT_ZATCA") tally.notZatca++;
-      else if (reading.status === "NONE") tally.none++;
-      else tally.skipped++;
-    }
-
     const xml = await xmlAttachments(file.data, mimeType);
-    if (xml.length > 0) withXml.push(`${row.file_name} — ${xml.join("، ")}`);
-    if (mimeType === "application/pdf" && row.text_source === "TEXT" && (await hasHiddenOcrLayer(file.data))) {
-      hiddenOcr.push(row.file_name);
-    }
+    const hidden = mimeType === "application/pdf" && row.text_source === "TEXT" && (await hasHiddenOcrLayer(file.data));
+
+    const result: RowResult = {
+      id: row.id,
+      kind: row.kind ?? "UNKNOWN",
+      source: row.text_source ?? "غير معروف",
+      status: reading.status,
+      xml: xml.length > 0 ? `${row.file_name} — ${xml.join("، ")}` : null,
+      hiddenOcr: hidden ? row.file_name : null,
+      vatLearn: null,
+      invoice: null,
+      mismatches: [],
+    };
 
     if (reading.status === "FOUND") {
       const q = reading.facts;
-      if (row.supplier_name && !row.supplier_vat && q.sellerVatNumber) vatLearnable.set(row.supplier_name, q.sellerVatNumber);
+      if (row.supplier_name && !row.supplier_vat && q.sellerVatNumber) result.vatLearn = [row.supplier_name, q.sellerVatNumber];
       if (row.total_minor !== null) {
-        invoicesWithQr++;
-        let agrees = true;
         if (q.totalMinor !== null && Math.abs(q.totalMinor - row.total_minor) > TOTAL_ROUNDING_TOLERANCE_MINOR) {
-          agrees = false;
-          mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "الإجماليّ", recorded: formatRiyals(row.total_minor), qr: formatRiyals(q.totalMinor) });
+          result.mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "الإجماليّ", recorded: formatRiyals(row.total_minor), qr: formatRiyals(q.totalMinor) });
         }
         if (q.vatMinor !== null && row.vat_minor !== null && Math.abs(q.vatMinor - row.vat_minor) > TOTAL_ROUNDING_TOLERANCE_MINOR) {
-          agrees = false;
-          mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "الضريبة", recorded: formatRiyals(row.vat_minor), qr: formatRiyals(q.vatMinor) });
+          result.mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "الضريبة", recorded: formatRiyals(row.vat_minor), qr: formatRiyals(q.vatMinor) });
         }
         if (row.supplier_vat && q.sellerVatNumber && row.supplier_vat.replace(/\s+/g, "") !== q.sellerVatNumber) {
-          agrees = false;
-          mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "رقم البائع الضريبيّ", recorded: row.supplier_vat, qr: q.sellerVatNumber });
+          result.mismatches.push({ file: row.file_name, invoice: row.invoice_number, field: "رقم البائع الضريبيّ", recorded: row.supplier_vat, qr: q.sellerVatNumber });
         }
-        if (agrees && q.totalMinor !== null) invoicesAgreeing++;
+        result.invoice = { agrees: result.mismatches.length === 0 && q.totalMinor !== null };
       }
     }
-    console.error(`  [${++done}/${rows.length}] ${reading.status === "FOUND" ? "✓" : "·"} ${reading.status.padEnd(9)} ${row.file_name.slice(0, 48)}`);
+    results.push(result);
+    appendFileSync(PROGRESS, JSON.stringify(result) + "\n");
+    console.error(`  [${++n}/${rows.length}] ${reading.status === "FOUND" ? "✓" : "·"} ${reading.status.padEnd(9)} ${row.file_name.slice(0, 48)}`);
   });
+
+  /* ── الجمع: ممّا فُحص الآن وممّا حُمل من تشغيلٍ سابق — بالقاعدة نفسها ── */
+  const byKind = new Map<string, Tally>();
+  const bySource = new Map<string, Tally>();
+  const all = blank();
+  const withXml: string[] = [];
+  const hiddenOcr: string[] = [];
+  const mismatches: RowResult["mismatches"] = [];
+  const vatLearnable = new Map<string, string>();
+  let invoicesWithQr = 0;
+  let invoicesAgreeing = 0;
+  for (const r of results) {
+    for (const tally of [all, tallyFor(byKind, r.kind), tallyFor(bySource, r.source)]) {
+      tally.files++;
+      if (r.status === "FOUND") tally.found++;
+      else if (r.status === "NOT_ZATCA") tally.notZatca++;
+      else if (r.status === "NONE") tally.none++;
+      else tally.skipped++;
+    }
+    if (r.xml) withXml.push(r.xml);
+    if (r.hiddenOcr) hiddenOcr.push(r.hiddenOcr);
+    if (r.vatLearn) vatLearnable.set(r.vatLearn[0], r.vatLearn[1]);
+    mismatches.push(...r.mismatches);
+    if (r.invoice) {
+      invoicesWithQr++;
+      if (r.invoice.agrees) invoicesAgreeing++;
+    }
+  }
 
   const line = (label: string, t: Tally) =>
     `  ${label.padEnd(22)} ${String(t.files).padStart(4)} ملفّاً · فُكّ رمزُه ${String(t.found).padStart(4)} (${pct(t.found, t.files)}) · رمزٌ لغير الفاتورة ${t.notZatca} · لا رمز قُرئ ${t.none} · لم يُفحص ${t.skipped}`;
@@ -207,8 +270,18 @@ async function main() {
     for (const f of downloadFailed.slice(0, 10)) console.log(`  · ${f}`);
   }
 
+  /* ملخّصٌ يُنسخ كما هو — أرقامٌ بلا أسماء ملفّاتٍ ولا مورّدين */
+  console.log(`\n── ملخّص للنسخ ──`);
+  console.log([
+    `فُحص: ${all.files} ملفّاً (الآن ${rows.length} · سابقاً ${carried.length} · تعذّر تنزيله ${downloadFailed.length})`,
+    `فُكّ رمزُه: ${all.found} (${pct(all.found, all.files)}) · رمزٌ لغير الفاتورة: ${all.notZatca} · لا رمز: ${all.none} · لم يُفحص: ${all.skipped}`,
+    ...[...byKind.entries()].sort((a, b) => b[1].files - a[1].files).map(([k, t]) => `  ${k}: ${t.found}/${t.files} (${pct(t.found, t.files)})`),
+    `فواتير مقيَّدة برمز: ${invoicesWithQr} · يطابقها: ${invoicesAgreeing} (${pct(invoicesAgreeing, invoicesWithQr)}) · خلافات: ${mismatches.length}`,
+    `مورّدون يُعرف رقمهم من الرمز: ${vatLearnable.size} · XML مضمَّن: ${withXml.length} · طبقة ماسح مخفيّة: ${hiddenOcr.length}`,
+  ].join("\n"));
+  if (downloadFailed.length > 0) console.log(`(ما تعذّر تنزيله يُعاد بـ --resume)`);
+
   /* إلى مجلّدٍ متجاهَل — لا إلى جذر المستودع */
-  mkdirSync(".bench", { recursive: true });
   const out = `.bench/zatca-${todayInRiyadh()}.json`;
   writeFileSync(out, JSON.stringify({
     files: all, byKind: Object.fromEntries(byKind), bySource: Object.fromEntries(bySource),

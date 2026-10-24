@@ -1,0 +1,9 @@
+{
+  "كل ساعة من السابعة صباحاً حتى منتصف الليل": "every hour from 7 am to midnight",
+  "تجري المزامنة تلقائياً كل ساعة من السابعة صباحاً حتى منتصف الليل ولو لم يُفتح التطبيق، أو اضغط «زامن الآن».": "Sync runs automatically every hour from 7 am to midnight, even when the app isn't open. Or press “Sync now”.",
+  "كل ساعة من السابعة صباحاً حتى منتصف الليل ولو لم يُفتح التطبيق، ومعها المراجعة الآلية وإعادة التسمية. لا حاجة إلى الضغط على أي زر، إلا إن أضفت ملفاً الآن ولا تريد الانتظار.": "Every hour from 7 am to midnight, even when the app isn't open, together with the automatic review and renaming. No need to press anything, unless you just added a file and don't want to wait.",
+  "كل ثلاث ساعات": "every three hours",
+  "لم يجرِ تشغيل آلي بعد. يعمل {0} ولو لم يُفتح التطبيق.": "No scheduled run yet. It runs {0}, even when the app isn't open.",
+  "آخر تشغيل آلي: {0} — {1}": "Last scheduled run: {0} — {1}",
+  "آخر تشغيل آلي: {0} — فشل: {1}": "Last scheduled run: {0} — failed: {1}"
+}

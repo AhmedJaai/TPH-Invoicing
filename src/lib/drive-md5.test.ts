@@ -24,7 +24,7 @@ describe("drive_md5 موصول من الدرايف إلى التحليل", () =>
   });
 
   it("المزامنة تحفظه في المسارين", () => {
-    const sync = read("app", "api", "drive-sync", "route.ts");
+    const sync = read("services", "drive-sync.service.ts");
     expect(sync.match(/driveMd5:/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 

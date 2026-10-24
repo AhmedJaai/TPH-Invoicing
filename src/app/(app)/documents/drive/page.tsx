@@ -14,6 +14,7 @@ import { formatDay, formatMoment } from "@/lib/riyadh-time";
 import { DriveSyncNow } from "@/components/drive-sync-now";
 import { loadDriveStatus, type DriveStatus } from "@/services/drive-status.service";
 import { AutoWorkSwitch } from "@/components/auto-work-switch";
+import { ScheduledRunLine } from "@/components/scheduled-run";
 import { loadAutoPause } from "@/services/auto-process.service";
 import { T } from "@/components/i18n/t";
 
@@ -52,7 +53,13 @@ export default async function DrivePage() {
       title="الدرايف"
       intro="أرشيف المقهى في جوجل درايف. يقرأ النظام كل جديد فيه تلقائياً، ويعيد تسمية الملفات المؤرشفة بالصيغة القياسية. هنا تجد حالة الربط وما نُفّذ، وأدوات يدوية إن لم ترد الانتظار."
     >
-      <DriveSyncNow {...statusCopy(s)} state={s.state} facts={syncFacts(s)} reconnect={reconnect} />
+      <DriveSyncNow
+        {...statusCopy(s)}
+        state={s.state}
+        facts={syncFacts(s)}
+        scheduled={s.previewMode ? null : <ScheduledRunLine run={s.scheduled} cadence="كل ساعة من السابعة صباحاً حتى منتصف الليل" />}
+        reconnect={reconnect}
+      />
 
       {/* ضابطُ ما يجري وحده — لمن يملك الاعتماد، وهو مَن يجري العملُ باسمه */}
       {can(user.role, "amounts:view") && (
@@ -227,13 +234,13 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
     case "unchecked":
       return {
         headline: "لم تُسجَّل أي مزامنة بعد",
-        detail: "تبدأ المزامنة تلقائياً خلال دقائق من فتح التطبيق ثم كل ثلاث ساعات، أو اضغط «زامن الآن».",
+        detail: "تجري المزامنة تلقائياً كل ساعة من السابعة صباحاً حتى منتصف الليل ولو لم يُفتح التطبيق، أو اضغط «زامن الآن».",
       };
     case "ok":
       return {
         headline: "المزامنة تلقائية",
         detail: s.writesAllowed
-          ? "كل ثلاث ساعات ما دام التطبيق مفتوحاً، وإعادة التسمية كل عشر دقائق. لا حاجة إلى الضغط على أي زر، إلا إن أضفت ملفاً الآن ولا تريد الانتظار."
+          ? "كل ساعة من السابعة صباحاً حتى منتصف الليل ولو لم يُفتح التطبيق، ومعها المراجعة الآلية وإعادة التسمية. لا حاجة إلى الضغط على أي زر، إلا إن أضفت ملفاً الآن ولا تريد الانتظار."
           : "إعادة التسمية متوقفة في هذه البيئة، ولا تتم إلا من نسخة الإنتاج لأن الأرشيف واحد.",
       };
   }

@@ -1,36 +1,30 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
-import { holdRows, type HeldRowInput } from "@/services/bank-held.service";
 import { deriveOpenMonths } from "@/services/expense.service";
 import { NextResponse } from "next/server";
-import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations, supplierAliases, suppliers, reconciliationPeriods, monthCloses } from "@/db/schema";
+import { bankRules, invoices, paymentAllocations, supplierAliases, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { readStatementFile } from "@/services/statement-file.service";
 import {
   findDuplicatePayments, suggestAlias,
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
-import { fileFingerprint, operationRef, operationRefs } from "@/lib/bank/identity";
-import { beneficiaryKey, factKey, looseKey, storedMissingFromFile, syncRows, type KnownRow } from "@/lib/bank/sync";
+import { fileFingerprint } from "@/lib/bank/identity";
 import { resolveBankAccount } from "@/services/bank-account.service";
-import { allocate, recordBankPayment } from "@/services/payment.service";
+import { ImportNotRecordedError, planStatementSync, rowKey, writeStatementImport } from "@/services/bank-import.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
-import { recordAudit } from "@/lib/audit";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { TRANSACTION, countNoun } from "@/lib/arabic";
 import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
 import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
-import { toCanonical, STATED_VALUE_DATE_LIMIT_DAYS } from "@/lib/bank/canonical";
-import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
-import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
 import { linkExactHandPayments, reserveForHandPayments } from "@/services/account-review.service";
 import { withDeadline } from "@/lib/ai/deadline";
-import { MS_PER_DAY, isoDay, isoDayOrNull } from "@/lib/riyadh-time";
+import { isoDay, isoDayOrNull } from "@/lib/riyadh-time";
 import { monthOf } from "@/lib/filing";
 
 export const runtime = "nodejs";
@@ -120,7 +114,7 @@ async function handle(request: Request) {
     .filter((i) => i.outstandingMinor > 0);
 
   const txs: BankTx[] = parsed.rows.map((r, i) => ({
-    id: `row-${r.rowNumber}-${i}`,
+    id: rowKey(r, i),
     valueDate: r.valueDate, description: r.description,
     transactionType: r.transactionType, amountMinor: r.amountMinor, direction: r.direction,
     beneficiaryRaw: r.beneficiaryRaw,
@@ -142,93 +136,10 @@ async function handle(request: Request) {
     bankName: parsed.bank,
   });
 
-  const times = parsed.rows.map((r) => r.valueDate.getTime());
-  const canonicalRows = parsed.rows.map((r, i) => ({
-    key: `row-${r.rowNumber}-${i}`,
-    raw: r,
-    tx: toCanonical({
-      valueDate: r.valueDate,
-      description: r.description,
-      beneficiaryRaw: r.beneficiaryRaw,
-      transactionType: r.transactionType,
-      amountMinor: r.amountMinor,
-      direction: r.direction,
-    }),
-  }));
-
-  /*
-    ما يُقابَل: حركاتُ الفترة نفسها — بالفهرس، لا القاعدة كلّها. وبلا
-    قيدِ حساب: «المجهول» ليس حساباً آخر، هو «لم نكن نعرف».
-  */
-  const priorRows = times.length === 0 ? [] : await db
-    .select({
-      id: bankTransactions.id,
-      valueDate: bankTransactions.valueDate,
-      amountMinor: bankTransactions.amountMinor,
-      direction: bankTransactions.direction,
-      description: bankTransactions.description,
-      transactionType: bankTransactions.transactionType,
-      beneficiaryRaw: bankTransactions.beneficiaryRaw,
-      bankAccountId: bankTransactions.bankAccountId,
-      operationRef: bankTransactions.operationRef,
-    })
-    .from(bankTransactions)
-    .where(and(
-      /*
-        تُوسَّع النافذة أسبوعاً من كلّ طرف — حدُّ `statedValueDate` نفسه:
-        حركةٌ خُزّنت بتاريخ عمودها ويقول نصُّها غيره كانت تقع خارجها فتُدرَج ثانية.
-      */
-      gte(bankTransactions.valueDate, new Date(Math.min(...times) - STATED_VALUE_DATE_LIMIT_DAYS * MS_PER_DAY)),
-      lte(bankTransactions.valueDate, new Date(Math.max(...times) + STATED_VALUE_DATE_LIMIT_DAYS * MS_PER_DAY)),
-    ));
-
-  const knownRows: KnownRow[] = priorRows.map((r) => {
-    const tx = toCanonical({
-      valueDate: r.valueDate, description: r.description,
-      beneficiaryRaw: r.beneficiaryRaw, transactionType: r.transactionType,
-      amountMinor: r.amountMinor, direction: r.direction as "DEBIT" | "CREDIT",
-    });
-    return {
-      id: r.id,
-      accountId: r.bankAccountId,
-      refs: operationRefs(tx),
-      operationRef: r.operationRef ?? operationRef(tx),
-      factKey: factKey(tx),
-      looseKey: looseKey(tx),
-      amountMinor: r.amountMinor,
-      direction: r.direction as "DEBIT" | "CREDIT",
-      beneficiary: beneficiaryKey(tx),
-    };
-  });
-
-  const sync = syncRows(
-    canonicalRows.map((c) => ({ row: c, tx: c.tx })),
-    knownRows,
-    bankAccountId,
-  );
-  /* والعكس: ما عندنا في مدّة الكشف وليس فيه — مكرَّرٌ دخل، أو حركةٌ لم تقع */
-  const missingFromFile = storedMissingFromFile(priorRows, sync, { start: parsed.periodStart, end: parsed.periodEnd }, bankAccountId);
-
-  /*
-    ── الشهر المقفل لا يُكتب فيه من أيّ باب ──
-
-    كان الاستيراد باباً مفتوحاً: أُقفل أغسطس ثمّ دخلت حركتان بتاريخه،
-    فانكسرت معادلة الشهر المقفل بصمت، وعلقت الحوالة في الطابور لأنّ
-    قيدها يُردّ 409. فالجديدُ في شهرٍ مقفل لا يُقيَّد، ويُعدّ ويُقال —
-    ويُعاد فتح الشهر إن كان مقصوداً. (المعروف من قبل لا يمسّه هذا.)
-  */
-  const monthOfRow = (f: (typeof sync.fresh)[number]) => monthOf(f.row.raw.valueDate);
-  const freshMonths = [...new Set(sync.fresh.map(monthOfRow))];
-  const closedMonths = freshMonths.length === 0
-    ? []
-    : (await db
-        .select({ month: monthCloses.month })
-        .from(monthCloses)
-        .where(and(inArray(monthCloses.month, freshMonths), eq(monthCloses.status, "CLOSED")))
-      ).map((r) => r.month);
-  const closedSet = new Set(closedMonths);
-  const inClosedMonth = sync.fresh.filter((f) => closedSet.has(monthOfRow(f)));
-  const freshRows = sync.fresh.filter((f) => !closedSet.has(monthOfRow(f)));
+  const syncPlan = await planStatementSync(db, parsed.rows, bankAccountId, { start: parsed.periodStart, end: parsed.periodEnd });
+  const canonicalRows = syncPlan.rows;
+  const { sync, missingFromFile, closedMonths, inClosedMonth } = syncPlan;
+  const freshRows = syncPlan.fresh;
 
   /*
     محرّك التسوية الجديد.
@@ -322,19 +233,7 @@ async function handle(request: Request) {
   const engineByKeyDraft = new Map(engine.results.map((r) => [r.key, r]));
   let adjudicationOutcomes: Awaited<ReturnType<typeof adjudicate>> = [];
   if (judge.isConfigured() && engine.adjudicationCases.length > 0) {
-    const canonicalByKey = new Map(
-      parsed.rows.map((r, i) => [
-        `row-${r.rowNumber}-${i}`,
-        toCanonical({
-          valueDate: r.valueDate,
-          description: r.description,
-          beneficiaryRaw: r.beneficiaryRaw,
-          transactionType: r.transactionType,
-          amountMinor: r.amountMinor,
-          direction: r.direction,
-        }),
-      ]),
-    );
+    const canonicalByKey = new Map(canonicalRows.map((c) => [c.key, c.tx]));
 
     const invoiceLabels = new Map(
       open.map((o) => [
@@ -379,7 +278,7 @@ async function handle(request: Request) {
   const engineByKey = new Map(engine.results.map((r) => [r.key, r]));
   const txByKey = new Map<string, (typeof txs)[number]>(txs.map((t) => [t.id, t]));
   const rowAmount = new Map<string, number>(
-    parsed.rows.map((r, i) => [`row-${r.rowNumber}-${i}`, r.amountMinor]),
+    parsed.rows.map((r, i) => [rowKey(r, i), r.amountMinor]),
   );
 
   /*
@@ -561,101 +460,9 @@ async function handle(request: Request) {
   }
 
   /*
-   * ── التطبيق ──
-   *
-   * الاستيراد منيع من التكرار على ثلاث طبقات:
-   *   ١. بصمة الملف: الملف نفسه يُعرف قبل قراءة صفوفه — اختصارٌ سريع لا هويّة.
-   *   ٢. هويّة كل حركة (`sync.ts`): مرجعُ العمليّة أوّلاً، فالوقائع.
-   *   ٣. قيدٌ فريد في القاعدة على الهويّة المخزَّنة: الفحص في الشيفرة
-   *      يفلت من طلبين متزامنين، والقيد لا يفلت.
-   */
-  const [priorImport] = await db
-    .select({ id: bankImports.id })
-    .from(bankImports)
-    .where(eq(bankImports.fileSha256, fileSha256))
-    .limit(1);
-
-  const alreadyImported = Boolean(priorImport);
-  const fresh = freshRows;
-
-  /*
-    ── التبنّي ──
-
-    ما عُرف الآن أنّه من هذا الحساب يُكتَب له الحساب، فينتقل من نطاق
-    «المجهول» إلى نطاقه ويحرسه القيدُ في القاعدة بعد اليوم.
-  */
-  if (bankAccountId !== null) {
-    const adopt = sync.known
-      .map((k) => k.verdict.matchedId)
-      .filter((id) => priorRows.find((p) => p.id === id)?.bankAccountId === null);
-    for (let i = 0; i < adopt.length; i += 400) {
-      await db.update(bankTransactions)
-        .set({ bankAccountId })
-        .where(inArray(bankTransactions.id, adopt.slice(i, i + 400)));
-    }
-  }
-
-  /*
-    ── ما تعلّمناه عن القديم يُكتَب عليه ──
-
-    كشفٌ أحدث قد يحمل مرجعَ عمليّةٍ لم يكن في الأوّل. فهو خبرٌ عن
-    الحركة نفسها لا حركةٌ ثانية: يُكتَب المرجع، وتُعرَف به المرّة
-    القادمة مهما تغيّر وصفُها.
-  */
-  for (const e of sync.enrich) {
-    await db.update(bankTransactions)
-      .set({ operationRef: e.operationRef })
-      .where(eq(bankTransactions.id, e.id));
-  }
-
-  /*
-    ── التبنّي ──
-
-    ما عُرف الآن أنّه من هذا الحساب يُكتَب له الحساب، فينتقل من نطاق
-    «المجهول» إلى نطاقه. وبه يحرسه القيدُ الفريد في القاعدة بعد اليوم،
-    ولا يعود يعتمد على فحصٍ في الشيفرة وحده.
-
-    ولا يُتبنّى إلّا ما طابق مفتاحاً في هذا الكشف: تلك وحدها التي ثبت
-    أنّها من هذا الحساب — والباقي يبقى مجهولاً لأنّه لم يُثبَت.
-  */
-  const newRows = fresh.length;
-
-  let importId = priorImport?.id ?? "";
-  let created = 0;
-  /** ما ردّه القيد بعد أن أجازه الفحص — يُعدّ ولا يُبتلَع. */
-  let rejectedByConstraint = 0;
-
-  if (newRows > 0 || !priorImport) {
-    const [imp] = await db
-      .insert(bankImports)
-      .values({
-        fileName: file.name,
-        fileSha256,
-        bank: parsed.bank,
-        accountNumber: parsed.accountNumber ?? null,
-        bankAccountId,
-        rowCount: parsed.rows.length,
-        newRowCount: newRows,
-        importedById: user.id,
-      })
-      .onConflictDoNothing()
-      .returning({ id: bankImports.id });
-    importId = imp?.id ?? priorImport?.id ?? "";
-  }
-
-  if (!importId) {
-    return NextResponse.json({ error: "تعذّر تسجيل الاستيراد. حاول مرة أخرى." }, { status: 500 });
-  }
-
-  /*
-    خطّة الكتابة من المحرّك وحده.
-
-    كان المُطابِق القديم هو من ينشئ الدفعات والتخصيصات، والمحرّك الجديد
-    يكتب «أدلّةً» فوقها. فيمكن أن تُحفَظ حركةٌ بدرجة ٩١ ونتيجةِ «فاتورة
-    بعينها»، وحالتُها `UNMATCHED` — لأنّ المحرّكين اختلفا. ومن يصدّق
-    المستخدم حينئذ؟
-
-    فصار مصدر القرار واحداً: `planned` من `runReconciliation`.
+    خطّة الكتابة من المحرّك وحده: `planned` من `runReconciliation`. كان المُطابِق
+    القديم يُنشئ الدفعات والمحرّكُ يكتب «أدلّةً» فوقها — فتُحفَظ حركةٌ بدرجة ٩١
+    وحالتُها `UNMATCHED`. مصدرُ قرارٍ واحد.
   */
   const plannedByKey = new Map(engine.planned.map((p) => [p.transactionKey, p]));
 
@@ -676,331 +483,52 @@ async function handle(request: Request) {
   }));
   for (const key of reservedForHand.keys()) plannedByKey.delete(key);
 
-  await db.transaction(async (tx) => {
-    for (const row of fresh) {
-      const t = row.row.tx;
-      const key = row.row.key;
-      const decided = engineByKey.get(key);
-      const plan = plannedByKey.get(key);
-      const [inserted] = await tx
-        .insert(bankTransactions)
-        .values({
-          bankImportId: importId,
-          bankAccountId,
-          /*
-            العمودان يحملان الهويّة نفسها — لا خوارزميّتين.
-
-            وكان `external_id` يحمل مفتاح الصفّ داخل الملفّ («row-5-4»)،
-            وعليه فهرسٌ فريد مقيَّد بالحساب. فاستيرادُ ملفٍّ ثانٍ تتكرّر
-            فيه أرقامُ الصفوف تُرَدّ صفوفُه الجديدة صامتةً — حركاتٌ
-            حقيقيّة تختفي بلا شكوى. والفهرس القديم يحرس الآن ما يحرسه
-            `bank_tx_identity_uniq` نفسه.
-          */
-          externalId: row.verdict.identityKey,
-          identityKey: row.verdict.identityKey,
-          operationRef: row.verdict.operationRef,
-          occurrence: row.verdict.occurrence,
-          valueDate: t.valueDate,
-          description: t.description,
-          transactionType: t.transactionType || null,
-          /*
-            ما كتبه البنك في عمود المستفيد — لا اسم المورّد الذي
-            رجّحناه. كان يُكتب هنا اسمُ المطابقة، فإن لم تُطابَق الحركة
-            بقي العمود فارغاً؛ ودائرة مغلقة على نفسها: لا يُعرف المستفيد
-            لأنّ العمود فارغ، والعمود فارغ لأنّه لم يُعرف.
-          */
-          beneficiaryRaw: t.beneficiaryRaw ?? null,
-          amountMinor: t.amountMinor,
-          direction: t.direction,
-          /*
-            كل هذه من المحرّك — بلا احتياطٍ إلى القديم. الاحتياط هنا
-            يعني مصدرَي حقيقة، وهو ما يُنتج التناقض لا يُصلحه.
-          */
-          category: decided?.category ?? "UNKNOWN",
-          /*
-            سبب التصنيف يُحفَظ، لا يُحسَب ثمّ يُرمى. كان يُكتب
-            `ruleId: null` صراحةً ولو صنّفت قاعدةٌ الحركة — فيضيع من
-            صنّف ولماذا، ولا يُقاس بعدها أيّ القواعد أدقّ.
-          */
-          ruleId: decided?.classificationRuleId ?? null,
-          classificationSource: decided?.classificationSource ?? "UNKNOWN",
-          classificationReason: decided?.classificationReason ?? null,
-          classificationVersion: decided?.classificationVersion ?? null,
-          supplierId: decided?.supplierId ?? null,
-          /*
-            المحجوزُ لسدادٍ قيّده صاحبُه بيد ليس «محسوماً» قبل أن يُربط: إن لم يُربط
-            (أخذت حوالةٌ أقدم السدادَ، أو الشهرُ مقفل) بقي في الطابور للمراجعة — لا
-            «قُرِّر ولم يُقيَّد» فلا يُعاد تخطيطُه ويُعدّ شذوذاً.
-          */
-          matchDisposition: reservedForHand.has(key) ? "REVIEW" : decided?.decision?.disposition ?? null,
-          matchScore: decided?.candidate ? Math.round(decided.candidate.score * 100) : null,
-          matchOutcome: decided?.outcome ?? null,
-          /*
-            الأدلّة تُحفَظ بنصّها كي يُعرَض «لماذا؟» بعد شهر — لا رقمُ
-            ثقةٍ ثابت لا يقول شيئاً.
-          */
-          matchEvidence: decided
-            ? {
-                تصنيف: decided.classificationReason,
-                مستفيد: decided.supplierEvidence,
-                مطابقة: decided.decision?.reasons ?? [],
-                درجةالمستفيد: Math.round(decided.supplierScore * 100),
-                ...(reservedForHand.has(key)
-                  ? { سدادمقيّدبيد: "بالمبلغ نفسه للمورّد نفسه، فتُربط به ولا تُسجَّل دفعة ثانية" }
-                  : {}),
-              }
-            : null,
-          /*
-            الحالة تتبع القرار نفسه: ما يُكتَب له سدادٌ «مطابَقة»، وما
-            ليس سداد مورّد «متجاهَلة»، وما عداهما ينتظر.
-          */
-          matchStatus:
-            plan !== undefined ? "MATCHED"
-            : decided && decided.outcome === "NOT_A_PAYMENT" ? "IGNORED"
-            : "UNMATCHED",
-          /*
-            الطبقة تُشتقّ من الحقائق نفسها التي تُكتَب بجانبها — لا
-            تُخمَّن ولا تُترَك `RAW` للكلّ. وهي تجيب سؤالاً لم يكن
-            يُجاب: أين تقف هذه الحركة الآن؟
-          */
-          lifecycle: deriveLifecycle({
-            classified: (decided?.category ?? "UNKNOWN") !== "UNKNOWN",
-            hasCandidate: decided?.candidate != null,
-            decided: decided?.decision?.disposition === "AUTO" && !reservedForHand.has(key),
-            posted: plan !== undefined,
-            ignored: decided?.outcome === "NOT_A_PAYMENT",
-          }),
-        })
-        .onConflictDoNothing()
-        .returning({ id: bankTransactions.id });
-
-      /*
-        القيد الفريد ردّها: إمّا حركةٌ سبقتنا إليها كتابةٌ أخرى، وإمّا
-        حركةٌ مقيَّدة من قبل فاتها الفحصُ أعلاه. والقيد آخر الحرّاس ولا
-        يفلت منه شيء.
-      */
-      if (!inserted) { rejectedByConstraint++; continue; }
-
-      await tx.insert(decisionHistory).values({
-        bankTransactionId: inserted.id,
-        event: "CLASSIFIED",
-        actor: decided?.classificationSource === "MEMORY" ? "MEMORY" : "SYSTEM",
-        actorId: user.id,
-        detail: decided?.classificationReason ?? "لا يوجد سبب مسجّل",
-        payload: {
-          الباب: decided?.category,
-          المصدر: decided?.classificationSource,
-          النسخة: decided?.classificationVersion,
-        },
-      });
-
-      /* أثرُ التحكيم، إن حُكِّمت */
-      const verdict = adjudicationOutcomes.find((o) => o.transactionId === key);
-      if (verdict) {
-        await tx.insert(adjudications).values({
-          bankTransactionId: inserted.id,
-          kind: verdict.kind,
-          provider: verdict.provenance.provider,
-          model: verdict.provenance.model,
-          promptVersion: verdict.provenance.promptVersion,
-          schemaVersion: verdict.provenance.schemaVersion,
-          durationMs: verdict.provenance.durationMs,
-          modelConfidence: String(verdict.provenance.modelConfidence),
-          modelReason: verdict.provenance.modelReason,
-          claimedCodes: verdict.provenance.claimedCodes,
-          upheldCodes: verdict.provenance.upheldCodes,
-          refutedCodes: verdict.provenance.refutedCodes,
-          chosenInvoiceIds: verdict.candidate?.invoiceIds ?? [],
-          chosenCounterparty: verdict.entityChoice?.name ?? null,
-          disposition: verdict.decision.disposition,
-          signals: verdict.decision.signals,
-          refused: verdict.refused,
-        });
-
-        await tx.insert(decisionHistory).values({
-          bankTransactionId: inserted.id,
-          event: "MATCH_SUGGESTED",
-          actor: `AI:${verdict.provenance.provider}`,
-          actorId: user.id,
-          detail: verdict.provenance.modelReason || "بلا سبب",
-          payload: {
-            الثقة: verdict.provenance.modelConfidence,
-            "أدلّة صحّت": verdict.provenance.upheldCodes,
-            "أدلّة ردّت": verdict.provenance.refutedCodes,
-          },
-        });
-      }
-      if (!plan) continue;
-
-      /* الإيصال أو القيد اليدويّ الذي سبق الكشف يُتبنّى ولا يُنسَخ */
-      const { id: paymentId } = await recordBankPayment(tx, {
-        supplierId: plan.supplierId,
-        paidAt: plan.paidAt,
-        amountMinor: plan.amountMinor,
-        method: "BANK_TRANSFER",
-        beneficiaryNameRaw: (t.beneficiaryRaw ?? t.description ?? "").slice(0, 200),
-        /*
-          الرسم يُحفَظ في حقله فيخرج من القسمة — ولا يُنسَب إلى المورّد
-          مالٌ ذهب إلى البنك.
-        */
-        feeMinor: plan.feeMinor,
-        /*
-          الشهر الحاكم هو الأحدث بين شهور الفواتير لا شهر أوّلها: دفعةٌ
-          تسدّد أغسطس وسبتمبر وأكتوبر كانت تُنسب إلى أغسطس كلّها.
-        */
-        appliesToMonth: plan.primaryMonth,
-      });
-
-      /*
-        الطبقة تتقدّم مع المال، لا بعده بخطوة.
-
-        كان هذا يكتب `matchedPaymentId` وحده ويترك `lifecycle` على
-        `RAW` — بينما يُكتب في `decision_history` حدثٌ اسمه `POSTED`.
-        فيختلف السجلّ عن العمود: الأثر يقول «قُيّدت» والحالُ يقول «خام».
-        وكلُّ شاشةٍ تقرأ `lifecycle` ترى الحركة معلَّقةً وقد سُدّدت،
-        فتُعرَض في طابور المراجعة تطلب تأكيداً لا يقبله الخادم —
-        لأنّها مطابَقةٌ أصلاً. خمسُ حركاتٍ في قاعدة أحمد كذلك.
-      */
-      /*
-        ── والبابُ يتقدّم معها ──
-
-        كان القيدُ الآليّ يكتب الدفعةَ والطبقةَ ويترك الباب `UNKNOWN`،
-        بينما يكتب التأكيدُ اليدويّ (`match-confirm`) `SUPPLIER`. فحوالةٌ
-        سدّدت فواتير بيكوف تُعرَض «صادر · غير مصنّفة» بجانب شارة «طُوبقت
-        تلقائياً»، وتدخل «أين ذهب المال» مالاً لا يُعرف أين ذهب — وهي
-        محسوبةٌ في المشتريات. والمصدرُ `STRUCTURE`: عرفها الحسابُ على
-        الفواتير لا كلمةٌ في الوصف. ولا يُكتب فوق بابٍ عرفه المصنِّف.
-      */
-      const classifiedElsewhere = (decided?.category ?? "UNKNOWN") !== "UNKNOWN";
-      await tx
-        .update(bankTransactions)
-        .set({
-          matchedPaymentId: paymentId,
-          matchStatus: "MATCHED",
-          lifecycle: "POSTED",
-          ...(classifiedElsewhere
-            ? {}
-            : {
-                category: "SUPPLIER" as const,
-                supplierId: plan.supplierId,
-                classificationSource: "STRUCTURE" as const,
-                classificationReason: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)} للمورّد`,
-              }),
-        })
-        .where(eq(bankTransactions.id, inserted.id));
-
-      /*
-       * التخصيص محدود بقيمة الدفعة: كانت فاتورة بـ١٥٠٠٫٠١ تُخصَّص كاملةً
-       * على حوالة بـ١٥٠٠٫٠٠، فيخلق النظام هللةً لم تُدفع.
-       */
-      await allocate(tx, paymentId, plan.amountMinor, plan.allocations);
-      created++;
-
-      await tx.insert(decisionHistory).values({
-        bankTransactionId: inserted.id,
-        event: "POSTED",
-        actor: "SYSTEM",
-        actorId: user.id,
-        detail: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)}`,
-        payload: { الدفعة: paymentId, الشهور: plan.months },
-      });
-    }
-  });
-
   /*
-    ── رصيدا كلّ شهرٍ من عمود الرصيد ──
+    ── التطبيق: معاملةٌ واحدة ودفعات (`bank-import.service.ts`) ──
 
-    القارئ يقرأ الرصيد من كلّ صفّ وكان يرميه، فتبقى معادلة التسوية بلا
-    مُدخلات. يُحفَظ لكلّ شهرٍ تستقيم سلسلةُ أرصدته، ولا يغلب ما أدخله
-    إنسان، ولا يستبدل ما قُرئ من كشفٍ أوسع بكشفٍ أضيق.
+    كان نصفُ الكتابة خارج المعاملة وكلُّ حركةٍ إدراجاً وحدها؛ فسقوطٌ في المنتصف
+    يترك استيراداً بلا حركاته. والآن كلُّه أو لا شيء.
   */
-  if (bankAccountId) {
-    for (const mb of monthBalancesFromStatement(parsed.rows)) {
-      await db.insert(reconciliationPeriods).values({
-        bankAccountId,
-        periodStart: mb.periodStart,
-        periodEnd: mb.periodEnd,
-        openingBalanceMinor: mb.openingMinor,
-        closingBalanceMinor: mb.closingMinor,
-        importedCount: mb.rows,
-      }).onConflictDoUpdate({
-        target: [reconciliationPeriods.bankAccountId, reconciliationPeriods.periodStart, reconciliationPeriods.periodEnd],
-        set: { openingBalanceMinor: mb.openingMinor, closingBalanceMinor: mb.closingMinor, importedCount: mb.rows },
-        setWhere: sql`reconciliation_periods.reviewed_by_id is null and reconciliation_periods.imported_count <= ${mb.rows}`,
-      });
-    }
+  let written;
+  try {
+    written = await db.transaction((t) => writeStatementImport(t, {
+      userId: user.id,
+      fileName: file.name,
+      fileSha256,
+      bank: parsed.bank,
+      accountNumber: parsed.accountNumber ?? null,
+      bankAccountId,
+      rows: parsed.rows,
+      plan: syncPlan,
+      decisions: engineByKey,
+      planned: plannedByKey,
+      reservedForHand: new Set(reservedForHand.keys()),
+      adjudications: adjudicationOutcomes,
+      auditSummary: summary,
+    }));
+  } catch (e) {
+    if (e instanceof ImportNotRecordedError) return NextResponse.json({ error: e.message }, { status: 500 });
+    /* الشهرُ المقفل وقيودُ القاعدة تُقال بجملتها — ولم يُكتب شيء */
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
   }
-
-  await recordAudit({
-    actorId: user.id,
-    action: "BANK_IMPORTED",
-    entityType: "bank_import",
-    entityId: importId,
-    after: {
-      ...summary,
-      حركات_جديدة: newRows,
-      حركات_موجودة_تُخطّيت: sync.known.length,
-      حركات_ملتبسة: sync.ambiguous.length,
-      تضارب_هويّة: sync.conflict.length,
-      مدفوعات_أُنشئت: created,
-      الملف_مستورد_مسبقاً: alreadyImported,
-    },
-  });
+  const { importId, alreadyImported, newRows, created, rejectedByConstraint, held } = written;
 
   /*
-    ── الحوالةُ وسدادُها المقيَّد بيد ──
+    ── وما بعد الكتابة: يقرأ ما أُودع، ويتعثّر وحده ──
 
-    فاتورةٌ رُفعت وقيل «سُدّدت» فقُيِّدت دفعةٌ بلا حركة وأُغلقت — فلا يجد المطابقُ
-    لحوالتها فاتورةً مفتوحة، وتقف في الطابور (مختبرات القهوة ٦٣٨). فبعد الكتابة
-    تُربط كلُّ حوالةٍ بدفعتها المقيَّدة بيد إن طابق المبلغُ والمورّدُ في نافذة أيّام.
-    وما زادت فيه الحوالةُ يُقترح في «راجِع الحسابات» ولا يُربط وحده.
+    الحوالةُ وسدادُها المقيَّد بيد: فاتورةٌ رُفعت وقيل «سُدّدت» فقُيِّدت دفعةٌ بلا
+    حركة — فبعد الكتابة تُربط كلُّ حوالةٍ بدفعتها إن طابق المبلغُ والمورّدُ في
+    نافذة أيّام (كلُّ ربطٍ في معاملته). ومصروفُ ما صُنّف من الجديد يُقيَّد وحده
+    في أشهره المفتوحة. وتعثّرُ أحدهما يُقال في الملاحظات ولا يُلغي الاستيراد.
   */
   const linkNotes: string[] = [];
   const handLinked = newRows > 0 ? await linkExactHandPayments(user.id, linkNotes) : 0;
-  /*
-    الملتبسُ والمتضاربُ يُحفظان لقرار إنسان — كانا يُعدّان هنا ثمّ يختفيان،
-    فحوالةٌ ثانيةٌ حقيقيّة تضيع ولا يُسأل عنها (`bank-held.service.ts`).
-  */
-  const held = await holdRows([
-    ...sync.ambiguous.map((a) => ({ kind: "AMBIGUOUS" as const, row: a.row, verdict: a.verdict })),
-    ...sync.conflict.map((c) => ({ kind: "CONFLICT" as const, row: c.row, verdict: c.verdict })),
-  ].map((h): HeldRowInput => ({
-    kind: h.kind,
-    bankImportId: importId ?? null,
-    bankAccountId,
-    againstTransactionId: h.verdict.againstId,
-    reason: h.verdict.reason,
-    valueDate: h.row.raw.valueDate,
-    description: h.row.raw.description ?? null,
-    beneficiaryRaw: h.row.raw.beneficiaryRaw ?? null,
-    transactionType: h.row.raw.transactionType || null,
-    amountMinor: h.row.raw.amountMinor,
-    direction: h.row.raw.direction,
-    operationRef: operationRef(h.row.tx),
-  })).concat(missingFromFile.map((m) => ({
-    kind: "MISSING_FROM_FILE" as const,
-    bankImportId: importId ?? null,
-    bankAccountId,
-    againstTransactionId: m.id,
-    reason: "موجودة عندنا وليست في كشف البنك الذي يغطي يومها. ربما سُجّلت مرتين، أو لم تحدث أصلاً.",
-    valueDate: m.valueDate,
-    description: m.description,
-    beneficiaryRaw: m.beneficiaryRaw,
-    transactionType: m.transactionType,
-    amountMinor: m.amountMinor,
-    direction: m.direction as "DEBIT" | "CREDIT",
-    operationRef: m.operationRef,
-  }))));
-  /* ومصروفُ ما صُنّف من الجديد يُقيَّد وحده — لا ينتظر زرّاً في صفحة المصروفات */
   const derived = newRows > 0
     ? await deriveOpenMonths(freshRows.map((f) => monthOf(f.row.raw.valueDate)), user.id)
     : { created: 0, notes: [] };
   linkNotes.push(...derived.notes);
-
-  /* الصفّ المحفوظ يقول ما دخل فعلاً — لا ما أجازه الفحص ثمّ ردّه القيد */
-  if (rejectedByConstraint > 0 && importId) {
-    await db.update(bankImports).set({ newRowCount: newRows - rejectedByConstraint }).where(eq(bankImports.id, importId));
-  }
   return NextResponse.json({
     ok: true,
     applied: true,

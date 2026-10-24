@@ -1,0 +1,75 @@
+name: التشغيل المجدول
+
+# العملُ الخلفيّ بلا صفحةٍ مفتوحة: ينادي /api/cron/<job> على الإنتاج بسرّ CRON_SECRET.
+# خطّة Vercel (Hobby) لا تجدول أكثر من مرّةٍ في اليوم — فالجدولُ هنا.
+# والأوقاتُ بتوقيت UTC (الرياض = UTC+3). وGitHub قد يؤخّر التشغيلَ المجدول دقائقَ أو أكثر
+# تحت الضغط، أو يُسقط بعضه — مقبول: القشرةُ في التطبيق تعمل احتياطاً حين يتأخّر.
+# والفشلُ (ردٌّ غير 2xx) يُسقط المهمّة، فيصل بريدُ GitHub إلى صاحب المستودع.
+on:
+  schedule:
+    # فودكس: كلَّ ثلاث ساعات (٠٣:١٧، ٠٦:١٧، … بتوقيت الرياض)
+    - cron: "17 */3 * * *"
+    # الدرايف والمراجعة الآلية: كلَّ ساعة من ٠٧:٤١ حتى ٠٠:٤١ بتوقيت الرياض
+    - cron: "41 4-21 * * *"
+    # لقطة أرقام اليوم: ٠٥:٣٠ بتوقيت الرياض
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "أيّ عمل"
+        type: choice
+        options: [foodics, drive, daily]
+        default: drive
+
+# ينادي رابطاً ولا يقرأ من المستودع شيئاً
+permissions:
+  contents: read
+
+# تشغيلان للعمل نفسه لا يتداخلان هنا (وفي التطبيق عقدٌ يردّ الثاني بلا عمل على أيّ حال)
+concurrency:
+  group: schedule-${{ github.event.schedule || inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: أيّ عمل
+        id: pick
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_JOB: ${{ inputs.job }}
+        run: |
+          case "$SCHEDULE" in
+            "17 */3 * * *") job=foodics ;;
+            "41 4-21 * * *") job=drive ;;
+            "30 2 * * *") job=daily ;;
+            "") job="$INPUT_JOB" ;;
+            *) job="" ;;
+          esac
+          case "$job" in
+            foodics|drive|daily) ;;
+            *) echo "::error::جدولٌ لا عملَ له: '$SCHEDULE'"; exit 1 ;;
+          esac
+          echo "job=$job" >> "$GITHUB_OUTPUT"
+
+      - name: نادِ التطبيق
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          JOB: ${{ steps.pick.outputs.job }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::سرّ CRON_SECRET غير موجود في أسرار المستودع"; exit 1; fi
+          url="https://tph-invoicing.vercel.app/api/cron/$JOB"
+          for attempt in 1 2; do
+            if curl --silent --show-error --fail-with-body --max-time 320 \
+                 -X POST -H "Authorization: Bearer $CRON_SECRET" "$url"; then
+              echo
+              exit 0
+            fi
+            echo
+            echo "::warning::المحاولة $attempt لـ$JOB لم تنجح"
+            if [ "$attempt" = 1 ]; then sleep 30; fi
+          done
+          echo "::error::فشل التشغيل المجدول لـ$JOB — الردّ أعلاه يقول السبب"
+          exit 1

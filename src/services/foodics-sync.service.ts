@@ -30,6 +30,8 @@ import { catalogItemsFromApi, catalogProductsFromApi } from "@/lib/foodics/catal
 import type { ParsedCatalog } from "@/lib/inventory/foodics-catalog";
 import { addDays, todayInRiyadh } from "@/lib/riyadh-time";
 import { ensureFoodicsSource, importParsedSales } from "./sales-import.service";
+import { acquireLease, loadCronRun, releaseLease } from "./job-state.service";
+import type { CronRun } from "@/lib/cron";
 
 const ORDER_INCLUDE = "payments.payment_method,products.product.category,products.options.modifier_option,products.taxes,branch,original_order,combos";
 const PURCHASE_INCLUDE = "supplier,items";
@@ -469,6 +471,38 @@ export async function runFoodicsSync(options: SyncOptions): Promise<SyncResult> 
   return { runId: run.id, status, counts, error };
 }
 
+/*
+  مزامنةٌ واحدةٌ في كلّ لحظة: الخلفيّةُ تُطلَق من كلّ جهازٍ ولسانٍ بتوقيته، فبدأت
+  اثنتان بفارق ثلاث ثوانٍ (١٩ أكتوبر ٢٠٢٦) وسقطت الثانية. والعقدُ أطولُ من عمر المسار
+  فلا ينقضي وصاحبُه يعمل، وينقضي وحده إن قتلته المنصّة. ويأخذه البابان معاً —
+  «زامن الآن» (`/api/foodics-sync`) والتشغيلُ المجدول (`/api/cron/foodics`).
+*/
+const SYNC_LEASE = "foodics-sync-lease";
+const SYNC_LEASE_MS = 70_000;
+
+export interface LeaseDeps {
+  acquire: (name: string, holder: string, ttlMs: number) => Promise<boolean>;
+  release: (name: string, holder: string) => Promise<void>;
+  run: (options: SyncOptions) => Promise<SyncResult>;
+}
+
+/** المزامنةُ تحت عقدها — `busy` إن كانت أخرى تجري، فلا تقع الثانيةُ ولا تكتب شيئاً. */
+export async function runLeasedFoodicsSync(
+  options: { actorId: string | null; budgetMs: number },
+  deps?: Partial<LeaseDeps>,
+): Promise<{ busy: true } | { busy: false; result: SyncResult }> {
+  const acquire = deps?.acquire ?? ((n, h, t) => acquireLease(n, h, t));
+  const release = deps?.release ?? ((n, h) => releaseLease(n, h));
+  const run = deps?.run ?? runFoodicsSync;
+  const holder = crypto.randomUUID();
+  if (!(await acquire(SYNC_LEASE, holder, SYNC_LEASE_MS))) return { busy: true };
+  try {
+    return { busy: false, result: await run({ actorId: options.actorId, budgetMs: options.budgetMs }) };
+  } finally {
+    await release(SYNC_LEASE, holder).catch(() => undefined);
+  }
+}
+
 export interface FoodicsStatus {
   configured: boolean;
   lastRun: { status: string; startedAt: Date; finishedAt: Date | null; error: string | null; scope: string } | null;
@@ -477,15 +511,18 @@ export interface FoodicsStatus {
   firstDay: string | null;
   lastDay: string | null;
   purchases: number;
+  /** آخرُ تشغيلٍ مجدول (`/api/cron/foodics`) — `null`: لم يجرِ قطّ. */
+  scheduled: CronRun | null;
 }
 
 /** حالُ الوصل لشاشاته — «أيعرف شيئاً؟» قبل أن يُعرَض رقم. */
 export async function loadFoodicsStatus(): Promise<FoodicsStatus> {
-  const [[lastRun], [ok], [o], [p]] = await Promise.all([
+  const [[lastRun], [ok], [o], [p], scheduled] = await Promise.all([
     db.select().from(foodicsSyncRuns).orderBy(desc(foodicsSyncRuns.startedAt)).limit(1),
     db.select({ at: sql<Date | null>`max(${foodicsSyncRuns.finishedAt})` }).from(foodicsSyncRuns).where(eq(foodicsSyncRuns.status, "OK")),
     db.select({ n: sql<number>`count(*)::int`, first: sql<string | null>`min(${foodicsOrders.businessDate})`, last: sql<string | null>`max(${foodicsOrders.businessDate})` }).from(foodicsOrders),
     db.select({ n: sql<number>`count(*)::int` }).from(foodicsPurchases),
+    loadCronRun("foodics").catch(() => null),
   ]);
   return {
     configured: foodicsConfigured(),
@@ -495,6 +532,7 @@ export async function loadFoodicsStatus(): Promise<FoodicsStatus> {
     firstDay: o?.first ?? null,
     lastDay: o?.last ?? null,
     purchases: Number(p?.n ?? 0),
+    scheduled,
   };
 }
 

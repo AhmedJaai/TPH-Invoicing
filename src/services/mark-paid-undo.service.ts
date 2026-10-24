@@ -17,7 +17,7 @@ import { assertMonthsOpen } from "./month-guard";
 import { reversePayment } from "./payment.service";
 import { undrawBankCredit } from "./supplier-credit.service";
 import type { Tx } from "./types";
-import { monthOf } from "@/lib/filing";
+import { currentMonthRiyadh } from "@/lib/riyadh-time";
 
 export const UNDO_WINDOW_MINUTES = 30;
 
@@ -63,7 +63,7 @@ export async function undoMarkedPaid(
     }
   }
 
-  await assertMonthsOpen(t, rows.flatMap((p) => [p.appliesToMonth, monthOf(p.paidAt)]));
+  await assertMonthsOpen(t, rows.flatMap((p) => [p.appliesToMonth, currentMonthRiyadh(p.paidAt)]));
 
   let freedMinor = 0;
   for (const p of rows) {

@@ -17,6 +17,7 @@ import { FIELD, FILE, countNoun } from "@/lib/arabic";
 import { ISSUE } from "@/lib/issue-codes";
 import { buttonClass, fieldClass } from "./ui-tokens";
 import { createLimiter } from "@/lib/async-pool";
+import { MAX_STAGED_BYTES, stagingPathname } from "@/lib/blob-staging-policy";
 import { deleteDraft, loadDrafts, saveDraft } from "@/lib/review-drafts";
 import { Sheet, toast } from "./ui-client";
 import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
@@ -106,6 +107,8 @@ type Item =
       edited: Record<string, string>;
       /** فارغٌ لصورة الفريق المفتوحة بمعرّفها — بايتاتُها في القاعدة، والأرشفةُ تأخذها من هناك */
       fileBase64: string;
+      /** ملفٌّ كبير رُفع إلى المحطّة المؤقّتة (`blob-staging-policy.ts`) — الأرشفةُ تأخذه من هناك */
+      blobUrl?: string;
       mimeType: string;
       previewUrl: string;
       /** صورةٌ من الفريق — تُعتمد بهذه الأرشفة */
@@ -686,7 +689,10 @@ export function Uploader({
   canCreateSupplier = true,
   suppliers: initialSuppliers = [],
   team = [],
+  largeUploads = false,
 }: {
+  /** مخزنُ الملفّات الكبيرة موصول — ما فوق ٣ ميجابايت يُرفع إلى المحطّة المؤقّتة لا يُردّ */
+  largeUploads?: boolean;
   canSeeAmounts?: boolean;
   canCreateSupplier?: boolean;
   suppliers?: SupplierOption[];
@@ -769,8 +775,20 @@ export function Uploader({
     /* «أعد المحاولة» يقرأ الملفَّ المُعَدّ — فيحمل المعرّفَ هو أيضاً */
     if (captureId) tagCapture(file, captureId);
 
-    /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
-    if (file.size > MAX_BYTES) {
+    /*
+      الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده. وإن وُصل مخزنُ الملفّات الكبيرة
+      فما فوق ٣ ميجابايت يُرفع إليه مباشرةً (حتى ٢٥) ويُقرأ من هناك.
+    */
+    const staged = largeUploads && file.size > MAX_BYTES;
+    if (staged && file.size > MAX_STAGED_BYTES) {
+      const tooBig: Item = {
+        id, fileName: file.name, state: "failed", mime: file.type, captureId, file,
+        error: "الملف أكبر من ٢٥ ميجابايت، وهو الحد الأقصى للرفع. صغّره أو قسّمه ثم أعد المحاولة.",
+      };
+      setItems((prev) => prev.map((it) => (it.id === id ? tooBig : it)));
+      return;
+    }
+    if (!staged && file.size > MAX_BYTES) {
       const tooBig: Item = {
         id, fileName: file.name, state: "failed", mime: file.type, captureId, file,
         error: file.type.startsWith("image/")
@@ -789,12 +807,33 @@ export function Uploader({
     const failed = (error: string): Item => ({ id, fileName: file.name, state: "failed", error, file, previewUrl, mime: file.type, captureId });
 
     try {
-      // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
-      const fileBase64 = await blobToBase64(file);
-
-      const body = new FormData();
-      body.append("file", file);
-      const r = await request<AnalysisResponse>("/api/analyze", { method: "POST", body });
+      /*
+        الملفّ الكبير: يُرفع إلى المحطّة ثمّ يُقرأ برابطه — والأرشفةُ تأخذه من هناك، فلا
+        تُحمل بايتاتُه في الصفحة. وغيرُه: البايتاتُ هنا لأنّ الأرشفة ترفع الملف الأصلي نفسه.
+      */
+      let fileBase64 = "";
+      let blobUrl: string | undefined;
+      let r: Awaited<ReturnType<typeof request<AnalysisResponse>>>;
+      if (staged) {
+        try {
+          const { upload } = await import("@vercel/blob/client");
+          const put = await upload(stagingPathname(file.name), file, {
+            access: "private",
+            handleUploadUrl: "/api/upload/blob",
+            ...(file.type ? { contentType: file.type, clientPayload: JSON.stringify({ contentType: file.type }) } : {}),
+          });
+          blobUrl = put.url;
+        } catch {
+          setItems((prev) => prev.map((it) => (it.id === id ? failed("تعذّر رفع الملف الكبير. تأكد من الشبكة ثم أعد المحاولة.") : it)));
+          return;
+        }
+        r = await postJson<AnalysisResponse>("/api/analyze", { blobUrl, fileName: file.name, mimeType: file.type });
+      } else {
+        fileBase64 = await blobToBase64(file);
+        const body = new FormData();
+        body.append("file", file);
+        r = await request<AnalysisResponse>("/api/analyze", { method: "POST", body });
+      }
 
       if (!r.ok) {
         setItems((prev) => prev.map((it) => (it.id === id ? failed(r.error) : it)));
@@ -811,6 +850,7 @@ export function Uploader({
                 state: "done",
                 data,
                 fileBase64,
+                blobUrl,
                 mimeType: file.type,
                 previewUrl,
                 captureId,
@@ -822,7 +862,7 @@ export function Uploader({
     } catch (e) {
       setItems((prev) => prev.map((it) => (it.id === id ? failed((e as Error).message) : it)));
     }
-  }, []);
+  }, [largeUploads]);
 
   /*
     ── طابورُ القراءة ──
@@ -913,6 +953,8 @@ export function Uploader({
       const live = new Set<string>();
       for (const it of items) {
         if (it.state !== "done") continue;
+        /* الملفّ الكبير في المحطّة لا يُحفظ في المتصفّح (بايتاتُه هناك) — ويُنبَّه عند الخروج */
+        if (it.blobUrl) continue;
         live.add(it.id);
         const pick = chosen[it.id];
         const sig = JSON.stringify([it.edited, it.data.result, pick?.id ?? null]);
@@ -934,7 +976,7 @@ export function Uploader({
     تحذيرُ الخروج لما يضيع فعلاً: ملفٌّ ينتظر أو يُقرأ (لم يصل بعد)، وبطاقةُ مراجعةٍ
     تعذّر حفظُها في المتصفّح. وما حُفظ يُستعاد فلا يُسأل عنه.
   */
-  const atRisk = items.some((i) => i.state === "queued" || i.state === "reading" || (draftsFailed && i.state === "done"));
+  const atRisk = items.some((i) => i.state === "queued" || i.state === "reading" || (i.state === "done" && (draftsFailed || Boolean(i.blobUrl))));
   useEffect(() => {
     if (!atRisk) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -994,6 +1036,8 @@ export function Uploader({
           mimeType: it.mimeType,
           /* صورةُ الفريق المفتوحة بمعرّفها لا ترفع ملفّاً: الخادمُ يأخذه من صفّها */
           fileBase64: it.fileBase64 || undefined,
+          /* الملفّ الكبير برابطه في المحطّة — الخادمُ يقرؤه ويفحص بصمته ويحذفه بعد الأرشفة */
+          blobUrl: it.blobUrl,
           documentKind: r.documentKind,
           supplierId: chosenRef.current[id]?.id ?? r.supplier?.id,
           invoiceNumber: it.edited.invoiceNumber,
@@ -1575,7 +1619,9 @@ export function Uploader({
         </div>
         {!compact && (
           <p className="mt-5 text-center text-[11px] text-muted">
-            حتى ٣ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام
+            {largeUploads
+              ? "حتى ٢٥ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"
+              : "حتى ٣ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"}
           </p>
         )}
       </div>

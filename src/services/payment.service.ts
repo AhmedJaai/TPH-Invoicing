@@ -7,7 +7,7 @@
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
 import { LINK_WINDOW_DAYS } from "@/lib/hand-payment-link";
-import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, paymentMonthOf, todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
 import { assertMonthsOpen } from "./month-guard";
@@ -150,8 +150,9 @@ export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<
   /*
     الشهرُ بتوقيت الرياض: حوالةٌ في الواحدة فجراً أوّلَ الشهر هي من الشهر
     الجديد، وكان `toISOString` يحسبها في السابق فيُفحَص قفلُ شهرٍ غير شهرها.
+    و`paymentMonthOf` هي `payment_month` في القاعدة — الحارسان يسألان عن شهرٍ واحد.
   */
-  await assertMonthsOpen(tx, [input.appliesToMonth ?? currentMonthRiyadh(input.paidAt)]);
+  await assertMonthsOpen(tx, [paymentMonthOf(input.appliesToMonth, input.paidAt)]);
 
   /*
     ── الواقعة الواحدة لا تُقيَّد دفعتين ──

@@ -11,6 +11,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { jobState } from "@/db/schema";
 import type { Conn } from "./types";
+import { cronStateRow, decodeCronRun, encodeCronRun, type CronJob, type CronRun } from "@/lib/cron";
 
 /** ما يعمل عليه الاستدراك: المستنداتُ والفواتيرُ والدفعاتُ والتخصيصاتُ والكشفُ وقراراتُه. */
 export async function backlogFingerprint(conn: Conn = db): Promise<string> {
@@ -65,4 +66,16 @@ export async function releaseLease(name: string, holder: string, conn: Conn = db
   await conn.execute(sql`
     update job_state set ran_at = to_timestamp(0) where name = ${name} and fingerprint = ${holder}
   `);
+}
+
+/** آخرُ تشغيلٍ مجدول لعملٍ (`cron:<job>`) — متى، وأنجح، وما وقع. `null`: لم يجرِ قطّ. */
+export async function loadCronRun(job: CronJob, conn: Conn = db): Promise<CronRun | null> {
+  const [row] = await conn.select().from(jobState).where(eq(jobState.name, cronStateRow(job))).limit(1);
+  return row ? decodeCronRun(row.fingerprint, row.ranAt) : null;
+}
+
+export async function recordCronRun(job: CronJob, run: { ok: boolean; result: string }, conn: Conn = db): Promise<void> {
+  const fingerprint = encodeCronRun(run);
+  await conn.insert(jobState).values({ name: cronStateRow(job), fingerprint, ranAt: new Date() })
+    .onConflictDoUpdate({ target: jobState.name, set: { fingerprint, ranAt: new Date() } });
 }

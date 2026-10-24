@@ -12,7 +12,7 @@ import { createId } from "@/lib/id";
 import { expenseEventKey } from "@/lib/expenses";
 import { recordAudit } from "@/lib/audit";
 import type { Conn, Tx } from "./types";
-import { firstClosedMonth } from "./month-guard";
+import { assertMonthsOpen, closedMonthsAmong, firstClosedMonth } from "./month-guard";
 import {
   deriveFromBank,
   bankExpenseLabel,
@@ -41,6 +41,8 @@ export interface DeriveResult {
   removed: number;
   /** مصروفٌ قُيِّد بيدٍ من قبل ووجدنا حركتَه — رُبط بها ولم يُكتب ثانية. */
   adopted: number;
+  /** حركاتُ مصروفٍ في شهرٍ مقفل لم تُقيَّد — الإقفالُ ختمٌ، وتُقيَّد إن أُعيد فتحُه. */
+  skippedClosedMonth: number;
 }
 
 /**
@@ -105,7 +107,15 @@ export async function deriveExpensesFromBank(
   conn: Conn = db,
 ): Promise<DeriveResult> {
   const { txs, already } = await loadBankForExpenses(month, conn);
-  const { candidates, goodsPurchases } = deriveFromBank(txs, already);
+  const derived = deriveFromBank(txs, already);
+  const { goodsPurchases } = derived;
+  /*
+    الشهرُ المقفل لا يُقيَّد فيه مصروف — وفي القاعدة مؤثِّرٌ يرفضه. فاشتقاقُ «كلّ
+    الأشهر» كان سيسقط كلُّه بحركةٍ واحدة في شهرٍ مقفل؛ فيُتخطّى المقفل ويُعدّ.
+  */
+  const closed = await closedMonthsAmong(conn, derived.candidates.map((c) => c.periodMonth));
+  const candidates = derived.candidates.filter((c) => !closed.has(c.periodMonth));
+  const skippedClosedMonth = derived.candidates.length - candidates.length;
   const recurring = await activeRecurring(conn);
 
   /*
@@ -200,7 +210,8 @@ export async function deriveExpensesFromBank(
     adopted: adoptions.length,
     skippedAlreadyRecorded: alreadyCount,
     skippedNotExpense:
-      debits.length - candidates.length - alreadyCount - goodsPurchases.length,
+      debits.length - derived.candidates.length - alreadyCount - goodsPurchases.length,
+    skippedClosedMonth,
     skippedGoodsPurchase: goodsPurchases.length,
     goodsPurchaseMinor: goodsPurchases.reduce((s, g) => s + g.amountMinor, 0),
     linkedToRecurring: linked,
@@ -238,6 +249,7 @@ export async function resyncBankExpenses(
     .select({
       expenseId: expenses.id,
       expenseCategory: expenses.category,
+      periodMonth: expenses.periodMonth,
       label: expenses.label,
       amountMinor: expenses.amountMinor,
       occurredOn: expenses.occurredOn,
@@ -251,13 +263,19 @@ export async function resyncBankExpenses(
     .innerJoin(bankTransactions, eq(bankTransactions.id, expenses.bankTransactionId))
     .where(and(where, eq(expenses.source, "BANK")));
 
-  const remove = rows.filter((r) =>
+  /*
+    المصروفُ في شهرٍ مقفل يبقى كما خُتم ولو تغيّر تصنيفُ حركته بعد الإقفال —
+    والمؤثِّرُ يرفض تعديلَه. ويتبع التصنيفَ حين يُعاد فتحُ شهره ويُشتقّ.
+  */
+  const closed = await closedMonthsAmong(tx, rows.map((r) => r.periodMonth));
+  const open = rows.filter((r) => !closed.has(r.periodMonth));
+  const remove = open.filter((r) =>
     r.direction !== "DEBIT"
     || !isExpenseCategory(r.category)
     || looksLikeGoodsPurchase(r.description, r.beneficiaryRaw));
   const removeIds = new Set(remove.map((r) => r.expenseId));
   /* البابُ والاسمُ يتبعان الحركة — والاسمُ لا يكتبه أحدٌ بيده للمصروف البنكيّ */
-  const update = rows
+  const update = open
     .filter((r) => !removeIds.has(r.expenseId))
     .map((r) => ({ ...r, nextLabel: bankExpenseLabel({ beneficiaryRaw: r.beneficiaryRaw, description: r.description, category: r.category }) }))
     .filter((r) => r.expenseCategory !== r.category || r.label !== r.nextLabel);
@@ -293,10 +311,12 @@ export async function resyncBankExpenses(
       .from(bankTransactions)
       .where(inArray(bankTransactions.id, [...scope.transactionIds]));
     const already = new Set(rows.filter((r) => !removeIds.has(r.expenseId)).map((r) => r.txId));
-    const { candidates } = deriveFromBank(
+    const derivedNow = deriveFromBank(
       txs.map((t) => ({ ...t, direction: t.direction as "DEBIT" | "CREDIT" })),
       already,
-    );
+    ).candidates;
+    const closedNow = await closedMonthsAmong(tx, derivedNow.map((c) => c.periodMonth));
+    const candidates = derivedNow.filter((c) => !closedNow.has(c.periodMonth));
     if (candidates.length > 0) {
       await tx.insert(expenses).values(candidates.map((c) => ({
         id: createId(),
@@ -343,42 +363,48 @@ export async function recordManualExpense(
     amountMinor: number;
     note?: string;
   },
+  conn: Conn = db,
 ): Promise<string> {
   if (input.amountMinor <= 0) throw new Error("يجب أن يكون المبلغ أكبر من صفر");
 
   const id = createId();
-  const recurring = await activeRecurring();
+  const recurring = await activeRecurring(conn);
   const match = matchRecurring(input, recurring);
+  const periodMonth = input.occurredOn.slice(0, 7);
 
-  await db.insert(expenses).values({
-    id,
-    periodMonth: input.occurredOn.slice(0, 7),
-    occurredOn: input.occurredOn,
-    category: input.category,
-    label: input.label,
-    amountMinor: input.amountMinor,
-    source: "MANUAL",
-    recurringExpenseId: match?.id ?? null,
-    /*
-      وتُحفَظ للقيد اليدويّ أيضاً — لا ليمنعه قيد، بل ليُعرَض تكرارُه.
-      فقيدُ الإنسان مرّتين قد يكون قصداً، والقرار له.
-    */
-    eventKey: expenseEventKey({
-      category: input.category,
+  /* الشهرُ المقفل يُقال بجملته (409) قبل أن يردّه مؤثِّرُ القاعدة — والقيدُ وأثرُه معاً أو لا شيء */
+  await conn.transaction(async (t) => {
+    await assertMonthsOpen(t, [periodMonth]);
+    await t.insert(expenses).values({
+      id,
+      periodMonth,
       occurredOn: input.occurredOn,
-      amountMinor: input.amountMinor,
+      category: input.category,
       label: input.label,
-    }),
-    note: input.note,
-    createdById: userId,
-  });
+      amountMinor: input.amountMinor,
+      source: "MANUAL",
+      recurringExpenseId: match?.id ?? null,
+      /*
+        وتُحفَظ للقيد اليدويّ أيضاً — لا ليمنعه قيد، بل ليُعرَض تكرارُه.
+        فقيدُ الإنسان مرّتين قد يكون قصداً، والقرار له.
+      */
+      eventKey: expenseEventKey({
+        category: input.category,
+        occurredOn: input.occurredOn,
+        amountMinor: input.amountMinor,
+        label: input.label,
+      }),
+      note: input.note,
+      createdById: userId,
+    });
 
-  await recordAudit({
-    actorId: userId,
-    action: "EXPENSE_ADDED",
-    entityType: "expense",
-    entityId: id,
-    after: { ...input, source: "MANUAL" },
+    await recordAudit({
+      actorId: userId,
+      action: "EXPENSE_ADDED",
+      entityType: "expense",
+      entityId: id,
+      after: { ...input, source: "MANUAL" },
+    }, t);
   });
 
   return id;
@@ -393,11 +419,13 @@ export type DeleteExpenseOutcome = "DELETED" | "NOT_FOUND" | "BANK_DERIVED";
  * فشلت الثانية. والمشتقّ من حركة بنك يُردّ: الاشتقاق يعيده، فحذفُه
  * يُوهم بإصلاحٍ لا يبقى — يُصحَّح تصنيف حركته بدلاً منه.
  */
-export async function deleteExpense(userId: string, id: string): Promise<DeleteExpenseOutcome> {
-  return db.transaction(async (t) => {
+export async function deleteExpense(userId: string, id: string, conn: Conn = db): Promise<DeleteExpenseOutcome> {
+  return conn.transaction(async (t) => {
     const [row] = await t.select().from(expenses).where(eq(expenses.id, id)).for("update");
     if (!row) return "NOT_FOUND";
     if (row.source === "BANK") return "BANK_DERIVED";
+    /* مصروفُ الشهر المقفل لا يُحذف — يُقال بجملته (409) لا بنصّ المؤثِّر */
+    await assertMonthsOpen(t, [row.periodMonth]);
 
     await t.delete(expenses).where(eq(expenses.id, id));
     await recordAudit({
