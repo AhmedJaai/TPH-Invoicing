@@ -15,6 +15,8 @@ interface Side {
   driveFileId: string | null;
   /** القيدُ الأقدم — يبقى بسداده وحوالته */
   older: boolean;
+  /** سُجّلت من سطر كشف بلا ملفّ — ليست ورقةً تُختار */
+  virtual?: boolean;
 }
 
 /**
@@ -26,7 +28,10 @@ interface Side {
 export function InvoiceMerge({ current, twin }: { current: Side; twin: Side }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [fileOf, setFileOf] = useState<string>(current.older ? current.id : twin.id);
+  const olderSide = current.older ? current : twin;
+  const newerSide = current.older ? twin : current;
+  /* الورقةُ الافتراضيّة ورقةُ الأقدم — إلّا أن تكون سطرَ كشفٍ بلا ملفّ والأخرى لها ملفّ */
+  const [fileOf, setFileOf] = useState<string>(olderSide.virtual && !newerSide.virtual ? newerSide.id : olderSide.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const kept = current.older ? current : twin;
@@ -69,10 +74,15 @@ export function InvoiceMerge({ current, twin }: { current: Side; twin: Side }) {
               key={s.id}
               className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${fileOf === s.id ? "border-accent bg-accent-soft" : "border-line"}`}
             >
-              <input type="radio" name={`file-${current.id}`} value={s.id} checked={fileOf === s.id} onChange={() => setFileOf(s.id)} className="mt-0.5" />
+              <input
+                type="radio" name={`file-${current.id}`} value={s.id} checked={fileOf === s.id} onChange={() => setFileOf(s.id)} className="mt-0.5"
+                disabled={s.virtual && !(s.id === kept.id ? dropped : kept).virtual}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-bold" dir="auto" title={s.fileName}>{s.fileName}</span>
-                <span className="mt-0.5 block text-[11px] text-muted">{s.older ? "ورقة القيد الأقدم" : "ورقة النسخة الأحدث"}</span>
+                <span className="mt-0.5 block text-[11px] text-muted">
+                  {s.virtual ? "سطر من كشف المورّد بلا ملف، فلا يُختار ورقة" : s.older ? "ورقة القيد الأقدم" : "ورقة النسخة الأحدث"}
+                </span>
                 {s.driveFileId && (
                   <a
                     href={`https://drive.google.com/file/d/${s.driveFileId}/view`}

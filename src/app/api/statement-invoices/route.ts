@@ -24,6 +24,9 @@ export async function POST(request: Request) {
     const total = out.created.reduce((s, c) => s + c.amountMinor, 0);
     const parts = [
       out.created.length > 0 ? `سُجّلت ${out.created.length} فاتورة من الكشف بمبلغ ${formatRiyalsDisplay(total)}. لا تُخصم ضريبتها حتى يصل ملفها.` : "لا توجد فواتير ناقصة لتُسجَّل",
+      out.matchedByAmount.length > 0 ? `و${out.matchedByAmount.length} مرجعها في الكشف مقروء خطأً، فطوبقت بفاتورتنا التي باليوم والمبلغ نفسيهما (${out.matchedByAmount.map((m) => m.invoiceNumber).join("، ")}) ولم تُسجَّل ثانية` : null,
+      out.ambiguous.length > 0 ? `و${out.ambiguous.length} لها عندنا أكثر من فاتورة باليوم والمبلغ نفسيهما فلم تُسجَّل (${out.ambiguous.map((a) => `${a.date} · ${formatRiyalsDisplay(a.amountMinor)}`).join("، ")}). قارنها بورقة الكشف` : null,
+      out.unclear.length > 0 ? `و${out.unclear.length} مرجعها ملتبس (${out.unclear.map((u) => u.ref).join("، ")}) فلم تُسجَّل. إن كانت فاتورة فعلاً فارفع ملفها أو سجّلها بيدك` : null,
       out.closedMonth.length > 0 ? `و${out.closedMonth.length} في شهر مقفل لم تُسجَّل (${[...new Set(out.closedMonth.map((c) => c.month))].join("، ")}). أعد فتح الشهر أولاً.` : null,
     ].filter(Boolean);
     return NextResponse.json({ ok: true, created: out.created.length, message: parts.join(". ") });

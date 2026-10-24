@@ -44,6 +44,7 @@ const EXEMPT: Record<string, string> = {
   "certify-flow.ts": "كلّ سيناريو في معاملة تلغى — لا يكتب شيء",
   "verify-invariants.ts": "يحاول خرق القيود في معاملات تلغى — لا يكتب شيء",
   "restore-verify.ts": "يكتب في قاعدة يسمّيها الأمر صراحةً ويرفض غير الفارغة — لا يقرأ DATABASE_URL هدفاً",
+  "find-statement-duplicates.ts": "قراءةٌ فقط في معاملة `read only` — القاعدةُ نفسها ترفض أيّ كتابة",
 };
 
 /** وكلُّ مُعفًى يحمل في نصّه ما يقوله سببُه — وإلّا صار الإعفاءُ ادّعاءً. */
@@ -53,6 +54,7 @@ const EXEMPT_EVIDENCE: Record<string, RegExp> = {
   "certify-flow.ts": /rollback/i,
   "verify-invariants.ts": /rollback/i,
   "restore-verify.ts": /rollback/i,
+  "find-statement-duplicates.ts": /set transaction read only/,
 };
 
 describe("النصوص الكاتبة تحمل حارسها", () => {

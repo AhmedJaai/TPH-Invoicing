@@ -566,10 +566,23 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       select d.id, i.message, d.file_name from issues i join documents d on d.id = i.entity_id
        where i.code = 'FILE_IN_WRONG_MONTH' and i.status = 'OPEN' order by i.created_at desc limit 20`)).rows
       .map((r) => ({ label: r.file_name.slice(0, 50), sub: r.message.replace(/^«[^»]*» /, ""), href: documentHref(r.id) })),
-    missingFiles: (await db.execute<{ id: string; message: string; file_name: string }>(sql`
-      select d.id, i.message, d.file_name from issues i join documents d on d.id = i.entity_id
+    /*
+      وفاتورتُه إن كانت له — وما خُصّص لها: ملفٌّ حُذف لأنّه مكرّر أو استُبدل يبقى قيدُه بسداده
+      (أحمد، ٢٥ أكتوبر)، فالسطرُ يفتح «حذف القيد» على صفحتها.
+    */
+    missingFiles: (await db.execute<{ id: string; message: string; file_name: string; invoice_id: string | null; allocated: string | number | null }>(sql`
+      select d.id, i.message, d.file_name, v.id as invoice_id,
+             (select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = v.id)::bigint as allocated
+        from issues i join documents d on d.id = i.entity_id
+        left join invoices v on v.document_id = d.id
        where i.code = 'FILE_MISSING_IN_DRIVE' and i.status = 'OPEN' order by i.created_at desc limit 20`)).rows
-      .map((r) => ({ label: r.file_name.slice(0, 50), sub: r.message.replace(/^«[^»]*» /, ""), href: documentHref(r.id) })),
+      .map((r) => ({
+        label: r.file_name.slice(0, 50),
+        sub: r.message.replace(/^«[^»]*» /, "") + (Number(r.allocated ?? 0) > 0 ? " وعليها سداد مسجّل." : ""),
+        href: r.invoice_id ? `${invoiceHref(r.invoice_id)}?act=remove#remove` : documentHref(r.id),
+        ...(Number(r.allocated ?? 0) > 0 ? { amountMinor: Number(r.allocated) } : {}),
+        removable: Boolean(r.invoice_id),
+      })),
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,

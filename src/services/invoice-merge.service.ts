@@ -22,6 +22,7 @@ import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { assertMonthsOpen } from "./month-guard";
 import { refreshPaymentStatus } from "./payment.service";
 import { applySupplierCredit } from "./supplier-credit.service";
+import { STATEMENT_LINE_ORIGIN } from "./invoice.service";
 import { refreshStatementFindings } from "./statement-reconcile.service";
 import type { Tx } from "./types";
 
@@ -66,22 +67,35 @@ export async function mergeDuplicateInvoice(
   }
   await assertMonthsOpen(tx, [keep.month, drop.month]);
 
-  const docs = await tx.select({ id: documents.id, fileName: documents.fileName }).from(documents)
+  const docs = await tx.select({ id: documents.id, fileName: documents.fileName, origin: documents.origin }).from(documents)
     .where(inArray(documents.id, [keep.documentId, drop.documentId]));
   const nameOf = (id: string) => docs.find((d) => d.id === id)?.fileName ?? null;
+  const virtual = (id: string) => docs.find((d) => d.id === id)?.origin === STATEMENT_LINE_ORIGIN;
+  /* سطرُ كشفٍ بلا ملفّ ليس ورقة — والأخرى لها ملفّ: لا تُعلَّق الباقيةُ بلا ورقة */
+  if (virtual(fileDocumentId) && !virtual(rejectedDocumentId)) {
+    throw new MergeRefused("هذه الفاتورة سُجّلت من سطر في كشف المورّد وليس لها ملف. اختر ملف الفاتورة الأخرى ليبقى", 400);
+  }
 
-  /* سطرُ كشف المورّد: ينتقل إلى الباقية إن لم يكن لها سطر، وإلّا عاد غيرَ مطابَق */
+  /*
+    سطرُ كشف المورّد: ينتقل إلى الباقية إن لم يكن لها سطرٌ **في الكشف نفسه**، وإلّا عاد غيرَ
+    مطابَق. كان يُسأل «ألها سطرٌ في أيّ كشف؟» — فبيكوف: 00346 طابقها سطرُ القراءة الثانية
+    للكشف، فلمّا دُمجت فيها «000285لـ#» المقيَّدةُ من القراءة الثالثة عاد سطرُ الثالثة «بلا
+    ملف» وزرُّ «قيّد الناقصة» يقيّدها ثالثةً.
+  */
   const lines = await tx.select({ id: statementLines.id, statementId: statementLines.statementId })
     .from(statementLines).where(eq(statementLines.matchedInvoiceId, drop.id));
   if (lines.length > 0) {
-    const [keptHasLine] = await tx.select({ id: statementLines.id }).from(statementLines)
-      .where(eq(statementLines.matchedInvoiceId, keep.id)).limit(1);
-    const [first, ...rest] = lines;
-    if (!keptHasLine) await tx.update(statementLines).set({ matchedInvoiceId: keep.id }).where(eq(statementLines.id, first.id));
-    const unmatch = keptHasLine ? lines : rest;
+    const keptIn = new Set((await tx.select({ statementId: statementLines.statementId }).from(statementLines)
+      .where(eq(statementLines.matchedInvoiceId, keep.id))).map((r) => r.statementId));
+    const unmatch: string[] = [];
+    for (const l of lines) {
+      if (keptIn.has(l.statementId)) { unmatch.push(l.id); continue; }
+      await tx.update(statementLines).set({ matchedInvoiceId: keep.id }).where(eq(statementLines.id, l.id));
+      keptIn.add(l.statementId);
+    }
     if (unmatch.length > 0) {
       await tx.update(statementLines).set({ matchedInvoiceId: null, matchStatus: "UNMATCHED" })
-        .where(inArray(statementLines.id, unmatch.map((l) => l.id)));
+        .where(inArray(statementLines.id, unmatch));
     }
   }
 
@@ -97,8 +111,13 @@ export async function mergeDuplicateInvoice(
     await tx.update(invoices).set({ documentId: fileDocumentId }).where(eq(invoices.id, keep.id));
     await tx.update(documents).set({ status: "ARCHIVED" }).where(eq(documents.id, fileDocumentId));
   }
-  await tx.update(documents).set({ status: "REJECTED" })
-    .where(and(eq(documents.id, rejectedDocumentId), sql`${documents.status} <> 'REJECTED'`));
+  /* مستندُ سطر الكشف لا ملفَّ له في الدرايف ولا في غيره — يُحذف كما يُحذف حين يصل ملفُّه (057) */
+  if (virtual(rejectedDocumentId)) {
+    await tx.delete(documents).where(and(eq(documents.id, rejectedDocumentId), eq(documents.origin, STATEMENT_LINE_ORIGIN)));
+  } else {
+    await tx.update(documents).set({ status: "REJECTED" })
+      .where(and(eq(documents.id, rejectedDocumentId), sql`${documents.status} <> 'REJECTED'`));
+  }
 
   for (const p of new Set(allocs.map((a) => a.paymentId))) await refreshPaymentStatus(tx, p);
   for (const s of new Set(lines.map((l) => l.statementId))) await refreshStatementFindings(tx, s);
@@ -120,7 +139,8 @@ export async function mergeDuplicateInvoice(
     },
     after: {
       الباقية: { المعرّف: keep.id, الرقم: keep.number, ملفها_قبل: nameOf(keep.documentId), ملفها_بعد: nameOf(fileDocumentId) },
-      المستند_المرفوض: { المعرّف: rejectedDocumentId, الملف: nameOf(rejectedDocumentId) },
+      المستند_المرفوض: { المعرّف: rejectedDocumentId, الملف: nameOf(rejectedDocumentId), حُذف: virtual(rejectedDocumentId) ? "سطر كشف بلا ملف" : null },
+      سطور_الكشف_إلى_الباقية: lines.length,
       عاد_رصيداً: releasedMinor,
       وُزّع_بعدها: credit.appliedMinor,
       السبب: "نسخة مكرّرة من الفاتورة نفسها — بقي القيد الأقدم بسداده، والملف الذي اختاره الإنسان، والآخر رُفض ويبقى في الدرايف",
