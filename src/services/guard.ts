@@ -9,7 +9,9 @@ import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";
 import { describeError, logEvent } from "@/lib/log";
-import { DomainError } from "@/lib/domain-error";
+import { DomainError, FailWithError } from "@/lib/domain-error";
+
+export { FailWithError };
 import { consume, RateLimitedError } from "./rate-limit.service";
 
 export { RateLimitedError };
@@ -22,19 +24,6 @@ export async function guard(route: string, capability: Capability): Promise<Curr
   const user = await requireUser(capability);
   await consume(route, user.id);
   return user;
-}
-
-/**
- * عطبٌ في موضعٍ كان المسارُ يختمه بـ`failWith` — تحمله الخدمةُ إلى بابها بسببه
- * واسمِ مسارِه، فيُقال كما كان: رسالتُنا بنصّها (400)، وعطبُ الخادم برقم مرجع (500).
- *
- * لا يُرمى إلّا حيث كان `failWith` بعينه، فلا يتّسع ختمُه لما كان يُرمى خامّاً.
- */
-export class FailWithError extends Error {
-  constructor(readonly failure: unknown, readonly route: string) {
-    super("failWith", { cause: failure });
-    this.name = "FailWithError";
-  }
 }
 
 /** يترجم أخطاء الحراسة المشتركة إلى ردّ، أو `null` إن لم يكن الخطأ منها. */

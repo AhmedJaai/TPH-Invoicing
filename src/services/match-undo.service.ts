@@ -25,7 +25,7 @@ import { MonthClosedError } from "./validation.service";
 import { recordAudit } from "@/lib/audit";
 import { refreshPaymentStatus, reversePayment } from "./payment.service";
 import { Conflict, NotFound, Refused } from "@/lib/domain-error";
-import { FailWithError } from "./guard";
+import { FailWithError } from "@/lib/domain-error";
 import type { Conn } from "./types";
 
 export const MatchUndoBody = z.object({

@@ -50,3 +50,16 @@ export class Unreadable extends DomainError {
     super(message, 422, payload);
   }
 }
+
+/**
+ * عطبٌ في موضعٍ كان المسارُ يختمه بـ`failWith` — تحمله الخدمةُ إلى بابها بسببه
+ * واسمِ مسارِه، فيُقال كما كان: رسالتُنا بنصّها (400)، وعطبُ الخادم برقم مرجع (500).
+ *
+ * لا يُرمى إلّا حيث كان `failWith` بعينه، فلا يتّسع ختمُه لما كان يُرمى خامّاً.
+ */
+export class FailWithError extends Error {
+  constructor(readonly failure: unknown, readonly route: string) {
+    super("failWith", { cause: failure });
+    this.name = "FailWithError";
+  }
+}
