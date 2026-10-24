@@ -3,6 +3,7 @@ import { formatDay, formatMoment } from "@/lib/riyadh-time";
 import type { FoodicsStatus } from "@/services/foodics-sync.service";
 import { PostAction } from "./post-action";
 import { T } from "@/components/i18n/t";
+import { ScheduledRunLine } from "./scheduled-run";
 
 /**
  * حالُ وصل فودكس — يظهر فوق كلّ مقارنةٍ تُبنى عليه.
@@ -45,6 +46,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
             ? <><T s="{0} طلباً من {1} إلى {2} · {3} حركة شراء. القراءة فقط، ولا يُكتب شيء في فودكس." a={[<span key="0" className="nums">{status.orders.toLocaleString("ar-SA-u-nu-latn")}</span>, <bdi key="1">{formatDay(status.firstDay)}</bdi>, <bdi key="2">{formatDay(status.lastDay)}</bdi>, <span key="3" className="nums">{status.purchases}</span>]} /></>
             : "لم تُقرأ أي طلبات بعد. اضغط «زامن الآن» لقراءة الأيام الأخيرة."}
         </p>
+        <div className="mt-1.5"><ScheduledRunLine run={status.scheduled} cadence="كل ثلاث ساعات" /></div>
       </div>
       {canSync && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">

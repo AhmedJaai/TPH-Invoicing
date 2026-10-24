@@ -1,7 +1,7 @@
 "use client";
 
 import { SubmitButton } from "./submit-button";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, CloudOff, FolderSync, Loader2, TriangleAlert } from "lucide-react";
@@ -73,6 +73,7 @@ export function DriveSyncNow({
   headline,
   detail,
   facts,
+  scheduled,
   reconnect,
 }: {
   state: DriveState;
@@ -80,6 +81,8 @@ export function DriveSyncNow({
   detail: string;
   /** «آخرُ مزامنة» و«آخرُ ما وجدته جديداً» و«آخرُ تسمية» — مصوغةٌ في الخادم بتوقيت الرياض. */
   facts: readonly { label: string; value: string; hint?: string }[];
+  /** «آخر تشغيل آلي» — يُرسم في الخادم (`ScheduledRunLine`). */
+  scheduled?: ReactNode;
   reconnect?: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -206,6 +209,7 @@ export function DriveSyncNow({
           </div>
         ))}
       </dl>
+      {scheduled && <div className="mt-3">{scheduled}</div>}
 
       {busy && (
         <div className="mt-4" aria-live="polite">

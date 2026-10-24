@@ -33,6 +33,17 @@ export function currentMonthRiyadh(at: Date = new Date()): string {
   return todayInRiyadh(at).slice(0, 7);
 }
 
+/**
+ * شهرُ الدفعة: الشهرُ الذي تخصّه إن ذُكر، وإلّا شهرُ سدادها بتوقيت الرياض.
+ *
+ * وهي نفسُها `payment_month` في القاعدة (هجرة الشهر المقفل، `at time zone
+ * 'Asia/Riyadh'`) — فالخدمةُ والمؤثِّر يفحصان قفلَ الشهر نفسه. كانت القاعدة
+ * تحسبه بتوقيت الجلسة، فحوالةُ ٢١:٣٠Z آخرَ أغسطس سبتمبريّةٌ هنا وأغسطسيّةٌ هناك.
+ */
+export function paymentMonthOf(appliesToMonth: string | null | undefined, paidAt: Date): string {
+  return appliesToMonth ?? currentMonthRiyadh(paidAt);
+}
+
 /** رقم اليوم من الشهر بتوقيت الرياض. */
 export function dayOfMonthRiyadh(at: Date = new Date()): number {
   return Number(parts(at).day);

@@ -63,6 +63,10 @@ const eslintConfig = defineConfig([
     ".scratch/**",
     // ملفّاتُ onnxruntime-web المصغَّرة — تُنسخ من الحزمة (scripts/copy-ort.mjs)
     "public/ort/**",
+    // اختبارُ الطفرات وتقريرُ التغطية — نسخةٌ مؤقّتة من الشجرة ومخرَجاتُ تشغيل
+    ".stryker-tmp/**",
+    "reports/**",
+    "coverage/**",
   ]),
 ]);
 

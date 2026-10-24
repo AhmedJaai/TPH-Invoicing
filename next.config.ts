@@ -64,7 +64,8 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://lh3.googleusercontent.com",
               "font-src 'self' data:",
-              "connect-src 'self'",
+              /* الملفّ الكبير يرفعه المتصفّح إلى Vercel Blob مباشرةً (`/api/upload/blob`) */
+              "connect-src 'self' https://vercel.com https://*.blob.vercel-storage.com",
               "frame-src 'self' blob:",
               "worker-src 'self' blob:",
               "object-src 'none'",

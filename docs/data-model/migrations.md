@@ -2,11 +2,11 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٨٩
+## الجداول — ٩٠
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
-`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state`
+`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state` `daily_figures`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
@@ -133,6 +133,8 @@
 | `084_payroll.sql` | الموظّفون والرواتب والحضور: `employees` (شهريّ أو جزئيّ، رقمُ المستفيد في البنك، الدوام، رابطُ الحضور ببصمة رمزه) · `employee_rates` (الراتبُ من شهرٍ يبدأ منه) · `payroll_adjustments` (خصم · مخالفة · سلفة · قسط · مكافأة · إضافيّ · بدل، يُسحب ولا يُحذف) · `payroll_attendance` (تأخير · انصراف مبكّر · غياب · إجازة، بيدٍ أو من الحضور) · `payroll_weeks` (أسبوعُ الجزئيّ) · `payroll_links` (حوالةٌ أو جزؤها لموظّفٍ **بغرضها**؛ المؤثِّرُ `payroll_link_guard` يرفض ما يتجاوز الحوالة وغيرَ الخارجة وغيرَ «راتب»/«تحويل للمالك» والشهرَ المقفل) · `attendance_checkins` (الحضورُ بموقعه وشبكته وحكمه) · `obligations.employee_id` — إضافةٌ خالصة |
 | `085_payroll_saudi_rules.sql` | الخصمُ بلائحة تنظيم العمل: `payroll_attendance.disrupted` (التأخيرُ عطّل غيره) و`penalty_waived` (عفا عن جزائه)، و`payroll_violations` (مخالفةٌ من بقيّة الجدول برقم بندها) — الجزاءُ يُحسب ولا يُخزَّن — إضافةٌ خالصة |
 | `086_payroll_paid_outside.sql` | `payroll_adjustments.kind` يقبل `PAID_OUTSIDE`: راتبٌ دُفع نقداً أو من حساب المالك بلا حوالةٍ تُعرف — يُحسب ممّا دُفع ولا يمسّ قائمةَ الدخل |
+| `087_daily_figures.sql` | `daily_figures` — لقطةُ أرقام كلّ يوم (المستحقّ، عدد «يحتاج قرارك»، النقد أو فراغُه) تكتبها المهمّةُ اليوميّة مرّةً لكلّ يوم |
+| `088_month_lock_coverage.sql` | مؤثِّراتٌ: قفلُ الفاتورة يشمل الخصم والرسوم والحال الضريبيّ والأصل الثابت؛ `expenses_month_lock`؛ `bank_transactions_month_lock` (المبلغ والاتّجاه والتاريخ)؛ و`payment_month` صريحةً بتوقيت الرياض |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

@@ -10,9 +10,8 @@ import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { foodicsConfigured } from "@/lib/foodics/client";
 import { guard, respondTo } from "@/services/guard";
-import { randomUUID } from "node:crypto";
-import { runFoodicsSync } from "@/services/foodics-sync.service";
-import { acquireLease, releaseLease } from "@/services/job-state.service";
+import { runLeasedFoodicsSync } from "@/services/foodics-sync.service";
+import { BROWSER_SYNC_EVERY_MS, scheduledRanRecently } from "@/services/cron.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,13 +19,7 @@ export const maxDuration = 60;
 /** ما يُترَك للكتابة الأخيرة والردّ من عمر المسار. */
 const BUDGET_MS = 40_000;
 
-/*
-  مزامنةٌ واحدةٌ في كلّ لحظة: الخلفيّةُ تُطلَق من كلّ جهازٍ ولسانٍ بتوقيته، فبدأت
-  اثنتان بفارق ثلاث ثوانٍ (١٩ أكتوبر ٢٠٢٦) وسقطت الثانية. والعقدُ أطولُ من عمر المسار
-  فلا ينقضي وصاحبُه يعمل، وينقضي وحده إن قتلته المنصّة.
-*/
-const SYNC_LEASE = "foodics-sync-lease";
-const SYNC_LEASE_MS = 70_000;
+/* والعقدُ (`foodics-sync-lease`) في `runLeasedFoodicsSync` — يأخذه هذا البابُ والتشغيلُ المجدول معاً. */
 
 const Body = z.object({ background: z.boolean().optional() }).strict();
 
@@ -49,19 +42,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "فودكس غير متصل: مفتاح الربط غير مضبوط في إعدادات الخادم." }, { status: 409 });
   }
 
-  const holder = randomUUID();
-  if (!(await acquireLease(SYNC_LEASE, holder, SYNC_LEASE_MS))) {
+  /* الخلفيّةُ من القشرة تُترَك إن نجح تشغيلٌ مجدول قريباً — قرأ ما تغيّر، فلا يعيده كلُّ جهاز */
+  if (read.body.background && await scheduledRanRecently("foodics", BROWSER_SYNC_EVERY_MS)) {
+    return NextResponse.json({ ok: true, configured: true, scheduled: true });
+  }
+
+  const leased = await runLeasedFoodicsSync({ actorId: user.id, budgetMs: BUDGET_MS });
+  if (leased.busy) {
     const error = "مزامنة أخرى مع فودكس تجري الآن من جهاز أو تبويب آخر. انتظر دقيقة ثم أعد المحاولة.";
     return read.body.background
       ? NextResponse.json({ ok: true, configured: true, busy: true })
       : NextResponse.json({ busy: true, error }, { status: 409 });
   }
-  let result;
-  try {
-    result = await runFoodicsSync({ actorId: user.id, budgetMs: BUDGET_MS });
-  } finally {
-    await releaseLease(SYNC_LEASE, holder).catch(() => undefined);
-  }
+  const result = leased.result;
   if (result.status === "FAILED") {
     return NextResponse.json({ error: `تعذّرت مزامنة فودكس: ${result.error ?? "سبب غير معروف"}` }, { status: 502 });
   }

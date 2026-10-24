@@ -6,7 +6,7 @@
  *  ٢. كل شهر محاسبي نصٌّ بصيغة YYYY-MM مشتقٌّ من تاريخ الفاتورة لا تاريخ الرفع.
  */
 import {
-  pgTable, pgEnum, text, integer, bigint, boolean, timestamp, jsonb,
+  pgTable, pgEnum, text, integer, bigint, boolean, timestamp, jsonb, date,
   doublePrecision, numeric, uniqueIndex, index, primaryKey,
   type AnyPgColumn, customType,
 } from "drizzle-orm/pg-core";
@@ -921,8 +921,9 @@ export const recurringExpenses = pgTable("recurring_expenses", {
   amountMinor: integer("amount_minor").notNull(),
   /** MONTHLY · QUARTERLY · ANNUAL */
   cadence: text("cadence").notNull().default("MONTHLY"),
-  startsOn: text("starts_on"),
-  endsOn: text("ends_on"),
+  /* عمودان `date` في القاعدة منذ ٠٠٥ — نصّاً `YYYY-MM-DD` هنا (`mode: "string"`) كي لا يفترق المخطّطان */
+  startsOn: date("starts_on", { mode: "string" }),
+  endsOn: date("ends_on", { mode: "string" }),
   note: text("note"),
   isActive: boolean("is_active").notNull().default(true),
   createdById: text("created_by_id").references(() => users.id),
@@ -1166,7 +1167,8 @@ export const sales = pgTable("sales", {
   branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
   externalId: text("external_id").notNull(),
   soldAt: timestamp("sold_at", { withTimezone: true }).notNull(),
-  businessDate: text("business_date").notNull(),
+  /* `date` في القاعدة (٠٠٥) — نصّاً `YYYY-MM-DD` هنا كما يقرؤه السائق */
+  businessDate: date("business_date", { mode: "string" }).notNull(),
   grossMinor: integer("gross_minor").notNull(),
   discountMinor: integer("discount_minor").notNull().default(0),
   refundMinor: integer("refund_minor").notNull().default(0),
@@ -1773,6 +1775,24 @@ export const jobState = pgTable("job_state", {
   name: text("name").primaryKey(),
   fingerprint: text("fingerprint").notNull(),
   ranAt: timestamp("ran_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * لقطةُ أرقام اليوم — تُكتب مرّةً في يوم الرياض من التشغيل المجدول (٠٥:٣٠)، ولا تُعدَّل.
+ * أساسُ «منذ أمس» حين يُبنى: الماضي لا يُعاد حسابُه من دفاترٍ تغيّرت بعده.
+ * والنقدُ المجهول `NULL` لا صفر.
+ */
+export const dailyFigures = pgTable("daily_figures", {
+  /** YYYY-MM-DD بتوقيت الرياض. */
+  day: text("day").primaryKey(),
+  /** «عليك للمورّدين» من `supplier-balance.service` لحظةَ الكتابة. */
+  owedMinor: integer("owed_minor").notNull(),
+  /** بنودُ «يحتاج قرارك» كما يعدّها الشريط للمالك. */
+  attentionCount: integer("attention_count").notNull(),
+  /** آخرُ رصيدٍ ختاميٍّ معروف — `NULL` حين لا كشفَ يحمله. */
+  cashMinor: integer("cash_minor"),
+  cashAsOf: text("cash_as_of"),
+  writtenAt: timestamp("written_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({

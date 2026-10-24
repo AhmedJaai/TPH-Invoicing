@@ -11,7 +11,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { failWith, guard, respondTo } from "@/services/guard";
 import { parseRiyals } from "@/lib/money";
 import {
   deleteExpense,
@@ -53,19 +53,29 @@ export async function POST(request: Request) {
   if (body.action === "derive") {
     const month = body.month?.match(/^\d{4}-\d{2}$/) ? body.month : undefined;
     const r = await deriveExpensesFromBank(user.id, month);
+    /* ما تُرك في شهرٍ مقفل يُقال — لا يُحسب «لا جديد» وهو جديدٌ لم يُقيَّد */
+    const closedNote = r.skippedClosedMonth > 0
+      ? ` وترك ${r.skippedClosedMonth} في شهر مقفل، تسجّل إن أعدت فتحه.`
+      : "";
     return NextResponse.json({
       ok: true,
       ...r,
       message:
-        r.created === 0
-          ? "لا جديد، فكل حركة مصنّفة سُجّلت من قبل."
-          : `سُجّل ${r.created} مصروفاً، منها ${r.linkedToRecurring} مربوطة بمصروف متوقع.`,
+        (r.created === 0
+          ? "لا جديد، فكل حركة مصنّفة في شهر مفتوح سُجّلت من قبل."
+          : `سُجّل ${r.created} مصروفاً، منها ${r.linkedToRecurring} مربوطة بمصروف متوقع.`) + closedNote,
     });
   }
 
   if (body.action === "delete") {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
-    const outcome = await deleteExpense(user.id, body.id);
+    let outcome;
+    try {
+      outcome = await deleteExpense(user.id, body.id);
+    } catch (e) {
+      /* الشهرُ المقفل 409 بجملته — وما عداه عطبٌ برقم مرجع */
+      return failWith(e, "expense-actual");
+    }
     if (outcome === "NOT_FOUND") {
       return NextResponse.json({ error: "هذا المصروف حُذف من قبل. حدّث الصفحة." }, { status: 404 });
     }
@@ -121,13 +131,19 @@ export async function POST(request: Request) {
     }
   }
 
-  const id = await recordManualExpense(user.id, {
-    occurredOn: body.occurredOn,
-    category: body.category,
-    label,
-    amountMinor,
-    note: body.note?.trim() || undefined,
-  });
+  let id: string;
+  try {
+    id = await recordManualExpense(user.id, {
+      occurredOn: body.occurredOn,
+      category: body.category,
+      label,
+      amountMinor,
+      note: body.note?.trim() || undefined,
+    });
+  } catch (e) {
+    /* «شهر 2026-07 مقفل…» يُقال 409 — كان يسقط ٥٠٠ بلا جملة */
+    return failWith(e, "expense-actual");
+  }
 
   /* التدقيق في recordManualExpense — كان يُكتب هنا ثانيةً فيُقيَّد الحدث مرّتين */
 

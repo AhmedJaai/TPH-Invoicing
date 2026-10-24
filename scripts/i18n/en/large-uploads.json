@@ -1,0 +1,11 @@
+{
+  "حتى ٢٥ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام": "Up to 25 MB per file · nothing is saved until you confirm what the system read",
+  "الملف أكبر من ٢٥ ميجابايت، وهو الحد الأقصى للرفع. صغّره أو قسّمه ثم أعد المحاولة.": "The file is over 25 MB, the upload limit. Compress or split it and try again.",
+  "تعذّر رفع الملف الكبير. تأكد من الشبكة ثم أعد المحاولة.": "Couldn't upload the large file. Check your connection and try again.",
+  "الملف أكبر من ٢٥ ميجابايت.": "The file is over 25 MB.",
+  "رفع الملفات الكبيرة غير مفعّل.": "Large-file upload is not enabled.",
+  "رابط الملف المؤقت غير مقبول.": "The temporary file link isn't accepted.",
+  "لم يعد الملف المؤقت موجوداً (يُحذف بعد يوم). أعد اختيار الملف من جهازك.": "The temporary file is gone (it's deleted after a day). Pick the file from your device again.",
+  "رفع الملفات الكبيرة غير مفعّل. الحد الأقصى ٣ ميجابايت للملف.": "Large-file upload is not enabled. The limit is 3 MB per file.",
+  "تعذّر تجهيز رفع الملف الكبير. أعد المحاولة بعد قليل.": "Couldn't prepare the large-file upload. Try again shortly."
+}

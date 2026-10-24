@@ -37,6 +37,23 @@ export async function firstClosedMonth(
   return rows[0]?.month ?? null;
 }
 
+/**
+ * الأشهرُ المقفلة من قائمةٍ — لمن يتخطّاها ولا يرمي: الاشتقاقُ الآليّ للمصروف
+ * يقيّد المفتوحَ ويترك المقفل كما خُتم. ومؤثِّرُ القاعدة خلفه إن سبقه إقفال.
+ */
+export async function closedMonthsAmong(
+  executor: typeof db | Tx,
+  months: readonly (string | null | undefined)[],
+): Promise<Set<string>> {
+  const list = [...new Set(months.filter((m): m is string => Boolean(m)))];
+  if (list.length === 0) return new Set();
+  const rows = await executor
+    .select({ month: monthCloses.month })
+    .from(monthCloses)
+    .where(and(inArray(monthCloses.month, list), eq(monthCloses.status, "CLOSED")));
+  return new Set(rows.map((r) => r.month));
+}
+
 const monthLockKey = (month: string) => `month-close:${month}`;
 
 /** القفلُ الحصريّ على الشهر — للإقفال وإعادة الفتح، داخل معاملتهما. */

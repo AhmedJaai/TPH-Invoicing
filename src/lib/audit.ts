@@ -7,6 +7,7 @@
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { previewAllowed } from "./preview-mode";
+import { systemActorLabel } from "./actor-context";
 
 /**
  * مقبض الكتابة: القاعدة أو معاملةٌ جارية.
@@ -192,17 +193,23 @@ export async function recordAudit(entry: {
     before: (entry.before ?? null) as never,
     /*
       وضعُ التجربة يستعير معرّف المالك لأنّ القيود مقيَّدةٌ بمفتاحٍ أجنبيّ —
-      فيُوسَم القيد كي لا يُقرأ فعلاً وقع من المالك نفسه.
+      فيُوسَم القيد كي لا يُقرأ فعلاً وقع من المالك نفسه. والتشغيلُ المجدول
+      يستعيره كذلك فيُوسَم باسمه (`lib/actor-context.ts`).
     */
-    after: (previewAllowed(process.env)
-      ? {
-          ...(entry.after && typeof entry.after === "object" && !Array.isArray(entry.after)
-            ? entry.after as Record<string, unknown>
-            : { القيمة: entry.after ?? null }),
-          "وضع التجربة": true,
-        }
-      : entry.after ?? null) as never,
+    after: tagAuditAfter(entry.after, {
+      ...(previewAllowed(process.env) ? { "وضع التجربة": true } : {}),
+      ...(systemActorLabel() ? { "المنفّذ": systemActorLabel() } : {}),
+    }) as never,
   });
+}
+
+/** يضمّ الوسومَ إلى أثر القيد — وما ليس كائناً يُحفظ تحت «القيمة». بلا وسمٍ يبقى كما هو. */
+export function tagAuditAfter(after: unknown, tags: Record<string, unknown>): unknown {
+  if (Object.keys(tags).length === 0) return after ?? null;
+  const base = after && typeof after === "object" && !Array.isArray(after)
+    ? after as Record<string, unknown>
+    : { القيمة: after ?? null };
+  return { ...base, ...tags };
 }
 
 /**

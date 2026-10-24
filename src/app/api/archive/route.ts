@@ -40,6 +40,8 @@ import { eq } from "drizzle-orm";
 import { applySupplierCredit, CreditError, markPaidByOwner } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { loadCaptureFile, settleCapture, settleCaptureBySha } from "@/services/capture.service";
+import { discardStaged, readStaged, StagedFileError } from "@/lib/blob-staging";
+import { MAX_STAGED_BYTES } from "@/lib/blob-staging-policy";
 
 export const runtime = "nodejs";
 
@@ -82,6 +84,11 @@ const ArchiveBody = z.object({
    * (`captureId`): بايتاتُها في القاعدة، فتُؤخذ منها لا من المتصفّح.
    */
   fileBase64: z.string().max(12_000_000).optional(),
+  /**
+   * ملفٌّ كبير في المحطّة المؤقّتة (Vercel Blob) بدلاً من `fileBase64` — يُقرأ هنا بمفتاح
+   * الخادم ويُحذف منها بعد الأرشفة أو الرفض (`blob-staging.ts`). والأرشيفُ الدرايف وحده.
+   */
+  blobUrl: z.string().max(1000).optional(),
   documentKind: Text(40),
   supplierId: Opt(64),
   invoiceNumber: Opt(120),
@@ -123,6 +130,7 @@ function toResponse(e: unknown): NextResponse | null {
   const guarded = respondTo(e);
   if (guarded) return guarded;
   if (e instanceof InvalidInputError) return NextResponse.json({ error: e.message }, { status: 400 });
+  if (e instanceof StagedFileError) return NextResponse.json({ error: e.message }, { status: 400 });
   if (e instanceof UnknownYearError) return NextResponse.json({ error: e.message }, { status: 400 });
   if (e instanceof DuplicateDocumentError) return NextResponse.json({ error: e.message }, { status: 409 });
   if (e instanceof MonthClosedError) return NextResponse.json({ error: e.message }, { status: 409 });
@@ -158,7 +166,28 @@ function toResponse(e: unknown): NextResponse | null {
 }
 
 export async function POST(request: Request) {
+  /*
+    الملفُّ في المحطّة يُحذف حين يُحسم: أُرشف، أو رُفض رفضاً لا تُصلحه إعادة (نوعٌ أو
+    بصمةٌ أو حجمٌ أو تكرار). وما رُدّ لمانعٍ يُصلَح (شهرٌ مقفل، مبلغٌ يُراجَع) يبقى لإعادة
+    الضغط، والكنسُ يلتقط ما تُرك بعد يوم.
+  */
+  let stagedUrl: string | undefined;
   try {
+    const res = await archive(request, (url) => { stagedUrl = url; });
+    if (res.status === 200) await discardStaged(stagedUrl);
+    return res;
+  } catch (e) {
+    if (e instanceof InvalidInputError || e instanceof DuplicateDocumentError || e instanceof StagedFileError) {
+      await discardStaged(stagedUrl);
+    }
+    const mapped = toResponse(e);
+    if (mapped) return mapped;
+    throw e;
+  }
+}
+
+async function archive(request: Request, staged: (url: string) => void): Promise<NextResponse> {
+  {
     const user = await guard("archive", "document:upload");
 
     /* يُردّ الجسم الكبير قبل أن يُحلَّل كلّه في الذاكرة */
@@ -180,7 +209,12 @@ export async function POST(request: Request) {
       يُؤرشف هو ما صوّره الباريستا بعينه، لا نسخةٌ مرّت بالمتصفّح.
     */
     let data: Buffer;
-    if (body.fileBase64) {
+    let maxBytes = MAX_ARCHIVE_BYTES;
+    if (body.blobUrl) {
+      staged(body.blobUrl);
+      data = await readStaged(body.blobUrl);
+      maxBytes = MAX_STAGED_BYTES;
+    } else if (body.fileBase64) {
       /* `Buffer.from(…, "base64")` لا يرمي أبداً — فالتحقّق بالبايتات لا بـ`try` */
       data = Buffer.from(body.fileBase64, "base64");
     } else if (body.captureId) {
@@ -215,9 +249,9 @@ export async function POST(request: Request) {
     if (PAYMENT_KINDS.has(body.documentKind) && !can(user.role, "payment:approve")) {
       throw new ForbiddenError("payment:approve");
     }
-    if (data.length > MAX_ARCHIVE_BYTES) {
+    if (data.length > maxBytes) {
       throw new InvalidInputError(
-        `الملف أكبر من ${MAX_ARCHIVE_BYTES / (1024 * 1024)} ميجابايت`,
+        `الملف أكبر من ${maxBytes / (1024 * 1024)} ميجابايت`,
       );
     }
 
@@ -566,9 +600,5 @@ export async function POST(request: Request) {
       ownerPaid,
       ownerPaidSkipped: Boolean(body.paidByOwner) && ownerPaid === null,
     });
-  } catch (e) {
-    const mapped = toResponse(e);
-    if (mapped) return mapped;
-    throw e;
   }
 }

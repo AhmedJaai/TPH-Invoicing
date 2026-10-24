@@ -1,0 +1,48 @@
+name: اختبار الطفرات
+
+# أسبوعيّاً وعند الطلب — لا في كلّ دفع: يأخذ دقائق، ويقيس قوّةَ الاختبارات على وحدات المال
+# والهويّة (stryker.config.json). وتقريرُه HTML يُرفع مع التشغيل.
+on:
+  schedule:
+    # الأحد ٠٣:٠٠ بتوقيت الرياض
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # الوضعُ التزايديّ: ما لم يتغيّر ملفُّه ولا اختبارُه لا يُعاد — النتيجةُ السابقة من الذاكرة المؤقّتة
+      - uses: actions/cache@v4
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-${{ github.sha }}
+          restore-keys: stryker-incremental-
+
+      - name: الطفرات على وحدات المال والهويّة
+        run: npm run test:mutation
+
+      - name: التقرير
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30

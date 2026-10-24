@@ -21,6 +21,8 @@ import { previewAllowed } from "@/lib/preview-mode";
 import { inboxCount } from "@/lib/work";
 import { driveState, type DriveState } from "@/lib/drive-state";
 import { refreshTokenFor } from "./drive.service";
+import { loadCronRun } from "./job-state.service";
+import type { CronRun } from "@/lib/cron";
 import { isoDayOrNull } from "@/lib/riyadh-time";
 
 export type NamedRecord = NamedDocument & {
@@ -137,6 +139,8 @@ export interface DriveStatus extends DriveHeartbeat {
     cannot: number;
   };
   recent: DriveActivity[];
+  /** آخرُ تشغيلٍ مجدول (`/api/cron/drive`) — `null`: لم يجرِ قطّ. */
+  scheduled: CronRun | null;
 }
 
 function countOf(v: unknown): number {
@@ -197,7 +201,7 @@ export async function loadDriveHeartbeat(userId: string): Promise<DriveHeartbeat
 export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
 
-  const [beat, arrivals, waiting, named, recentRows, lastActs] = await Promise.all([
+  const [beat, arrivals, waiting, named, recentRows, lastActs, scheduled] = await Promise.all([
     loadDriveHeartbeat(userId),
     db
       .select({
@@ -222,6 +226,7 @@ export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
       .from(auditLogs)
       .where(inArray(auditLogs.action, ["DRIVE_SYNCED", "DRIVE_FILE_RENAMED"]))
       .groupBy(auditLogs.action),
+    loadCronRun("drive").catch(() => null),
   ]);
   const lastOf = (action: string) => {
     const at = lastActs.find((r) => r.action === action)?.at;
@@ -249,5 +254,6 @@ export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
     waitingReview: waiting,
     naming,
     recent: recentRows.map(toActivity),
+    scheduled,
   };
 }

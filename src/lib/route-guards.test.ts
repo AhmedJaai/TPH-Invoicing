@@ -28,6 +28,8 @@ export interface HandlerGuards {
   method: string;
   /** صلاحيّاتُ نداءات `guard` التي يبلغها المعالج — `null` لما ليس نصّاً حرفيّاً */
   capabilities: (string | null)[];
+  /** صلاحيّاتُ نداءات `cronGuard` (سرُّ التشغيل المجدول بدل الجلسة) — مساراتُ `api/cron/` وحدها */
+  cronCapabilities: (string | null)[];
 }
 
 /** لكلّ معالجٍ مصدَّر: ما يبلغه من نداءات `guard`، مباشرةً أو عبر دوالّ الملفّ. */
@@ -53,11 +55,11 @@ export function handlerGuards(source: string, fileName = "route.ts"): HandlerGua
     }
   }
 
-  const reach = (start: ts.Node): (string | null)[] => {
+  const reach = (start: ts.Node, guardName: "guard" | "cronGuard"): (string | null)[] => {
     const caps: (string | null)[] = [];
     const seen = new Set<ts.Node>();
     const visit = (n: ts.Node) => {
-      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === "guard") {
+      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === guardName) {
         const cap = n.arguments[1];
         caps.push(cap && ts.isStringLiteralLike(cap) ? cap.text : null);
       }
@@ -76,7 +78,9 @@ export function handlerGuards(source: string, fileName = "route.ts"): HandlerGua
     return caps;
   };
 
-  return [...exported.entries()].map(([method, node]) => ({ method, capabilities: reach(node) }));
+  return [...exported.entries()].map(([method, node]) => ({
+    method, capabilities: reach(node, "guard"), cronCapabilities: reach(node, "cronGuard"),
+  }));
 }
 
 /**
@@ -97,6 +101,18 @@ const UNGUARDED: Record<string, string> = {
  */
 const WRITE_WITH_VIEW: Record<string, string> = {
   "src/app/api/notifications/route.ts POST": "يكتب حدّ القراءة للمستخدم نفسه وحده — لا مال ولا قرار",
+};
+
+/**
+ * التشغيلُ المجدول (`src/app/api/cron/`) بلا جلسة: يدخل بسرّ `CRON_SECRET` في `Authorization: Bearer`
+ * عبر `cronGuard` — لا بـ`guard` — ثمّ يعمل باسم المالك بصلاحيّةٍ حرفيّة تُسأل بـ`can()`.
+ * فلكلّ معالجٍ فيه نداءُ `cronGuard` بصلاحيّةٍ حرفيّة، ولا `guard` (لا جلسةَ تُطلب)، والكتابةُ
+ * بغير صلاحيّة قراءة كبقيّة المسارات. وأنّ `cronGuard` يرفض بلا السرّ مفحوصٌ سلوكاً هنا
+ * وفي `cron.service.test.ts`.
+ */
+const CRON_DIR = "src/app/api/cron/";
+const CRON_WRITE_WITH_VIEW: Record<string, string> = {
+  "src/app/api/cron/daily/route.ts POST": "يقرأ المبالغ ويكتب لقطتها اليوميّة وحدها (`daily_figures`) — لا مال ولا قرار",
 };
 
 const isReadOnly = (capability: string) => /:view$/.test(capability);
@@ -120,12 +136,32 @@ describe("كلّ مسار يبدأ بحارس، والكتابة بغير صلا
       });
     }
 
+    if (key.startsWith(CRON_DIR)) {
+      for (const h of handlers) {
+        it(`${key} ${h.method} — بسرّ التشغيل المجدول لا بجلسة`, () => {
+          expect(h.capabilities, "مسارُ التشغيل المجدول لا يطلب جلسة — guard() لا يعمل بلا كعكة").toEqual([]);
+          expect(h.cronCapabilities.length, `${h.method} لا يبلغ نداء cronGuard(request, capability)`).toBeGreaterThan(0);
+          expect(h.cronCapabilities, "الصلاحيّة تكتب نصّاً حرفيّاً").not.toContain(null);
+          if (!MUTATING.has(h.method)) return;
+          const writes = h.cronCapabilities.filter((c): c is string => c !== null && !isReadOnly(c));
+          const exemption = `${key} ${h.method}`;
+          if (exemption in CRON_WRITE_WITH_VIEW) {
+            expect(writes, `${exemption} في CRON_WRITE_WITH_VIEW وله صلاحيّة كتابة — احذفه منها`).toEqual([]);
+            return;
+          }
+          expect(writes.length, `${h.method} يكتب وحارسه صلاحيّة قراءة`).toBeGreaterThan(0);
+        });
+      }
+      continue;
+    }
+
     for (const h of handlers) {
       it(`${key} ${h.method}`, () => {
         if (key in UNGUARDED) {
           expect(h.capabilities, `${key} في UNGUARDED وهو يحمل حارساً — احذفه منها`).toEqual([]);
           return;
         }
+        expect(h.cronCapabilities, "cronGuard لمسارات api/cron/ وحدها — السرُّ لا يفتح بابَ شاشة").toEqual([]);
         expect(h.capabilities.length, `${h.method} لا يبلغ نداء guard(route, capability)`).toBeGreaterThan(0);
         expect(h.capabilities, "الصلاحيّة تكتب نصّاً حرفيّاً — لا متغيّراً لا يقرأ هنا").not.toContain(null);
 
@@ -148,6 +184,7 @@ describe("كلّ مسار يبدأ بحارس، والكتابة بغير صلا
     const known = new Set(files.map(posix));
     for (const k of Object.keys(UNGUARDED)) expect(known, `${k} في UNGUARDED وليس في المستودع`).toContain(k);
     for (const k of Object.keys(WRITE_WITH_VIEW)) expect(known).toContain(k.split(" ")[0]);
+    for (const k of Object.keys(CRON_WRITE_WITH_VIEW)) expect(known).toContain(k.split(" ")[0]);
   });
 
   it("والقارئ يبلغ الحارس عبر دالّة محلّيّة، ويفرّق معالجاً عن آخر", () => {
@@ -160,10 +197,29 @@ describe("كلّ مسار يبدأ بحارس، والكتابة بغير صلا
       export async function PATCH() { await guard("x", capabilityFor()); }
     `;
     expect(handlerGuards(source)).toEqual([
-      { method: "GET", capabilities: ["bank:view"] },
-      { method: "POST", capabilities: ["bank:edit"] },
-      { method: "DELETE", capabilities: [] },
-      { method: "PATCH", capabilities: [null] },
+      { method: "GET", capabilities: ["bank:view"], cronCapabilities: [] },
+      { method: "POST", capabilities: ["bank:edit"], cronCapabilities: [] },
+      { method: "DELETE", capabilities: [], cronCapabilities: [] },
+      { method: "PATCH", capabilities: [null], cronCapabilities: [] },
     ]);
+  });
+
+  it("ويرى cronGuard منفصلاً عن guard", () => {
+    const source = `
+      export async function POST(request: Request) { const a = await cronGuard(request, "document:upload"); return run(a); }
+    `;
+    expect(handlerGuards(source)).toEqual([{ method: "POST", capabilities: [], cronCapabilities: ["document:upload"] }]);
+  });
+
+  it("ومساراتُ التشغيل المجدول موجودةٌ ويرفض حارسُها بلا السرّ", async () => {
+    const files = routes(API).map(posix).filter((f) => f.startsWith(CRON_DIR));
+    expect(files.length).toBeGreaterThanOrEqual(3);
+    const { cronGuard, CronRefusal } = await import("@/services/cron.service");
+    const owner = async () => [{ id: "owner", role: "OWNER" as const }];
+    const req = (auth?: string) => new Request("https://x/api/cron/drive", { method: "POST", headers: auth ? { authorization: auth } : {} });
+    const status = async (p: Promise<unknown>) => p.then(() => 200, (e: unknown) => (e instanceof CronRefusal ? e.status : 500));
+    expect(await status(cronGuard(req(), "document:upload", { secret: "s3cret", loadOwners: owner }))).toBe(401);
+    expect(await status(cronGuard(req("Bearer s3cret"), "document:upload", { secret: undefined, loadOwners: owner }))).toBe(503);
+    expect(await status(cronGuard(req("Bearer s3cret"), "document:upload", { secret: "s3cret", loadOwners: owner }))).toBe(200);
   });
 });
