@@ -83,10 +83,10 @@ describe("شهادة الجرد الأسبوعيّ على بيانات المق�
       expect(report.coverage.scope.excluded).toBe(5);
       log.push(`النطاق: ${report.coverage.scope.included} داخله · ${report.coverage.scope.excluded} خارجه باختيار`);
 
-      /* ٥ · الاستهلاكُ المتوقَّع — بنُّ إثيوبيا ٥٫٧١٥ كجم من ملفّ المبيعات */
+      /* ٥ · الاستهلاكُ المتوقَّع — بنُّ إثيوبيا ٥٫٨٧٥ كجم: Iced (٢٧٦ بيعت + ٨ صُنعت وأُرجعت) × ٢٠ + Hot ١٣ × ١٥ */
       const coffee = stock.find((s) => s.sku === "sk-0003")!.id;
       let line = report.lines.find((l) => l.productId === coffee)!;
-      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.715);
+      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.875);
       const knownConsumption = report.lines.filter((l) => l.inScope && l.theoreticalConsumptionMilli !== null).length;
       const unknownConsumption = report.lines.filter((l) => l.inScope && l.theoreticalConsumptionMilli === null).length;
       log.push(`الاستهلاك المتوقّع: معروف لـ${knownConsumption} · مجهول لـ${unknownConsumption} (لا وصفة تصل إليه) — معلن`);
@@ -122,13 +122,13 @@ describe("شهادة الجرد الأسبوعيّ على بيانات المق�
       }, actorId, tx))).toBeInstanceOf(PossibleDuplicateReceiptError);
       log.push("الاستلام: ٢ كجم يدوياً، ثمّ فاتورتها ← مجهولة حتى ربطتا ← ٢ كجم مرّةً واحدة");
 
-      /* ٩ · العدُّ والفرق: ٨ + ٢ − ٥٫٧١٥ = ٤٫٢٨٥ متوقَّعاً، ووُجد ٤٫٢ ← −٨٥ جراماً */
-      report = await saveActualCounts(countId, [{ productId: coffee, actualMilli: toCanonical(4_200_000, "G") }], actorId, tx);
+      /* ٩ · العدُّ والفرق: ٨ + ٢ − ٥٫٨٧٥ = ٤٫١٢٥ متوقَّعاً، ووُجد ٤٫٠٤ ← −٨٥ جراماً */
+      report = await saveActualCounts(countId, [{ productId: coffee, actualMilli: toCanonical(4_040_000, "G") }], actorId, tx);
       line = report.lines.find((l) => l.productId === coffee)!;
-      expect(canonicalToQuantity(line.theoreticalClosingMilli!, "KG")).toBe(4.285);
+      expect(canonicalToQuantity(line.theoreticalClosingMilli!, "KG")).toBe(4.125);
       expect(canonicalToQuantity(line.varianceMilli!, "G")).toBe(-85);
       expect(report.totals.summary.shortageCostMinor).toBeGreaterThan(0);
-      log.push(`الفرق: متوقّع ٤٫٢٨٥ كجم · فعليّ ٤٫٢ · فرق −٨٥ جم · نقص ${report.totals.summary.shortageCostMinor} هللة`);
+      log.push(`الفرق: متوقّع ٤٫١٢٥ كجم · فعليّ ٤٫٠٤ · فرق −٨٥ جم · نقص ${report.totals.summary.shortageCostMinor} هللة`);
 
       /* ١٠ · الإقفال — والمقفَلُ لا يتغيّر بتصحيح وصفةٍ ولا باستلامٍ متأخّر */
       await finaliseCount(countId, actorId, tx);
