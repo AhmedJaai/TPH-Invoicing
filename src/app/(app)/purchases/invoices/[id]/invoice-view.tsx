@@ -6,7 +6,7 @@ import { CreditNoteForm } from "@/components/credit-note-form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Ban, CircleAlert, CircleCheck, Copy, ExternalLink, FileText, History, Landmark, ListOrdered,
+  Ban, CircleAlert, CircleCheck, Copy, FileText, History, Landmark, ListOrdered,
   Receipt, ScanText, ShieldCheck, TrendingUp, TriangleAlert, Wallet,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -15,12 +15,13 @@ import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
 import { LiveMoney } from "@/components/live-money";
 import {
-  Badge, DataTable, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline, buttonClass,
+  Badge, DataTable, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline,
   type TimelineItem, type Tone,
 } from "@/components/ui";
 import { MarkInvoicePaid } from "@/components/mark-invoice-paid";
 import { InvoiceFix } from "@/components/invoice-fix";
 import { DocumentReread } from "@/components/document-reread";
+import { DocumentPaper } from "@/components/document-paper";
 import { RejectDocument } from "@/components/reject-document";
 import { loadInvoiceProfile, neighbours } from "@/services/invoice-profile.service";
 import { evaluateInvoice, missingPillars } from "@/lib/invoice-findings";
@@ -541,16 +542,9 @@ export async function InvoiceView({
               </div>
 
               <div className="flex flex-wrap items-start gap-2 border-t border-line-soft bg-sunken/40 p-4">
-                {doc.driveFileId && (
-                  <a
-                    href={`https://drive.google.com/file/d/${doc.driveFileId}/view`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonClass("secondary", "sm")}
-                  >
-                    <T s="{0}افتح الورقة في الدرايف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-                )}
                 {p.lines.length > 0 && <DocumentReread documentId={doc.id} canEdit={canEdit} />}
+                {/* الورقةُ تُفتح هنا تحت قراءتها — لا في لسانٍ آخر */}
+                {doc.driveFileId && <DocumentPaper documentId={doc.id} driveFileId={doc.driveFileId} fileName={doc.fileName} openLabel="قارن بالورقة" />}
               </div>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-muted">

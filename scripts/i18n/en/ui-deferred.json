@@ -1,0 +1,19 @@
+{
+"معرّف المستند غير صالح": "Invalid document ID",
+"هذا المستند لم يعد موجوداً في النظام. حدّث الصفحة": "This document no longer exists in the system. Refresh the page",
+"لا ملف لهذا المستند في الدرايف، فلا ورقة تُعرض": "This document has no file in Drive, so there is no paper to show",
+"لا يوجد تفويض للدرايف في هذه البيئة، فلا تُعرض الورقة هنا. افتحها في الدرايف": "There is no Drive authorization in this environment, so the paper can't be shown here. Open it in Drive",
+"الملف أكبر من ٢٥ ميجابايت فلا يُعرض هنا. افتحه في الدرايف": "The file is larger than 25 MB, so it can't be shown here. Open it in Drive",
+"الملف لم يعد في مكانه في الدرايف، أو لا تملك صلاحية فتحه": "The file is no longer where it was in Drive, or you don't have permission to open it",
+"تعذّر جلب الورقة من الدرايف. أعد المحاولة، أو افتحها في الدرايف": "Couldn't fetch the paper from Drive. Try again, or open it in Drive",
+"هذا النوع من الملفات لا يُعرض داخل التطبيق. افتحه في الدرايف": "This file type can't be shown inside the app. Open it in Drive",
+"تعذّر عرض الورقة.": "Couldn't show the paper.",
+"انقطع جلب الورقة قبل أن يكتمل. أعد المحاولة.": "Fetching the paper was cut off before it finished. Try again.",
+"{0}افتحها في الدرايف": "{0}Open it in Drive",
+"{0}أخفِ الورقة": "{0}Hide the paper",
+"يجلب الورقة من الدرايف…": "Fetching the paper from Drive…",
+"اعرض الورقة": "Show the paper",
+"الورقة": "The paper",
+"يجهّز الورقة…": "Preparing the paper…",
+"تعذّر عرض الورقة. أعد فتح البطاقة.": "Couldn't show the paper. Reopen the card."
+}

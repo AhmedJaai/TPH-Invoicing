@@ -29,3 +29,8 @@ export const DOCUMENT_STATUS_BADGE: Record<string, { text: string; tone: LabelTo
 export function documentHref(id: string, anchor?: "fix" | "why"): string {
   return `/documents/file/${encodeURIComponent(id)}${anchor ? `#${anchor}` : ""}`;
 }
+
+/** رابطُ الملفّ في الدرايف — طريقٌ ثانٍ حين لا تُعرض الورقة داخل التطبيق (`document-paper.tsx`). */
+export function driveFileUrl(driveFileId: string): string {
+  return `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/view`;
+}
