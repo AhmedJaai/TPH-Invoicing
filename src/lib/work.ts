@@ -26,7 +26,7 @@ import { db } from "@/db";
 import { buildAttention, type AttentionItem } from "./attention";
 import { gatherAttentionFacts } from "./attention-facts";
 import { partitionSnoozed, type SnoozedItem } from "./attention-snooze";
-import { todayInRiyadh } from "./riyadh-time";
+import { formatMoment, todayInRiyadh } from "./riyadh-time";
 import { areaCounts, tabCounts } from "./nav";
 import { can, type Capability, type Role } from "./permissions";
 import { loadOpenIbanWatch } from "@/services/iban-guard.service";
@@ -40,16 +40,21 @@ import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { loadRepeatDeliveries } from "@/services/repeat-delivery.service";
 import { loadPayrollAttentionFacts } from "@/services/payroll.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
+import { loadSealDrift } from "@/services/month-seal.service";
+import { loadLowAiBalance } from "@/services/daily-checks.service";
+import { formatAiBalance } from "./ai/balance";
 
 /** كلُّ البنود كما يبنيها `buildAttention` — قبل أن يُفرز المؤجَّل. */
 const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, payroll] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, payroll, drift, aiLow] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(),
     loadPayrollAttentionFacts(todayInRiyadh()),
+    /* فحوصُ الصباح تُقرأ ولا تُعاد: آخرُ ما وجده `/api/cron/daily` */
+    loadSealDrift(), loadLowAiBalance(),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -85,6 +90,12 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       amountMinor: f.totalMinor,
     })),
     firstTransferMinor: first.reduce((s, f) => s + f.totalMinor, 0),
+    sealDrift: drift ? { checkedAt: formatMoment(drift.checkedAt), findings: drift.findings } : null,
+    aiBalanceLow: aiLow ? {
+      display: formatAiBalance({ known: true, cents: aiLow.cents, currency: aiLow.currency, available: aiLow.available }),
+      available: aiLow.available,
+      checkedAt: formatMoment(aiLow.checkedAt),
+    } : null,
   });
 });
 

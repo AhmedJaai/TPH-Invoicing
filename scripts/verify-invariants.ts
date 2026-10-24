@@ -435,7 +435,20 @@ async function main() {
       { code: "23514" }),
   ] : [];
 
-  const all = [...results, ...inventory, ...payroll];
+  /* أرقامُ الشهر المختومة عند إقفاله تُضاف ولا تُعدَّل ولا تُحذف — إعادةُ الإقفال تكتب ختماً جديداً */
+  const sealRow = `insert into month_seals (id, month, origin, figures) values ('t-seal', '2099-01', 'CLOSE', '{}'::jsonb);`;
+  const seals = [
+    await mustFail("ختمُ أرقام شهرٍ مقفل يُعدَّل بعد كتابته",
+      `${sealRow} update month_seals set figures = '{"v":2}'::jsonb where id = 't-seal'`,
+      { code: "P0001", message: /لا تُعدَّل/ }),
+    await mustFail("ختمُ أرقام شهرٍ مقفل يُحذف",
+      `${sealRow} delete from month_seals where id = 't-seal'`,
+      { code: "P0001", message: /لا تُعدَّل ولا تُحذف/ }),
+    await mustPass("إعادةُ الإقفال تكتب ختماً ثانياً للشهر نفسه",
+      `${sealRow} insert into month_seals (id, month, origin, figures) values ('t-seal-2', '2099-01', 'CLOSE', '{}'::jsonb)`),
+  ];
+
+  const all = [...results, ...inventory, ...payroll, ...seals];
   const passed = all.filter(Boolean).length;
   console.log(`\n${passed} من ${all.length} قيداً يعمل.`);
   await pool.end();

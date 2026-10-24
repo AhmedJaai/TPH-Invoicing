@@ -58,6 +58,10 @@
 | `src/lib/bank/match.ts` | ربط الحركة بمورّد — حدود الكلمات، لا احتواء نصّي |
 | `src/lib/statement-match.ts` | مطابقة كشوف المورّدين |
 | `src/lib/month-close.ts` | الإقفال: `BLOCK` يمنع، `WARN` لا يمنع |
+| `src/lib/month-seal.ts` | أرقامُ الشهر المختومة وما تغيّر منها بعد إقفاله (`diffSealedFigures`) |
+| `src/services/month-seal.service.ts` | ختمُ الشهر عند إقفاله، وفحصُ الصباح يقارن كلَّ شهرٍ مقفل بختمه |
+| `src/services/daily-checks.service.ts` | ما وجده فحصُ الصباح (`daily_checks`)، ورصيدُ القراءة الذكيّة |
+| `src/lib/since-yesterday.ts` | «منذ صباح أمس» من لقطة `daily_figures` — بلا لقطة: «غير معروف» |
 | `src/lib/attention.ts` | كل تنبيه يحمل `href` (مكان الإصلاح) و`evidence` (لِمَ ظهر) |
 | `src/lib/data-health.ts` | التغطية لا تُختلق؛ فيها حال `NOT_CONNECTED` |
 | `src/lib/expenses.ts` | المصروف الفعلي. **سداد المورّد ليس مصروفاً** — محسوبٌ في المشتريات. وازدواجُ الحدث يُكشَف ولا يُحذَف |

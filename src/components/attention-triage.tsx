@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Activity, ArrowDown, ArrowLeft, Ban, Banknote, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon,
+  Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon,
 } from "lucide-react";
 import { Money, Prose } from "./money";
 import { SignalControls } from "./signal-controls";
@@ -71,6 +71,8 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "foodics-purchase-differs": Scale,
   "foodics-purchase-missing": FileSearch,
   "foodics-stale": RefreshCw,
+  "sealed-month-drift": Stamp,
+  "ai-balance-low": BatteryLow,
   "foodics-till-gap": Banknote,
   "finance-incomplete": HandCoins,
   "payroll-owed": HandCoins,

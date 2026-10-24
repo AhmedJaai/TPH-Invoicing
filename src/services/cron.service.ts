@@ -28,6 +28,8 @@ import type { SyncResult } from "./foodics-sync.service";
 import type { DriveSyncBody } from "./drive-sync.service";
 import type { SweepOutcome } from "./backlog-sweep.service";
 import type { DayFigures } from "./daily-figures.service";
+import type { SealCheckSummary } from "./month-seal.service";
+import { balanceIsLow, formatAiBalance, type AiBalance } from "@/lib/ai/balance";
 
 /**
  * إيقاعُ القشرة — مزامنةُ فودكس والدرايف من الصفحة المفتوحة كلَّ ثلاث ساعات
@@ -266,16 +268,54 @@ export interface DailyCronDeps {
   day: () => string;
   gather: () => Promise<DayFigures>;
   write: (day: string, f: DayFigures) => Promise<boolean>;
+  /** يختم ما لم يُختم من الأشهر المقفلة ويقارن كلّها بختمها (`runSealCheck`). */
+  checkSeals: () => Promise<SealCheckSummary>;
+  /** رصيدُ القراءة الذكيّة عند المزوّد — لا يرمي، والمجهولُ مجهول. */
+  checkAiBalance: () => Promise<AiBalance>;
 }
 
+function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
+  if (!written) return `لقطة يوم ${day} مكتوبة من قبل، ولم تتغيّر`;
+  const cash = figures.cashMinor === null ? "النقد غير معروف" : `النقد ${formatRiyalsDisplay(figures.cashMinor)}`;
+  return `كُتبت لقطة يوم ${day}: عليك ${formatRiyalsDisplay(figures.owedMinor)} · ${figures.attentionCount} بنداً يحتاج قرارك · ${cash}`;
+}
+
+function sealLine(s: SealCheckSummary): string {
+  const parts: string[] = [];
+  if (s.sealedNow.length > 0) parts.push(`خُتمت أرقام ${s.sealedNow.join("، ")} لأول مرة`);
+  if (s.months === 0) parts.push("لا شهر مقفل مختوم يُقارن");
+  else if (s.findings.length === 0) parts.push(`أرقام ${s.months === 1 ? "الشهر المقفل" : `${s.months} أشهر مقفلة`} كما خُتمت`);
+  else {
+    const months = [...new Set(s.findings.map((f) => f.month))];
+    parts.push(`تغيّر ${s.findings.length} من أرقام ${months.join("، ")} بعد إقفاله`);
+  }
+  return parts.join("، ");
+}
+
+/**
+ * لقطةُ اليوم، ثمّ فحصا الصباح: أرقامُ الأشهر المقفلة، ورصيدُ القراءة الذكيّة. كلٌّ يُقال
+ * في سطر النتيجة، وتعثّرُ فحصٍ لا يُسقط ما قبله — لكنّه يُعلَن فشلاً (٥٠٢) ليُرى.
+ */
 export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
   const day = deps.day();
   const figures = await deps.gather();
   const written = await deps.write(day, figures);
-  if (!written) return { ok: true, record: true, result: `لقطة يوم ${day} مكتوبة من قبل، ولم تتغيّر` };
-  const cash = figures.cashMinor === null ? "النقد غير معروف" : `النقد ${formatRiyalsDisplay(figures.cashMinor)}`;
-  return {
-    ok: true, record: true,
-    result: `كُتبت لقطة يوم ${day}: عليك ${formatRiyalsDisplay(figures.owedMinor)} · ${figures.attentionCount} بنداً يحتاج قرارك · ${cash}`,
-  };
+  const parts = [snapshotLine(day, written, figures)];
+  let ok = true;
+
+  try {
+    parts.push(sealLine(await deps.checkSeals()));
+  } catch (e) {
+    ok = false;
+    parts.push(`تعذّر فحص الأشهر المقفلة: ${e instanceof Error ? e.message.split("\n")[0].slice(0, 160) : String(e)}`);
+  }
+
+  const balance = await deps.checkAiBalance().catch((e: unknown): AiBalance => ({
+    known: false, reason: e instanceof Error ? e.message.slice(0, 120) : "تعذّر السؤال",
+  }));
+  parts.push(balance.known
+    ? `رصيد القراءة الذكية ${formatAiBalance(balance)}${balanceIsLow(balance) ? " (ينفد)" : ""}`
+    : `رصيد القراءة الذكية غير معروف: ${balance.reason}`);
+
+  return { ok, record: true, result: parts.join(" · ") };
 }

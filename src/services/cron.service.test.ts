@@ -5,6 +5,7 @@ import {
 } from "./cron.service";
 import { runLeasedFoodicsSync, type SyncCounts, type SyncResult } from "./foodics-sync.service";
 import type { DayFigures } from "./daily-figures.service";
+import type { AiBalance } from "@/lib/ai/balance";
 import { snapshotDay } from "@/lib/cron";
 import { tagAuditAfter } from "@/lib/audit";
 import { CRON_ACTOR_LABEL, runAsSystem, systemActorLabel } from "@/lib/actor-context";
@@ -242,6 +243,8 @@ describe("لقطةُ اليوم", () => {
       day: () => "2026-10-23",
       gather: async () => figures,
       write: async (day: string, f: DayFigures) => { if (store.has(day)) return false; store.set(day, f); return true; },
+      checkSeals: async () => ({ sealedNow: [], months: 0, findings: [] }),
+      checkAiBalance: async (): Promise<AiBalance> => ({ known: false, reason: "لا مفتاح" }),
     };
     const first = await dailyCronJob(deps);
     expect(first.ok).toBe(true);
@@ -250,5 +253,50 @@ describe("لقطةُ اليوم", () => {
     const second = await dailyCronJob({ ...deps, gather: async () => ({ ...figures, owedMinor: 1 }) });
     expect(second).toMatchObject({ ok: true, result: expect.stringContaining("من قبل") });
     expect(store.get("2026-10-23")?.owedMinor).toBe(1_234_500);
+  });
+
+  const quietDeps = {
+    day: () => "2026-10-24",
+    gather: async () => figures,
+    write: async () => true,
+    checkSeals: async () => ({ sealedNow: [], months: 3, findings: [] }),
+    checkAiBalance: async (): Promise<AiBalance> => ({ known: true, currency: "USD", cents: 42_00, available: true }),
+  };
+
+  it("وفحصا الصباح في سطر النتيجة: الأشهرُ كما خُتمت، والرصيدُ بمبلغه", async () => {
+    const r = await dailyCronJob(quietDeps);
+    expect(r.ok).toBe(true);
+    expect(r.result).toContain("أرقام 3 أشهر مقفلة كما خُتمت");
+    expect(r.result).toContain("رصيد القراءة الذكية 42.00 USD");
+    expect(r.result).not.toContain("ينفد");
+  });
+
+  it("ما تغيّر يُسمّى شهرُه، وما خُتم لأوّل مرّة يُقال، والرصيدُ القليل «ينفد»", async () => {
+    const r = await dailyCronJob({
+      ...quietDeps,
+      checkSeals: async () => ({
+        sealedNow: ["2026-07"], months: 3,
+        findings: [{ sealId: "s", month: "2026-08", figure: "ضريبة المدخلات", sealedMinor: 1, nowMinor: 2 }],
+      }),
+      checkAiBalance: async () => ({ known: true, currency: "USD", cents: 3_10, available: true }),
+    });
+    expect(r.result).toContain("خُتمت أرقام 2026-07 لأول مرة");
+    expect(r.result).toContain("تغيّر 1 من أرقام 2026-08 بعد إقفاله");
+    expect(r.result).toContain("3.10 USD (ينفد)");
+  });
+
+  it("تعثّرُ فحص الأشهر لا يُسقط اللقطة، لكنّه يُعلَن فشلاً — والرصيدُ المجهول يُقال مجهولاً", async () => {
+    let wrote = false;
+    const r = await dailyCronJob({
+      ...quietDeps,
+      write: async () => { wrote = true; return true; },
+      checkSeals: async () => { throw new Error("انقطع الاتصال"); },
+      checkAiBalance: async () => ({ known: false, reason: "ردّ المزوّد 401" }),
+    });
+    expect(wrote).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.result).toContain("تعذّر فحص الأشهر المقفلة: انقطع الاتصال");
+    expect(r.result).toContain("رصيد القراءة الذكية غير معروف: ردّ المزوّد 401");
+    expect(r.result).not.toMatch(/0\.00 USD/);
   });
 });

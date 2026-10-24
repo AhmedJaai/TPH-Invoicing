@@ -1,11 +1,22 @@
 /**
- * «لماذا هذا الرقم؟» — آخرُ القيود التي حرّكت رقماً رئيسيّاً، من سجلّ التدقيق.
- * قراءةٌ وحدها، ولمن يرى المبالغ.
+ * «لماذا هذا الرقم؟» — آخرُ القيود التي حرّكت رقماً رئيسيّاً، من سجلّ التدقيق،
+ * وما تغيّر منذ لقطة صباح أمس لما تحفظه اللقطة («عليك»). قراءةٌ وحدها، ولمن يرى المبالغ.
  */
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { isFigureId } from "@/lib/figure-history";
 import { loadFigureMovers } from "@/services/figure-history.service";
+import { loadDayFigures } from "@/services/daily-figures.service";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
+import { sinceYesterday, type SinceYesterday } from "@/lib/since-yesterday";
+import { addDays, todayInRiyadh } from "@/lib/riyadh-time";
+
+/** «عليك» الآن ناقصاً لقطة صباح أمس — الرقمُ الوحيد هنا الذي تحفظه اللقطة اليوميّة. */
+async function owedSinceYesterday(): Promise<SinceYesterday> {
+  const day = addDays(todayInRiyadh(), -1);
+  const [snap, balances] = await Promise.all([loadDayFigures(day), loadBalanceTotals()]);
+  return sinceYesterday(balances.totals.owedMinor, snap ? snap.owedMinor : undefined, day);
+}
 
 export const runtime = "nodejs";
 
@@ -22,5 +33,9 @@ export async function GET(request: Request) {
   if (!isFigureId(figure)) {
     return NextResponse.json({ error: "الرقم غير معروف" }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, movers: await loadFigureMovers(figure, user.id) }, { headers: { "cache-control": "no-store" } });
+  const [movers, since] = await Promise.all([
+    loadFigureMovers(figure, user.id),
+    figure === "owed" ? owedSinceYesterday() : Promise.resolve(null),
+  ]);
+  return NextResponse.json({ ok: true, movers, since }, { headers: { "cache-control": "no-store" } });
 }

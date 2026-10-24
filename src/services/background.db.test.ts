@@ -4,7 +4,8 @@ import { dailyFigures, jobState } from "@/db/schema";
 import { withRollback } from "@/test/db";
 import { ranRecently } from "@/lib/cron";
 import { acquireLease, loadCronRun, recordCronRun, releaseLease } from "./job-state.service";
-import { writeDailyFigures } from "./daily-figures.service";
+import { loadDayFigures, writeDailyFigures } from "./daily-figures.service";
+import { sinceYesterday } from "@/lib/since-yesterday";
 
 /*
   التشغيلُ المجدول على القاعدة الحقيقيّة: العقدُ يردّ الثاني، وأثرُ التشغيل يُقرأ كما كُتب،
@@ -52,6 +53,18 @@ describe("لقطةُ أرقام اليوم", () => {
       expect(rows[0]).toMatchObject({ owedMinor: 12_345_00, attentionCount: 4, cashMinor: null, cashAsOf: null });
       /* واليومُ التالي يُكتب */
       expect(await writeDailyFigures("2099-01-16", { owedMinor: 0, attentionCount: 0, cashMinor: 0, cashAsOf: "2099-01-15" }, tx)).toBe(true);
+    }));
+
+  it("«منذ صباح أمس» من لقطة أمس كما كُتبت — ولا لقطة: غير معروف", () =>
+    withRollback(async (tx) => {
+      expect(await loadDayFigures("2099-02-01", tx)).toBeNull();
+      await writeDailyFigures("2099-02-01", { owedMinor: 1_000_00, attentionCount: 3, cashMinor: null, cashAsOf: null }, tx);
+      const snap = await loadDayFigures("2099-02-01", tx);
+      expect(snap).toEqual({ owedMinor: 1_000_00, attentionCount: 3, cashMinor: null, cashAsOf: null });
+      expect(sinceYesterday(1_250_00, snap?.owedMinor, "2099-02-01")).toMatchObject({ known: true, delta: 250_00 });
+      expect(sinceYesterday(9_00, snap?.cashMinor, "2099-02-01")).toMatchObject({ known: false, reason: "unknown-value" });
+      const none = await loadDayFigures("2099-01-31", tx);
+      expect(sinceYesterday(1_250_00, none ? none.owedMinor : undefined, "2099-01-31")).toMatchObject({ known: false, reason: "no-snapshot" });
     }));
 
   it("والقاعدةُ ترفض يوماً بغير صيغته", () =>

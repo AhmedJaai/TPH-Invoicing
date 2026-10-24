@@ -86,5 +86,6 @@
   "085_payroll_saudi_rules.sql": "93ef2d03c01b4133ea6ca994e597986edbe376b18fb95d8f5ae25a2a0823d17f",
   "086_payroll_paid_outside.sql": "7136a2c44f9b487aac2dd90da10e516b130010bfa3bc900b3787b72ca5e657dd",
   "087_daily_figures.sql": "7f8e97b3f894d9ac01a789d184c877e2340e6ba746166d9f47483acd2f39d3a0",
-  "088_month_lock_coverage.sql": "6bd615e043443d64cf4ed44e6185c757f35e6edc28588c59af1e58b28e6a2a3c"
+  "088_month_lock_coverage.sql": "6bd615e043443d64cf4ed44e6185c757f35e6edc28588c59af1e58b28e6a2a3c",
+  "089_month_seals.sql": "d3f2a82f21aaa5996f060049f3c057552b3cb19d801568cfc5d5fdcb356b2f59"
 }

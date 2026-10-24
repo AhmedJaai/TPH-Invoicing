@@ -607,3 +607,53 @@ describe("صورُ الفريق", () => {
     expect(buildAttention({ ...quiet, teamCaptures: 0 }).map((i) => i.id)).not.toContain("team-captures");
   });
 });
+
+describe("فحوصُ الصباح في «يحتاج قرارك»", () => {
+  const findings = [
+    { month: "2026-08", figure: "عليك للمورّدين في آخر الشهر", sealedMinor: 10_000_00, nowMinor: 10_230_00 },
+    { month: "2026-08", figure: "رصيد ختام الحساب الجاري", sealedMinor: 5_000_00, nowMinor: null },
+  ];
+
+  it("أرقامُ شهرٍ مقفل تغيّرت: بندٌ واحد يسمّي الشهرَ والرقمَ وقيمتيه — والمجهولُ «غير معروف»", () => {
+    const items = buildAttention({ ...quiet, sealDrift: { checkedAt: "اليوم 05:31", findings } });
+    const item = items.find((i) => i.id === "sealed-month-drift");
+    expect(item?.title).toBe("أرقام شهر مقفل تغيّرت بعد إقفاله");
+    expect(item?.detail).toContain("عليك للمورّدين في آخر الشهر");
+    expect(item?.detail).toContain("عند الإقفال 10,000.00 · الآن 10,230.00");
+    expect(item?.evidence[1].sub).toBe("عند الإقفال 5,000.00 · الآن غير معروف");
+    expect(item?.count).toBe(2);
+    /* تنبيهٌ لا مبلغَ ضائع: الأثرُ لا يُخترَع، والبصمةُ تتغيّر إن تحرّك رقمٌ آخر */
+    expect(item?.impact).toEqual({ kind: "BLOCKED", amountMinor: null });
+    expect(item?.amountMinor).toBe(230_00 + 1);
+    expect(item?.needs).toBe("month:close");
+    expect(items.filter((i) => i.id === "sealed-month-drift")).toHaveLength(1);
+  });
+
+  it("لا فرق ولا فحص: لا بند", () => {
+    expect(buildAttention({ ...quiet, sealDrift: { checkedAt: "اليوم", findings: [] } }).some((i) => i.id === "sealed-month-drift")).toBe(false);
+    expect(buildAttention({ ...quiet, sealDrift: null }).some((i) => i.id === "sealed-month-drift")).toBe(false);
+  });
+
+  it("رصيدُ القراءة الذكيّة ينفد — بمبلغه، وأشدّ إن قال المزوّد إنّه لا يكفي", () => {
+    const low = buildAttention({ ...quiet, aiBalanceLow: { display: "3.20 USD", available: true, checkedAt: "اليوم 05:31" } })
+      .find((i) => i.id === "ai-balance-low");
+    expect(low?.title).toBe("رصيد القراءة الذكيّة ينفد");
+    expect(low?.detail).toContain("3.20 USD");
+    expect(low?.severity).toBe("HIGH");
+    const out = buildAttention({ ...quiet, aiBalanceLow: { display: "0.00 USD", available: false, checkedAt: "اليوم" } })
+      .find((i) => i.id === "ai-balance-low");
+    expect(out?.severity).toBe("CRITICAL");
+    expect(buildAttention({ ...quiet, aiBalanceLow: null }).some((i) => i.id === "ai-balance-low")).toBe(false);
+  });
+});
+
+it("فرقٌ ثانٍ يُقال بعدده مذكَّراً", () => {
+  const item = buildAttention({
+    ...quiet,
+    sealDrift: { checkedAt: "اليوم", findings: [
+      { month: "2026-08", figure: "ضريبة المخرجات", sealedMinor: 1, nowMinor: 2 },
+      { month: "2026-08", figure: "ضريبة المدخلات", sealedMinor: 1, nowMinor: 3 },
+    ] },
+  }).find((i) => i.id === "sealed-month-drift");
+  expect(item?.detail).toContain("، ورقم واحد غيره");
+});
