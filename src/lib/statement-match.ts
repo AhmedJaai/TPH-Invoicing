@@ -60,7 +60,12 @@ export type LineStatus =
   | "CREDIT_NOTE"
   | "PAYMENT"
   /** طابقه حلٌّ تقريبيّ — نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل */
-  | "APPROXIMATE";
+  | "APPROXIMATE"
+  /**
+   * مرجعُه لا يطابق شيئاً، وعندنا من المورّد أكثرُ من فاتورةٍ باليوم والمبلغ نفسيهما (أو
+   * يتنازع فاتورتَه سطرٌ آخر) — ليس «ناقصاً» ولا يُقيَّد، يختار الإنسانُ من `candidates`.
+   */
+  | "AMBIGUOUS";
 
 export interface LineMatch {
   line: StatementLineInput;
@@ -74,12 +79,44 @@ export interface LineMatch {
   score?: number;
   /** لماذا طوبق هكذا، بنصّه. */
   why?: string[];
+  /** مرجعُه مقروءٌ خطأً فطوبق بالمبلغ واليوم (بيكوف ٢٦ أغسطس: «000285لـ#» وهي 00346) */
+  misreadRef?: boolean;
+  /** في المرجع حروفٌ عربيّة — القارئ أخذه من نصٍّ مجاور غالباً: «مرجعٌ مقروءٌ ملتبس» */
+  refFlag?: string;
+  /** فواتيرُ اليوم والمبلغ نفسيهما لسطرٍ ملتبس (`AMBIGUOUS`) */
+  candidates?: OurInvoice[];
+}
+
+/** نصُّ الدليل حين يُطابَق سطرٌ مرجعُه مقروءٌ خطأً — يُحفظ ويُعرض بنصّه. */
+export const MISREAD_REF_EVIDENCE = "المرجع مقروءٌ خطأً — طابق بالمبلغ واليوم";
+export const AMBIGUOUS_REF_FLAG = "مرجعٌ مقروءٌ ملتبس";
+
+const ARABIC_LETTERS = /[ء-ي]/;
+const ANY_DIGIT = /[0-9٠-٩۰-۹]/;
+
+/** في المرجع حروفٌ عربيّة — «000285لـ#»، «فاتورة»: ليس رقمَ فاتورةٍ نظيفاً. */
+export function refLooksMisread(ref: string | null | undefined): boolean {
+  return ARABIC_LETTERS.test(ref ?? "");
+}
+
+/**
+ * ما ألصقه القارئ بالرقم من العربيّة: «000285لـ#» ← «000285 #»، «رقم123» ← «123».
+ * لا يمسّ ما لا رقمَ فيه — «عملية الدفع» تبقى نصّاً.
+ */
+export function stripArabicGlue(value: string): string {
+  if (!ANY_DIGIT.test(value)) return value;
+  return value
+    .replace(/رقم/g, " ")
+    .replace(/(?<=[0-9٠-٩۰-۹#])[ء-يـ]+/g, " ")
+    .replace(/[ء-يـ]+(?=[0-9٠-٩۰-۹#])/g, " ");
 }
 
 export interface Reconciliation {
   lines: LineMatch[];
   /** حمّلها علينا وليست في أرشيفنا — الأهمّ */
   missingFromArchive: LineMatch[];
+  /** مرجعُه لا يطابق ولها عندنا أكثرُ من فاتورةٍ باليوم والمبلغ — يختار إنسان، ولا تُقيَّد */
+  ambiguous: LineMatch[];
   /** عندنا ولم ترد في كشفه */
   notInStatement: OurInvoice[];
   amountMismatches: LineMatch[];
@@ -105,7 +142,7 @@ import { INVOICE, countNoun } from "./arabic";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
 export function normalizeRef(value: string | null | undefined): string {
-  return latinDigits(unreverseInvoiceNumber((value ?? "").trim())).replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
+  return stripArabicGlue(latinDigits(unreverseInvoiceNumber((value ?? "").trim()))).replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
 }
 
 /**
@@ -270,6 +307,31 @@ export function reconcileStatement(
   const byLineKey = new Map(oneToOne.map((a) => [a.transactionId, a]));
   const invoiceById = new Map(ourInvoices.map((i) => [i.invoiceId, i]));
   const claimedIds = takenInvoice;
+  const fingerprintOf = (line: StatementLineInput) => `${isoDay(line.date)}|${line.debitMinor}|${normalizeRef(line.ref ?? line.description)}`;
+
+  /*
+    ── المرجعُ المقروءُ خطأً ──
+    بيكوف ٢٦ أغسطس: القراءةُ الثالثة أخذت مرجعَ سطر الفاتورة من سطر السداد المجاور
+    («000285لـ#») فضاع رقمُها 00346، فعُرض «فاتورة في الكشف بلا ملف» وقُيِّدت ثانيةً.
+    فسطرٌ مرجعُه لا يطابق فاتورةً، ولنا من المورّد فاتورةٌ **واحدة** باليوم والمبلغ نفسيهما
+    لم يطابقها سطرٌ آخر من هذا الكشف — هي هو. وإن كانت أكثرَ من واحدة (أو تنازعها سطران)
+    فهو «ملتبس» بمرشّحيه: لا يُطابَق تلقائياً، ولا يُقال «ناقص» فيُقيَّد.
+  */
+  const fallback = new Map<number, OurInvoice[]>();
+  const seenPre = new Set<string>();
+  debitLines.forEach((line, i) => {
+    const fp = fingerprintOf(line);
+    if (seenPre.has(fp)) return;
+    seenPre.add(fp);
+    if (byLineKey.has(`line-${i}`)) return;
+    const theirRef = normalizeRef(line.ref ?? line.description);
+    if (theirRef && ourByRef.some((o) => refMatches(theirRef, o.ref))) return;
+    const day = isoDay(line.date);
+    const c = ourInvoices.filter((o) => !takenInvoice.has(o.invoiceId) && isoDay(o.invoiceDate) === day && amountAgrees(o, line.debitMinor, tolerance));
+    if (c.length > 0) fallback.set(i, c);
+  });
+  const fallbackClaims = new Map<string, number>();
+  for (const c of fallback.values()) for (const o of c) fallbackClaims.set(o.invoiceId, (fallbackClaims.get(o.invoiceId) ?? 0) + 1);
 
   const lines: LineMatch[] = [];
   let debitIndex = -1;
@@ -293,7 +355,7 @@ export function reconcileStatement(
     }
 
     debitIndex++;
-    const fingerprint = `${isoDay(line.date)}|${line.debitMinor}|${normalizeRef(line.ref ?? line.description)}`;
+    const fingerprint = fingerprintOf(line);
     if (seenLines.has(fingerprint)) {
       lines.push({ line, status: "DUPLICATE_LINE" });
       continue;
@@ -301,8 +363,24 @@ export function reconcileStatement(
     seenLines.add(fingerprint);
 
     const hit = byLineKey.get(`line-${debitIndex}`);
+    const refFlag = refLooksMisread(line.ref) ? AMBIGUOUS_REF_FLAG : undefined;
     if (!hit) {
-      lines.push({ line, status: "MISSING_FROM_ARCHIVE" });
+      const cands = fallback.get(debitIndex);
+      if (cands && cands.length === 1 && fallbackClaims.get(cands[0].invoiceId) === 1) {
+        const invoice = cands[0];
+        claimedIds.add(invoice.invoiceId);
+        lines.push({
+          line, invoice, status: "MATCHED", method: "AMOUNT_DATE", differenceMinor: 0, score: 70, misreadRef: true, refFlag,
+          why: [MISREAD_REF_EVIDENCE, `فاتورتنا ${invoice.invoiceNumber} باليوم والمبلغ نفسيهما، ولم يطابقها سطر آخر من الكشف`],
+        });
+      } else if (cands) {
+        lines.push({
+          line, status: "AMBIGUOUS", candidates: cands, refFlag,
+          why: [`المرجع لا يطابق فاتورة، وعندنا ${countNoun(cands.length, INVOICE)} باليوم والمبلغ نفسيهما${cands.length === 1 ? " يطابقها سطر آخر ملتبس" : ""}. اختر منها ولا تقيّده فاتورة جديدة`],
+        });
+      } else {
+        lines.push({ line, status: "MISSING_FROM_ARCHIVE", refFlag, why: refFlag ? [`${AMBIGUOUS_REF_FLAG}: قارنه بورقة الكشف قبل أن تقيّده`] : undefined });
+      }
       continue;
     }
 
@@ -339,6 +417,7 @@ export function reconcileStatement(
   }
 
   const missingFromArchive = lines.filter((l) => l.status === "MISSING_FROM_ARCHIVE");
+  const ambiguous = lines.filter((l) => l.status === "AMBIGUOUS");
   const amountMismatches = lines.filter((l) => l.status === "AMOUNT_MISMATCH");
   /*
     وما بعد آخر أيّامه لا يُدّعى عليه: النافذةُ الموسَّعة أسبوعاً للمطابقة لا للدعوى —
@@ -382,6 +461,14 @@ export function reconcileStatement(
     });
   }
 
+  if (ambiguous.length > 0) {
+    findings.push({
+      code: ISSUE.STATEMENT_LINE_AMBIGUOUS,
+      severity: "WARN",
+      message: `${countNoun(ambiguous.length, INVOICE)} في الكشف مرجعها لا يطابق فاتورة، ولها عندنا أكثر من فاتورة باليوم والمبلغ نفسيهما. ربما قُرئ المرجع خطأً، فقارنها بورقة الكشف ولا تقيّدها فاتورة جديدة`,
+    });
+  }
+
   if (amountMismatches.length > 0) {
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
@@ -409,6 +496,7 @@ export function reconcileStatement(
   return {
     lines,
     missingFromArchive,
+    ambiguous,
     notInStatement,
     amountMismatches,
     matchedCount: lines.filter((l) => l.status === "MATCHED").length,

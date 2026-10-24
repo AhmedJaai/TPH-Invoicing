@@ -19,6 +19,8 @@ export const ISSUE = {
   STATEMENT_AMOUNT_MISMATCH: "STATEMENT_AMOUNT_MISMATCH",
   STATEMENT_LEDGER_GAP: "STATEMENT_LEDGER_GAP",
   STATEMENT_POSSIBLE_DUPLICATE: "STATEMENT_POSSIBLE_DUPLICATE",
+  /* سطرٌ مرجعُه لا يطابق ولنا أكثرُ من فاتورةٍ باليوم والمبلغ — مرجعٌ مقروءٌ خطأً غالباً */
+  STATEMENT_LINE_AMBIGUOUS: "STATEMENT_LINE_AMBIGUOUS",
   FILE_IN_WRONG_MONTH: "FILE_IN_WRONG_MONTH",
   FILE_MISSING_IN_DRIVE: "FILE_MISSING_IN_DRIVE",
   PAYMENT_WITHOUT_INVOICE: "PAYMENT_WITHOUT_INVOICE",
@@ -51,6 +53,7 @@ export const ISSUE_TEXT: Record<IssueCode, { severity: Severity; message: string
   STATEMENT_AMOUNT_MISMATCH: { severity: "WARN", message: "فرق في المبلغ بين الكشف والفاتورة" },
   STATEMENT_LEDGER_GAP: { severity: "WARN", message: "الرصيد الختامي في كشف المورّد يختلف عما نسجّله له في سجلاتنا" },
   STATEMENT_POSSIBLE_DUPLICATE: { severity: "WARN", message: "يشبه كشفاً مسجّلاً للمورّد نفسه عن الفترة نفسها" },
+  STATEMENT_LINE_AMBIGUOUS: { severity: "WARN", message: "سطر في الكشف مرجعه لا يطابق فاتورة، ولنا أكثر من فاتورة باليوم والمبلغ نفسيهما" },
   FILE_IN_WRONG_MONTH: { severity: "WARN", message: "ملف في مجلد شهر غير شهر فاتورته" },
   FILE_MISSING_IN_DRIVE: { severity: "WARN", message: "ملف مسجّل لم يعد في الدرايف، فربما حُذف أو نُقل إلى سلة المحذوفات" },
   PAYMENT_WITHOUT_INVOICE: { severity: "WARN", message: "حركة بنكية خارجة بلا فاتورة" },

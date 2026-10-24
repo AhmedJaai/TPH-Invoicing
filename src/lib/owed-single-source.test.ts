@@ -29,6 +29,7 @@ const ALLOWED = new Map<string, string>([
   [path.join("src", "services", "supplier-balance.service.ts"), "المصدر نفسه"],
   [path.join("src", "services", "supplier-credit.service.ts"), "قائمة الفواتير المفتوحة للتخصيص — سؤال عن الفواتير لا عن «عليك»"],
   [path.join("src", "lib", "month-close-facts.ts"), "فواتير الشهر غير المسدّدة في قائمة الإقفال — عدّ فواتير بعتبة الهللة"],
+  [path.join("src", "services", "invoice-removal.service.ts"), "ما بقي على فاتورةٍ بعينها — سقفُ ما ينتقل إليها من سداد القيد المحذوف، سؤالٌ عن فاتورة لا عن «عليك» (وهذا من الخدمة قبل وبعد)"],
   [path.join("src", "lib", "changes-facts.ts"), "«عليك» قبل ثلاثين يوماً بالمعادلة نفسها عند تاريخ مضى — لا تجيبه الخدمة"],
 ]);
 

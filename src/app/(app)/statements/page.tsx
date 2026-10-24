@@ -15,6 +15,7 @@ import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
+import { lineHasSameDayInvoice } from "@/services/statement-reconcile.service";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +59,10 @@ export default async function StatementsPage({
              st.closing_balance_minor as closing, d.file_name,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched,
-             /* سطور مدينة برقم لم يطابق: فواتير يذكرها الكشف ولا ملفّ لها */
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing,
-             (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing_minor
+             /* سطور مدينة برقم لم يطابق: فواتير يذكرها الكشف ولا ملفّ لها — إلّا ما له عندنا فاتورةٌ
+                باليوم والمبلغ نفسيهما (مرجعٌ مقروءٌ خطأً، بيكوف «000285لـ#»): ليس ناقصاً */
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")}) as missing,
+             (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")}) as missing_minor
         from statements st
         left join suppliers s on s.id = st.supplier_id
         left join documents d on d.id = st.document_id

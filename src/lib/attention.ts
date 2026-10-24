@@ -173,7 +173,8 @@ export interface AttentionFacts {
   misplacedFiles?: { label: string; sub: string; href: string }[];
 
   /** مستنداتٌ مقيَّدة لم يعد ملفُّها في الدرايف — حُذف أو في السلّة (`missingFromDrive`) */
-  missingFiles?: { label: string; sub: string; href: string }[];
+  /** `removable`: له فاتورةٌ مقيَّدة — فالفعلُ «حذف القيد» على صفحتها */
+  missingFiles?: { label: string; sub: string; href: string; amountMinor?: number; removable?: boolean }[];
 
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
@@ -1249,18 +1250,21 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
 
   const missingFiles = f.missingFiles ?? [];
   if (missingFiles.length > 0) {
+    const firstEntry = missingFiles.find((m) => m.removable);
     out.push({
       id: "files-missing-in-drive",
       area: "DATA",
       severity: "MEDIUM",
       title: `${countNoun(missingFiles.length, DOCUMENT)} مسجّلة ولم يعد ملفها في الدرايف`,
-      detail: "الفاتورة مسجّلة لكن ملفها غاب، فربما حُذف أو نُقل إلى سلة المحذوفات. والفاتورة بلا ملفها لا تثبت حقك في خصم ضريبتها عند الفحص.",
-      action: "استعدها من سلة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، وسيختفي التنبيه في المزامنة التالية.",
-      actionLabel: "افتح الدرايف",
-      href: "/documents/drive",
+      detail: "الفاتورة مسجّلة لكن ملفها غاب. فإن حُذف لأنه مكرّر أو استُبدل بغيره، بقي قيده بسداده فيبدو أن لك رصيداً عند المورّد. وإن حُذف خطأً فالفاتورة بلا ملفها لا تثبت حقك في خصم ضريبتها.",
+      action: firstEntry
+        ? "إن حذفته عمداً فاحذف قيده من صفحة الفاتورة، ويعود سداده رصيداً أو ينتقل إلى الفاتورة الأخرى. وإن حُذف خطأً فاستعده من سلة الدرايف (تُفرَّغ بعد ثلاثين يوماً)."
+        : "استعده من سلة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، وسيختفي التنبيه في المزامنة التالية.",
+      actionLabel: firstEntry ? "حذف القيد" : "افتح الدرايف",
+      href: firstEntry?.href ?? "/documents/drive",
       count: missingFiles.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
-      evidence: missingFiles,
+      evidence: missingFiles.map(({ label, sub, href, amountMinor }) => ({ label, sub, href, ...(amountMinor !== undefined ? { amountMinor } : {}) })),
     });
   }
 

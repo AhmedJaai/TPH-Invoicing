@@ -35,6 +35,11 @@ export type Capability =
    * ينقل مالاً تاريخيّاً بين حسابين، فلا يُعار من «تعديل المورّدين».
    */
   | "supplier:merge"
+  /**
+   * حذفُ قيد فاتورةٍ أو نقلُ سدادها إلى أخرى — للمالك وحده (أحمد، ٢٥ أكتوبر ٢٠٢٦):
+   * يُخرج فاتورةً من المستحقّ ويحرّك مالاً تاريخيّاً بين فواتير. `invoice-removal.service.ts`.
+   */
+  | "invoice:remove"
   | "amounts:view"
   /**
    * تصحيحُ مبالغ الفاتورة ومورّدها — كتابةٌ لا تُعار من «رؤية المبالغ».
@@ -79,7 +84,7 @@ export type Capability =
 
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
-    "document:upload", "document:view", "supplier:view", "supplier:edit", "supplier:merge",
+    "document:upload", "document:view", "supplier:view", "supplier:edit", "supplier:merge", "invoice:remove",
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view", "payroll:edit",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
@@ -125,6 +130,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "supplier:view": "عرض المورّدين",
   "supplier:edit": "تعديل المورّدين والأصناف",
   "supplier:merge": "دمج المورّدين وحذفهم",
+  "invoice:remove": "حذف قيد فاتورة ونقل سدادها",
   "amounts:view": "رؤية المبالغ",
   "invoice:edit": "تصحيح مبالغ الفاتورة ومورّدها",
   "reports:view": "عرض التقارير",

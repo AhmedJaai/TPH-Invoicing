@@ -104,7 +104,7 @@ export interface InvoiceProfile {
     periodStart: Date;
     periodEnd: Date;
   }[];
-  twins: { id: string; number: string; date: Date; totalMinor: number; createdAt: Date; fileName: string; driveFileId: string | null }[];
+  twins: { id: string; number: string; date: Date; totalMinor: number; createdAt: Date; fileName: string; driveFileId: string | null; origin: string | null }[];
   history: {
     id: string;
     action: string;
@@ -222,7 +222,7 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
     db
       .select({
         id: invoices.id, number: invoices.invoiceNumber, date: invoices.invoiceDate, totalMinor: invoices.totalMinor,
-        createdAt: invoices.createdAt, fileName: documents.fileName, driveFileId: documents.driveFileId,
+        createdAt: invoices.createdAt, fileName: documents.fileName, driveFileId: documents.driveFileId, origin: documents.origin,
       })
       .from(invoices)
       .innerJoin(documents, eq(documents.id, invoices.documentId))

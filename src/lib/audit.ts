@@ -43,6 +43,8 @@ export type AuditAction =
   | "INVOICE_REPLACED"
   /* نسخةٌ مكرّرة دُمجت في أختها — أُسقطت وعاد سدادها رصيداً */
   | "INVOICE_MERGED"
+  /* قيدُ فاتورةٍ حُذف بقرار المالك (ملفُّها حُذف أو استُبدل) — سدادُها عاد رصيداً أو انتقل إلى أخرى */
+  | "INVOICE_ENTRY_REMOVED"
   | "SUPPLIER_ALIAS_LEARNED"
   | "STATEMENT_RECONCILED"
   | "PRODUCT_LINKED"

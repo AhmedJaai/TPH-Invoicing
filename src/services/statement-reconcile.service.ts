@@ -6,16 +6,34 @@
  * فالمسارُ والإصلاحُ يمرّان هنا: الفترةُ من الأسطر، ونافذةُ الفواتير، والمطابقة،
  * ثمّ الحفظ (الأسطر والفترة والرصيدان والتنبيهات) والسجلّ.
  */
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { ISSUE } from "@/lib/issue-codes";
 import { db } from "@/db";
 import { invoices, issues, statementLines, statements } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
-import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
+import { HALALA_TOLERANCE_MINOR, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import { amountAgrees, reconcileStatement, STATEMENT_DATE_WINDOW_DAYS, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
 import type { Conn, Tx } from "./types";
 import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
+
+/**
+ * سطرُ الكشف (بالاسم المستعار `alias`) له عندنا فاتورةٌ من مورّده باليوم والمبلغ نفسيهما لم
+ * يطابقها سطرٌ آخر من كشفه — فليس «بلا ملف» ولو لم يطابق مرجعُه (بيكوف: «000285لـ#» وهي
+ * 00346). شرطٌ واحد لعدّاد صفحة الكشوف وتنبيه الكشف — والقيدُ يعيد الحساب بنفسه.
+ */
+export function lineHasSameDayInvoice(alias: string): SQL {
+  const a = sql.raw(alias);
+  return sql`exists (
+    select 1 from invoices si
+      join statements sst on sst.id = ${a}.statement_id
+      join documents sd on sd.id = si.document_id
+     where si.supplier_id = sst.supplier_id and sd.status <> 'REJECTED'
+       and (si.invoice_date at time zone 'UTC')::date = (${a}.date at time zone 'UTC')::date
+       and (abs(si.total_minor - ${a}.debit_minor) <= ${HALALA_TOLERANCE_MINOR}
+            or abs(coalesce(si.subtotal_minor, -1000000000) - ${a}.debit_minor) <= ${HALALA_TOLERANCE_MINOR})
+       and not exists (select 1 from statement_lines so where so.statement_id = ${a}.statement_id and so.matched_invoice_id = si.id))`;
+}
 
 export interface ReconcileInput {
   statementId: string | null;
@@ -265,13 +283,23 @@ export async function refreshStatementFindings(tx: Tx, statementId: string): Pro
   };
 
   const [left] = (await tx.execute<{ n: number; total: number }>(sql`
-    select count(*)::int as n, coalesce(sum(debit_minor), 0)::bigint as total
-      from statement_lines
-     where statement_id = ${statementId} and match_status = 'UNMATCHED' and debit_minor > 0
+    select count(*)::int as n, coalesce(sum(sl.debit_minor), 0)::bigint as total
+      from statement_lines sl
+     where sl.statement_id = ${statementId} and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0
+       and not ${lineHasSameDayInvoice("sl")}
   `)).rows;
   await put(ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED, Number(left.n) === 0 ? null : {
     severity: "WARN",
     message: `${countNoun(Number(left.n), INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(Number(left.total))} ريال، وليس لها ملف عندنا. اطلبها منه`,
+  });
+  /* وما استُثني من «بلا ملف» لأنّ له عندنا فاتورةً باليوم والمبلغ — يُقال ملتبساً حتى يُحسم */
+  const [odd] = (await tx.execute<{ n: number }>(sql`
+    select count(*)::int as n from statement_lines sl
+     where sl.statement_id = ${statementId} and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0
+       and ${lineHasSameDayInvoice("sl")}`)).rows;
+  await put(ISSUE.STATEMENT_LINE_AMBIGUOUS, Number(odd.n) === 0 ? null : {
+    severity: "WARN",
+    message: `${countNoun(Number(odd.n), INVOICE)} في الكشف مرجعها لا يطابق فاتورة، ولها عندنا فاتورة باليوم والمبلغ نفسيهما. ربما قُرئ المرجع خطأً، فقارنها بورقة الكشف ولا تقيّدها فاتورة جديدة`,
   });
   /* «يخالف مبلغها» من أسطره المتنازَع عليها — فاتورةٌ مصحَّحة أو مقروءةٌ من جديد تُسقطه */
   const [{ disputed }] = (await tx.execute<{ disputed: number }>(sql`
@@ -331,7 +359,9 @@ export interface StatementDiscrepancies {
   statementId: string;
   periodEnd: string;
   /** في كشفه وليست عندنا — اطلبها منه */
-  missing: { ref: string | null; day: string; amountMinor: number }[];
+  missing: { ref: string | null; day: string; amountMinor: number; unclear: boolean }[];
+  /** مرجعُه لا يطابق ولنا أكثرُ من فاتورةٍ باليوم والمبلغ — ليس ناقصاً، يُقارَن بالورقة */
+  ambiguous: { ref: string | null; day: string; amountMinor: number; candidates: { invoiceId: string; invoiceNumber: string }[] }[];
   /** الرقمُ نفسُه والمبلغُ غيرُه — كشفُه مقابل فاتورتنا */
   priceDiffs: { ref: string | null; day: string; theirsMinor: number; oursMinor: number; invoiceId: string; invoiceNumber: string }[];
   /** عندنا في مدّته وليست في كشفه — فاتورةٌ لم يحسبها، أو ليست منه */
@@ -394,7 +424,11 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
   return {
     statementId: st.id,
     periodEnd: st.pe,
-    missing: live.missingFromArchive.map((l) => ({ ref: l.line.ref ?? null, day: day(l.line.date), amountMinor: l.line.debitMinor })),
+    missing: live.missingFromArchive.map((l) => ({ ref: l.line.ref ?? null, day: day(l.line.date), amountMinor: l.line.debitMinor, unclear: Boolean(l.refFlag) })),
+    ambiguous: live.ambiguous.map((l) => ({
+      ref: l.line.ref ?? null, day: day(l.line.date), amountMinor: l.line.debitMinor,
+      candidates: (l.candidates ?? []).map((c) => ({ invoiceId: c.invoiceId, invoiceNumber: c.invoiceNumber })),
+    })),
     priceDiffs: [...groups.entries()].flatMap(([inv, g]) => {
       const o = byId.get(inv);
       const theirs = g.reduce((sum, p) => sum + p.debit, 0);

@@ -401,3 +401,89 @@ describe("مذكّرة الفروق — المال من الهللات نصّا�
     expect(memo).not.toContain("2026-08-10");
   });
 });
+
+/*
+  بيكوف ٢٦ أغسطس (الإنتاج): قُرئ الكشفُ ثلاث مرّات. الثانيةُ قرأت سطرَ الفاتورة «00346#»،
+  والثالثةُ أخذت مرجعَه من سطر السداد المجاور «000285لـ#» — فعُرض «بلا ملف» وقُيِّدت ثانيةً.
+*/
+describe("المرجع المقروء خطأً (بيكوف)", () => {
+  const ours = [inv("i346", "00346", "2026-08-26", 150_00), inv("i350", "00350", "2026-09-01", 200_00)];
+  const tail = line({ date: "2026-09-01", ref: "00350#", description: "فاتورة", debitMinor: 200_00 });
+
+  it("يُنقّي ما ألصقه القارئ بالرقم ويَسِم المرجع الملتبس", async () => {
+    const { refLooksMisread, stripArabicGlue } = await import("./statement-match");
+    expect(normalizeRef("000285لـ#")).toBe("000285");
+    expect(normalizeRef("رقم123")).toBe("123");
+    expect(normalizeRef("00346#")).toBe("00346");
+    expect(stripArabicGlue("عملية الدفع")).toBe("عملية الدفع");
+    expect(refLooksMisread("000285لـ#")).toBe(true);
+    expect(refLooksMisread("00346#")).toBe(false);
+  });
+
+  it("القراءة الثانية: سطر الفاتورة يطابق 00346 برقمه", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "000279#", description: "عملية الدفع", creditMinor: 750_00 }),
+      line({ date: "2026-08-26", ref: "00281#", description: "عملية الدفع 000285لـ# فاتورة", creditMinor: 150_00 }),
+      line({ date: "2026-08-26", ref: "00346#", description: "فاتورة", debitMinor: 150_00 }),
+      tail,
+    ], ours);
+    const l = r.lines.find((x) => x.line.debitMinor === 150_00)!;
+    expect(l).toMatchObject({ status: "MATCHED", method: "REF", invoice: { invoiceId: "i346" } });
+    expect(r.missingFromArchive).toHaveLength(0);
+  });
+
+  it("القراءة الثالثة: «000285لـ#» تطابق 00346 بالمبلغ واليوم، ولا تُعرض «بلا ملف»", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "000279#", description: "عملية الدفع", creditMinor: 750_00 }),
+      line({ date: "2026-08-26", ref: "00281#", description: "عملية الدفع", creditMinor: 150_00 }),
+      line({ date: "2026-08-26", ref: "000285لـ#", description: "فاتورة", debitMinor: 150_00 }),
+      tail,
+    ], ours);
+    const l = r.lines.find((x) => x.line.debitMinor === 150_00)!;
+    expect(l).toMatchObject({ status: "MATCHED", misreadRef: true, invoice: { invoiceId: "i346" }, refFlag: "مرجعٌ مقروءٌ ملتبس" });
+    expect(l.why).toContain("المرجع مقروءٌ خطأً — طابق بالمبلغ واليوم");
+    expect(r.missingFromArchive).toHaveLength(0);
+    expect(r.notInStatement).toHaveLength(0);
+  });
+
+  it("فاتورتان باليوم والمبلغ: ملتبس بمرشّحيه، لا «ناقص»", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "000285لـ#", debitMinor: 150_00 }),
+      tail,
+    ], [...ours, inv("i347", "00347", "2026-08-26", 150_00)]);
+    const l = r.lines.find((x) => x.line.debitMinor === 150_00)!;
+    expect(l.status).toBe("AMBIGUOUS");
+    expect(l.candidates?.map((c) => c.invoiceId).sort()).toEqual(["i346", "i347"]);
+    expect(r.missingFromArchive).toHaveLength(0);
+    expect(r.ambiguous).toHaveLength(1);
+    expect(r.findings.some((f) => f.code === "STATEMENT_LINE_AMBIGUOUS")).toBe(true);
+  });
+
+  it("سطران ملتبسان على فاتورةٍ واحدة: لا يأخذها أحدهما بترتيبه", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "000285لـ#", debitMinor: 150_00 }),
+      line({ date: "2026-08-26", ref: "000286لـ#", debitMinor: 150_00 }),
+      tail,
+    ], ours);
+    expect(r.lines.filter((x) => x.status === "AMBIGUOUS")).toHaveLength(2);
+    expect(r.lines.some((x) => x.misreadRef)).toBe(false);
+  });
+
+  it("فاتورة اليوم طابقها سطرها في الكشف نفسه: الملتبس يبقى ناقصاً موسوماً", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "00346#", debitMinor: 150_00 }),
+      line({ date: "2026-08-26", ref: "000285لـ#", debitMinor: 150_00 }),
+      tail,
+    ], ours);
+    const odd = r.lines.find((x) => x.line.ref === "000285لـ#")!;
+    expect(odd).toMatchObject({ status: "MISSING_FROM_ARCHIVE", refFlag: "مرجعٌ مقروءٌ ملتبس" });
+  });
+
+  it("مرجعٌ يطابق رقم فاتورةٍ أخرى لا يُطابَق بالمبلغ (غاناش يبقى كما هو)", () => {
+    const r = reconcileStatement([
+      line({ date: "2026-08-26", ref: "00350#", debitMinor: 150_00 }),
+      line({ date: "2026-09-01", ref: "00350#", debitMinor: 200_00 }),
+    ], ours);
+    expect(r.lines.some((x) => x.misreadRef)).toBe(false);
+  });
+});

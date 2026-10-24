@@ -1,13 +1,13 @@
-import { asc, eq, or } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
-import { suppliers } from "@/db/schema";
+import { issues, suppliers } from "@/db/schema";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { CreditNoteForm } from "@/components/credit-note-form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Ban, CircleAlert, CircleCheck, Copy, FileText, History, Landmark, ListOrdered,
-  Receipt, ScanText, ShieldCheck, TrendingUp, TriangleAlert, Wallet,
+  Receipt, ScanText, ShieldCheck, Trash2, TrendingUp, TriangleAlert, Wallet,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -27,6 +27,8 @@ import { loadInvoiceProfile, neighbours } from "@/services/invoice-profile.servi
 import { evaluateInvoice, missingPillars } from "@/lib/invoice-findings";
 import { InvoiceRejudge } from "@/components/invoice-rejudge";
 import { InvoiceMerge } from "@/components/invoice-merge";
+import { InvoiceRemoval } from "@/components/invoice-removal";
+import { previewInvoiceRemoval } from "@/services/invoice-removal.service";
 import { firstClosedMonth } from "@/services/month-guard";
 import { ISSUE } from "@/lib/issue-codes";
 import { FIELD_LABEL, LOW_CONFIDENCE, amountsAddUp, invoiceHref, weakFields } from "@/lib/invoice-profile";
@@ -104,6 +106,14 @@ export async function InvoiceView({
   const { invoice: inv, supplier, document: doc } = p;
   const canEdit = can(user.role, "document:upload");
   const canPay = can(user.role, "payment:approve");
+  const canRemove = can(user.role, "invoice:remove");
+  /* ملفُّها حُذف من الدرايف أو صار في سلّته (`FILE_MISSING_IN_DRIVE`) — فحذفُ القيد سؤالٌ مطروح */
+  const [fileGone] = await db.select({ id: issues.id }).from(issues)
+    .where(and(eq(issues.code, ISSUE.FILE_MISSING_IN_DRIVE), eq(issues.status, "OPEN"), eq(issues.entityId, doc.id))).limit(1);
+  /* من «يحتاج قرارك» (`?act=remove`) تُفتح «حذف القيد» ومعاينتُها محسوبة — التنفيذُ نفسُه في معاملةٍ تُلغى */
+  const removalPreview = canRemove && act === "remove"
+    ? await previewInvoiceRemoval(inv.id, { mode: "release", reallocate: false }, user.id).catch(() => null)
+    : null;
   /* الجارتان وقائمةُ المورّدين لا يعتمد أحدُهما على الآخر — يُطلَبان معاً */
   const [nav, supplierOptions] = await Promise.all([
     neighbours(supplier.id, inv.date, inv.id),
@@ -284,8 +294,15 @@ export async function InvoiceView({
         كلُّ سطرٍ هنا مشتقٌّ لا مخزَّن، ومعه موضعُ علاجه. ولا يُعرَض القسم
         حين لا شيء: فراغُه هو الخبر.
       */}
-      {(stale || doc.origin === "STATEMENT_LINE" || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
+      {(fileGone || stale || doc.origin === "STATEMENT_LINE" || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
         <ul className="mt-4 space-y-2" aria-label="تنبيهات تستحق انتباهك">
+          {fileGone && (
+            <Notice tone="danger" icon={CircleAlert} href={canRemove ? "#remove" : "/documents/drive"} cta={canRemove ? "احذف القيد" : "افتح الدرايف"}>
+              {p.allocations.length > 0
+                ? "ملف هذه الفاتورة لم يعد في الدرايف، وعليها سداد. إن حذفته لأنه مكرّر أو استبدلته بغيره فاحذف قيدها، ويعود سدادها رصيداً أو ينتقل إلى الفاتورة الأخرى. وإن حُذف خطأً فاستعده من سلة الدرايف."
+                : "ملف هذه الفاتورة لم يعد في الدرايف. إن حذفته لأنه مكرّر أو استبدلته بغيره فاحذف قيدها، وإن حُذف خطأً فاستعده من سلة الدرايف."}
+            </Notice>
+          )}
           {p.twins.map((t) => (
             <Notice
               key={t.id}
@@ -295,8 +312,8 @@ export async function InvoiceView({
               cta="قارنها"
               extra={canEdit && (
                 <InvoiceMerge
-                  current={{ id: inv.id, number: inv.number, fileName: doc.fileName, driveFileId: doc.driveFileId, older: isOlder(inv, t) }}
-                  twin={{ id: t.id, number: t.number, fileName: t.fileName, driveFileId: t.driveFileId, older: !isOlder(inv, t) }}
+                  current={{ id: inv.id, number: inv.number, fileName: doc.fileName, driveFileId: doc.driveFileId, older: isOlder(inv, t), virtual: doc.origin === "STATEMENT_LINE" }}
+                  twin={{ id: t.id, number: t.number, fileName: t.fileName, driveFileId: t.driveFileId, older: !isOlder(inv, t), virtual: t.origin === "STATEMENT_LINE" }}
                 />
               )}
             >
@@ -576,6 +593,20 @@ export async function InvoiceView({
                 <p className="rounded-xl border border-line bg-sunken px-4 py-3 text-[11px] leading-relaxed text-muted">
                   <T s="لا يمكن إلغاؤها: {0}." a={[p.allocations.length > 0 ? "عليها سداد مسجّل، فافصله عن حركة البنك أولاً" : "لأنها مطابقة بسطر في كشف المورّد"]} /></p>
               )}
+            </Section>
+          )}
+          {canRemove && (
+            <Section icon={Trash2} title="حذف القيد">
+              <div id="remove" className="scroll-mt-24 space-y-3 rounded-xl border border-line bg-raised p-4 shadow-raised">
+                <p className="text-[11px] leading-relaxed text-muted">
+                  لفاتورة حُذف ملفها أو استُبدل، أو قيدٍ مكرّر بقي بسداده. الدفعات لا تُحذف: يعود ما خُصّص لها رصيداً، أو ينتقل إلى فاتورة أخرى تختارها.
+                </p>
+                <InvoiceRemoval
+                  invoiceId={inv.id}
+                  initial={removalPreview}
+                  redirectTo={`/purchases/invoices?supplier=${encodeURIComponent(supplier.slug)}`}
+                />
+              </div>
             </Section>
           )}
         </aside>

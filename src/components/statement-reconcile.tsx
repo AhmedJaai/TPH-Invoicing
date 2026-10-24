@@ -46,7 +46,11 @@ interface Result {
     theirBilledMinor: number; theirPaidMinor: number; ourBilledMinor: number;
     billedDifferenceMinor: number; balanceArithmeticOk: boolean | null;
   };
-  missing: { date: string; ref: string; amountMinor: number }[];
+  missing: { date: string; ref: string; amountMinor: number; unclear?: boolean }[];
+  /** مرجعُه لا يطابق ولنا أكثرُ من فاتورةٍ باليوم والمبلغ — ليس ناقصاً */
+  ambiguous?: { date: string; ref: string; amountMinor: number; candidates: string[] }[];
+  /** طوبقت بالمبلغ واليوم لأنّ مرجعها مقروءٌ خطأً */
+  misread?: { date: string; ref: string; invoiceNumber: string; amountMinor: number }[];
   mismatches: { invoiceNumber: string; theirsMinor: number; oursMinor: number; differenceMinor: number }[];
   extra: { invoiceNumber: string; date: string; amountMinor: number }[];
   /** أسطرٌ لم يُقرأ مبلغها أو تاريخها — لم تُطابَق ولم تُحذف. */
@@ -378,7 +382,41 @@ function ResultView({ result }: { result: Result }) {
               <li key={i} className="flex items-center justify-between gap-3 bg-danger-bg px-3 py-2 text-xs">
                 <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
                 <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                {m.unclear && <Badge tone="warn">مرجع مقروء ملتبس</Badge>}
                 <span className="shrink-0 font-bold"><Money minor={m.amountMinor} tone="danger" /></span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(result.ambiguous?.length ?? 0) > 0 && (
+        <section>
+          <h3 className="text-sm font-bold text-warn"><T s="مرجعها لا يطابق، ولها عندك أكثر من فاتورة باليوم والمبلغ نفسيهما: {0}" a={[result.ambiguous!.length]} /></h3>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">ربما قُرئ المرجع خطأً. قارنها بورقة الكشف، ولا تسجّلها فاتورة جديدة.</p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-warn/25">
+            {result.ambiguous!.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 bg-warn-bg px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="text-ink-soft"><T s="المرشّحة: {0}" a={[<bdi key="0" className="nums">{m.candidates.join("، ")}</bdi>]} /></span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(result.misread?.length ?? 0) > 0 && (
+        <section>
+          <h3 className="text-sm font-bold"><T s="مرجعها مقروء خطأً فطوبقت بالمبلغ واليوم: {0}" a={[result.misread!.length]} /></h3>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
+            {result.misread!.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="text-ink-soft"><T s="فاتورتنا {0}" a={[<bdi key="0" className="nums">{m.invoiceNumber}</bdi>]} /></span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
               </li>
             ))}
           </ul>

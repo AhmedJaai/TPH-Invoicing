@@ -273,6 +273,21 @@ async function handle(request: Request) {
       date: isoDay(l.line.date),
       ref: l.line.ref ?? l.line.description ?? "—",
       amountMinor: l.line.debitMinor,
+      unclear: Boolean(l.refFlag),
+    })),
+    /* مرجعُه لا يطابق ولنا أكثرُ من فاتورةٍ باليوم والمبلغ — ليس ناقصاً ولا يُقيَّد */
+    ambiguous: result.ambiguous.map((l) => ({
+      date: isoDay(l.line.date),
+      ref: l.line.ref ?? l.line.description ?? "—",
+      amountMinor: l.line.debitMinor,
+      candidates: (l.candidates ?? []).map((c) => c.invoiceNumber),
+    })),
+    /* طوبقت بالمبلغ واليوم لأنّ مرجعها مقروءٌ خطأً — تُذكر كي لا تُفاجئ */
+    misread: result.lines.filter((l) => l.misreadRef && l.invoice).map((l) => ({
+      date: isoDay(l.line.date),
+      ref: l.line.ref ?? "—",
+      invoiceNumber: l.invoice!.invoiceNumber,
+      amountMinor: l.line.debitMinor,
     })),
     mismatches: result.amountMismatches.map((l) => ({
       invoiceNumber: l.invoice!.invoiceNumber,

@@ -514,7 +514,7 @@ export async function SupplierView({
                 {paidAfterStatement > 0 && <> <T s=" · ودفعت له بعد تاريخ كشفه {0}" a={[<Money key="0" minor={paidAfterStatement} />]} /></>}
                 {account.allocatedAfterStatementMinor ? <> <T s=" · وخُصّص بعده على فواتير أقدم من الكشف {0}" a={[<Money key="0" minor={account.allocatedAfterStatementMinor} />]} /></> : null}
               </p>
-              {why && (why.missing.length + why.priceDiffs.length + why.notInStatement.length > 0) && (
+              {why && (why.missing.length + why.ambiguous.length + why.priceDiffs.length + why.notInStatement.length > 0) && (
                 <div className="mt-3 space-y-2.5 border-t border-line-soft pt-3 text-xs">
                   <p className="font-bold"><T s="أسباب الفرق، من كشفه حتى {0}" a={[formatDay(why.periodEnd)]} /></p>
                   {why.missing.length > 0 && (
@@ -523,7 +523,24 @@ export async function SupplierView({
                       <ul className="mt-1 space-y-0.5">
                         {why.missing.map((m, i) => (
                           <li key={i} className="flex justify-between gap-3">
-                            <span><bdi className="nums">{m.ref ?? "بلا رقم"}</bdi> · {formatDay(m.day)}</span>
+                            <span><bdi className="nums">{m.ref ?? "بلا رقم"}</bdi> · {formatDay(m.day)}{m.unclear && <span className="text-warn"> · مرجع مقروء ملتبس، قارنه بورقة الكشف</span>}</span>
+                            <Money minor={m.amountMinor} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {why.ambiguous.length > 0 && (
+                    <div>
+                      <p className="text-warn">سطور مرجعها لا يطابق فاتورة، ولنا أكثر من فاتورة باليوم والمبلغ نفسيهما. ربما قُرئ المرجع خطأً، فلا تسجّلها فاتورة جديدة:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {why.ambiguous.map((m, i) => (
+                          <li key={i} className="flex flex-wrap justify-between gap-x-3">
+                            <span>
+                              <bdi className="nums">{m.ref ?? "بلا رقم"}</bdi> · {formatDay(m.day)} · <T s="المرشّحة: {0}" a={[m.candidates.map((c, j) => (
+                                <span key={c.invoiceId}>{j > 0 && "، "}<Link href={invoiceHref(c.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{c.invoiceNumber}</bdi></Link></span>
+                              ))]} />
+                            </span>
                             <Money minor={m.amountMinor} />
                           </li>
                         ))}
