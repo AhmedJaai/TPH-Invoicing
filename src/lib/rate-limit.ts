@@ -69,6 +69,8 @@ export const RULES: Record<string, RateLimitRule> = {
   /* رابطُ الحضور: تسجيلان في اليوم عادةً — والعشرون سقفٌ لمن يعبث بالرابط */
   "attend": { limit: 20, windowSeconds: 3600 },
   "capture-file": { limit: 300, windowSeconds: 3600 },
+  /* ورقةُ المستند من الدرايف: تنزيلٌ لا نموذج — ومن يراجع مئةً في جلسة لا يقف عند الأربعين */
+  "document-file": { limit: 300, windowSeconds: 3600 },
   "capture-state": { limit: 300, windowSeconds: 3600 },
   /*
     صورُ الفريق تُهيَّأ للمراجعة بمعرّفها: قراءتُها محفوظةٌ منذ وصلت، فالكلفةُ استعلاماتٌ لا

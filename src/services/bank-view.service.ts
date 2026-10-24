@@ -15,6 +15,7 @@ import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import type { TxCategory } from "@/lib/bank/rules";
 import type { LedgerSearch } from "@/lib/bank/ledger-search";
+import { LEDGER_RECENT, ledgerPages, ledgerWindow } from "@/lib/bank/ledger-window";
 import { findDoublePaid, partitionDoublePaid, type DoublePaidTx } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
@@ -254,15 +255,6 @@ function viewWhere(view: TxView): SQL | undefined {
   }
 }
 
-/**
- * كم صفّاً يُرسَم — وما زاد يُقال بعدده ويُضيَّق بالشهر. بلا شهرٍ أحدثُ
- * ستّين وحدها: مئةٌ وعشرون بطاقةً على الجوّال صفحةٌ طولُها ثمانيةٌ وعشرون
- * ألفَ بكسل (قيس)، ومن يبحث عن حركةٍ قديمة يعرف شهرها.
- */
-export function txLimit(month: string | null): number {
-  return month ? 400 : 60;
-}
-
 export interface LedgerRow {
   id: string;
   valueDate: Date;
@@ -284,17 +276,21 @@ export interface Ledger {
   months: string[];
   /** حوالاتُ رواتب حُجبت عمّن لا يملك `payroll:view` — عددُها وحده (`lib/payroll/visibility.ts`). */
   hiddenSalary: number;
+  /** الصفحةُ المعروضة من الشهر، وعددُ صفحاته (`ledger-window.ts`) — ١ و١ بلا شهر. */
+  page: number;
+  pages: number;
+  /** كم صفّاً يُرسَم بلا شهر — لجملة «المعروض هو أحدث …». */
+  recentLimit: number;
 }
-
-/** حدُّ نتائج البحث — يبحث في الحركات كلِّها، ويُقال إن زادت المطابِقاتُ عليه. */
-export const SEARCH_LIMIT = 300;
 
 export async function loadLedger(
   view: TxView, month: string | null, search: LedgerSearch | null = null,
   /** لمن لا يرى الرواتب: حوالاتُ «راتب أو أجر» لا تُرسم ولا تُبحث ولا تُعدّ في الألسنة */
   hideSalaries = false,
+  page = 1,
 ): Promise<Ledger> {
   const noSalary = hideSalaries ? sql`${bankTransactions.category} <> 'SALARY'` : undefined;
+  const window = ledgerWindow(month, search !== null, page);
   const inMonth = month ? sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${month}` : undefined;
   /*
     البحثُ في الخادم لا في الصفوف المرسومة: نصُّ البنك واسمُ المستفيد، أو المبلغ إن
@@ -329,8 +325,10 @@ export async function loadLedger(
     })
       .from(bankTransactions)
       .where(where)
-      .orderBy(desc(bankTransactions.valueDate), desc(bankTransactions.amountMinor))
-      .limit(search ? SEARCH_LIMIT : txLimit(month)),
+      /* المعرّفُ آخرَ الترتيب: حركتان باليوم والمبلغ نفسيهما لا تتبادلان الصفحتين */
+      .orderBy(desc(bankTransactions.valueDate), desc(bankTransactions.amountMinor), desc(bankTransactions.id))
+      .limit(window.limit)
+      .offset(window.offset),
 
     db.execute<Record<TxView, number>>(sql`
       select
@@ -393,6 +391,9 @@ export async function loadLedger(
     counts,
     months: monthRows.rows.map((r) => r.m),
     hiddenSalary: hiddenRows ? Number(hiddenRows[0]?.n ?? 0) : 0,
+    page: window.page,
+    pages: ledgerPages(counts[view], month, search !== null),
+    recentLimit: LEDGER_RECENT,
   };
 }
 

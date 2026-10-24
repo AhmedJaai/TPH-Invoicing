@@ -1,10 +1,12 @@
 import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
+import { DocumentPaper } from "./document-paper";
+import { driveFileUrl } from "@/lib/document-labels";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Money } from "@/components/money";
-import { ChevronDown, CircleCheck, CircleHelp, ExternalLink, FileText, MessageCircle, TriangleAlert } from "lucide-react";
+import { ChevronDown, CircleCheck, CircleHelp, FileText, MessageCircle, TriangleAlert } from "lucide-react";
 import { LinkButton, Monogram, buttonClass, FlowItem } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
 import { ConfirmEligible } from "./confirm-eligible";
@@ -146,7 +148,7 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
                     <OrphanPayment
                       paymentId={p.paymentId}
                       suppliers={supplierOptions}
-                      receiptUrl={p.receiptDriveFileId ? `https://drive.google.com/file/d/${p.receiptDriveFileId}/view` : null}
+                      receiptUrl={p.receiptDriveFileId ? driveFileUrl(p.receiptDriveFileId) : null}
                     />
                   ) : (
                     <p className="text-[11px] text-muted">يقرّر فيها من يملك صلاحية اعتماد السداد.</p>
@@ -233,19 +235,6 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   </span>
                 </span>
                 <span className="flex shrink-0 flex-wrap items-center gap-1.5">
-                  {/*
-                    «افتحه» قبل «أكّده» عمداً: التأكيدُ شهادةٌ بأنّ ما قرأه
-                    النموذج يطابق الورقة، ولا تُعطى شهادةٌ بلا نظر.
-                  */}
-                  {d.driveFileId && (
-                    <a
-                      href={`https://drive.google.com/file/d/${d.driveFileId}/view`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={buttonClass("quiet", "sm")}
-                    >
-                      <T s="{0}افتح المستند" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-                  )}
                   {canUpload && <ConfirmDocument documentId={d.id} />}
                   {canUpload && <RejectDocument documentId={d.id} />}
                 </span>
@@ -282,6 +271,12 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                         <T s="{0}لم يُعتمد تلقائياً: {1}" a={[<TriangleAlert key="0" className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />, GAP_TEXT[g]]} /></li>
                     ))}
                   </ul>
+                )}
+                {/* الورقةُ تحت قراءتها هنا — التأكيدُ شهادةٌ بأنّ القراءة تطابقها */}
+                {d.driveFileId && (
+                  <div className="mt-2.5">
+                    <DocumentPaper documentId={d.id} driveFileId={d.driveFileId} fileName={d.fileName} openLabel="قارن بالورقة" />
+                  </div>
                 )}
               </div>
             </li>

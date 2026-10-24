@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CircleAlert, CircleCheck, ExternalLink, PenLine, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, PenLine, TriangleAlert } from "lucide-react";
+import { DocumentPaper } from "./document-paper";
 import { Money } from "./money";
 import { Monogram } from "./ui";
 import { buttonClass } from "./ui-tokens";
@@ -12,9 +13,6 @@ import { documentHref } from "@/lib/document-labels";
 const RECORDABLE = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UNKNOWN"]);
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
-
-/** رابط الملف في الدرايف — المعرّف محفوظ لكل مستند منذ الأرشفة. */
-const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`;
 
 /**
  * بطاقةُ مستندٍ ينتظر: من، وكم، ولماذا لم يدخل وحده، وما قرأه النموذج —
@@ -105,11 +103,14 @@ export function WaitingCard({
         </dl>
       )}
 
+      {/* الورقةُ تُفتح تحت قراءتها في البطاقة نفسها — والدرايفُ بجانبها طريقاً ثانياً */}
+      {r.driveFileId && (
+        <div className="mx-4 mt-3 sm:mx-5">
+          <DocumentPaper documentId={r.id} driveFileId={r.driveFileId} fileName={r.fileName} openLabel="افتح الورقة" />
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft bg-sunken/40 px-4 py-3 sm:px-5">
-        {r.driveFileId && (
-          <a href={driveUrl(r.driveFileId)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-            <T s="{0}افتح الورقة" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-        )}
         {r.invoiceId && showAmounts && (
           <Link href={invoiceHref(r.invoiceId, "tax")} className={buttonClass("quiet", "sm")}>
             <T s="{0}صحّح معلومة" a={[<PenLine key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>

@@ -13,7 +13,7 @@ import { DAY, INVOICE, TRANSACTION, countNoun, GROUP } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
-import { toast } from "./ui-client";
+import { BusyStatus, toast } from "./ui-client";
 import { SupplierPicker } from "./supplier-picker";
 import { T } from "@/components/i18n/t";
 
@@ -605,6 +605,7 @@ function PreviewPanel({
                 : <><T s="{0} سجّل {1} وطابِق" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />, countNoun(added, TRANSACTION)]} /></>}
             </button>
             <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>ألغِ، ولن يُحفظ شيء</button>
+            <BusyStatus busy={busy === "applying"} text="يسجّل الحركات ويطابقها بالفواتير…" className="basis-full" />
           </>
         )}
       </div>

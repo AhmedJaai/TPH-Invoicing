@@ -101,6 +101,7 @@ const UNGUARDED: Record<string, string> = {
  */
 const WRITE_WITH_VIEW: Record<string, string> = {
   "src/app/api/notifications/route.ts POST": "يكتب حدّ القراءة للمستخدم نفسه وحده — لا مال ولا قرار",
+  "src/app/api/push/route.ts POST": "يحفظ اشتراكَ جهاز صاحب الجلسة في إشعار الصباح أو يمحوه — لا مال ولا قرار، وما يُرسَل إليه نصُّ ما يراه بالصلاحية نفسها",
 };
 
 /**

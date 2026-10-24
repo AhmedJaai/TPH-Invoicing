@@ -30,7 +30,7 @@ import { companyConfig } from "@/config/drive";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadDriveHeartbeat, type DriveHeartbeat } from "@/services/drive-status.service";
 
-import { DOCUMENT_KIND_LABEL, DOCUMENT_STATUS_BADGE, documentHref } from "@/lib/document-labels";
+import { DOCUMENT_KIND_LABEL, DOCUMENT_STATUS_BADGE, documentHref, driveFileUrl } from "@/lib/document-labels";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -44,8 +44,6 @@ const STATUS_BADGE = DOCUMENT_STATUS_BADGE;
 const WAITING = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
 const isWaiting = (s: string) => (WAITING as readonly string[]).includes(s);
 
-/** رابط الملف في الدرايف — المعرّف محفوظ لكل مستند منذ الأرشفة. */
-const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`;
 
 interface Params {
   month?: string;
@@ -564,7 +562,7 @@ export default async function DocumentsPage({
                     cell: (r) =>
                       r.driveFileId ? (
                         <a
-                          href={driveUrl(r.driveFileId)}
+                          href={driveFileUrl(r.driveFileId)}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex min-h-8 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"

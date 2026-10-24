@@ -1,10 +1,11 @@
 import { parseLedgerSearch } from "@/lib/bank/ledger-search";
+import { parseLedgerPage } from "@/lib/bank/ledger-window";
 import { BankHeldRows } from "@/components/bank-held-rows";
 import { loadOpenHeldRows } from "@/services/bank-held.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  ArrowLeft, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
+  ArrowLeft, ArrowRight, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
   ListFilter, Search, Upload,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -26,7 +27,7 @@ import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { BANK_STALE_DAYS } from "@/lib/attention";
 import { formatRiyalsDisplay } from "@/lib/money";
 import {
-  TX_VIEWS, txLimit, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadLedger,
+  TX_VIEWS, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadLedger,
   type LedgerRow, type TxView,
 } from "@/services/bank-view.service";
 import { T } from "@/components/i18n/t";
@@ -56,7 +57,7 @@ const VIEW_LABEL: Record<TxView, string> = {
 export default async function BankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tx?: string; show?: string; month?: string; q?: string }>;
+  searchParams: Promise<{ tx?: string; show?: string; month?: string; q?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const user = await currentUser();
@@ -81,7 +82,7 @@ export default async function BankPage({
   const [coverage, queue, ledger, doublePaid, handLinks, held] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
-    loadLedger(view, month, search, !seesSalaries(user.role)),
+    loadLedger(view, month, search, !seesSalaries(user.role), parseLedgerPage(params.page)),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
     loadOpenHeldRows(),
@@ -94,7 +95,8 @@ export default async function BankPage({
   const stale = staleDays !== null && staleDays > BANK_STALE_DAYS;
   const queuedTx = queue.groups.reduce((n, g) => n + g.items.length, 0);
 
-  const href = (next: { show?: TxView; month?: string | null; q?: null }) => {
+  /* اللسانُ والشهرُ والبحثُ يعيدون الصفحةَ إلى أوّلها — `page` وحده يحملها */
+  const href = (next: { show?: TxView; month?: string | null; q?: null; page?: number }) => {
     const q = new URLSearchParams();
     const s = next.show ?? view;
     const m = next.month === undefined ? month : next.month;
@@ -102,6 +104,7 @@ export default async function BankPage({
     if (m) q.set("month", m);
     /* البحثُ يبقى مع تبديل اللسان والشهر — ويُمسَح بزرّه */
     if (search && next.q !== null) q.set("q", search.text);
+    if (next.page && next.page > 1) q.set("page", String(next.page));
     const qs = q.toString();
     return `/bank${qs ? `?${qs}` : ""}#transactions`;
   };
@@ -239,10 +242,10 @@ export default async function BankPage({
             {search ? (
               <p className="mb-3 text-xs text-ink-soft" role="status">
                 <T s="{0} «{1}»{2} في «{3}»{4}{5}{6}" a={[ledger.total === 0 ? "لا توجد حركات مطابقة" : <><T s="{0} نتيجة مطابقة" a={[<span key="0" className="nums">{ledger.total}</span>]} /></>, <bdi key="1">{search.text}</bdi>, search.amount ? " (مبلغ أو نص)" : "", VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : " في كل الأشهر", ledger.total > ledger.rows.length && <><T s=". المعروض هو أحدث {0}، فضيّق البحث أو اختر شهراً" a={[<span key="0" className="nums">{ledger.rows.length}</span>]} /></>, view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></>]} /></p>
-            ) : ledger.total > ledger.rows.length && (
+            ) : !month && ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-                <span><T s="المعروض هو أحدث {0} من {1}. ابحث في كل الحركات من الأعلى، أو اختر شهراً لترى حركاته." a={[countNoun(txLimit(month), TRANSACTION), <span key="1" className="nums">{ledger.total}</span>]} /></span>
+                <span><T s="المعروض هو أحدث {0} من {1}. ابحث في كل الحركات من الأعلى، أو اختر شهراً لترى حركاته." a={[countNoun(ledger.recentLimit, TRANSACTION), <span key="1" className="nums">{ledger.total}</span>]} /></span>
               </p>
             )}
 
@@ -297,6 +300,21 @@ export default async function BankPage({
                 },
               ]}
             />
+
+            {/* الشهرُ صفحاتٌ من مئة — كان يُرسَم حتى أربعمئة دفعةً، وكلُّ صفٍّ مرّتين */}
+            {ledger.pages > 1 && (
+              <nav className="mt-5 flex items-center justify-between gap-3" aria-label="صفحات الشهر">
+                {ledger.page > 1 ? (
+                  <LinkButton href={href({ page: ledger.page - 1 })} size="sm" icon={ArrowRight}>الأحدث</LinkButton>
+                ) : <span />}
+                <span className="text-xs text-muted">
+                  <T s="صفحة {0} من {1}" a={[<span key="0" className="nums">{ledger.page}</span>, <span key="1" className="nums">{ledger.pages}</span>]} /></span>
+                {ledger.page < ledger.pages ? (
+                  <Link href={href({ page: ledger.page + 1 })} className={buttonClass("secondary", "sm")}>
+                    <T s="الأقدم{0}" a={[<ArrowLeft key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></Link>
+                ) : <span />}
+              </nav>
+            )}
           </Section>
         </>
       )}

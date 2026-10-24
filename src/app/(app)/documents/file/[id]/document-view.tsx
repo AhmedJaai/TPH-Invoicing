@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Brain, CircleAlert, CircleCheck, CircleX, ExternalLink, FileText, FileWarning, History, PenLine, Receipt,
+  Brain, CircleAlert, CircleCheck, CircleX, FileText, FileWarning, History, PenLine, Receipt,
   ScanText, Sparkles, TriangleAlert, Wrench,
 } from "lucide-react";
 import { asc, eq } from "drizzle-orm";
@@ -11,9 +11,10 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
-import { Badge, Callout, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline, buttonClass, type TimelineItem } from "@/components/ui";
+import { Badge, Callout, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline, type TimelineItem } from "@/components/ui";
 import { DocumentRecord } from "@/components/document-record";
 import { DocumentReread } from "@/components/document-reread";
+import { DocumentPaper } from "@/components/document-paper";
 import { RejectDocument } from "@/components/reject-document";
 import { RestoreDocument } from "@/components/restore-document";
 import { ConfirmDocument } from "@/components/confirm-document";
@@ -167,10 +168,6 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       }
       actions={
         <>
-          {p.driveFileId && (
-            <a href={`https://drive.google.com/file/d/${p.driveFileId}/view`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-              <T s="{0}افتح الملف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-          )}
           {p.invoice && showAmounts && (
             <LinkButton href={invoiceHref(p.invoice.id)} size="sm" icon={Receipt}>فاتورته</LinkButton>
           )}
@@ -271,6 +268,13 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
           </div>
         )}
       </section>
+
+      {/* ── الورقة نفسها — تُقارَن بما قرأه النموذج في مكانها، لا في لسانٍ آخر ── */}
+      {p.driveFileId && (
+        <Section id="paper" icon={FileText} title="الورقة" className="mt-8 scroll-mt-24">
+          <DocumentPaper documentId={p.id} driveFileId={p.driveFileId} fileName={p.fileName} defaultOpen />
+        </Section>
+      )}
 
       {/* ── أكمِل الناقص وقيّدها ── */}
       {recordable && !sureTwin && canEdit && showAmounts && (

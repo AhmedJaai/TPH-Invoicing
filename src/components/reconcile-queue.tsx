@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ChevronDown, CircleAlert, Lightbulb, SkipForward, Store, Wallet } from "lucide-react";
 import { Money } from "./money";
 import { Badge, DoneMark, Meter, Monogram, buttonClass, type Tone } from "./ui";
-import { toast } from "./ui-client";
+import { BusyStatus, toast } from "./ui-client";
 import { countNoun, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
 import { suggestSuppliers } from "@/lib/supplier-suggest";
@@ -260,6 +260,11 @@ export function ReconcileQueue({
           className={buttonClass("quiet", "sm")}
         >
           <T s="{0}تخطّها الآن" a={[<SkipForward key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
+        <BusyStatus
+          busy={busy !== null}
+          text={busy === "settle" ? "يسجّل السداد على حساب المورّد ويوزّعه على الأقدم…" : busy === "advance" ? "يسجّله دفعة مقدّمة…" : "يحفظ تصنيف الحركات…"}
+          className="basis-full"
+        />
       </div>
 
       {/* المجموعةُ التالية تدخل بحركة — تُرى أنّ ما قبلها حُسم لا أنّ الصفحةَ تبدّلت */}

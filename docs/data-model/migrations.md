@@ -2,11 +2,11 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٩٣
+## الجداول — ٩٤
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
-`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` `month_seals` · `job_state` `daily_figures` `daily_checks`
+`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` `month_seals` · `job_state` `daily_figures` `daily_checks` `push_subscriptions`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
@@ -138,6 +138,7 @@
 | `089_month_seals.sql` | `month_seals` — أرقامُ الشهر مختومةً عند إقفاله (المستحقّ لكلّ مورّد، ختامُ البنك ووارده وصادره، ضريبةُ المخرجات والمدخلات)، تُضاف ولا تُعدَّل؛ و`daily_checks` — نتيجةُ فحص الصباح (افتراقُ الختم · رصيدُ القراءة) |
 | `090_other_sales_category.sql` | `tx_category`: قيمةٌ جديدة `OTHER_SALES` — «مبيعات خارج فودكس» للوارد وحده |
 | `091_supplier_merge.sql` | `suppliers.merged_into_id` · `merged_at` · `merged_by_id`، و`supplier_merges` — ما نُقل وما حُذف وما نُسخ في كلّ دمج، للتراجع |
+| `092_push_subscriptions.sql` | `push_subscriptions` — جهازُ كلّ مستخدمٍ اشترك في إشعار الصباح؛ خاملٌ حتى تُضبط مفاتيح VAPID |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

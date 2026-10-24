@@ -50,7 +50,10 @@ const SHOWN = 5;
  *   ٣. ما ينتظر قرارك — العددُ نفسُه في القشرة والطابور.
  *   ٤. بجانبه: تقدّمُ إقفال الشهر، وما تغيّر منذ الأسبوع الماضي.
  *
- * والأقسامُ البطيئة (الإقفال) تصل بعد الصفحة في `Suspense` — فلا ينتظرها ما فوقها.
+ * والأقسامُ البطيئة تصل بعد الصفحة في `Suspense` — فلا ينتظرها ما فوقها: الإقفال،
+ * و«ما الجديد» ورقمُ المشتريات (`gatherChangeFacts` — يمشي على الفواتير والكشوف شهرين،
+ * وينتظر الطابورَ نفسه). والتحيّةُ وجملةُ الحال والفعلُ الأوّل لا تنتظرها: تُبنى من
+ * الطابور والدفعة وحدهما. **والأرقامُ هي هي** — الدوالُّ نفسُها، ووعدٌ واحد يُقرأ في موضعين.
  */
 /** ما يُسأل عنه لعرض بنود «الجديد» — صلاحياتُ `NewsItem.needs`. */
 const NEWS_CAPABILITIES = ["payment:approve", "bank:view", "document:upload", "document:view"] as const;
@@ -74,7 +77,9 @@ export default async function HomePage() {
   }));
   /* «منذ صباح أمس» من لقطة أمس المحفوظة — لا إعادةُ حسابٍ لأمس */
   const yesterday = addDays(todayInRiyadh(), -1);
-  const [attention, balances, overdue, start, run, cash, recurring, facts, snap] = await Promise.all([
+  /* لا ينتظره ما فوق الصفحة — ورفضُه يُلتقَط هنا كي لا يسقط بلا قارئ إن لم يُرسم قسمُه */
+  factsP.catch(() => undefined);
+  const [attention, balances, overdue, start, run, cash, recurring, snap] = await Promise.all([
     attentionP,
     loadBalanceTotals(),
     loadOverdueBalances(),
@@ -82,7 +87,6 @@ export default async function HomePage() {
     canPay || canBank ? loadPaymentRun(runMonth) : Promise.resolve(null),
     canBank ? loadCashPosition() : Promise.resolve(null),
     canPay || canBank ? loadRecurringInputs() : Promise.resolve([]),
-    factsP,
     loadDayFigures(yesterday),
   ]);
   /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر، كما في «النقد القادم» */
@@ -95,14 +99,8 @@ export default async function HomePage() {
   const attentionSince = user.role === "OWNER" ? sinceYesterday(attention.length, snap ? snap.attentionCount : undefined, yesterday) : null;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
-  const changes = notable(buildChanges(facts)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
-
   const { top } = prioritize(attention, SHOWN);
   const first = top[0];
-
-  const pct = facts.purchasesPrevMonth > 0
-    ? ((facts.purchasesThisMonth - facts.purchasesPrevMonth) / facts.purchasesPrevMonth) * 100
-    : null;
 
   const name = user.name && user.name !== "وضع التجربة" ? user.name.split(" ")[0] : null;
   const title = name ? `${greeting()}، ${name}` : greeting();
@@ -238,20 +236,11 @@ export default async function HomePage() {
               )}
             </KeyFigure>
           )}
-          <KeyFigure
-            icon={ShoppingBasket}
-            label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
-            href="/purchases/invoices"
-            value={<Money minor={facts.purchasesThisMonth} />}
-            sub={
-              pct === null
-                ? "محسوبة من الفواتير المسجّلة، لا من كشف البنك."
-                : facts.daysElapsedInMonth === null
-                  ? `عن ${formatMonth(facts.prevMonthLabel)}`
-                  : `عن أول ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
-            }
-            delta={pct}
-          />
+          <SectionBoundary what="مشتريات الشهر">
+            <Suspense fallback={<FigureSkeleton />}>
+              <PurchasesFigure factsP={factsP} />
+            </Suspense>
+          </SectionBoundary>
         </div>
       )}
 
@@ -311,12 +300,68 @@ export default async function HomePage() {
 
           {!start.knowsNothing && (
             <Section title="ما الجديد" icon={Sparkles} hint="منذ الأسبوع الماضي." className="mt-0!">
-              <Changes changes={changes} />
+              <SectionBoundary what="ما الجديد">
+                <Suspense fallback={<ChangesSkeleton />}>
+                  <ChangesList factsP={factsP} />
+                </Suspense>
+              </SectionBoundary>
             </Section>
           )}
         </div>
       </div>
     </PageShell>
+  );
+}
+
+type ChangeFacts = Awaited<ReturnType<typeof gatherChangeFacts>>;
+
+/** «مشتريات الشهر» — من الحقائق نفسها التي يُبنى منها «ما الجديد»، وتصل بعد الصفحة. */
+async function PurchasesFigure({ factsP }: { factsP: Promise<ChangeFacts> }) {
+  const facts = await factsP;
+  const pct = facts.purchasesPrevMonth > 0
+    ? ((facts.purchasesThisMonth - facts.purchasesPrevMonth) / facts.purchasesPrevMonth) * 100
+    : null;
+  return (
+    <KeyFigure
+      icon={ShoppingBasket}
+      label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
+      href="/purchases/invoices"
+      value={<Money minor={facts.purchasesThisMonth} />}
+      sub={
+        pct === null
+          ? "محسوبة من الفواتير المسجّلة، لا من كشف البنك."
+          : facts.daysElapsedInMonth === null
+            ? `عن ${formatMonth(facts.prevMonthLabel)}`
+            : `عن أول ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
+      }
+      delta={pct}
+    />
+  );
+}
+
+async function ChangesList({ factsP }: { factsP: Promise<ChangeFacts> }) {
+  const changes = notable(buildChanges(await factsP)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
+  return <Changes changes={changes} />;
+}
+
+/** بمقاس `KeyFigure` — كهيكل الصفحة (`page-skeleton.tsx`)، فلا تقفز الشبكة حين يصل. */
+function FigureSkeleton() {
+  return (
+    <div aria-busy="true" className="rounded-2xl border border-line bg-raised p-5">
+      <div className="skeleton h-3.5 w-24" />
+      <div className="skeleton mt-5 h-8 w-32" />
+      <div className="skeleton mt-4 h-3 w-40 max-w-full" />
+    </div>
+  );
+}
+
+function ChangesSkeleton() {
+  return (
+    <div aria-busy="true" className="space-y-2">
+      <div className="skeleton h-14 rounded-xl" />
+      <div className="skeleton h-14 rounded-xl" />
+      <div className="skeleton h-14 rounded-xl" />
+    </div>
   );
 }
 
