@@ -8,14 +8,13 @@ vi.mock("./rate-limit.service", () => ({
   consume: vi.fn(),
   RateLimitedError: class RateLimitedError extends Error { retryAfterSeconds = 1; },
 }));
-vi.mock("./validation.service", () => ({ MonthClosedError: class MonthClosedError extends Error {} }));
-vi.mock("./payment.service", () => ({
-  AlreadyMatchedError: class AlreadyMatchedError extends Error {},
-  PaymentTwinError: class PaymentTwinError extends Error {},
-}));
 
-import { failWith } from "./guard";
+import { FailWithError, answer, failWith, respondTo } from "./guard";
 import { ForbiddenError } from "@/lib/permissions";
+import { Conflict, DomainError, NotFound, Refused, Unreadable } from "@/lib/domain-error";
+import { MonthClosedError } from "./validation.service";
+import { AlreadyMatchedError, PaymentTwinError } from "./payment.service";
+import { ImportNotRecordedError } from "./bank-import.service";
 
 /**
  * خاتمةُ المسار: رسالتُنا تُقال بنصّها، وعطبُ الخادم لا يُعرَض نصُّه.
@@ -52,5 +51,81 @@ describe("failWith", () => {
 
   it("وخطأ الصلاحيّة 403 لا 400", () => {
     expect(failWith(new ForbiddenError("recipe:edit"), "inventory-recipe").status).toBe(403);
+  });
+});
+
+/**
+ * أخطاءُ العمل تُترجَم في موضعٍ واحد — والشكلُ والرمز هما ما كانت المسارات تكتبه
+ * بيدها، فالشاشاتُ (`http-client.ts`) تقرأ `error` كما كانت.
+ */
+describe("respondTo: أخطاءُ العمل", () => {
+  const read = async (e: unknown) => {
+    const res = respondTo(e);
+    if (!res) throw new Error("لم يُترجَم");
+    return { status: res.status, body: await res.json() };
+  };
+
+  it("كلُّ صنفٍ برمزه ونصّه", async () => {
+    expect(await read(new Refused("حدّد الحركة"))).toEqual({ status: 400, body: { error: "حدّد الحركة" } });
+    expect(await read(new NotFound("هذه الحركة غير موجودة"))).toEqual({ status: 404, body: { error: "هذه الحركة غير موجودة" } });
+    expect(await read(new Conflict("سُجّل من قبل"))).toEqual({ status: 409, body: { error: "سُجّل من قبل" } });
+  });
+
+  it("والحمولةُ بجانب `error` — كشفٌ مصوَّر يقول مصدره", async () => {
+    expect(await read(new Unreadable("الكشف مصوَّر", { source: "PDF_VISION" })))
+      .toEqual({ status: 422, body: { error: "الكشف مصوَّر", source: "PDF_VISION" } });
+  });
+
+  it("أخطاءُ المال المعروفة ما زالت ٤٠٩ بنصّها", async () => {
+    const month = new MonthClosedError("2026-08");
+    expect(await read(month)).toEqual({ status: 409, body: { error: month.message } });
+    expect(await read(new AlreadyMatchedError())).toEqual({ status: 409, body: { error: new AlreadyMatchedError().message } });
+    const twin = new PaymentTwinError({ id: "p", documentId: null, hasBankRow: false, allocatedMinor: 0 });
+    expect(await read(twin)).toEqual({ status: 409, body: { error: twin.message } });
+    expect(twin.status).toBe(409);
+  });
+
+  it("وصفُّ الاستيراد الذي لم يُكتب ٥٠٠ بنصّه كما كان", async () => {
+    expect(await read(new ImportNotRecordedError())).toEqual({ status: 500, body: { error: "تعذّر تسجيل الاستيراد. حاول مرة أخرى." } });
+  });
+
+  it("والصنفُ يبقى خطأً يُعرَف باسمه", () => {
+    const e = new Conflict("x");
+    expect(e).toBeInstanceOf(Error);
+    expect(e).toBeInstanceOf(DomainError);
+    expect(e.name).toBe("Conflict");
+    expect(new MonthClosedError("2026-08").name).toBe("MonthClosedError");
+  });
+});
+
+describe("answer", () => {
+  it("النجاحُ ٢٠٠ بجسمه", async () => {
+    const res = await answer(async () => ({ ok: true, message: "حُفظ" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, message: "حُفظ" });
+  });
+
+  it("والرفضُ المعروف برمزه", async () => {
+    const res = await answer(async () => { throw new NotFound("هذه الحركة غير موجودة"); });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "هذه الحركة غير موجودة" });
+  });
+
+  it("وما لا يُعرَف يُرمى كما كان — لا يُبدَّل برسالة", async () => {
+    const boom = new Error("connection reset");
+    await expect(answer(async () => { throw boom; })).rejects.toBe(boom);
+  });
+});
+
+describe("FailWithError: ختمُ failWith حيث كان بعينه", () => {
+  it("رسالتُنا بنصّها ٤٠٠، وعطبُ الخادم ٥٠٠ برقم مرجع — كما كان المسار يختم", async () => {
+    const own = respondTo(new FailWithError(new Error("لا يمكن فك هذه الدفعة"), "match-undo"))!;
+    expect(own.status).toBe(400);
+    expect(await own.json()).toEqual({ error: "لا يمكن فك هذه الدفعة" });
+
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const raw = respondTo(new FailWithError(new Error("connection reset"), "match-undo"))!;
+    expect(raw.status).toBe(500);
+    expect((await raw.json()).ref).toMatch(/^[0-9a-f]{8}$/);
   });
 });

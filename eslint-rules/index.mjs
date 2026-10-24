@@ -305,6 +305,7 @@ const noInlineRiyalsFormat = {
     schema: [],
     messages: {
       inline: "قسمةُ مالٍ مضمَّنة في تنسيق (`/ 100` ثمّ `toFixed`/`toLocaleString`/`format`) — استعمل `formatRiyalsDisplay`، وللآلة `formatRiyals` (`lib/money.ts`).",
+      bare: "قسمةُ مالٍ تصير نصّاً بلا منزلتين (`String(x / 100)` يكتب «660.1» لا «660.10») — استعمل `formatRiyals` للحقل والآلة، و`formatRiyalsDisplay` للعرض (`lib/money.ts`).",
     },
   },
   create(context) {
@@ -322,8 +323,22 @@ const noInlineRiyalsFormat = {
     return {
       CallExpression(node) {
         const c = node.callee;
+        /*
+          `String(x / 100)` — وقع في `uploader.tsx`: حقلُ الصافي «660.1». والقسمةُ مباشرةً
+          وحدها: `String(Math.round(bp / 100))` نسبةٌ تُقرَّب لا مالٌ يُكتب.
+        */
+        if (c.type === "Identifier" && c.name === "String" && node.arguments.length === 1) {
+          const a = node.arguments[0];
+          if (a.type === "BinaryExpression" && dividesByHundred(a)) context.report({ node, messageId: "bare" });
+          return;
+        }
         if (c.type !== "MemberExpression" || c.computed) return;
         const name = c.property.name;
+        /* `(x / 100).toString()` — الشكلُ نفسه بطريقٍ آخر */
+        if (name === "toString" && node.arguments.length === 0 && c.object.type === "BinaryExpression" && dividesByHundred(c.object)) {
+          context.report({ node, messageId: "bare" });
+          return;
+        }
         /* `(x / 100).toFixed(2)` */
         if (name === "toFixed") {
           if (node.arguments.length !== 1 || node.arguments[0].type !== "Literal" || node.arguments[0].value !== 2) return;

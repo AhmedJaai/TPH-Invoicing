@@ -1,0 +1,278 @@
+/**
+ * التراجع عن مطابقة — بابُه `/api/match-undo`.
+ *
+ * كان القبول نهائياً: من وافق على مطابقة خاطئة لا يملك ردّها إلّا
+ * بتعديل القاعدة يدوياً. والمال يُراجَع ويُصحَّح.
+ *
+ * **ولا يُحذف شيء.** كانت الدفعة تُحذف إن لم تعد تفسّر حركة — فيختفي
+ * أنّ مالاً خرج ونُسب ثمّ رُدّ نسبُه، ولا يبقى إلّا سطرٌ في سجلّ
+ * التدقيق يقول إنّ شيئاً حُذف. ومن راجع بعد شهر يجد فاتورةً عادت
+ * مستحقّةً بلا سببٍ ظاهر، فيدفع ثمنها مرّتين.
+ *
+ * فصارت الدفعة تُردّ لا تُحذف: تُفكّ تخصيصاتها، وتُعلَن `REVERSED`
+ * بسببها ومن ردّها، فتخرج من «ما دُفع» ويبقى أثرها. ويُكتب الحدث في
+ * `decision_history` — وهو يجيب عن سؤالٍ آخر غير «من فعل ماذا»:
+ * **كيف تطوّر هذا القرار؟**
+ *
+ * نُقل من المسار كما هو (أكتوبر ٢٠٢٦): المعاملتان والنصوصُ والرموز نفسها.
+ */
+import { z } from "zod";
+import { and, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { bankTransactions, classificationSourceEnum, decisionHistory, payments } from "@/db/schema";
+import { isOwnersPayment } from "./payment-echo.service";
+import { MonthClosedError } from "./validation.service";
+import { recordAudit } from "@/lib/audit";
+import { refreshPaymentStatus, reversePayment } from "./payment.service";
+import { Conflict, NotFound, Refused } from "@/lib/domain-error";
+import { FailWithError } from "@/lib/domain-error";
+import type { Conn } from "./types";
+
+export const MatchUndoBody = z.object({
+  transactionId: z.string().trim().min(1).max(64).optional(),
+  /** سبب التراجع — يُحفَظ كي يُفهَم لاحقاً لِمَ فُكّت. */
+  reason: z.string().max(500).optional(),
+});
+export type MatchUndoBody = z.infer<typeof MatchUndoBody>;
+
+export interface MatchUndone {
+  ok: true;
+  message: string;
+  removedAllocations?: number;
+  reversedPayment?: boolean;
+  freedMinor?: number;
+}
+
+export async function undoMatch(userId: string, body: MatchUndoBody, conn: Conn = db): Promise<MatchUndone> {
+  if (!body.transactionId) throw new Refused("حدّد الحركة");
+
+  const [tx] = await conn
+    .select()
+    .from(bankTransactions)
+    .where(eq(bankTransactions.id, body.transactionId));
+
+  if (!tx) throw new NotFound("هذه الحركة غير موجودة");
+  if (!tx.matchedPaymentId) {
+    /*
+      «ليست سداداً» كانت بلا تراجع: من أعلنها خطأً لا يملك ردّها.
+      فتعود الحركة إلى «مقترَحة» بلا قرار، ويبقى أثرُ الإعلان وردُّه.
+    */
+    if (tx.matchOutcome === "NOT_A_PAYMENT") {
+      const reason = body.reason?.trim() || "تراجع عن «ليست سداداً»";
+      /*
+        والبابُ يعود إلى ما كان قبل الإعلان (محفوظٌ في تاريخ القرار) — كان
+        يبقى «تحويلاً داخليّاً» فلا تعود الحركة إلى الطابور وتقول الرسالة
+        «عادت تنتظر قراراً». ومشروطٌ بأنّها ما زالت «ليست سداداً»: ضغطتان
+        لا تكتبان ردَّين.
+      */
+      const [prior] = (
+        await conn.execute<{ category: string | null; source: string | null }>(sql`
+          select payload->>'الباب السابق' as category, payload->>'المصدر السابق' as source from decision_history
+           where bank_transaction_id = ${tx.id} and event = 'MATCH_REJECTED'
+           order by created_at desc limit 1
+        `)
+      ).rows;
+      const restored = (prior?.category ?? "UNKNOWN") as typeof tx.category;
+      /*
+        ومصدرُ التصنيف يعود معه: الإعلانُ يكتبه `HUMAN`، ولو بقي لَما عادت
+        الحركةُ إلى الطابور (الطابور لا يسأل عمّا صنّفه إنسان). وما أُعلن قبل
+        حفظ المصدر السابق لم يتغيّر مصدرُه أصلاً فيُترَك.
+      */
+      const priorSource = classificationSourceEnum.enumValues.find((v) => v === prior?.source);
+      const undone = await conn.transaction(async (t) => {
+        const rows = await t.update(bankTransactions).set({
+          matchStatus: "UNMATCHED",
+          matchOutcome: null,
+          matchDisposition: "REVIEW",
+          lifecycle: "SUGGESTED",
+          category: restored,
+          ...(priorSource ? { classificationSource: priorSource } : {}),
+        }).where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchOutcome, "NOT_A_PAYMENT")))
+          .returning({ id: bankTransactions.id });
+        if (rows.length === 0) return false;
+        await t.insert(decisionHistory).values({
+          bankTransactionId: tx.id,
+          event: "MATCH_REVERSED",
+          actor: "HUMAN",
+          actorId: userId,
+          detail: reason,
+          payload: { "كانت": "ليست سداداً", الباب: tx.category, "عاد إلى": restored },
+        });
+        await recordAudit({
+          actorId: userId,
+          action: "MATCH_UNDONE",
+          entityType: "bank_transaction",
+          entityId: tx.id,
+          before: { النتيجة: "NOT_A_PAYMENT", الباب: tx.category },
+          after: { الفعل: "تراجع عن «ليست سداداً»", السبب: reason, "عاد الباب إلى": restored },
+        }, t);
+        return true;
+      });
+      if (!undone) throw new Conflict("سبق التراجع عن هذا القرار. حدّث الصفحة.");
+      return { ok: true, message: "تراجعتَ عن «ليست سداداً»، وعادت الحركة تنتظر قرارك" };
+    }
+    throw new Conflict("هذه الحركة غير مطابقة أصلاً");
+  }
+
+  const paymentId = tx.matchedPaymentId;
+  const reason = body.reason?.trim() || "تراجع يدويّ عن المطابقة";
+  let freedInvoices: string[] = [];
+  let freedMinor = 0;
+  let reversedPayment = false;
+  let previousAllocations: { invoiceId: string; amountMinor: number }[] = [];
+
+  let done: boolean;
+  try {
+    done = await conn.transaction(async (t) => {
+      const unlinked = await t
+        .update(bankTransactions)
+        .set({
+          matchedPaymentId: null,
+          matchStatus: "UNMATCHED",
+          matchDisposition: "REVIEW",
+          matchOutcome: null,
+          matchScore: null,
+          /*
+            الردّ يُنزل الطبقة إلى «مقترَحة»: عاد لها مرشّحٌ بلا حسم.
+            ولا تعود `RAW` — فما عُرف عنها لم يُمحَ بردّ المطابقة.
+          */
+          lifecycle: "SUGGESTED",
+        })
+        /* ضغطتان متزامنتان كانتا تُنتجان ردَّين وقيدَي تدقيق لدفعةٍ واحدة */
+        .where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchedPaymentId, paymentId)))
+        .returning({ id: bankTransactions.id });
+      if (unlinked.length === 0) return false;
+
+      /*
+        الدفعة تُردّ إن لم تعد تفسّر حركة. أمّا إن بقيت لها حركة أخرى
+        فتبقى عاملة — فردّها يكسر مطابقةً صحيحة لم يُطلَب التراجع عنها.
+      */
+      const [{ others }] = (
+        await t.execute<{ others: number }>(sql`
+          select count(*)::int as others from bank_transactions
+          where matched_payment_id = ${paymentId}
+        `)
+      ).rows;
+
+      /*
+        ── الدفعةُ التي سبقت حوالتَها لا تُردّ بردّ الربط ──
+
+        «سجّل أنّها سُدّدت» أو إيصالٌ قُيِّد قبل أن يصل الكشف، ثمّ رُبطت به الحوالة
+        (`recordBankPayment` · «راجِع الحسابات»). فالتراجعُ عن الربط يفكّ الحوالةَ
+        وحدها — وكان يردّ الدفعةَ كلَّها، فيمحو إقرارَ صاحب العمل وتعود فاتورتُه
+        مستحقّةً كأنّها لم تُسدَّد. ويُعاد مبلغُها الذي كان إن غيّره الربط.
+      */
+      /*
+        وما ورث إقرارَ صاحب العمل بدمج الصدى (`mergePaymentEcho` · `mergeIntoCredit`)
+        هو إقرارُه كذلك: أُلغي السدادُ اليدويّ وانتقلت تخصيصاتُه إلى الحوالة. كان
+        يُحكَم بتاريخ الإنشاء وحده، فالحوالةُ أحدثُ من الاستيراد فتُردّ — وتعود
+        الفاتورةُ مستحقّةً والإقرارُ ملغى.
+      */
+      const adoptedPayment = await isOwnersPayment(t, paymentId, tx.id);
+      if (adoptedPayment) {
+        /* والربطُ الآليّ يُسجَّل `POSTED` بيد النظام (لا إقرارَ إنسان) — وفيه ما كان كذلك */
+        const [linked] = (await t.execute<{ was: string | number | null; fee: string | number | null }>(sql`
+          select payload->>'كانت بالهللات' as was, payload->>'كان الرسم بالهللات' as fee from decision_history
+           where bank_transaction_id = ${tx.id} and event in ('MATCH_CONFIRMED', 'POSTED') and payload ? 'كانت بالهللات'
+           order by created_at desc limit 1
+        `)).rows;
+        const was = linked?.was === null || linked?.was === undefined ? null : Number(linked.was);
+        const feeWas = linked?.fee === null || linked?.fee === undefined ? 0 : Number(linked.fee);
+        if (was !== null && Number.isInteger(was) && was > 0) {
+          const [{ allocated }] = (await t.execute<{ allocated: number }>(sql`
+            select coalesce(sum(amount_minor), 0)::int as allocated from payment_allocations where payment_id = ${paymentId}
+          `)).rows;
+          /* لا يُعاد مبلغٌ أصغرُ ممّا خُصّص منها — يبقى كما هو ويُقال */
+          if (Number.isInteger(feeWas) && Number(allocated) <= was - feeWas) {
+            await t.update(payments).set({ amountMinor: was, feeMinor: feeWas }).where(eq(payments.id, paymentId));
+            await refreshPaymentStatus(t, paymentId);
+          }
+        }
+      }
+
+      if (Number(others) === 0 && !adoptedPayment) {
+        const outcome = await reversePayment(t, {
+          paymentId,
+          kind: "REVERSED",
+          reason,
+          userId,
+        });
+        freedInvoices = outcome.freedInvoiceIds;
+        freedMinor = outcome.freedMinor;
+        reversedPayment = true;
+        previousAllocations = outcome.previousAllocations;
+      }
+
+      /*
+        الحدث في تاريخ القرار — لا في سجلّ التدقيق وحده.
+
+        سجلّ التدقيق يجيب «من فعل ماذا ومتى»، وهذا يجيب «كيف صار هذا
+        القرار على ما هو عليه»: صُنّفت، ثمّ اقتُرحت، ثمّ أُقرّت، ثمّ رُدّت.
+        وبلا التسلسل لا يُقاس أين يُخطئ النظام.
+      */
+      await t.insert(decisionHistory).values({
+        bankTransactionId: tx.id,
+        event: "MATCH_REVERSED",
+        actor: "HUMAN",
+        actorId: userId,
+        detail: reason,
+        payload: {
+          الدفعة: paymentId,
+          "فواتير تحرّرت": freedInvoices.length,
+          "مبلغ تحرّر": freedMinor,
+          "ردّت الدفعة": reversedPayment,
+          /*
+            التفصيل لا العدد: أيّ فاتورةٍ كانت تُغطّى وبكم.
+            فبعد شهرٍ يُقرأ «كانت على فاتورتَي أغسطس ٤ و١٢» لا «فُكّت ٢».
+          */
+          "كانت مخصّصة على": previousAllocations,
+        },
+      });
+
+      await recordAudit({
+        actorId: userId,
+        action: "MATCH_UNDONE",
+        entityType: "bank_transaction",
+        entityId: tx.id,
+        before: {
+          الدفعة: paymentId,
+          الحالة: tx.matchStatus,
+          القرار: tx.matchDisposition,
+          الدرجة: tx.matchScore,
+          الأدلّة: tx.matchEvidence,
+        },
+        after: {
+          الفعل: "تراجع عن المطابقة",
+          السبب: reason,
+          "تخصيصات فكّت": freedInvoices.length,
+          "ردّت الدفعة": reversedPayment,
+          "مبلغ تحرّر": freedMinor,
+          "كانت مخصّصة على": previousAllocations,
+        },
+      }, t);
+      return true;
+    });
+  } catch (e) {
+    /*
+      الفكُّ يردّ تخصيصاً على فاتورةٍ شهرُها مقفل — والمقفلُ لا يُكتب فيه من أيّ باب. كان
+      يخرج «ردّ الخادم بخطأ (500)» فلا يُعرَف ما المانع ولا ما العمل؛ فيُقال الشهرُ والطريق.
+    */
+    if (e instanceof MonthClosedError) {
+      throw new Conflict(`تعذّر فك المطابقة: هذه الدفعة مخصّصة على فاتورة في شهر مقفل. ${e.message.split(".")[0]}. أعد فتحه من صفحة الإقفال، ثم فك المطابقة، ثم أقفله من جديد.`);
+    }
+    /* وما سواه يُختَم كما كان: رسالتُنا بنصّها، وعطبُ الخادم برقم مرجع */
+    throw new FailWithError(e, "match-undo");
+  }
+
+  if (!done) throw new Conflict("فُكّت هذه المطابقة من قبل. حدّث الصفحة.");
+
+  return {
+    ok: true,
+    removedAllocations: freedInvoices.length,
+    reversedPayment,
+    freedMinor,
+    message: reversedPayment
+      ? `فُكّت المطابقة ورُدّت الدفعة وفُكّ ${freedInvoices.length} تخصيصاً. تبقى الدفعة في السجل مردودة مع سبب ردّها`
+      : `فُكّت المطابقة و${freedInvoices.length} تخصيصاً، وتبقى الدفعة متاحة لحركة أخرى`,
+  };
+}
