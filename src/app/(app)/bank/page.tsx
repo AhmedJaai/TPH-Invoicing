@@ -21,10 +21,12 @@ import { MatchExplain } from "@/components/match-explain";
 import { ReconcileQueue } from "@/components/reconcile-queue";
 import { AccountReview } from "@/components/account-review";
 import { loadHandPaymentLinks } from "@/services/account-review.service";
-import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, DAY, GROUP, ITEM, TRANSACTION } from "@/lib/arabic";
 import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { BANK_STALE_DAYS } from "@/lib/attention";
+import { attentionItems } from "@/lib/work";
+import { countedArea } from "@/lib/nav";
+import { TaskList } from "@/components/task-list";
 import { formatRiyalsDisplay } from "@/lib/money";
 import {
   TX_VIEWS, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadLedger,
@@ -79,14 +81,22 @@ export default async function BankPage({
   /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
   if (params.tx) redirect(txHref(params.tx));
 
-  const [coverage, queue, ledger, doublePaid, handLinks, held] = await Promise.all([
+  const [coverage, queue, ledger, doublePaid, handLinks, held, attention] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
     loadLedger(view, month, search, !seesSalaries(user.role), parseLedgerPage(params.page)),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
     loadOpenHeldRows(),
+    /* كما في شارة «البنك» في الشريط (`workByArea`): لمن يرى الطابورَ وحده */
+    can(user.role, "reports:view") ? attentionItems(user.role).catch(() => []) : Promise.resolve([]),
   ]);
+  /*
+    بنودُ «يحتاج قرارك» التي تقع في هذه المساحة — هي التي تعدّها شارةُ «البنك».
+    كانت الشارةُ تقول ١ والصفحةُ «لا توجد حركات تنتظر» فلا يُعرف ما الواحد.
+    وما وجهتُه الطابورُ هنا (`#queue`) يُعرض في الطابور نفسه تحت.
+  */
+  const areaWork = attention.filter((i) => countedArea(i.href) === "/bank" && !i.href.startsWith("/bank#queue"));
 
   const canApprove = can(user.role, "payment:approve");
   const canEdit = can(user.role, "bank:edit");
@@ -159,7 +169,7 @@ export default async function BankPage({
             id="queue"
             title="ما ينتظر قرارك"
             icon={Inbox}
-            count={queue.groups.length + held.length > 0 ? queue.groups.length + held.length : undefined}
+            count={queue.groups.length + held.length + areaWork.length > 0 ? queue.groups.length + held.length + areaWork.length : undefined}
             hint={queue.groups.length > 0
               ? `${countNoun(queue.groups.length, GROUP)} تضم ${countNoun(queuedTx, TRANSACTION)}. نسألك سؤالاً واحداً عن الحركات المتشابهة، ويتذكر النظام ما تؤكده.`
               : undefined}
@@ -175,6 +185,11 @@ export default async function BankPage({
                     {handLinks.length === 1 ? "حركة سبق أن سجّلت سدادها يدوياً" : `${countNoun(handLinks.length, TRANSACTION)} سبق أن سجّلت سداد كل منها يدوياً`}
                   </span>, handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")]} /></p>
                 <AccountReview size="sm" variant="primary" />
+              </div>
+            )}
+            {areaWork.length > 0 && (
+              <div className="mb-3">
+                <TaskList items={areaWork} />
               </div>
             )}
             <BankHeldRows rows={held} canEdit={canEdit} />
@@ -257,8 +272,11 @@ export default async function BankPage({
               rows={ledger.rows}
               keyOf={(t) => t.id}
               hrefOf={(t) => txHref(t.id)}
-              searchOf={(t) => [t.who, t.description, CATEGORY_LABEL[t.category], formatDay(t.valueDate), formatRiyalsDisplay(t.amountMinor)].filter(Boolean).join(" ")}
-              searchLabel="تصفية المعروض"
+              /*
+                بلا تصفيةٍ محلّيّة (`searchOf`): البحثُ فوقها يبحث في الحركات كلِّها
+                بالمبلغ والاسم ونصّ البنك، وكان حقلٌ ثانٍ «تصفية المعروض» تحته يُربك
+                على الجوّال: أيُّهما يبحث في ماذا؟
+              */
               empty={
                 <EmptyState
                   compact
@@ -283,7 +301,7 @@ export default async function BankPage({
                     </span>
                   ),
                 },
-                { key: "date", header: "التاريخ", cell: (t) => <bdi className="whitespace-nowrap text-ink-soft">{formatDay(t.valueDate)}</bdi> },
+                { key: "date", header: "التاريخ", meta: true, cell: (t) => <bdi className="whitespace-nowrap text-ink-soft">{formatDay(t.valueDate)}</bdi> },
                 { key: "kind", header: "التصنيف", secondary: true, cell: (t) => <CategoryBadge category={t.category} /> },
                 {
                   key: "amount", header: "المبلغ", numeric: true,
@@ -295,7 +313,7 @@ export default async function BankPage({
                   ),
                 },
                 {
-                  key: "state", header: "الحالة", wrap: true,
+                  key: "state", header: "الحالة", wrap: true, meta: true,
                   cell: (t) => <span id={`tx-${t.id}`} className="block scroll-mt-28"><StateCell tx={t} queued={queue.queuedIds.has(t.id)} canUndo={canApprove} /></span>,
                 },
               ]}

@@ -5,27 +5,44 @@
  * والدفعةُ من `payment-run.service`، والإقفالُ من `month-close`. وما لا
  * يُعرف يُقال مجهولاً: رصيدُ البنك بلا كشفٍ فيه عمودُ الرصيد `null` لا صفر.
  */
-import { desc, isNotNull, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { monthCloses, reconciliationPeriods } from "@/db/schema";
+import { monthCloses } from "@/db/schema";
 import { buildMonthClose, type MonthCloseReport } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { balanceAsOf } from "@/lib/bank/statement-balances";
 
 export interface CashPosition {
   /** آخرُ رصيدٍ ختاميٍّ معروف — `null` حين لا كشفَ يحمل الرصيد. */
   balanceMinor: number | null;
-  /** تاريخ ذلك الرصيد (YYYY-MM-DD). */
+  /** يومُ ذلك الرصيد (YYYY-MM-DD): آخرُ حركةٍ في فترته — `null` إن لم يُعرف يومٌ ماضٍ. */
   asOf: string | null;
 }
 
 export async function loadCashPosition(): Promise<CashPosition> {
-  const [row] = await db
-    .select({ closing: reconciliationPeriods.closingBalanceMinor, end: reconciliationPeriods.periodEnd })
-    .from(reconciliationPeriods)
-    .where(isNotNull(reconciliationPeriods.closingBalanceMinor))
-    .orderBy(desc(reconciliationPeriods.periodEnd))
-    .limit(1);
-  return { balanceMinor: row?.closing ?? null, asOf: row?.end ?? null };
+  /*
+    الفترةُ شهرٌ كامل (`period_end` آخرُ يومٍ فيه) والرصيدُ رصيدُ آخر حركةٍ منه في
+    الكشف — فتاريخُه يومُ تلك الحركة لا آخرُ الشهر. كانت الرئيسيّة تقول «آخر رصيد
+    معروف · 31 أكتوبر» في الخامس والعشرين منه، والكشفُ يقف عند الثاني والعشرين.
+  */
+  const r = (await db.execute<{ closing: number | null; period_end: string; last_day: string | null }>(sql`
+    select rp.closing_balance_minor as closing, rp.period_end,
+           (select to_char(max(bt.value_date at time zone 'Asia/Riyadh'), 'YYYY-MM-DD')
+              from bank_transactions bt
+             where (bt.bank_account_id = rp.bank_account_id or bt.bank_account_id is null)
+               and to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')
+                   between rp.period_start and rp.period_end) as last_day
+      from reconciliation_periods rp
+     where rp.closing_balance_minor is not null
+     order by rp.period_end desc
+     limit 1
+  `)).rows[0];
+  if (!r) return { balanceMinor: null, asOf: null };
+  return {
+    balanceMinor: r.closing === null ? null : Number(r.closing),
+    asOf: balanceAsOf(String(r.period_end), r.last_day ? String(r.last_day) : null, todayInRiyadh()),
+  };
 }
 
 export interface CloseProgress {

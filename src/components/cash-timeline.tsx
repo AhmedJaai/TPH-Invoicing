@@ -70,7 +70,7 @@ export function CashTimeline({
       {balanceMinor !== null && <BalanceSteps balanceMinor={balanceMinor} buckets={view.buckets} />}
 
       {trying && (
-        <div role="status" className="sticky top-14 z-10 mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-info/30 bg-info-bg px-4 py-3 text-xs lg:top-[60px]">
+        <div role="status" className="sticky top-(--app-header) z-10 mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-info/30 bg-info-bg px-4 py-3 text-xs">
           <FlaskConical className="h-4 w-4 shrink-0 text-info" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 basis-56 leading-relaxed text-ink-soft">
             <T s="{0} أجّلتَ {1} إلى المرحلة التالية{2}{3}" a={[<b key="0" className="text-ink">هذه تجربة، ولم يُحفظ شيء.</b>, <Money key="1" minor={view.deferredMinor} />, view.lowestMinor !== null && (

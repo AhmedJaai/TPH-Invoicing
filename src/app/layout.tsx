@@ -9,7 +9,12 @@ import { asLocale, DICTIONARY_URL, LOCALE_COOKIE } from "@/lib/i18n/locale";
 export const metadata: Metadata = {
   title: "ذا بوبليك هاوس — المال والتشغيل",
   description: "ماذا تحتاج أن تعرف أو تفعل اليوم، من وصول الفاتورة إلى تسجيلها وسدادها وإقفال الشهر",
-  appleWebApp: { capable: true, title: "ذا بوبليك هاوس", statusBarStyle: "black-translucent" },
+  /*
+    `default` لا `black-translucent`: الشفّافُ يكتب الساعةَ أبيضَ فوق ورق الشريط
+    العلويّ فلا تُقرأ، ويمدّ الصفحةَ تحتها. والشريطُ العلويّ يحسب الحافّةَ الآمنة
+    (`--safe-top`) على أيّ حال — لسفاري حين يطوي شريطه.
+  */
+  appleWebApp: { capable: true, title: "ذا بوبليك هاوس", statusBarStyle: "default" },
   manifest: "/manifest.webmanifest",
 };
 
@@ -20,6 +25,7 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  /* الصفحةُ تمتدّ تحت الساعة وشريط المنزل، وكلُّ لاصقٍ بحافّةٍ يحسبها من `--safe-*` في `globals.css` */
   viewportFit: "cover",
 };
 

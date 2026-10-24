@@ -101,7 +101,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       }
     >
       <MonthTabs base={`/payroll/employee/${id}`} months={workMonths.slice(0, 12)} active={month} />
-      <nav aria-label="أقسام الصفحة" className="sticky top-14 z-10 -mx-1 mt-3 flex gap-1 overflow-x-auto bg-surface/90 px-1 py-2 backdrop-blur">
+      <nav aria-label="أقسام الصفحة" className="sticky top-(--app-header) z-10 -mx-1 mt-3 flex gap-1 overflow-x-auto bg-surface/90 px-1 py-2 backdrop-blur">
         {[["#month", "الشهر"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "الحضور"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
           .filter(([href]) => employee.kind === "MONTHLY" || href !== "#violations")
           .map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-hover">{label}</a>)}

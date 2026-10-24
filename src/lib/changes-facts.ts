@@ -4,17 +4,14 @@ import { db } from "@/db";
 import type { ChangeFacts } from "./changes";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
 import { loadBalanceTotals } from "@/services/supplier-balance.service";
+import { todayInRiyadh } from "./riyadh-time";
+import type { Conn } from "@/services/types";
 
 interface Row extends Record<string, unknown> {
-  this_month: string | null;
-  prev_month: string | null;
-  purchases_this: number;
-  purchases_prev: number;
   docs_7: number;
   docs_prev_7: number;
   outstanding_then: number;
   new_unclassified: number;
-  days_elapsed: number | null;
 }
 
 /**
@@ -24,39 +21,11 @@ interface Row extends Record<string, unknown> {
 export async function gatherChangeFacts(
   rising: { count: number; amountMinor: number } | Promise<{ count: number; amountMinor: number }>,
 ): Promise<ChangeFacts> {
-  const [{ totals }, rows, spend, rises] = await Promise.all([
+  const [{ totals }, purchases, rows, spend, rises] = await Promise.all([
     loadBalanceTotals(),
+    loadMonthPurchases(db, todayInRiyadh()),
     db.execute<Row>(sql`
-      with months as (
-        select period_month as m
-        from invoices
-        group by period_month
-        order by period_month desc
-        limit 2
-      ),
-      cur as (select max(m) as m from months),
-      prv as (select min(m) as m from months where m <> (select max(m) from months))
       select
-        (select m from cur)                                                       as this_month,
-        (select m from prv)                                                       as prev_month,
-        (select coalesce(sum(total_minor),0)::bigint from invoices
-          where period_month = (select m from cur))                               as purchases_this,
-        /*
-          الشهر السابق يقصّ عند اليوم نفسه إن كان الجاري لم يتمّ.
-
-          كان يجمع كاملاً ويقارن بستّة أيّام من الجاري، فيقال في
-          السادس من كل شهر «أنفقت أقلّ بـ٩٨٪» — والنقص يوم لا سلوك.
-          والقصّ يجعل المقارنة مثلاً بمثل، ويعلن في نصّ الأساس.
-        */
-        (select coalesce(sum(total_minor),0)::bigint from invoices
-          where period_month = (select m from prv)
-            and (
-              (select m from cur) <> to_char(now() at time zone 'Asia/Riyadh', 'YYYY-MM')
-              or extract(day from invoice_date) <= extract(day from now() at time zone 'Asia/Riyadh')
-            ))                                                                    as purchases_prev,
-        /* يوم الشهر بتوقيت الرياض — كما في بطاقة المشتريات، فلا يقول أحدهما ١٣ والآخر ١٤ */
-        (select case when (select m from cur) = to_char(now() at time zone 'Asia/Riyadh', 'YYYY-MM')
-                     then extract(day from now() at time zone 'Asia/Riyadh')::int end)                       as days_elapsed,
         /*
           «وصل» يعني مستنداً جديداً — لا ملفّاً قديماً رفع من الأرشيف.
           كان أسبوع رفع أرشيف مايو–أغسطس (١٥٨ ملفّاً) أساساً للمقارنة، فقالت
@@ -127,11 +96,11 @@ export async function gatherChangeFacts(
   const [r] = rows.rows;
 
   return {
-    purchasesThisMonth: Number(r?.purchases_this ?? 0),
-    purchasesPrevMonth: Number(r?.purchases_prev ?? 0),
-    thisMonthLabel: r?.this_month ?? "هذا الشهر",
-    prevMonthLabel: r?.prev_month ?? "الشهر السابق",
-    daysElapsedInMonth: r?.days_elapsed == null ? null : Number(r.days_elapsed),
+    purchasesThisMonth: purchases.thisMinor,
+    purchasesPrevMonth: purchases.prevMinor,
+    thisMonthLabel: purchases.thisMonth ?? "هذا الشهر",
+    prevMonthLabel: purchases.prevMonth ?? "الشهر السابق",
+    daysElapsedInMonth: purchases.daysElapsed,
     documentsLast7: Number(r?.docs_7 ?? 0),
     documentsPrev7: Number(r?.docs_prev_7 ?? 0),
     /* «عليك» الآن من المصدر الواحد — الرقم نفسه الذي في بطاقة الصفحة الأولى */
@@ -147,5 +116,69 @@ export async function gatherChangeFacts(
       prev90Minor: Number(x.prev90),
       activeMonths: Number(x.months),
     })),
+  };
+}
+
+export interface MonthPurchases {
+  /** آخرُ شهرٍ فيه فواتير **لم يأتِ بعدُ ما بعده** (YYYY-MM) — `null` بلا فواتير. */
+  thisMonth: string | null;
+  prevMonth: string | null;
+  thisMinor: number;
+  /** الشهرُ السابق مقصوصاً عند يوم اليوم إن كان الجاري لم يتمّ — مثلاً بمثل. */
+  prevMinor: number;
+  /** كم مضى من الشهر الجاري — `null` إن لم يكن «هذا الشهر» هو الجاري. */
+  daysElapsed: number | null;
+}
+
+/**
+ * مشترياتُ آخر شهرين فيهما فواتير — لبطاقة «مشتريات الشهر» وسطرِ «ما الجديد».
+ *
+ * الشهرُ لا يتجاوز شهرَ اليوم بتوقيت الرياض: كانت «آخرُ شهرٍ فيه فواتير» تلتقط
+ * فاتورةً واحدةً تاريخُها في نوفمبر (قُرئ خطأً أو سُجّل مقدّماً) فقالت الرئيسيّة
+ * في ٢٥ أكتوبر «مشتريات نوفمبر 104.66 ▼ 100٪ عن أكتوبر». و`today` يُمرَّر
+ * (لا `now()` في الاستعلام) فيُختبَر بيومٍ ثابت.
+ */
+export async function loadMonthPurchases(q: Conn, today: string): Promise<MonthPurchases> {
+  const month = today.slice(0, 7);
+  const dayOfMonth = Number(today.slice(8, 10));
+  const r = (await q.execute<{
+    this_month: string | null; prev_month: string | null;
+    purchases_this: number; purchases_prev: number;
+  }>(sql`
+    with months as (
+      select period_month as m
+        from invoices
+       where period_month <= ${month}
+       group by period_month
+       order by period_month desc
+       limit 2
+    ),
+    cur as (select max(m) as m from months),
+    prv as (select min(m) as m from months where m <> (select max(m) from months))
+    select
+      (select m from cur) as this_month,
+      (select m from prv) as prev_month,
+      (select coalesce(sum(total_minor), 0)::bigint from invoices
+        where period_month = (select m from cur)) as purchases_this,
+      /*
+        الشهر السابق يقصّ عند اليوم نفسه إن كان الجاري لم يتمّ.
+
+        كان يجمع كاملاً ويقارن بستّة أيّام من الجاري، فيقال في
+        السادس من كل شهر «أنفقت أقلّ بـ٩٨٪» — والنقص يوم لا سلوك.
+        والقصّ يجعل المقارنة مثلاً بمثل، ويعلن في نصّ الأساس.
+      */
+      (select coalesce(sum(total_minor), 0)::bigint from invoices
+        where period_month = (select m from prv)
+          and ((select m from cur) <> ${month}
+            or extract(day from invoice_date at time zone 'Asia/Riyadh') <= ${dayOfMonth})) as purchases_prev
+  `)).rows[0];
+  const thisMonth = r?.this_month ?? null;
+  return {
+    thisMonth,
+    prevMonth: r?.prev_month ?? null,
+    thisMinor: Number(r?.purchases_this ?? 0),
+    prevMinor: Number(r?.purchases_prev ?? 0),
+    /* يوم الشهر بتوقيت الرياض — كما في بطاقة المشتريات، فلا يقول أحدهما ١٣ والآخر ١٤ */
+    daysElapsed: thisMonth === month ? dayOfMonth : null,
   };
 }

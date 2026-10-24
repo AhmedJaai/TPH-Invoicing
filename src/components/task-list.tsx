@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CircleAlert, Lightbulb, TriangleAlert, Info } from "lucide-react";
+import { CircleAlert, Lightbulb, TriangleAlert, Info } from "lucide-react";
 import { Money } from "@/components/money";
 import { buttonClass } from "./ui";
 import { IMPACT_LABEL, SEVERITY_LABEL, type AttentionItem, type AttentionSeverity } from "@/lib/attention";
@@ -25,11 +25,20 @@ export function TaskRow({ item }: { item: AttentionItem }) {
   const Icon = s.icon;
   const detailHref = `/attention?item=${encodeURIComponent(item.id)}`;
 
+  const action = item.actionLabel ?? "افتح السجلات";
+  const amount = amountMinor !== null && amountMinor > 0;
+
+  /*
+    على الجوّال: النصُّ يأخذ العرضَ كلَّه (العنوانُ سطران لا «…» بعد ثلاث كلمات)،
+    والمبلغُ والفعلُ تحته. كان الزرُّ يأخذ نصفَ الصفّ فيُقصّ العنوان — وكان
+    مقصوداً أن يُخفى (`hidden sm:inline-flex`) فغلبه `inline-flex` في `buttonClass`.
+    وعلى الحاسوب صفٌّ واحد: النصّ، ثمّ المبلغ، ثمّ الفعل.
+  */
   return (
     <li
       data-nav-item=""
       data-href={`/attention?item=${encodeURIComponent(item.id)}`}
-      className="card-rows group relative flex items-center gap-3.5 px-4 py-3.5 transition-colors hover:bg-hover sm:px-5"
+      className="card-rows group relative flex items-start gap-3.5 px-4 py-3.5 transition-colors hover:bg-hover sm:items-center sm:px-5"
     >
       <Link href={detailHref} aria-label="افتح التفاصيل" tabIndex={-1} className="absolute inset-0" />
       <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${s.chip}`} title={SEVERITY_LABEL[item.severity]}>
@@ -38,23 +47,31 @@ export function TaskRow({ item }: { item: AttentionItem }) {
       </span>
 
       <span className="min-w-0 flex-1">
-        <Link href={detailHref} className="block truncate text-[14px] font-bold leading-snug hover:text-accent">
+        <Link href={detailHref} className="line-clamp-2 text-[14px] font-bold leading-snug hover:text-accent sm:block sm:truncate">
           {item.title}
         </Link>
-        <span className="mt-0.5 block truncate text-xs leading-relaxed text-muted">{item.detail}</span>
+        <span className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:block sm:truncate">{item.detail}</span>
+        <span className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:hidden">
+          <Link href={item.href} className={buttonClass("secondary", "sm")}>{action}</Link>
+          {amount && (
+            <span className="text-xs text-muted">
+              <span className="nums font-bold text-ink"><Money minor={amountMinor} /></span> · {IMPACT_LABEL[kind]}
+            </span>
+          )}
+        </span>
       </span>
 
-      {amountMinor !== null && amountMinor > 0 && (
+      {amount && (
         <span className="hidden w-32 shrink-0 text-end sm:block">
           <span className="nums-col block text-[14px] font-bold"><Money minor={amountMinor} /></span>
           <span className="block text-[11px] text-muted">{IMPACT_LABEL[kind]}</span>
         </span>
       )}
 
-      <Link href={item.href} className={`${buttonClass("secondary", "sm")} hidden sm:inline-flex`}>
-        {item.actionLabel ?? "افتح السجلات"}
-      </Link>
-      <ArrowLeft className="h-4 w-4 shrink-0 text-muted sm:hidden" strokeWidth={2} aria-hidden />
+      {/* الإخفاءُ على الغلاف لا على الزرّ — `buttonClass` يحمل `inline-flex` فيغلب `hidden` */}
+      <span className="hidden shrink-0 sm:block">
+        <Link href={item.href} className={buttonClass("secondary", "sm")}>{action}</Link>
+      </span>
     </li>
   );
 }

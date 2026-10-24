@@ -337,11 +337,21 @@ export function activeArea(pathname: string): NavArea | undefined {
 export function areaCounts(hrefs: readonly string[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const href of hrefs) {
-    const area = activeArea(href.split(/[?#]/)[0]);
-    if (!area || area.href === "/" || area.href === "/attention") continue;
-    out[area.href] = (out[area.href] ?? 0) + 1;
+    const area = countedArea(href);
+    if (area) out[area] = (out[area] ?? 0) + 1;
   }
   return out;
+}
+
+/**
+ * المساحةُ التي يُعَدّ لها بندٌ بوجهته — القاعدةُ نفسُها التي تكتب العددَ على
+ * أيقونة المساحة. وتقرؤها صفحةُ المساحة لتسمّي ما وراء العدد: كانت شارةُ «البنك»
+ * تقول ١ وصفحتُه تقول «لا شيء ينتظر».
+ */
+export function countedArea(href: string): string | null {
+  const area = activeArea(href.split(/[?#]/)[0]);
+  if (!area || area.href === "/" || area.href === "/attention") return null;
+  return area.href;
 }
 
 /**

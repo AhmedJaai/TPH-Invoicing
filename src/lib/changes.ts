@@ -30,10 +30,25 @@ export interface Change {
    * تشريحُ البطاقة داخل الشبكة الواحدة.
    */
   currentCount?: number;
+  /** العددُ الذي قُورن به — ليُقال الفرقُ عدداً حين يصغر الأساس (`countDelta`). */
+  previousCount?: number;
   /** هل هذا التغيّر في صالحه؟ ارتفاع المشتريات ليس كارتفاع المبيعات. */
   favourable: boolean | null;
   detail: string;
   href?: string;
+}
+
+/**
+ * أساسٌ أصغر من هذا يُقال الفرقُ عنه عدداً لا نسبة: «60 مستنداً عن 5» كانت
+ * «▲ 1100٪» — رقمٌ مهول لا يقول شيئاً؛ و«+55» يقوله.
+ */
+export const SMALL_BASE_COUNT = 10;
+
+/** الفرقُ عدداً لتغيّرٍ أساسُه عددٌ صغير — `null` حين تصلح النسبة. */
+export function countDelta(c: Pick<Change, "currentCount" | "previousCount">): number | null {
+  if (c.currentCount === undefined || c.previousCount === undefined) return null;
+  if (c.previousCount >= SMALL_BASE_COUNT) return null;
+  return c.currentCount - c.previousCount;
 }
 
 /** ما دون هذا الحدّ ضجيجٌ لا تغيّر. */
@@ -173,6 +188,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
       direction: dir,
       pct: pctChange(f.documentsLast7, f.documentsPrev7),
       currentCount: f.documentsLast7,
+      previousCount: f.documentsPrev7,
       favourable: null,
       detail: `${countNoun(f.documentsLast7, DOCUMENT)} هذا الأسبوع · ${f.documentsPrev7} الذي قبله`,
       href: "/documents",

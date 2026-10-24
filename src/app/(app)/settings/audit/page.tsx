@@ -181,7 +181,7 @@ export default async function AuditTrailPage({
         <div className="space-y-8">
           {[...days].map(([day, list]) => (
             <section key={day} aria-label={day}>
-              <h2 className="sticky top-14 z-[5] -mx-1 mb-3 bg-surface/90 px-1 py-1.5 text-[13px] font-bold backdrop-blur lg:top-[60px]">
+              <h2 className="sticky top-(--app-header) z-[5] -mx-1 mb-3 bg-surface/90 px-1 py-1.5 text-[13px] font-bold backdrop-blur">
                 {day === today ? "اليوم" : day === yesterday ? "أمس" : DAY_LABEL.format(new Date(`${day}T12:00:00+03:00`))}
                 <span className="ms-2 text-[11px] font-medium text-muted"><span className="nums">{list.length}</span></span>
               </h2>

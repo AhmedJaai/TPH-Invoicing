@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NOISE_PCT, buildChanges, direction, notable, pctChange, spendSpikes, type ChangeFacts } from "./changes";
+import { NOISE_PCT, SMALL_BASE_COUNT, buildChanges, countDelta, direction, notable, pctChange, spendSpikes, type ChangeFacts } from "./changes";
 
 const quiet: ChangeFacts = {
   purchasesThisMonth: 100_00, purchasesPrevMonth: 100_00,
@@ -149,5 +149,26 @@ describe("spendSpikes — إنفاق فوق المعتاد عند مورّد", (
       s({ slug: "C", last30Minor: 700_000, prev90Minor: 600_000 }),
     ]);
     expect(out.map((c) => c.id)).toEqual(["spend:B", "spend:C"]);
+  });
+});
+
+describe("الفرقُ عدداً حين يصغر الأساس", () => {
+  it("60 مستنداً عن 5 تُقال «+55» لا «1100٪»", () => {
+    expect(countDelta({ currentCount: 60, previousCount: 5 })).toBe(55);
+    expect(countDelta({ currentCount: 2, previousCount: 9 })).toBe(-7);
+  });
+  it("وأساسٌ من عشرة فأكثر تصلح له النسبة", () => {
+    expect(countDelta({ currentCount: 60, previousCount: SMALL_BASE_COUNT })).toBeNull();
+  });
+  it("والمالُ لا يُعَدّ عدداً — نسبتُه باقية", () => {
+    expect(countDelta({})).toBeNull();
+  });
+  it("بطاقةُ المستندات تحمل ما قُورن به", () => {
+    const docs = buildChanges({
+      purchasesThisMonth: 0, purchasesPrevMonth: 0, thisMonthLabel: "2026-10", prevMonthLabel: "2026-09",
+      daysElapsedInMonth: null, documentsLast7: 60, documentsPrev7: 5, outstandingNow: 0, outstandingThen: 0,
+      risingItems: 0, risingAnnualMinor: 0, newUnclassified: 0,
+    }).find((c) => c.id === "documents");
+    expect(docs && countDelta(docs)).toBe(55);
   });
 });

@@ -41,7 +41,11 @@ export default async function LoginPage({
   const { error, from } = await searchParams;
 
   return (
-    <main className="grid grid-cols-[minmax(0,1fr)] min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    /*
+      `dvh` لا `screen` (‎100vh‎): على الآيفون ‎100vh‎ هو ارتفاعُ الشاشة وشريطُ سفاري
+      مطويّ، فيقع «الوسط» تحت منتصف ما يُرى، وتختبئ الملاحظةُ تحت الشريط عند أوّل فتح.
+    */
+    <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <title>الدخول · ذا بوبليك هاوس</title>
       {/* ── العلامة: إطارٌ داكن يقول ما هذا النظام قبل أن يُطلب الدخول ── */}
       <section className="relative hidden overflow-hidden bg-frame p-12 text-frame-ink lg:flex lg:flex-col">
@@ -72,9 +76,9 @@ export default async function LoginPage({
         <span aria-hidden className="pointer-events-none absolute -bottom-40 -end-40 h-[28rem] w-[28rem] rounded-full bg-frame-accent/10 blur-3xl" />
       </section>
 
-      <section className="flex flex-col justify-center px-6 py-16 sm:px-12">
+      <section className="flex flex-col justify-center px-6 pb-[calc(2.5rem+var(--safe-bottom))] pt-[calc(2.5rem+var(--safe-top))] sm:px-12 lg:py-16">
         <div className="mx-auto w-full max-w-sm">
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
             <BrandMark className="h-9 w-auto text-accent" />
             <p className="text-base font-bold">ذا بوبليك هاوس</p>
           </div>

@@ -12,7 +12,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, EmptyState, Kbd, KeyFigure, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
+import { Badge, EmptyState, Kbd, KeyFigure, LinkButton, Meter, Section, StatGrid, Stepper, buttonClass } from "@/components/ui";
 import { SectionBoundary } from "@/components/ui-client";
 import { TaskList } from "@/components/task-list";
 import { Changes } from "@/components/changes";
@@ -179,7 +179,7 @@ export default async function HomePage() {
 
       {/* ── الأرقامُ الأربعة: كلٌّ جوابُ سؤال، وكلٌّ يفتح موضعه ── */}
       {!start.knowsNothing && (
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatGrid>
           <KeyFigure
             icon={Store}
             label="المستحق للمورّدين"
@@ -224,7 +224,7 @@ export default async function HomePage() {
               label="رصيد البنك"
               href="/cash"
               value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
-              sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : `آخر رصيد معروف · ${formatDay(cash.asOf)}`}
+              sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : cash.asOf ? `آخر رصيد معروف · ${formatDay(cash.asOf)}` : "آخر رصيد معروف"}
             >
               {cashSince && <SinceYesterdayLine s={cashSince} kind="money" />}
               {cash.balanceMinor !== null && week && week.totalMinor > 0 && (
@@ -241,7 +241,7 @@ export default async function HomePage() {
               <PurchasesFigure factsP={factsP} />
             </Suspense>
           </SectionBoundary>
-        </div>
+        </StatGrid>
       )}
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
@@ -324,7 +324,8 @@ async function PurchasesFigure({ factsP }: { factsP: Promise<ChangeFacts> }) {
   return (
     <KeyFigure
       icon={ShoppingBasket}
-      label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
+      label="المشتريات"
+      period={formatMonth(facts.thisMonthLabel)}
       href="/purchases/invoices"
       value={<Money minor={facts.purchasesThisMonth} />}
       sub={

@@ -277,7 +277,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
   return (
     <section aria-labelledby="ready-title">
       {/* ── شريطُ الاختيار: المجموعُ والأفعالُ ثابتةٌ فوق القائمة ── */}
-      <div className="sticky top-14 z-10 -mx-4 mb-4 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:top-[60px] lg:-mx-8 lg:px-8">
+      <div className="sticky top-(--app-header) z-10 -mx-4 mb-4 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <label className="flex min-h-11 items-center gap-2.5 text-[13px] font-bold">
             <input

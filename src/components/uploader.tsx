@@ -1954,7 +1954,7 @@ function ReviewCard({
         على الجوّال الذيلُ يلتصق فوق شريط التنقّل ما دامت البطاقةُ على الشاشة: من قرأ
         «قُرئ كلُّ شيءٍ بثقة» يؤكّد من حيث هو، ومعه الإجماليّ — كان يمرّر شاشتين إلى الزرّ.
       */}
-      <footer className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 border-t border-line-soft bg-raised px-4 py-3 sm:px-5 lg:static lg:bg-sunken/40 lg:py-3.5">
+      <footer className="sticky bottom-(--above-tabbar) z-10 border-t border-line-soft bg-raised px-4 py-3 sm:px-5 lg:static lg:bg-sunken/40 lg:py-3.5">
         {item.archiving && (
           <div className="mb-3">
             <Elapsed startedAt={item.startedAt} slowAfter={30} text="يرفع إلى الدرايف ويسجّل…" slowText="يرفع الآن، والخادم بطيء، فامنحه لحظة" />
