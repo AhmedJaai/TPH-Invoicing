@@ -16,6 +16,7 @@ import {
   adjudications, bankImports, bankTransactions, decisionHistory, reconciliationPeriods,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { DomainError } from "@/lib/domain-error";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { toCanonical, STATED_VALUE_DATE_LIMIT_DAYS, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { operationRef, operationRefs } from "@/lib/bank/identity";
@@ -189,9 +190,9 @@ export interface StatementWriteResult {
 }
 
 /** صفُّ الاستيراد لم يُكتب — طلبٌ آخر بالملفّ نفسه سبق. */
-export class ImportNotRecordedError extends Error {
+export class ImportNotRecordedError extends DomainError {
   constructor() {
-    super("تعذّر تسجيل الاستيراد. حاول مرة أخرى.");
+    super("تعذّر تسجيل الاستيراد. حاول مرة أخرى.", 500);
     this.name = "ImportNotRecordedError";
   }
 }

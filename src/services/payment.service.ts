@@ -7,6 +7,7 @@
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
 import { LINK_WINDOW_DAYS } from "@/lib/hand-payment-link";
+import { Conflict } from "@/lib/domain-error";
 import { currentMonthRiyadh, paymentMonthOf, todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
@@ -51,8 +52,7 @@ export interface CreatePaymentInput {
 }
 
 /** توأمٌ وُجد ولم يُقَرّ بأنّه واقعةٌ أخرى. */
-export class PaymentTwinError extends Error {
-  readonly status = 409;
+export class PaymentTwinError extends Conflict {
   /*
     `documentId` يحمله الخطأ لأنّ من يقيّد من إيصالٍ يتبنّى التوأم إن كان
     بلا مستند — ولا يسأل عنه ثانيةً فيكرّر السؤال الذي سُئل هنا.
@@ -64,8 +64,7 @@ export class PaymentTwinError extends Error {
 }
 
 /** الحركة قُيّدت بدفعةٍ بين قراءتها وكتابتها — ضغطتان أو تبويبان. */
-export class AlreadyMatchedError extends Error {
-  readonly status = 409;
+export class AlreadyMatchedError extends Conflict {
   constructor() {
     super("سُجّلت هذه الحركة من قبل، ولم يُضف شيء جديد. افتحها في صفحة البنك لترى دفعتها");
     this.name = "AlreadyMatchedError";

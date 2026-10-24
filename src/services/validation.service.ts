@@ -9,6 +9,7 @@
  * تُقرأ، وتُفحص، ولا يُبنى عليها قرار مالي بلا إعادة حساب.
  */
 import { sameInvoiceNumber } from "@/lib/invoice-number";
+import { Conflict } from "@/lib/domain-error";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, monthCloses } from "@/db/schema";
@@ -27,7 +28,7 @@ export class BlockedError extends Error {
 }
 
 /** خطأ يُترجم إلى ٤٠٩: الشهر مقفل. */
-export class MonthClosedError extends Error {
+export class MonthClosedError extends Conflict {
   constructor(month: string) {
     super(`شهر ${month} مقفل. أعد فتحه من صفحة الإقفال إن كانت هذه فاتورة متأخرة.`);
     this.name = "MonthClosedError";

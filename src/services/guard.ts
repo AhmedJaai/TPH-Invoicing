@@ -9,9 +9,8 @@ import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";
 import { describeError, logEvent } from "@/lib/log";
+import { DomainError } from "@/lib/domain-error";
 import { consume, RateLimitedError } from "./rate-limit.service";
-import { MonthClosedError } from "./validation.service";
-import { AlreadyMatchedError, PaymentTwinError } from "./payment.service";
 
 export { RateLimitedError };
 
@@ -33,9 +32,12 @@ export function respondTo(e: unknown): NextResponse | null {
   if (e instanceof ForbiddenError) {
     return NextResponse.json({ error: e.message }, { status: 403 });
   }
-  /* أخطاءُ المال المعروفة تُقال لقارئها بـ409، لا ٥٠٠ صامتة */
-  if (e instanceof MonthClosedError || e instanceof AlreadyMatchedError || e instanceof PaymentTwinError) {
-    return NextResponse.json({ error: e.message }, { status: 409 });
+  /*
+    أخطاءُ العمل المعروفة (`lib/domain-error.ts`) تُقال برمزها ونصّها، لا ٥٠٠ صامتة —
+    ومنها أخطاءُ المال: الشهرُ المقفل، والحركةُ المقيَّدة بين قراءتها وكتابتها، والتوأم.
+  */
+  if (e instanceof DomainError) {
+    return NextResponse.json({ error: e.message, ...e.payload }, { status: e.status });
   }
   if (e instanceof RateLimitedError) {
     return NextResponse.json(
@@ -73,6 +75,20 @@ export function respondTo(e: unknown): NextResponse | null {
     return NextResponse.json({ error: "الرقم كبير جداً، فراجع عدد الأصفار" }, { status: 400 });
   }
   return null;
+}
+
+/**
+ * جوابُ المسار بعد حارسه وفحص طلبه: نداءُ خدمةٍ واحد، ونجاحُه ٢٠٠ بجسمه، ورفضُه
+ * المعروف بـ`respondTo` — وما لا يُعرف يُرمى كما كان (لا يُبدَّل عطبُ الخادم برسالة).
+ */
+export async function answer(work: () => Promise<object>): Promise<NextResponse> {
+  try {
+    return NextResponse.json(await work());
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 }
 
 /**
