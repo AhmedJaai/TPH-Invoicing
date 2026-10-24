@@ -139,7 +139,13 @@ describe("tph/no-inline-riyals-format", () => {
     "بمنسّق Intl": 'const riyals = (m: number) => new Intl.NumberFormat("en-US").format(m / 100);',
     "بالقيمة المطلقة": 'const riyals = (m: number) => new Intl.NumberFormat("en-US").format(Math.abs(m) / 100);',
     "المطلق خارج القسمة": "const label = Math.abs(m / 100).toFixed(2);",
+    "حقلٌ يكتب «660.1»": 'const subtotal = r.subtotalMinor !== undefined ? String(r.subtotalMinor / 100) : "";',
+    "بالثابت إلى نصّ": "const v = String(amountMinor / HALALAS_PER_RIYAL);",
+    "toString": "const v = (amountMinor / 100).toString();",
   }, {
+    "الحقل بمنسّقه": "const subtotal = formatRiyals(r.subtotalMinor);",
+    "نسبة مقرّبة إلى نصّ": "const pct = String(Math.round(bp / 100));",
+    "قسمة أخرى إلى نصّ": "const kb = String(bytes / 1024);",
     "للآلة بلا قسمة": "const cell = formatRiyals(amountMinor);",
     "تاريخ لا مال": "const day = DAY_FORMAT.format(d);",
     "عدد بلا قسمة": 'const n = count.toLocaleString("en-US");',

@@ -10,7 +10,7 @@ import {
   Camera, Check, CircleAlert, CircleCheck, ExternalLink, FileText, FolderOpen, Info, Layers, Link2, Plus,
   RotateCw, TriangleAlert, Upload, X, ZoomIn, ZoomOut,
 } from "lucide-react";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatRiyals, formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
 import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { FIELD, FILE, countNoun } from "@/lib/arabic";
@@ -1042,7 +1042,7 @@ export function Uploader({
           supplierId: chosenRef.current[id]?.id ?? r.supplier?.id,
           invoiceNumber: it.edited.invoiceNumber,
           invoiceDate: it.edited.invoiceDate,
-          subtotal: r.subtotalMinor !== undefined ? String(r.subtotalMinor / 100) : "",
+          subtotal: r.subtotalMinor !== undefined ? formatRiyals(r.subtotalMinor) : "",
           vat: it.edited.vat.replace(/,/g, ""),
           total: it.edited.total.replace(/,/g, ""),
           sellerVat: r.sellerVat,
