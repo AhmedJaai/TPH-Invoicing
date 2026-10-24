@@ -89,5 +89,6 @@
   "088_month_lock_coverage.sql": "6bd615e043443d64cf4ed44e6185c757f35e6edc28588c59af1e58b28e6a2a3c",
   "089_month_seals.sql": "d3f2a82f21aaa5996f060049f3c057552b3cb19d801568cfc5d5fdcb356b2f59",
   "090_other_sales_category.sql": "bbfc898f4aa2ea42a9083ecfc01dcaa303325d5e9b002cae6743d66faef40794",
-  "091_supplier_merge.sql": "15fcdff8fb408fcd04102031f7810c89153547b551ca903f589adea47a0a3fed"
+  "091_supplier_merge.sql": "15fcdff8fb408fcd04102031f7810c89153547b551ca903f589adea47a0a3fed",
+  "092_push_subscriptions.sql": "2edac05fc047db4026976362b694e5fd97e56e1c4ed1be39edf71bfa7ff96d83"
 }
