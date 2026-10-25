@@ -34,6 +34,11 @@ export interface StartState {
   knowsNothing: boolean;
   /** بقي من الأساسَين (المستندات والكشف) شيء — فتُعرَض الخطوات. */
   incomplete: boolean;
+  /**
+   * ما يعرفه النظام بمصدره — لكلّ رقمٍ مصدرُه: المستحقُّ من المستندات، والرصيدُ من الكشف.
+   * «الوضع الآن» كانت تقول «المستحق 0.00» و«قُدّم إقرار الربع الماضي» على قاعدةٍ فارغة.
+   */
+  has: { documents: boolean; bank: boolean; recipes: boolean };
 }
 
 export function startState(f: StartFacts): StartState {
@@ -67,5 +72,6 @@ export function startState(f: StartFacts): StartState {
     steps,
     knowsNothing: f.documents === 0 && f.bankTransactions === 0,
     incomplete: f.documents === 0 || f.bankTransactions === 0,
+    has: { documents: f.documents > 0, bank: f.bankTransactions > 0, recipes: f.recipes > 0 },
   };
 }

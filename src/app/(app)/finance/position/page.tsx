@@ -9,6 +9,7 @@ import { MaybeMoney } from "@/components/finance-bits";
 import { BarList, Callout, DataTable, KeyFigure, LinkButton, NoAccess, Section, type Column } from "@/components/ui";
 import { DAY, SUPPLIER, countNoun } from "@/lib/arabic";
 import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { loadStartState } from "@/services/start.service";
 import { loadFinancePosition, TILL_SMALL_MINOR, type TillRow } from "@/services/finance-position.service";
 import { loadFinanceAttentionFacts, tillSignalKey } from "@/services/finance-attention.service";
 import { SignalControls } from "@/components/signal-controls";
@@ -45,7 +46,8 @@ export default async function FinancePositionPage() {
   if (!can(user.role, "amounts:view")) {
     return <PageShell user={user} title="الوضع الآن"><NoAccess what="الوضع المالي" /></PageShell>;
   }
-  const [pos, attention] = await Promise.all([loadFinancePosition(), loadFinanceAttentionFacts()]);
+  const [pos, attention, start] = await Promise.all([loadFinancePosition(), loadFinanceAttentionFacts(), loadStartState()]);
+  const unknown = <span className="text-xl text-muted">غير معروف</span>;
   const flagged = attention.tillGaps;
   const canSilence = can(user.role, "bank:edit");
   const bankAge = pos.bank.asOf ? daysSinceRiyadh(pos.bank.asOf) : null;
@@ -69,24 +71,26 @@ export default async function FinancePositionPage() {
           icon={HandCoins}
           label="المستحق للمورّدين"
           tone={overdueMinor > 0 ? "warn" : undefined}
-          value={<Money minor={totals.owedMinor} currency />}
-          sub={<><T s="لـ{0}{1}{2}." a={[countNoun(totals.owedSuppliers, SUPPLIER), overdueMinor > 0 && <Fragment key="1"><T s="، منها {0} تجاوزت ستين يوماً" a={[<strong key="0" className="text-ink"><Money minor={overdueMinor} /></strong>]} /></Fragment>, totals.creditLeftMinor > 0 && <Fragment key="2"><T s=". ولك رصيد عند بعض المورّدين {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></Fragment>]} /></>}
+          value={start.has.documents ? <Money minor={totals.owedMinor} currency /> : unknown}
+          sub={!start.has.documents ? "لم تُرفع فاتورة بعد، فلا يعرف النظام لمن تدين." : totals.owedSuppliers === 0 ? "كل فاتورة مسجّلة يغطيها ما دفعته." : <><T s="لـ{0}{1}{2}." a={[countNoun(totals.owedSuppliers, SUPPLIER), overdueMinor > 0 && <Fragment key="1"><T s="، منها {0} تجاوزت ستين يوماً" a={[<strong key="0" className="text-ink"><Money minor={overdueMinor} /></strong>]} /></Fragment>, totals.creditLeftMinor > 0 && <Fragment key="2"><T s=". ولك رصيد عند بعض المورّدين {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></Fragment>]} /></>}
           href="/suppliers"
         />
         <KeyFigure
           icon={Receipt}
           label={vatNext ? `ضريبة ${vatNext.label}` : "ضريبة الإقرار القادم"}
-          value={vatNext ? (vatNext.amountMinor === null ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={vatNext.amountMinor} currency />) : <span className="text-xl text-muted">لا يوجد إقرار مستحق</span>}
+          value={vatNext ? (vatNext.amountMinor === null ? unknown : <Money minor={vatNext.amountMinor} currency />) : !start.has.documents && !start.has.bank ? unknown : <span className="text-xl text-muted">لا يوجد إقرار مستحق</span>}
           sub={vatNext
             ? <><T s="ضريبة المبيعات مطروحاً منها ضريبة المشتريات، كما يحسبها الإقرار الضريبي{0}. آخر موعد {1}.{2}" a={[vatNext.accruing ? " حتى اليوم" : "", <bdi key="1">{formatDay(vatNext.deadline)}</bdi>, vatNext.amountMinor === null && " في الفترة أيام بلا كشف بنك."]} /></>
+            : !start.has.documents && !start.has.bank ? "يُحسب من كشف البنك وفواتير الفترة، ولم يصل منهما شيء بعد."
             : "قُدّم إقرار الربع الماضي، ولا يوجد شيء في الربع الحالي بعد."}
           href="/close/vat"
         />
         <KeyFigure
           icon={Banknote}
           label="نقد سجّله فودكس ولم يدخل البنك"
-          value={<Money minor={pos.cash.totalMinor} currency />}
-          sub={<><T s="منذ {0}. لا توجد في الكشف إيداعات نقدية، والبيانات لا تبيّن كم بقي منه." a={[pos.cash.firstDay ? <bdi key="0">{formatDay(pos.cash.firstDay)}</bdi> : "البداية"]} /></>}
+          /* بلا مبيعاتٍ من فودكس لا يُعرف النقد — لا «0.00 منذ البداية» */
+          value={pos.cash.firstDay ? <Money minor={pos.cash.totalMinor} currency /> : unknown}
+          sub={pos.cash.firstDay ? <><T s="منذ {0}. لا توجد في الكشف إيداعات نقدية، والبيانات لا تبيّن كم بقي منه." a={[<bdi key="0">{formatDay(pos.cash.firstDay)}</bdi>]} /></> : "لم تصل مبيعات من فودكس بعد."}
           href="#cash"
         />
       </div>
@@ -97,7 +101,7 @@ export default async function FinancePositionPage() {
           ? <LinkButton href="/payments" size="sm" variant="quiet">دفعة الشهر</LinkButton>
           : <LinkButton href="/suppliers" size="sm" variant="quiet">حسابات المورّدين</LinkButton>}>
           {pos.suppliers.top.length === 0 ? (
-            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد مبالغ مستحقة لأي مورّد الآن.</p>
+            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">{start.has.documents ? "لا توجد مبالغ مستحقة لأي مورّد الآن." : "لم تُرفع فواتير بعد، فلا يعرف النظام لمن تدين."}</p>
           ) : (
             <BarList items={pos.suppliers.top.map((s) => ({ key: s.supplierId, label: s.name, minor: s.owedMinor, href: s.slug ? `/suppliers/${encodeURIComponent(s.slug)}` : "/suppliers" }))} />
           )}
@@ -117,8 +121,11 @@ export default async function FinancePositionPage() {
                 <span className="font-bold"><Money minor={o.owedMinor} /></span>
               </li>
             ))}
-            {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && (
+            {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && start.has.documents && (
               <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا ضريبة معلّقة، ولا مورّد تأخر سداد مستحقاته.</li>
+            )}
+            {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && !start.has.documents && (
+              <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا يعرف النظام بعدُ ما يستحق: لم تصل فواتير ولا كشف بنك.</li>
             )}
           </ul>
         </Section>

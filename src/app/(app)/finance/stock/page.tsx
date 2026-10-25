@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { SignalControls } from "@/components/signal-controls";
-import { Callout, DataTable, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
+import { Callout, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { BALANCE_NOTE_LABEL, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
 import { readableQuantity } from "@/lib/finance/quantity";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -27,6 +27,16 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
  * المشترى والمباع — لكلّ صنف مخزون: كم اشتريتَ، كم بِيع منه، وكم يُتوقَّع أنّه بقي.
  * **بلا اشتراط جرد**؛ والجردُ إن وُجد يقول كم ضاع (`lib/finance/stock-balance.ts`).
  */
+/** «فواتيرنا أكمل في 11 صنفاً، وفودكس في 28، ويتفقان في 13» — بلا «في لا أصناف» لما عددُه صفر */
+function sourcesSentence(t: { invoicesBetter: number; foodicsBetter: number; sourcesAgree: number }): string {
+  const parts = [
+    t.invoicesBetter > 0 ? `فواتيرنا أكمل في ${countNoun(t.invoicesBetter, PRODUCT)}` : null,
+    t.foodicsBetter > 0 ? `فودكس أكمل في ${countNoun(t.foodicsBetter, PRODUCT)}` : null,
+    t.sourcesAgree > 0 ? `يتفقان في ${countNoun(t.sourcesAgree, PRODUCT)}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? ` ${parts.join("، و")}.` : "";
+}
+
 export default async function FinanceStockPage({ searchParams }: { searchParams: Promise<{ month?: string; sort?: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/finance/stock");
@@ -133,12 +143,23 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         ]}
       />
 
+      {t.items === 0 ? (
+        /* بلا صنفٍ واحد: أربعةُ «0.00» صفرٌ عن غير علم — يُقال ما ينقص ومن أين يأتي */
+        <div className="mt-5">
+          <EmptyState
+            icon={Boxes}
+            title="لا يعرف النظام بعدُ ما اشتُري وما بيع."
+            hint="المشترى من فواتيرك المربوطة بأصناف المخزون ومن مشتريات فودكس، والمباع من مبيعات فودكس ووصفاتها."
+            action={<LinkButton href="/inventory/import" size="sm" variant="primary">ارفع كتالوج فودكس</LinkButton>}
+          />
+        </div>
+      ) : (
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KeyFigure
           icon={ShoppingCart}
           label={month ? "المشترى في الشهر" : "المشترى"}
           value={<Money minor={t.purchasedMinor} currency />}
-          sub={<><T s="من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في {0}، وفودكس أكمل في {1}، ويتفقان في {2}.{3}" a={[<strong key="0" className="text-ink">{countNoun(t.invoicesBetter, PRODUCT)}</strong>, <strong key="1" className="text-ink">{countNoun(t.foodicsBetter, PRODUCT)}</strong>, countNoun(t.sourcesAgree, PRODUCT), b.unlinkedInvoiceMinor > 0 && <Fragment key="3"> <T s=" وهناك بنود فواتير بقيمة {0} لم تُربط بعد." a={[<Money key="0" minor={b.unlinkedInvoiceMinor} />]} /></Fragment>]} /></>}
+          sub={<><T s="من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف.{0}{1}" a={[sourcesSentence(t), b.unlinkedInvoiceMinor > 0 && <Fragment key="3"> <T s=" وهناك بنود فواتير بقيمة {0} لم تُربط بعد." a={[<Money key="0" minor={b.unlinkedInvoiceMinor} />]} /></Fragment>]} /></>}
           href="/finance/stock/links"
         />
         <KeyFigure
@@ -164,6 +185,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
           href="/inventory"
         />
       </div>
+      )}
 
       {short.length > 0 && (
         <Callout tone="warn" icon={Info} className="mt-4" title={`${countNoun(short.length, PRODUCT)} بيع منها أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}

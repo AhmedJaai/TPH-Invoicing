@@ -12,6 +12,7 @@ import { Callout, EmptyState, KeyFigure, LinkButton, NoAccess } from "@/componen
 import { SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { loadCashOutlook } from "@/services/cash-outlook.service";
+import { loadStartState } from "@/services/start.service";
 import { CashTimeline } from "@/components/cash-timeline";
 import { CashFloor } from "@/components/cash-floor";
 import { T } from "@/components/i18n/t";
@@ -37,7 +38,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   }
 
   const withVat = (await searchParams).vat !== "off";
-  const o = await loadCashOutlook({ withVat, canSeePayroll: can(user.role, "payroll:view") });
+  const [o, start] = await Promise.all([loadCashOutlook({ withVat, canSeePayroll: can(user.role, "payroll:view") }), loadStartState()]);
   const hasPayroll = o.buckets.some((b) => b.lines.some((l) => l.kind === "PAYROLL"));
   /* المحاسبُ لا يعتمد الدفعة — فسطرُ المورّد يفتح حساباته لا صفحةً تقول «خارج صلاحيتك» */
   const canPay = can(user.role, "payment:approve");
@@ -96,9 +97,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <KeyFigure
           icon={CalendarClock}
           label="يخرج حتى نهاية الشهر القادم"
-          value={<Money minor={o.totalMinor} />}
+          /* «0.00» على قاعدةٍ بلا فاتورةٍ ولا كشف صفرٌ عن غير علم */
+          value={start.knowsNothing && o.buckets.length === 0 ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={o.totalMinor} />}
           sub={
-            balanceKnown && o.buckets.length > 0
+            start.knowsNothing && o.buckets.length === 0 ? "لم تصل فواتير ولا كشف بنك بعد."
+            : balanceKnown && o.buckets.length > 0
               ? o.shortfallAt
                 ? "الرصيد المعروف لا يكفيه. انظر التفاصيل أدناه."
                 : "الرصيد المعروف يكفيه."

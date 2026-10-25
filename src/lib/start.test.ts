@@ -29,3 +29,10 @@ describe("أوّل يوم", () => {
     }
   });
 });
+
+describe("ما يعرفه النظام بمصدره", () => {
+  it("المستندُ والكشفُ والوصفاتُ كلٌّ وحده", () => {
+    expect(startState({ documents: 0, bankTransactions: 0, recipes: 0 }).has).toEqual({ documents: false, bank: false, recipes: false });
+    expect(startState({ documents: 3, bankTransactions: 0, recipes: 0 }).has).toEqual({ documents: true, bank: false, recipes: false });
+  });
+});

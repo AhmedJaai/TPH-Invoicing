@@ -39,5 +39,13 @@
 "{0} جرود": "{0} counts",
 "الفرق في الجرود المقفلة": "Difference in closed counts",
 "أقدم من {0}، فلا تدخل «يحتاج قرارك» ({1})": "Older than {0}, so not in “Needs your decision” ({1})",
-"ضريبة مهددة في هذه الدفعة": "VAT at risk in this run"
+"ضريبة مهددة في هذه الدفعة": "VAT at risk in this run",
+"من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف.{0}{1}": "From both sources, taking whichever is more complete for each item.{0}{1}",
+"لا يعرف النظام بعدُ ما اشتُري وما بيع.": "The system doesn’t yet know what was bought and sold.",
+"لم يُستورد كشف بنك بعد.": "No bank statement imported yet.",
+"لا يعرف النظام بعدُ ما يستحق: لم تصل فواتير ولا كشف بنك.": "The system doesn’t yet know what is due: no invoices or bank statement have arrived.",
+"لم تصل مبيعات من فودكس بعد.": "No sales have arrived from Foodics yet.",
+"لم تُرفع فاتورة بعد، فلا يعرف النظام لمن تدين.": "No invoice uploaded yet, so the system doesn’t know whom you owe.",
+"كل فاتورة مسجّلة يغطيها ما دفعته.": "Every recorded invoice is covered by what you paid.",
+"لم تصل فواتير ولا كشف بنك بعد.": "No invoices or bank statement yet."
 }

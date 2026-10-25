@@ -14,6 +14,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, EMPLOYEE, TRANSFER } from "@/lib/arabic";
 import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { loadStartState } from "@/services/start.service";
 import { loadBankPayees, loadEmployees, loadPayrollMonth, loadPayrollMonths, loadOpenTransfers, transfersSince, type PayrollRow, type TransferView } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
@@ -50,11 +51,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const current = currentMonthRiyadh();
   const month = q.month && MONTH_RE.test(q.month) ? q.month : current;
 
-  const [sheet, open, payees, staff] = await Promise.all([
+  const [sheet, open, payees, staff, start] = await Promise.all([
     loadPayrollMonth(month),
     loadOpenTransfers(transfersSince(month)),
     loadBankPayees(),
     loadEmployees(),
+    loadStartState(),
   ]);
   const totals = payrollTotals(sheet.rows.map((r) => r.slip));
   /* الأشهرُ من أوّل مباشرةٍ مسجّلة — لا من تاريخٍ مكتوب في الشيفرة */
@@ -211,7 +213,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           </Callout>
         )}
         {salaryOpen.length === 0 ? (
-          <EmptyState compact icon={Link2} title="كل حوالات الرواتب موزّعة." hint="حين تصل حوالة رواتب جديدة في الكشف تظهر هنا." />
+          start.has.bank
+            ? <EmptyState compact icon={Link2} title="كل حوالات الرواتب موزّعة." hint="حين تصل حوالة رواتب جديدة في الكشف تظهر هنا." />
+            /* «كلُّها موزّعة» عن كشفٍ لم يُستورد صدقٌ على المجموعة الفارغة */
+            : <EmptyState compact icon={Link2} title="لم يُستورد كشف بنك بعد." hint="منه تُقرأ حوالات الرواتب لتوزَّع على أصحابها." action={<LinkButton href="/bank#import" size="sm">استورد الكشف</LinkButton>} />
         ) : (
           <ul className="space-y-2">
             {salaryOpen.map((o) => <TransferItem key={o.id} o={o} canEdit={canEdit} people={people} owed={owed} />)}

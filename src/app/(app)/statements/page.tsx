@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { asc, eq, sql } from "drizzle-orm";
 import { MailQuestion, MessageCircle } from "lucide-react";
 import { db } from "@/db";
-import { suppliers } from "@/db/schema";
+import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -49,7 +49,7 @@ export default async function StatementsPage({
   /* الشهر نفسه الذي يعدّ به التنبيه: المنقضي بتوقيت الرياض */
   const missingMonth = previousMonth(currentMonthRiyadh());
 
-  const [rows, missing, supplierRows] = await Promise.all([
+  const [rows, missing, supplierRows, [monthInvoices]] = await Promise.all([
     db.execute<{
       id: string; supplier_name: string | null; supplier_slug: string | null; ps: string; pe: string;
       closing: number | null; file_name: string | null; lines: number; matched: number; missing: number; missing_minor: number;
@@ -79,7 +79,10 @@ export default async function StatementsPage({
       .from(suppliers)
       .where(eq(suppliers.isActive, true))
       .orderBy(asc(suppliers.nameAr)),
+    /* «وصلت كل الكشوف» عن شهرٍ بلا فاتورة صدقٌ منطقيّ وكذبٌ عمليّ — يُسأل أوّلاً أفيه فواتير */
+    db.select({ n: sql<number>`count(*)::int` }).from(invoices).where(eq(invoices.periodMonth, missingMonth)),
   ]);
+  const monthHasInvoices = Number(monthInvoices?.n ?? 0) > 0;
 
   const focusSupplier = params.supplier ? supplierRows.find((r) => r.slug === params.supplier) ?? null : null;
   const focusMissing = params.missing === "1";
@@ -92,13 +95,17 @@ export default async function StatementsPage({
     >
       <header className="border-b border-line-soft px-4 py-3.5 sm:px-5">
         <h2 id="missing-title" className="flex items-center gap-2 text-sm font-bold">
-          <MailQuestion className={`h-4 w-4 ${missing.length > 0 ? "text-warn" : "text-ok"}`} strokeWidth={2} aria-hidden />
-          {missing.length === 0
+          <MailQuestion className={`h-4 w-4 ${missing.length > 0 ? "text-warn" : monthHasInvoices ? "text-ok" : "text-muted"}`} strokeWidth={2} aria-hidden />
+          {missing.length === 0 && !monthHasInvoices
+            ? `لا فواتير في ${formatMonth(missingMonth)} تُطلب لها كشوف`
+            : missing.length === 0
             ? `وصلت كل كشوف ${formatMonth(missingMonth)}`
             : `لم يصل كشف ${formatMonth(missingMonth)} من ${countNoun(missing.length, SUPPLIER)}`}
         </h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          {missing.length === 0
+          {missing.length === 0 && !monthHasInvoices
+            ? "يُطلب كشف المورّد عن شهر فيه فواتير منه. ارفع فواتير الشهر أولاً."
+            : missing.length === 0
             ? "وصل من كل مورّد له فواتير عندنا كشفٌ ينتهي في هذا الشهر."
             : "لهؤلاء المورّدين فواتير عندنا، ولم يصل منهم كشف ينتهي في هذا الشهر. اطلب منهم الكشف، ثم ارفعه وطابقه."}
         </p>
