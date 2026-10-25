@@ -68,6 +68,7 @@
     "finance:reading-eval": "tsx --env-file=.env scripts/finance-reading-eval.ts",
     "docs:handbook": "tsx scripts/build-handbook.ts",
     "ui:crawl": "tsx scripts/ui-crawl.ts",
+    "test-env": "tsx scripts/test-env.ts",
     "backup:local": "tsx --env-file=.env scripts/backup-local.ts",
     "backup:install": "sh scripts/backup-install.sh"
   },

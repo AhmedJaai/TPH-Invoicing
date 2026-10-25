@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "tph-test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test-env", "--", "dev", "3100"],
+      "port": 3100
     }
   ]
 }
