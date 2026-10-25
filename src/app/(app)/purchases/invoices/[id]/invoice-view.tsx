@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { MarkInvoicePaid } from "@/components/mark-invoice-paid";
 import { InvoiceFix } from "@/components/invoice-fix";
+import { InvoiceLineQty } from "@/components/invoice-line-qty";
 import { DocumentReread } from "@/components/document-reread";
 import { DocumentPaper } from "@/components/document-paper";
 import { RejectDocument } from "@/components/reject-document";
@@ -156,7 +157,8 @@ export async function InvoiceView({
     «غير صالحة» وقائمةُ ما ينقص فارغة — تناقضٌ لا يُفهم. فيُقال، ويُعاد الحكمُ بضغطة.
   */
   const stale = verdict.taxStatus !== inv.taxStatus;
-  const monthClosed = stale ? (await firstClosedMonth(db, [inv.month])) !== null : false;
+  /* كمّيّةُ البند تُصحَّح في مكانها — والشهرُ المقفل يمنعها، فلا يُعرَض قلمٌ يُرفَض */
+  const monthClosed = stale || (canEdit && p.lines.length > 0) ? (await firstClosedMonth(db, [inv.month])) !== null : false;
   /* وما قاله `invoiceReasons` لا يُكرَّر بنصٍّ ثانٍ */
   const addsUp = reasons.some((r) => r.code === ISSUE.VAT_MATH_MISMATCH)
     ? null
@@ -378,7 +380,11 @@ export async function InvoiceView({
             icon={ListOrdered}
             title="البنود"
             count={p.lines.length > 0 ? p.lines.length : undefined}
-            hint={p.lines.length > 0 ? "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه." : undefined}
+            hint={p.lines.length > 0
+              ? canEdit && !monthClosed
+                ? "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه. إن قُرئت الكمية خطأً فصحّحها بالقلم بجانبها."
+                : "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه."
+              : undefined}
           >
             {p.lines.length === 0 ? (
               <EmptyState
@@ -399,7 +405,10 @@ export async function InvoiceView({
                     primary: true,
                     cell: (l) => <span className="font-bold" dir="auto">{l.description}</span>,
                   },
-                  { key: "qty", header: "الكمية", numeric: true, cell: (l) => <span className="nums">{trimQty(l.qty)}</span> },
+                  {
+                    key: "qty", header: "الكمية", numeric: true,
+                    cell: (l) => <InvoiceLineQty lineId={l.id} qty={l.qty} lineTotalMinor={l.lineTotalMinor} canEdit={canEdit && !monthClosed} />,
+                  },
                   { key: "unit", header: "سعر الوحدة", numeric: true, cell: (l) => <Money minor={l.unitPriceMinor} /> },
                   { key: "total", header: "المجموع", numeric: true, cell: (l) => <span className="font-bold"><Money minor={l.lineTotalMinor} /></span> },
                   {
@@ -639,10 +648,6 @@ const STATEMENT_MATCH_LABEL: Record<string, string> = {
 };
 
 /** «١٫٠٠٠» كمّيّةٌ مخزَّنة بثلاث خانات — تُعرَض «١» كما كُتبت على الورقة. */
-function trimQty(qty: string | null): string {
-  if (qty === null) return "غير مقروءة";
-  return qty.includes(".") ? qty.replace(/\.?0+$/, "") : qty;
-}
 
 function Notice({
   tone, icon: Icon, href, cta, children, extra,

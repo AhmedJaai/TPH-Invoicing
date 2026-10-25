@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import { paymentAllocations, users } from "@/db/schema";
 import { allocate, createPayment } from "./payment.service";
-import { correctInvoice } from "./invoice-correction.service";
+import { correctInvoice, correctInvoiceLine, InvoiceCorrectionRefused } from "./invoice-correction.service";
 import { replaceLines } from "./invoice.service";
 import type { Tx } from "./types";
 
@@ -48,5 +48,51 @@ describe("تصحيح مورّد الفاتورة وتاريخها", () => {
       await correctInvoice(tx, { invoiceId: inv, invoiceDate: "2026-08-28" }, await someone(tx));
       const [r] = (await tx.execute<{ m: string }>(sql`select period_month as m from invoices where id = ${inv}`)).rows;
       expect(r.m).toBe("2026-08");
+    }));
+});
+
+describe("تصحيح كمية البند", () => {
+  const lineOf = async (tx: Tx, inv: string) => (await tx.execute<{ id: string; qty: string | null; unit: number; total: number; basis: string }>(sql`
+    select id, qty::text as qty, unit_price_minor as unit, line_total_minor as total, pricing_basis as basis from invoice_lines where invoice_id = ${inv}
+  `)).rows[0];
+
+  it("خمسة كيلو قُرئت واحداً: الكمية تُصحَّح وسعر الوحدة يُشتقّ والمجموع لا يتغيّر", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 833_75, "2026-10-19");
+      await replaceLines(tx, { invoiceId: inv, supplierId: s, invoiceDate: day("2026-10-19"), subtotalMinor: 725_00, lines: [
+        { description: "بن برازيلي تشوكليت", quantity: "1", unitPrice: "725", lineTotal: "725" },
+      ] });
+      const l = await lineOf(tx, inv);
+      const actor = await someone(tx);
+
+      const out = await correctInvoiceLine(tx, { lineId: l.id, quantity: "٥" }, actor);
+      expect(out.changed).toBe(true);
+      expect(await lineOf(tx, inv)).toMatchObject({ qty: "5.000", unit: 145_00, total: 725_00, basis: "CONSISTENT" });
+
+      /* مرّةً ثانية لا تغيّر شيئاً ولا تكتب قيداً ثانياً */
+      expect((await correctInvoiceLine(tx, { lineId: l.id, quantity: "5" }, actor)).changed).toBe(false);
+      const [{ n }] = (await tx.execute<{ n: number }>(sql`
+        select count(*)::int as n from audit_logs where action = 'INVOICE_LINE_CORRECTED' and entity_id = ${inv}
+      `)).rows;
+      expect(n).toBe(1);
+
+      /* الفراغُ «غير معروفة» لا واحد */
+      await correctInvoiceLine(tx, { lineId: l.id, quantity: "" }, actor);
+      expect(await lineOf(tx, inv)).toMatchObject({ qty: null, total: 725_00, basis: "QTY_UNREAD" });
+    }));
+
+  it("كمية لا تُفهم أو صفر تُرفض", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 115_00, "2026-10-19");
+      await replaceLines(tx, { invoiceId: inv, supplierId: s, invoiceDate: day("2026-10-19"), subtotalMinor: 100_00, lines: [
+        { description: "حليب", quantity: "10", unitPrice: "10", lineTotal: "100" },
+      ] });
+      const l = await lineOf(tx, inv);
+      const actor = await someone(tx);
+      await expect(correctInvoiceLine(tx, { lineId: l.id, quantity: "0" }, actor)).rejects.toThrow(InvoiceCorrectionRefused);
+      await expect(correctInvoiceLine(tx, { lineId: l.id, quantity: "خمسة" }, actor)).rejects.toThrow(InvoiceCorrectionRefused);
+      expect(await lineOf(tx, inv)).toMatchObject({ qty: "10.000", unit: 10_00 });
     }));
 });

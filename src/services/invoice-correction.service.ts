@@ -28,6 +28,7 @@ import { applySupplierCredit } from "./supplier-credit.service";
 import { reviewConfirmed } from "@/lib/confirm";
 import type { Tx } from "./types";
 import { isoDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { parseLineQuantity, resolveLinePricing } from "@/lib/line-pricing";
 
 export class InvoiceCorrectionRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -237,4 +238,81 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
   }, tx);
 
   return { review, releasedMinor: released.reduce((s, r) => s + r.amountMinor, 0), supplierName: supplier?.nameAr ?? null };
+}
+
+/* ───────────────────────── كمّيّةُ البند ───────────────────────── */
+
+/**
+ * تصحيحُ كمّيّة بندٍ قرأها النموذج خطأً — كوهي روستري (١٩ أكتوبر ٢٠٢٦): «٥ كيلو»
+ * قُرئت «١ × ٧٢٥»، فحسب «المشترى والمباع» كيلو واحداً وقال تتبّعُ الأسعار إنّ الكيلو ٧٢٥.
+ *
+ * **مجموعُ البند لا يتغيّر** — هو ما دُفع، وعليه صافي الفاتورة وضريبتُها وسدادُها.
+ * والكمّيّةُ تأتي نصّاً (`parseLineQuantity`)، وسعرُ الوحدة يُشتقّ هنا لا من المتصفّح:
+ * المجموعُ ÷ الكمّيّة، أو سعرُ القائمة المحفوظ إن بقي يفسّر خصماً بالكمّيّة الجديدة.
+ * والفراغُ «غير معروفة» لا واحد.
+ */
+export async function correctInvoiceLine(
+  tx: Tx,
+  input: { lineId: string; quantity: string | null },
+  actorId: string,
+) {
+  const [line] = await tx
+    .select({
+      id: invoiceLines.id, invoiceId: invoiceLines.invoiceId, description: invoiceLines.description,
+      qty: invoiceLines.qty, unitPriceMinor: invoiceLines.unitPriceMinor, lineTotalMinor: invoiceLines.lineTotalMinor,
+      listUnitPriceMinor: invoiceLines.listUnitPriceMinor, discountMinor: invoiceLines.discountMinor,
+      pricingBasis: invoiceLines.pricingBasis, periodMonth: invoices.periodMonth,
+    })
+    .from(invoiceLines)
+    .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
+    .where(eq(invoiceLines.id, input.lineId))
+    .for("update", { of: invoiceLines })
+    .limit(1);
+  if (!line) throw new InvoiceCorrectionRefused("لا بند بهذا المعرّف. حدّث الصفحة", 404);
+
+  const typed = input.quantity?.trim() ?? "";
+  const qtyText = typed === "" ? null : parseLineQuantity(typed);
+  if (typed !== "" && qtyText === null) {
+    throw new InvoiceCorrectionRefused("الكمية غير مفهومة. اكتبها رقماً أكبر من صفر، مثل 5 أو 2.5", 400);
+  }
+  await assertMonthsOpen(tx, [line.periodMonth]);
+
+  const total = line.lineTotalMinor;
+  const next = qtyText === null
+    /* بلا كمّيّةٍ لا يُعرف سعرُ الوحدة — فلا يدخل تتبّعَ الأسعار (كما في `replaceLines`) */
+    ? { qty: null, unitPriceMinor: total, listUnitPriceMinor: null, discountMinor: 0, pricingBasis: "QTY_UNREAD" }
+    : (() => {
+      const quantity = Number(qtyText);
+      const derived = Math.round(total / quantity);
+      /* سعرُ القائمة يبقى إن فسّر خصماً بالكمّيّة الجديدة؛ وإلّا فالسعرُ ما دُفع */
+      const withList = line.listUnitPriceMinor !== null
+        ? resolveLinePricing({ quantity, unitPriceMinor: line.listUnitPriceMinor, lineTotalMinor: total })
+        : null;
+      const p = withList && (withList.basis === "CONSISTENT" || withList.basis === "DISCOUNTED") && withList.netTotalMinor === total
+        ? withList
+        : resolveLinePricing({ quantity, unitPriceMinor: derived, lineTotalMinor: total })!;
+      return {
+        qty: qtyText, unitPriceMinor: p.effectiveUnitMinor, listUnitPriceMinor: p.listUnitMinor,
+        discountMinor: p.discountMinor, pricingBasis: p.basis,
+      };
+    })();
+
+  const before = {
+    qty: line.qty, unitPriceMinor: line.unitPriceMinor, listUnitPriceMinor: line.listUnitPriceMinor,
+    discountMinor: line.discountMinor, pricingBasis: line.pricingBasis,
+  };
+  const unchanged = (before.qty === null ? null : Number(before.qty)) === (next.qty === null ? null : Number(next.qty))
+    && before.unitPriceMinor === next.unitPriceMinor;
+  if (unchanged) return { changed: false as const, ...next, lineTotalMinor: total };
+
+  await tx.update(invoiceLines).set(next).where(eq(invoiceLines.id, line.id));
+  await recordAudit({
+    actorId,
+    action: "INVOICE_LINE_CORRECTED",
+    entityType: "invoice",
+    entityId: line.invoiceId,
+    before: { بند: line.description, lineId: line.id, ...before, lineTotalMinor: total },
+    after: { بند: line.description, lineId: line.id, ...next, lineTotalMinor: total },
+  }, tx);
+  return { changed: true as const, ...next, lineTotalMinor: total };
 }
