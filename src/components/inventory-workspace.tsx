@@ -44,6 +44,7 @@ export function InventoryWorkspace({
   canCount,
   canReopen,
   showAmounts,
+  canRecipes = false,
   scopeInherited,
   receipts,
   duplicates,
@@ -60,6 +61,8 @@ export function InventoryWorkspace({
   report: EngineReport;
   canCount: boolean;
   canReopen: boolean;
+  /** يحرّر الوصفات — وإلّا لا يُعرض رابطُها فعلاً لفجوة */
+  canRecipes?: boolean;
   /**
    * أيرى هذا الدورُ المبالغ؟
    *
@@ -400,6 +403,7 @@ export function InventoryWorkspace({
         report={report}
         inScopeCount={inScopeCount}
         showAmounts={showAmounts}
+        canRecipes={canRecipes}
         canCount={canCount}
         locked={locked}
       />
@@ -428,6 +432,7 @@ export function InventoryWorkspace({
               <PurchaseLinkPanel rows={purchaseLinks} options={stockOptions} canEdit={canCount} />
             )}
             canEdit={canCount}
+            canRecipes={canRecipes}
             locked={locked}
             scopeInherited={scopeInherited}
             scopeExplicit={header.scopeSource === "EXPLICIT"}
@@ -454,12 +459,13 @@ const READINESS_SKIN: Record<Readiness, { tone: Tone; icon: LucideIcon; stripe: 
  * الجاهزيّةُ تُقرأ قبل أيّ رقم — حكمٌ، وجملةٌ، وأربعةُ مقاييس، وفجواتٌ بأفعالها.
  */
 function CoverageBanner({
-  header, report, inScopeCount, showAmounts, canCount, locked,
+  header, report, inScopeCount, showAmounts, canRecipes, canCount, locked,
 }: {
   header: CountHeader;
   report: EngineReport;
   inScopeCount: number;
   showAmounts: boolean;
+  canRecipes: boolean;
   canCount: boolean;
   locked: boolean;
 }) {
@@ -526,7 +532,7 @@ function CoverageBanner({
       {coverage.gaps.length > 0 && (
         <ul className="divide-y divide-line-soft border-t border-line bg-sunken/40">
           {coverage.gaps.map((g, i) => {
-            const fix = gapAction(g, locked);
+            const fix = gapAction(g, locked, { amounts: showAmounts, recipes: canRecipes });
             return (
               <li key={i} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
                 <div className="min-w-0 flex-1 text-xs leading-relaxed">
@@ -569,8 +575,19 @@ function CoverageBanner({
   );
 }
 
-/** فعلُ كلّ فجوة — العددُ الذي يُنذر يحمل ما يُصلحه. */
-function gapAction(g: CoverageGap, locked: boolean): { href: string; label: string } | null {
+/**
+ * فعلُ كلّ فجوة — العددُ الذي يُنذر يحمل ما يُصلحه. ولا رابطَ لدورٍ تفتح له وجهتُه «خارج صلاحيتك»
+ * (زاحفُ مدير المشتريات: الوصفاتُ والأصنافُ والأسعارُ والفواتيرُ ليست له).
+ */
+function gapAction(g: CoverageGap, locked: boolean, can: { amounts: boolean; recipes: boolean }): { href: string; label: string } | null {
+  const a = gapActionFor(g, locked);
+  if (!a) return null;
+  if (a.href.startsWith("/inventory/recipes") && !can.recipes) return null;
+  if ((a.href.startsWith("/analysis") || a.href.startsWith("/purchases/")) && !can.amounts) return null;
+  return a;
+}
+
+function gapActionFor(g: CoverageGap, locked: boolean): { href: string; label: string } | null {
   switch (g.reason) {
     case "UNMAPPED_POS_PRODUCT":
       return { href: "/inventory/mapping", label: "اربطها" };
@@ -586,7 +603,7 @@ function gapAction(g: CoverageGap, locked: boolean): { href: string; label: stri
     case "UNIT_FAMILY_MISMATCH":
       /* المقفَلُ لا يُعاد حسابُه — فالربطُ له يخدم الجردَ القادم من صفحة الأصناف */
       return locked
-        ? { href: "/purchases/products", label: "الأصناف والعبوات" }
+        ? { href: "/analysis?view=mapping", label: "الأصناف والعبوات" }
         : { href: "?step=flow", label: "اربطها في الخطوة الثانية" };
     case "MISSING_QUANTITY":
       return { href: "/purchases/invoices", label: "الفواتير" };

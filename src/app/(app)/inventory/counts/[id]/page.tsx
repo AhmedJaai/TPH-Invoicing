@@ -65,6 +65,7 @@ export default async function CountReportPage({
         canCount={can(user.role, "inventory:count")}
         canReopen={can(user.role, "inventory:reopen")}
         showAmounts={can(user.role, "amounts:view")}
+        canRecipes={can(user.role, "recipe:edit")}
         scopeInherited={scope.inherited}
         {...inputs}
         stale={stale}

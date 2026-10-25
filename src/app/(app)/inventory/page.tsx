@@ -115,6 +115,7 @@ export default async function InventoryPage({
             canCount={can(user.role, "inventory:count")}
             canReopen={can(user.role, "inventory:reopen")}
             showAmounts={showAmounts}
+            canRecipes={can(user.role, "recipe:edit")}
             scopeInherited={scope.inherited}
             {...inputs}
             today={todayInRiyadh()}

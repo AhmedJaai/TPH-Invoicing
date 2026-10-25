@@ -70,6 +70,7 @@ export function FlowStep({
   suppliers,
   purchaseLinks,
   canEdit,
+  canRecipes = false,
 }: {
   countId: string;
   branchId: string | null;
@@ -83,6 +84,7 @@ export function FlowStep({
   suppliers: { id: string; name: string }[];
   purchaseLinks: ReactNode;
   canEdit: boolean;
+  canRecipes?: boolean;
 }) {
   const [editor, setEditor] = useState<Editor>(null);
   const [query, setQuery] = useState("");
@@ -194,7 +196,7 @@ export function FlowStep({
                   label="الاستهلاك المتوقع"
                   value={row.consumptionText}
                   source={row.consumptionText === null ? "لا توجد وصفة تستخدمه" : "من المبيعات حسب وصفاتها"}
-                  action={row.consumptionText === null ? (
+                  action={row.consumptionText === null && canRecipes ? (
                     /* المجهولُ هنا وصفةٌ غائبة — وموضعُ كتابتها الوصفات، بلا بحثٍ عنه */
                     <Link href="/inventory/recipes" className={buttonClass("secondary", "sm")}>
                       اكتب وصفة تستخدمه

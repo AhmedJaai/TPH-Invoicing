@@ -104,6 +104,8 @@ export default async function InventoryItemsPage({
 
   /* من لا يرى المبالغ لا يُعرَض له عمودُ الكلفة — و`inventory:view` ليست `amounts:view` */
   const showAmounts = can(user.role, "amounts:view");
+  /* «أضف وصفة» لمن يحرّر الوصفات — كانت تفتح لمدير المشتريات «خارج صلاحيتك» */
+  const canRecipes = can(user.role, "recipe:edit");
   const canEdit = can(user.role, "recipe:edit");
 
   let columns: readonly Column<ItemRow>[] = [
@@ -121,7 +123,9 @@ export default async function InventoryItemsPage({
       cell: (r) => (
         r.inRecipes === 0
           /* الشارةُ بابٌ إلى علاجها — الوصفات، لا خبرٌ يقف */
-          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا توجد وصفة تستخدمه، أضف وصفة</Badge></Link>
+          ? canRecipes
+            ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا توجد وصفة تستخدمه، أضف وصفة</Badge></Link>
+            : <Badge tone="warn" dot>لا توجد وصفة تستخدمه</Badge>
           : <span className="text-ink-soft">{countNoun(r.inRecipes, RECIPE)}</span>
       ),
     },

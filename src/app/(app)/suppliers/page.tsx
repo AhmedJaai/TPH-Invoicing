@@ -214,10 +214,15 @@ export default async function SuppliersPage({
           <span className="text-muted">—</span>
         ) : (
           <span className="flex flex-col gap-0.5 text-[12px]">
-            <Link href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}`} className="relative whitespace-nowrap text-ink-soft hover:text-accent">
-              <T s="{0} بملف" a={[<b key="0" className="nums text-ink">{r.invoiceCount - r.statementOnlyCount}</b>]} />
-            </Link>
-            {r.statementOnlyCount > 0 && (
+            {/* قائمةُ الفواتير لمن يرى المبالغ — كانت تفتح لمدير المشتريات «خارج صلاحيتك» */}
+            {showAmounts ? (
+              <Link href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}`} className="relative whitespace-nowrap text-ink-soft hover:text-accent">
+                <T s="{0} بملف" a={[<b key="0" className="nums text-ink">{r.invoiceCount - r.statementOnlyCount}</b>]} />
+              </Link>
+            ) : (
+              <span className="whitespace-nowrap text-ink-soft"><T s="{0} بملف" a={[<b key="0" className="nums text-ink">{r.invoiceCount - r.statementOnlyCount}</b>]} /></span>
+            )}
+            {r.statementOnlyCount > 0 && showAmounts && (
               <Link
                 href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}&noFile=1`}
                 className="relative whitespace-nowrap font-bold text-warn hover:underline"

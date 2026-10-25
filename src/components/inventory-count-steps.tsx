@@ -72,6 +72,7 @@ export function InventoryCountSteps({
   suppliers,
   purchaseLinks,
   canEdit,
+  canRecipes = false,
   locked,
   scopeInherited,
   scopeExplicit,
@@ -93,6 +94,8 @@ export function InventoryCountSteps({
   /** ربطُ بنود فواتير الأسبوع بأصناف الجرد — يُرسَم في الخادم ويُمرَّر. */
   purchaseLinks: ReactNode;
   canEdit: boolean;
+  /** يحرّر الوصفات — وإلّا «اكتب وصفة» لا يُعرض رابطاً */
+  canRecipes?: boolean;
   locked: boolean;
   /** أمورَّثٌ هذا النطاق من الجرد السابق؟ — يُقال، فلا يُظنّ أنّه اختيارُ اليوم. */
   scopeInherited: boolean;
@@ -203,6 +206,7 @@ export function InventoryCountSteps({
             suppliers={suppliers}
             purchaseLinks={purchaseLinks}
             canEdit={canEdit && !locked}
+            canRecipes={canRecipes}
           />
         </div>
 
