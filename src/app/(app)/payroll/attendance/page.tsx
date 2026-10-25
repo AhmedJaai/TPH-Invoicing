@@ -122,8 +122,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         <LinkTabs label="اليوم" items={days.map((d) => ({ href: `/payroll/attendance?day=${d}`, label: d === today ? "اليوم" : `${WEEKDAY_LABEL[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${Number(d.slice(8))}`, active: d === day }))} />
         <form method="get" className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
           <label htmlFor="att-day">يوم آخر</label>
-          <input id="att-day" type="date" name="day" dir="ltr" max={today} defaultValue={day} className="min-h-10 rounded-lg border border-line-input bg-raised px-2" />
-          <button type="submit" className="min-h-10 rounded-lg border border-line px-3 font-bold hover:bg-hover">اعرض</button>
+          <input id="att-day" type="date" name="day" dir="ltr" max={today} defaultValue={day} className="min-h-11 sm:min-h-10 rounded-lg border border-line-input bg-raised px-2" />
+          <button type="submit" className="min-h-11 sm:min-h-10 rounded-lg border border-line px-3 font-bold hover:bg-hover">اعرض</button>
         </form>
       </div>
 

@@ -320,7 +320,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-soft">
             <span>
               <T s="عدّلتَ الدفعة:{0}{1}{2}. اختيارك محفوظ على هذا الجهاز." a={[skippedSuppliers > 0 && <Fragment key="0"> <T s=" استثنيتَ {0}" a={[countNoun(skippedSuppliers, SUPPLIER)]} /></Fragment>, skippedInvoices > 0 && <Fragment key="1">{skippedSuppliers > 0 ? " و" : " استثنيتَ "}{countNoun(skippedInvoices, INVOICE)}</Fragment>, partialCount > 0 && <Fragment key="2"><T s="{0}مبلغ جزئي لـ{1}" a={[skippedSuppliers + skippedInvoices > 0 ? " · " : " ", countNoun(partialCount, SUPPLIER)]} /></Fragment>]} /></span>
-            <button type="button" onClick={() => change(EMPTY_SELECTION)} className="inline-flex min-h-8 items-center gap-1 font-bold text-accent hover:underline">
+            <button type="button" onClick={() => change(EMPTY_SELECTION)} className="inline-flex min-h-11 sm:min-h-8 items-center gap-1 font-bold text-accent hover:underline">
               <T s="{0}أعد الكل بمبالغها الكاملة" a={[<RotateCcw key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />]} /></button>
           </p>
         )}
@@ -332,7 +332,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           <p role="status" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-ink-soft">
             <span><T s="يسجّل {0} من {1}: {2}" a={[<span key="0" className="nums">{progress.done + 1}</span>, <span key="1" className="nums">{progress.total}</span>, progress.current]} /></span>
             {progress.total - progress.done > 1 && (
-              <button type="button" onClick={() => { stop.current = true; }} className="min-h-8 font-bold text-accent hover:underline">
+              <button type="button" onClick={() => { stop.current = true; }} className="min-h-11 sm:min-h-8 font-bold text-accent hover:underline">
                 توقف بعد المورّد الحالي
               </button>
             )}
@@ -385,11 +385,11 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   {/* الحسابُ والمبلغُ يُنسخان بضغطة إلى تطبيق البنك — بصيغته، بلا فواصل */}
                   {s.account && (
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted">
-                      <CopyValue value={s.account} label="الحساب" className="min-h-8">
+                      <CopyValue value={s.account} label="الحساب" className="min-h-11 sm:min-h-8">
                         <bdi dir="ltr" className="font-mono">{s.account}</bdi>
                       </CopyValue>
                       {plan.on && (
-                        <CopyValue value={formatRiyals(plan.payingMinor)} label="المبلغ" className="min-h-8">
+                        <CopyValue value={formatRiyals(plan.payingMinor)} label="المبلغ" className="min-h-11 sm:min-h-8">
                           انسخ المبلغ
                         </CopyValue>
                       )}
@@ -464,7 +464,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
                             <span className="min-w-0 flex-1">
                               <T s="{0} {1}. سببك: «{2}»" a={[<b key="0" className="text-warn">موقوفة وأضفتها بقرارك:</b>, i.owner.hold, i.owner.note]} /></span>
-                            <button type="button" disabled={busy} onClick={() => restoreHold(i)} className="min-h-8 shrink-0 font-bold text-accent hover:underline">
+                            <button type="button" disabled={busy} onClick={() => restoreHold(i)} className="min-h-11 sm:min-h-8 shrink-0 font-bold text-accent hover:underline">
                               أعدها إلى الموقوفة
                             </button>
                           </div>

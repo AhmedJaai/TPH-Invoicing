@@ -71,7 +71,7 @@ export function DocumentsBulk() {
           </button>
           {progress && (
             <span role="status" className="flex items-center gap-2 text-xs font-bold text-ink-soft">
-              <T s="يعتمد {0} من {1}{2}" a={[<span key="0" className="nums nums-count">{progress.done + 1}</span>, <span key="1" className="nums nums-count">{progress.total}</span>, <button key="2" type="button" onClick={() => { stop.current = true; }} className="min-h-8 text-accent hover:underline">توقف بعد الحالي</button>]} /></span>
+              <T s="يعتمد {0} من {1}{2}" a={[<span key="0" className="nums nums-count">{progress.done + 1}</span>, <span key="1" className="nums nums-count">{progress.total}</span>, <button key="2" type="button" onClick={() => { stop.current = true; }} className="min-h-11 sm:min-h-8 text-accent hover:underline">توقف بعد الحالي</button>]} /></span>
           )}
           {failures.length > 0 && (
             <ul className="w-full space-y-0.5 text-[11px] leading-relaxed text-danger" role="alert">

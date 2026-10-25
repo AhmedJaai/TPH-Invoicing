@@ -1029,7 +1029,7 @@ export function DataTable<T>({
                   {/* الثانويُّ (ما يُخفى في الجدول الضيّق) يُطوى هنا — لا يزاحم ما يُقرأ أوّلاً */}
                   {extra.length > 0 && (
                     <details className="mt-2">
-                      <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-[11px] font-bold text-ink-soft [&::-webkit-details-marker]:hidden">
+                      <summary className="inline-flex min-h-11 sm:min-h-9 cursor-pointer list-none items-center text-[11px] font-bold text-ink-soft [&::-webkit-details-marker]:hidden">
                         المزيد
                       </summary>
                       <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-2">

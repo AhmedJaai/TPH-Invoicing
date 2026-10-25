@@ -154,7 +154,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
               type="button"
               aria-pressed={tab === k}
               onClick={() => setTab(k)}
-              className={`min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${tab === k ? "bg-raised text-ink shadow-raised" : "text-muted hover:text-ink"}`}
+              className={`min-h-11 sm:min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${tab === k ? "bg-raised text-ink shadow-raised" : "text-muted hover:text-ink"}`}
             >
               {label}
               {k === "new" && unread > 0 && <span className="nums nums-count ms-1.5 rounded-full bg-danger px-1.5 text-[10px] text-raised">{unread}</span>}

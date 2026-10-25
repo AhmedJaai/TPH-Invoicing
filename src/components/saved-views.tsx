@@ -95,7 +95,7 @@ export function SavedViews({ scope, suggestedName }: {
       {views.map((v) => (
         <span
           key={v.href}
-          className={`inline-flex min-h-8 items-center rounded-full border text-[12px] ${v.href === here ? "border-accent-line bg-accent-soft text-accent" : "border-line bg-raised text-ink-soft"}`}
+          className={`inline-flex min-h-11 sm:min-h-8 items-center rounded-full border text-[12px] ${v.href === here ? "border-accent-line bg-accent-soft text-accent" : "border-line bg-raised text-ink-soft"}`}
         >
           <Link href={v.href} scroll={false} aria-current={v.href === here ? "true" : undefined} className="py-1 ps-3 pe-1 font-bold hover:text-accent">
             {v.name}
@@ -124,7 +124,7 @@ export function SavedViews({ scope, suggestedName }: {
             placeholder={suggestedName}
             aria-label="اسم العرض"
             dir="auto"
-            className="min-h-9 w-44 rounded-lg border border-line-input bg-raised px-2.5 text-[13px]"
+            className="min-h-11 sm:min-h-9 w-44 rounded-lg border border-line-input bg-raised px-2.5 text-[13px]"
           />
           <button type="submit" className={buttonClass("primary", "sm")}>احفظ</button>
           <button type="button" onClick={() => setNaming(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>

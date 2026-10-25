@@ -798,7 +798,7 @@ function Pages({
               role="radio"
               aria-checked={mode === m}
               onClick={() => onMode(m)}
-              className={`inline-flex min-h-9 items-center gap-1 rounded-md px-3 font-bold ${mode === m ? "bg-accent text-accent-ink" : "text-ink-soft"}`}
+              className={`inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md px-3 font-bold ${mode === m ? "bg-accent text-accent-ink" : "text-ink-soft"}`}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden /> {text}
             </button>

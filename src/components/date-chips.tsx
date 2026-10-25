@@ -34,7 +34,7 @@ export function DateChips({
           disabled={disabled}
           aria-pressed={value === c.value}
           onClick={() => onPick(c.value)}
-          className={`min-h-8 rounded-full border px-2.5 text-[11px] font-bold transition-colors disabled:opacity-50 ${
+          className={`min-h-11 sm:min-h-8 rounded-full border px-2.5 text-[11px] font-bold transition-colors disabled:opacity-50 ${
             value === c.value ? "border-accent-line bg-accent-soft text-accent" : "border-line bg-raised text-ink-soft hover:bg-hover"
           }`}
         >

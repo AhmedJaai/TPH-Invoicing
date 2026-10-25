@@ -1908,7 +1908,7 @@ function ReviewCard({
 
           {r.proposedFileName && (
             <details className="group rounded-xl border border-line bg-sunken/40 px-3.5 py-2.5">
-              <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold text-ink-soft">
+              <summary className="flex min-h-11 sm:min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold text-ink-soft">
                 <T s="اسم الملف ومكانه في الدرايف{0}" a={[<span key="0" className="text-[11px] font-normal text-muted group-open:hidden">اعرضه</span>]} /></summary>
               <label htmlFor={fid("file")} className="mt-2 block text-[11px] text-muted">الاسم الجديد</label>
               <input

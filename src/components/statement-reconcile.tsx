@@ -362,7 +362,7 @@ function ResultView({ result }: { result: Result }) {
               </li>
             ))}
           </ul>, !allUnread && result.unreadLines.length > 12 && (
-            <button key="1" type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-8 text-[11px] font-bold text-accent hover:underline">
+            <button key="1" type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-11 sm:min-h-8 text-[11px] font-bold text-accent hover:underline">
               <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{result.unreadLines.length - 12}</span>]} /></button>
           )]} /></Callout>
       )}

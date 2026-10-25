@@ -50,7 +50,7 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="relative z-10 mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+        className="relative z-10 mt-1 inline-flex min-h-11 sm:min-h-8 items-center gap-1 text-[11px] font-medium text-accent hover:underline"
       >
         <Merge className="h-3 w-3" aria-hidden />
         {options.some((o) => o.suggested) ? "يشبه صنفاً آخر. هل هما صنف واحد؟" : "هل هو نفسه صنف آخر؟"}

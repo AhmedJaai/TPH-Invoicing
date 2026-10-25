@@ -63,7 +63,7 @@ export function WhyNumber({ figure, auditHref }: { figure: "owed" | "vat" | "pay
     <span onClickCapture={() => void load()} onKeyDownCapture={(e) => { if (e.key === "Enter" || e.key === " ") void load(); }}>
       <Popover
         buttonLabel="لماذا هذا الرقم؟"
-        buttonClassName="inline-flex min-h-8 items-center gap-1 rounded-md text-[11px] font-bold text-accent hover:underline"
+        buttonClassName="inline-flex min-h-11 items-center gap-1 rounded-md text-[11px] font-bold text-accent hover:underline sm:min-h-8"
         button={<><T s="{0}لماذا هذا الرقم؟" a={[<CircleHelp key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></>}
         width="22rem"
       >

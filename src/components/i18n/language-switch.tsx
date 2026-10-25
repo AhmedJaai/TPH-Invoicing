@@ -42,7 +42,7 @@ export function LanguageSwitch({ current }: { current: Locale }) {
             lang={o.lang}
             disabled={busy}
             onClick={() => choose(o.value)}
-            className={`flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors ${
+            className={`flex min-h-11 sm:min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors ${
               on ? "bg-accent text-accent-ink" : "text-ink-soft hover:bg-hover hover:text-ink"
             } disabled:opacity-60`}
           >

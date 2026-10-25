@@ -98,7 +98,7 @@ function RejectedList({ rejected, items }: { rejected: { transactionId: string; 
         })}
       </ul>
       {rejected.length > shown.length && (
-        <button type="button" onClick={() => setAll(true)} className="mt-1.5 min-h-8 text-xs font-bold text-accent hover:underline">
+        <button type="button" onClick={() => setAll(true)} className="mt-1.5 min-h-11 sm:min-h-8 text-xs font-bold text-accent hover:underline">
           <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{rejected.length - shown.length}</span>]} /></button>
       )}
     </>

@@ -104,7 +104,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
         <legend className={label}>أيام الراحة</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
           {WEEKDAY_LABEL.map((d, i) => (
-            <label key={d} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs ${v.daysOff.includes(String(i)) ? "border-accent-line bg-accent-soft/60 font-bold" : "border-line"}`}>
+            <label key={d} className={`flex min-h-11 sm:min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs ${v.daysOff.includes(String(i)) ? "border-accent-line bg-accent-soft/60 font-bold" : "border-line"}`}>
               <input type="checkbox" checked={v.daysOff.includes(String(i))} onChange={() => toggleDay(i)} />{d}
             </label>
           ))}
@@ -203,7 +203,7 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="حال اليوم">
         {([["LATE", "تأخر"], ["EARLY", "انصرف مبكراً"], ["ABSENT", "غاب دون إذن"], ["LEAVE", "إجازة أو عذر مقبول"]] as const).map(([k, l]) => (
           <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)}
-            className={`min-h-10 rounded-lg border px-3 text-xs font-bold ${kind === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-raised text-ink-soft hover:bg-hover"}`}>{l}</button>
+            className={`min-h-11 sm:min-h-10 rounded-lg border px-3 text-xs font-bold ${kind === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-raised text-ink-soft hover:bg-hover"}`}>{l}</button>
         ))}
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -212,7 +212,7 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
         <label className={label}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></label>
       </div>
       {kind === "LATE" && (
-        <label className="flex min-h-10 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft">
+        <label className="flex min-h-11 sm:min-h-10 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft">
           <input type="checkbox" checked={disrupted} onChange={(e) => setDisrupted(e.target.checked)} />
           تأخره عطّل زملاءه (مثلاً لم يُفتح المقهى أو انتظره من يسلّمه الوردية) — بند أشد في اللائحة
         </label>

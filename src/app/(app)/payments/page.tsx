@@ -225,7 +225,7 @@ export default async function PaymentsPage({
                           <li key={h.invoice.invoiceId}>
                             <Link
                               href={invoiceHref(h.invoice.invoiceId, "tax")}
-                              className="inline-flex min-h-8 items-center rounded-md bg-sunken px-2 font-mono text-[11px] text-ink-soft hover:text-accent"
+                              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md bg-sunken px-2 font-mono text-[11px] text-ink-soft hover:text-accent"
                               dir="ltr"
                             >
                               {h.invoice.invoiceNumber}

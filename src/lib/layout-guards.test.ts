@@ -132,3 +132,29 @@ describe("الزرُّ لا يُخفى بـ`hidden` على صنفه", () => {
     expect(HIDDEN_BUTTON.test('className={`${buttonClass("primary")} cursor-pointer sm:hidden`}')).toBe(false);
   });
 });
+
+/**
+ * ── هدفُ اللمس ٤٤ بكسلاً على الجوّال ──
+ *
+ * `min-h-8` (٣٢) و`min-h-9` و`min-h-10` على زرٍّ أو رابطٍ أو حقل كانت ٢٨ موضعاً بلا
+ * ارتفاعٍ للجوّال — منها «لماذا هذا الرقم؟» تحت أهمّ رقمٍ في «اليوم». فالمنخفضُ يُكتب
+ * للحاسوب بعد `sm:` ومعه `min-h-11` للّمس؛ والحاوية (`div` · `li`) لا تُلمس.
+ */
+export function shortTouchTargets(source: string): string[] {
+  return source.split("\n")
+    .map((line, i) => [line, i + 1] as const)
+    .filter(([line]) => /(^|[" `{])min-h-(8|9|10)(?=[ "`])/.test(line) && !/<div|<li |const cls/.test(line))
+    .map(([line, n]) => `${n}: ${line.trim().slice(0, 80)}`);
+}
+
+describe("هدفُ اللمس على الجوّال", () => {
+  it("يمسك الزرَّ المنخفض بلا ارتفاعِ لمس، ويترك ما بعد sm:", () => {
+    expect(shortTouchTargets(`<button className="min-h-8 px-2">x</button>`)).toHaveLength(1);
+    expect(shortTouchTargets(`<button className="min-h-11 sm:min-h-8 px-2">x</button>`)).toHaveLength(0);
+  });
+
+  it("لا زرَّ ولا رابطَ ولا حقلَ دون ٤٤ بكسلاً على الجوّال", () => {
+    const found = walk("src").flatMap((f) => shortTouchTargets(readFileSync(f, "utf8")).map((x) => `${f}:${x}`));
+    expect(found).toEqual([]);
+  });
+});

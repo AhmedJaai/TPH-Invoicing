@@ -526,7 +526,7 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
           shown === 0 ? (
             /* الفراغُ يُقال بما يُخرج منه: رأسُ جدولٍ فوق لا شيء لا يقول ما العمل */
             <>
-              <T s="لا صف يطابق «{0}» في الصفوف المعروضة. {1}" a={[<bdi key="0">{q}</bdi>, <button key="1" type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-8 font-bold text-accent hover:underline">
+              <T s="لا صف يطابق «{0}» في الصفوف المعروضة. {1}" a={[<bdi key="0">{q}</bdi>, <button key="1" type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-11 sm:min-h-8 font-bold text-accent hover:underline">
                 امسح البحث
               </button>]} /></>
           ) : <><T s="{0} من {1}" a={[<span key="0" className="nums nums-count">{shown}</span>, <span key="1" className="nums nums-count">{total}</span>]} /></>

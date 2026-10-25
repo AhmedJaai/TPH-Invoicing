@@ -565,7 +565,7 @@ export default async function DocumentsPage({
                           href={driveFileUrl(r.driveFileId)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex min-h-8 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"
+                          className="inline-flex min-h-11 sm:min-h-8 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"
                         >
                           <T s="{0}الدرايف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
                       ) : (

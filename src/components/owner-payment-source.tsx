@@ -42,7 +42,7 @@ export function OwnerPaymentSource({ paymentId, fromTransfers }: { paymentId: st
           aria-checked={value === v}
           disabled={busy}
           onClick={() => void choose(v)}
-          className={`min-h-8 rounded-full px-2.5 ${value === v ? "bg-accent font-bold text-accent-ink" : "text-ink-soft"}`}
+          className={`min-h-11 sm:min-h-8 rounded-full px-2.5 ${value === v ? "bg-accent font-bold text-accent-ink" : "text-ink-soft"}`}
         >
           {label}
         </button>
