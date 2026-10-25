@@ -14,5 +14,16 @@
 "أقفله بعد آخر يوم فيه، حين تصل فواتيره وكشفه كاملة": "Close it after its last day, once its invoices and statement are complete",
 "تاريخ فاتورة فيه بعد اليوم، فراجع تاريخها": "An invoice in it is dated after today; check its date",
 "{0} لم ينتهِ بعد": "{0} hasn't ended yet",
-"{0} لم يبدأ بعد": "{0} hasn't started yet"
+"{0} لم يبدأ بعد": "{0} hasn't started yet",
+"مبلغ مستحق عليك، وليس مالاً ضائعاً.": "An amount you owe — not money lost.",
+"مستند مسجّل غاب ملفه من الدرايف": "A recorded document's file is gone from Drive",
+"مستندان مسجّلان غاب ملفّاهما من الدرايف": "Two recorded documents' files are gone from Drive",
+"{0} مستندات مسجّلة غابت ملفاتها من الدرايف": "{0} recorded documents' files are gone from Drive",
+"{0} مستنداً مسجّلاً غابت ملفاته من الدرايف": "{0} recorded documents' files are gone from Drive",
+"فاتورة واحدة تاريخها بعد اليوم": "One invoice is dated after today",
+"{0} تاريخها بعد اليوم": "{0} dated after today",
+"الأرجح أن القراءة أخطأت اليوم والشهر. فالفاتورة تُحتسب في شهر لم يأتِ، فتغيب عن ضريبة شهرها وإقفاله، وتجعل «آخر تعامل» مع المورّد يوماً لم يأتِ.": "The reading most likely swapped the day and month. The invoice is counted in a month that hasn't come, so it's missing from its own month's VAT and close, and makes the supplier's last activity a future day.",
+"افتحها وصحّح التاريخ كما على الورقة.": "Open it and correct the date as on the paper.",
+"صحّح التاريخ": "Correct the date",
+"الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة.": "The reading most likely swapped the day and month. Correct it as on the paper."
 }

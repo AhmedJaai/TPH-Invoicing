@@ -141,6 +141,14 @@ export async function InvoiceView({
     companyConfig.vatNumber,
   );
   const reasons = verdict.reasons;
+  /*
+    التاريخُ بعد اليوم ليس ركناً ضريبيّاً — لكنّه سببُ وصوله من «يحتاج قرارك». كان اللوحُ يقول
+    «مستوفية، ولا ينقصها شيء» تحت بندٍ يقول «صحّح التاريخ»، فيُطلب ضغطتان للتصحيح.
+  */
+  const futureDated = todayInRiyadh(inv.date) > todayInRiyadh();
+  const fixReasons = futureDated
+    ? [{ code: "FUTURE_DATE", severity: "WARN" as const, what: `تاريخها ${formatDay(todayInRiyadh(inv.date))} بعد اليوم`, fix: "الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة." }, ...reasons]
+    : reasons;
   /* الركنُ الناقص باسمه — يُقال بجانب «غير صالحة» */
   const gaps = verdict.taxStatus === "VALID" ? [] : missingPillars(reasons);
   /*
@@ -499,8 +507,8 @@ export async function InvoiceView({
               <InvoiceFix
                 invoiceId={inv.id}
                 canEdit={canEdit}
-                startOpen={act === "fix"}
-                reasons={reasons}
+                startOpen={act === "fix" || futureDated}
+                reasons={fixReasons}
                 initial={{
                   invoiceNumber: inv.number,
                   sellerVat: inv.sellerVat ?? "",

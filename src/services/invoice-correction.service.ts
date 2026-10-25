@@ -27,7 +27,7 @@ import { refreshPaymentStatus } from "./payment.service";
 import { applySupplierCredit } from "./supplier-credit.service";
 import { reviewConfirmed } from "@/lib/confirm";
 import type { Tx } from "./types";
-import { isoDay } from "@/lib/riyadh-time";
+import { isoDay, todayInRiyadh } from "@/lib/riyadh-time";
 
 export class InvoiceCorrectionRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -78,6 +78,10 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
 
   const date = input.invoiceDate ? new Date(`${input.invoiceDate}T00:00:00Z`) : row.invoiceDate;
   if (Number.isNaN(date.getTime())) throw new InvoiceCorrectionRefused("تعذّر فهم التاريخ", 400);
+  /* التصحيحُ لا يكتب تاريخاً بعد اليوم — فاتورةُ نادك بـ«١٠ نوفمبر» في أكتوبر كانت تفتح شهراً قادماً للإقفال */
+  if (input.invoiceDate && input.invoiceDate > todayInRiyadh()) {
+    throw new InvoiceCorrectionRefused(`التاريخ ${input.invoiceDate} بعد اليوم. اكتب التاريخ كما على الورقة.`, 400);
+  }
   const supplierId = pick(input.supplierId, row.supplierId ?? undefined) ?? null;
   const supplierChanged = supplierId !== row.supplierId;
 

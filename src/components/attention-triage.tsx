@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon,
+  Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, CalendarX, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon,
 } from "lucide-react";
 import { Money, Prose } from "./money";
 import { SignalControls } from "./signal-controls";
@@ -89,6 +89,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "statement-ledger-gap": Scale,
   "files-wrong-month": FolderInput,
   "files-missing-in-drive": FolderX,
+  "future-invoices": CalendarX,
   "unknown-tax": FileSearch,
   "no-lines": FileWarning,
   "unrecorded-invoices": FileX,
@@ -116,7 +117,8 @@ const IMPACT: Record<ImpactKind, { icon: LucideIcon; text: string; hint: string;
   },
   OWED: {
     icon: Clock, text: "text-warn",
-    hint: "مبلغ مستحق عليك للمورّدين، وليس مالاً ضائعاً.",
+    /* «للمورّدين» كانت تُقال تحت رواتب الموظفين وإقرار الضريبة — المستحقُّ أعمّ من المورّد */
+    hint: "مبلغ مستحق عليك، وليس مالاً ضائعاً.",
     unknownHint: "مبلغ مستحق عليك لم يُعرف مقداره بعد.",
   },
   UNATTRIBUTED: {

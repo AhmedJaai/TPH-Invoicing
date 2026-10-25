@@ -43,6 +43,16 @@ export const AREA_LABEL: Record<AttentionArea, string> = {
   DATA: "جودة البيانات",
 };
 
+/** «مستند مسجّل غاب ملفه» · «مستندان مسجّلان غاب ملفّاهما» · «٤ مستندات مسجّلة غابت ملفاتها» · «١٢ مستنداً مسجّلاً غابت ملفاته» */
+export function missingFilesTitle(n: number): string {
+  if (n === 1) return "مستند مسجّل غاب ملفه من الدرايف";
+  if (n === 2) return "مستندان مسجّلان غاب ملفّاهما من الدرايف";
+  const rest = n % 100;
+  return rest >= 3 && rest <= 10
+    ? `${n} مستندات مسجّلة غابت ملفاتها من الدرايف`
+    : `${n} مستنداً مسجّلاً غابت ملفاته من الدرايف`;
+}
+
 export const SEVERITY_LABEL: Record<AttentionSeverity, string> = {
   CRITICAL: "حرج",
   HIGH: "مرتفع",
@@ -175,6 +185,8 @@ export interface AttentionFacts {
   /** مستنداتٌ مقيَّدة لم يعد ملفُّها في الدرايف — حُذف أو في السلّة (`missingFromDrive`) */
   /** `removable`: له فاتورةٌ مقيَّدة — فالفعلُ «حذف القيد» على صفحتها */
   missingFiles?: { label: string; sub: string; href: string; amountMinor?: number; removable?: boolean }[];
+  /** فواتيرُ تاريخُها بعد اليوم — قراءةٌ أخطأت اليوم والشهر */
+  futureInvoices?: AttentionEvidence[];
 
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
@@ -997,7 +1009,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     out.push({
       id: "payroll-open",
       area: "DATA",
-      severity: "OPPORTUNITY",
+      /* عملٌ ناقص لا فرصة: بلا نسبة الحوالة لا يعرف المسيّرُ ما بقي لكلّ موظف */
+      severity: "MEDIUM",
       title: pay.unlinkedSalary.count > 0
         ? `${countNoun(pay.unlinkedSalary.count, TRANSFER)} رواتب في الكشف لم تُنسب لموظف`
         : `${pay.missingRates.length === 1 ? pay.missingRates[0] : `${pay.missingRates.length} موظفين`} بلا راتب مكتوب`,
@@ -1248,6 +1261,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     });
   }
 
+  const futureInvoices = f.futureInvoices ?? [];
+  if (futureInvoices.length > 0) {
+    out.push({
+      id: "future-invoices",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: futureInvoices.length === 1 ? "فاتورة واحدة تاريخها بعد اليوم" : `${countNoun(futureInvoices.length, INVOICE)} تاريخها بعد اليوم`,
+      detail: "الأرجح أن القراءة أخطأت اليوم والشهر. فالفاتورة تُحتسب في شهر لم يأتِ، فتغيب عن ضريبة شهرها وإقفاله، وتجعل «آخر تعامل» مع المورّد يوماً لم يأتِ.",
+      action: "افتحها وصحّح التاريخ كما على الورقة.",
+      actionLabel: "صحّح التاريخ",
+      href: futureInvoices[0].href ?? "/purchases/invoices",
+      count: futureInvoices.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: futureInvoices.reduce((n, e) => n + (e.amountMinor ?? 0), 0) },
+      evidence: futureInvoices,
+    });
+  }
+
   const missingFiles = f.missingFiles ?? [];
   if (missingFiles.length > 0) {
     const firstEntry = missingFiles.find((m) => m.removable);
@@ -1255,7 +1285,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "files-missing-in-drive",
       area: "DATA",
       severity: "MEDIUM",
-      title: `${countNoun(missingFiles.length, DOCUMENT)} مسجّلة ولم يعد ملفها في الدرايف`,
+      title: missingFilesTitle(missingFiles.length),
       detail: "الفاتورة مسجّلة لكن ملفها غاب. فإن حُذف لأنه مكرّر أو استُبدل بغيره، بقي قيده بسداده فيبدو أن لك رصيداً عند المورّد. وإن حُذف خطأً فالفاتورة بلا ملفها لا تثبت حقك في خصم ضريبتها.",
       action: firstEntry
         ? "إن حذفته عمداً فاحذف قيده من صفحة الفاتورة، ويعود سداده رصيداً أو ينتقل إلى الفاتورة الأخرى. وإن حُذف خطأً فاستعده من سلة الدرايف (تُفرَّغ بعد ثلاثين يوماً)."

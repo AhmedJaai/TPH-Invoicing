@@ -583,6 +583,22 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         ...(Number(r.allocated ?? 0) > 0 ? { amountMinor: Number(r.allocated) } : {}),
         removable: Boolean(r.invoice_id),
       })),
+    /*
+      فاتورةٌ تاريخُها بعد اليوم — قراءةٌ أخطأت اليومَ والشهر (نادك «١٠ نوفمبر» في ٢٥ أكتوبر).
+      كانت لا يراها شيء: تفتح شهراً قادماً للإقفال، وتقول «آخر تعامل» بيومٍ لم يأتِ.
+    */
+    futureInvoices: (await db.execute<{ id: string; invoice_number: string; total_minor: number; name_ar: string; day: string }>(sql`
+      select v.id, v.invoice_number, v.total_minor, s.name_ar,
+             to_char((v.invoice_date at time zone 'Asia/Riyadh')::date, 'YYYY-MM-DD') as day
+        from invoices v join suppliers s on s.id = v.supplier_id
+       where (v.invoice_date at time zone 'Asia/Riyadh')::date > ${todayInRiyadh()}::date
+       order by v.invoice_date desc limit 20`)).rows
+      .map((r) => ({
+        label: `${r.name_ar} · ${r.invoice_number}`,
+        sub: `بتاريخ ${formatDay(r.day)}`,
+        href: `${invoiceHref(r.id)}?act=fix#fix`,
+        amountMinor: Number(r.total_minor),
+      })),
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,

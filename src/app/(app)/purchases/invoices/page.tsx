@@ -78,9 +78,12 @@ export default async function InvoicesPage({
 
   /* حالُ السداد — العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
   const PAID_WHERE: Record<PaidFilter, SQL> = {
+    /* قسمةٌ لا تتداخل: «عليها رصيد» = «غير مسدّدة» + «جزئياً»، و«مسدّدة» ما عداها.
+       كان «جزئياً» يعدّ ما سُدّد إلّا هللاتٍ تحت العتبة فيظهر في «مسدّدة» أيضاً،
+       و«غير مسدّدة» بلا عتبة فتساوي «عليها رصيد» عدداً وتخالفها معنىً */
     OPEN: sql`${remaining} > ${SETTLED_TOLERANCE_MINOR}`,
-    UNPAID: sql`${allocated} = 0`,
-    PARTIAL: sql`${allocated} > 0 and ${allocated} < ${invoices.totalMinor}`,
+    UNPAID: sql`${allocated} = 0 and ${remaining} > ${SETTLED_TOLERANCE_MINOR}`,
+    PARTIAL: sql`${allocated} > 0 and ${remaining} > ${SETTLED_TOLERANCE_MINOR}`,
     PAID: sql`${remaining} <= ${SETTLED_TOLERANCE_MINOR}`,
   };
 

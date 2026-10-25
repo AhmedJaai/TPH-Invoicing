@@ -5,6 +5,7 @@ import {
   impactByKind,
   prioritize,
   type AttentionFacts,
+  missingFilesTitle,
 } from "./attention";
 
 const quiet: AttentionFacts = {
@@ -656,4 +657,27 @@ it("فرقٌ ثانٍ يُقال بعدده مذكَّراً", () => {
     ] },
   }).find((i) => i.id === "sealed-month-drift");
   expect(item?.detail).toContain("، ورقم واحد غيره");
+});
+
+describe("missingFilesTitle", () => {
+  it("الصفةُ والضميرُ يتبعان العدد", () => {
+    expect(missingFilesTitle(1)).toBe("مستند مسجّل غاب ملفه من الدرايف");
+    expect(missingFilesTitle(2)).toBe("مستندان مسجّلان غاب ملفّاهما من الدرايف");
+    expect(missingFilesTitle(4)).toBe("4 مستندات مسجّلة غابت ملفاتها من الدرايف");
+    expect(missingFilesTitle(12)).toBe("12 مستنداً مسجّلاً غابت ملفاته من الدرايف");
+  });
+});
+
+describe("فاتورةٌ تاريخُها بعد اليوم", () => {
+  it("بندٌ يفتح تصحيحَ تاريخها ويقول مبلغها", () => {
+    const [item] = buildAttention({ ...quiet, futureInvoices: [{ label: "نادك · 234", sub: "بتاريخ 10 نوفمبر 2026", href: "/purchases/invoices/x#fix", amountMinor: 10466 }] });
+    expect(item.id).toBe("future-invoices");
+    expect(item.title).toBe("فاتورة واحدة تاريخها بعد اليوم");
+    expect(item.href).toBe("/purchases/invoices/x#fix");
+    expect(item.impact.amountMinor).toBe(10466);
+  });
+
+  it("ولا بندَ بلا فاتورةٍ كهذه", () => {
+    expect(ids({ futureInvoices: [] })).not.toContain("future-invoices");
+  });
 });

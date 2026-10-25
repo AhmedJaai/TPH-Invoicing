@@ -1,5 +1,6 @@
 "use client";
 
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { useRouter } from "next/navigation";
 import { useId, useState, Fragment } from "react";
 import { CircleAlert, CircleCheck, Info, PenLine, TriangleAlert } from "lucide-react";
@@ -213,7 +214,7 @@ export function InvoiceFix({
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-muted">تاريخ الفاتورة</span>
               <input
-                type="date" value={form.invoiceDate} onChange={(e) => set({ invoiceDate: e.target.value })}
+                type="date" max={todayInRiyadh()} value={form.invoiceDate} onChange={(e) => set({ invoiceDate: e.target.value })}
                 className="nums min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9"
               />
               {form.invoiceDate.slice(0, 7) !== initial.invoiceDate.slice(0, 7) && (

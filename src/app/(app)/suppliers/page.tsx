@@ -4,7 +4,7 @@ import { SectionBoundary } from "@/components/ui-client";
 import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, FileWarning, GitMerge, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
+import { CircleCheck, Clock, FileWarning, GitMerge, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -318,7 +318,9 @@ export default async function SuppliersPage({
       {/* ── الأجوبة الثلاثة ── */}
       {showAmounts && (
         knows ? (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+          {/* رقمٌ صفرُه معلوم يُقال سطراً هادئاً لا بطاقةً «٠٫٠٠» (ui-ux.md) — والبطاقاتُ لما فيه جواب */}
+          <div className={`grid gap-3 ${overdueMinor > 0 && totals.creditLeftMinor > 0 ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]" : overdueMinor > 0 || totals.creditLeftMinor > 0 ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}>
             <Figure
               className="col-span-2 lg:col-span-1"
               icon={Receipt}
@@ -332,25 +334,44 @@ export default async function SuppliersPage({
             >
               <AgeingBar buckets={allBuckets} />
             </Figure>
-            <Figure
-              icon={Hourglass}
-              label="متأخر أكثر من 60 يوماً"
-              href="/suppliers?view=overdue"
-              tone={overdueMinor > 0 ? "danger" : "ok"}
-              value={<Money minor={overdueMinor} />}
-              sub={overdueMinor > 0
-                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمها منذ ${countNoun(oldestOverdue, DAY)}`
-                : "لا مبلغ متأخر أكثر من ستين يوماً بعد خصم أرصدتك."}
-            />
-            <Figure
-              icon={PiggyBank}
-              label="رصيد لك عندهم"
-              href="/suppliers?view=credit"
-              value={<Money minor={totals.creditLeftMinor} />}
-              sub={totals.creditLeftMinor > 0
-                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مبالغ دفعتها ولم تصلك فواتيرها، وستُخصم من فواتيرهم القادمة`
-                : "كل مبلغ دفعته وصلتك فاتورته."}
-            />
+            {overdueMinor > 0 && (
+              <Figure
+                className={totals.creditLeftMinor > 0 ? undefined : "col-span-2 lg:col-span-1"}
+                icon={Hourglass}
+                label="متأخر أكثر من 60 يوماً"
+                href="/suppliers?view=overdue"
+                tone="danger"
+                value={<Money minor={overdueMinor} />}
+                sub={`عند ${countNoun(overdue.length, SUPPLIER)} · أقدمها منذ ${countNoun(oldestOverdue, DAY)}`}
+              />
+            )}
+            {totals.creditLeftMinor > 0 && (
+              <Figure
+                className={overdueMinor > 0 ? undefined : "col-span-2 lg:col-span-1"}
+                icon={PiggyBank}
+                label="رصيد لك عندهم"
+                href="/suppliers?view=credit"
+                value={<Money minor={totals.creditLeftMinor} />}
+                sub={`${countNoun(totals.creditSuppliers, SUPPLIER)} · مبالغ دفعتها ولم تصلك فواتيرها، وستُخصم من فواتيرهم القادمة`}
+              />
+            )}
+          </div>
+          {(overdueMinor === 0 || totals.creditLeftMinor === 0) && (
+            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+              {overdueMinor === 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+                  لا مبلغ متأخر أكثر من ستين يوماً بعد خصم أرصدتك.
+                </span>
+              )}
+              {totals.creditLeftMinor === 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+                  لا رصيد لك عند أي مورّد: كل مبلغ دفعته وصلتك فاتورته.
+                </span>
+              )}
+            </p>
+          )}
           </div>
         ) : (
           /* مورّدون مسجَّلون ولا فاتورةَ ولا دفعة: «عليك صفر» كذبٌ عن غير علم */
