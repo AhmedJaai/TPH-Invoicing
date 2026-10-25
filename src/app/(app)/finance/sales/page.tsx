@@ -1,3 +1,5 @@
+import { formatRiyalsDisplay } from "@/lib/money";
+import { DAY, ORDER, countNoun } from "@/lib/arabic";
 import { redirect } from "next/navigation";
 import { CalendarDays, Clock, Coffee, CreditCard, Info, ShoppingBag, TrendingDown, TrendingUp, Utensils } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -94,7 +96,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           label="الطلبات"
           delta={rev && a.previous && !open ? pctChange(rev.orders, a.previous.orders) : undefined}
           value={rev ? <span className="nums">{rev.orders.toLocaleString("en-US")}</span> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={rev ? <><T s="في {0} يوماً، بمعدل {1} طلباً يومياً." a={[rev.coveredDays, rev.coveredDays > 0 ? Math.round(rev.orders / rev.coveredDays) : 0]} /></> : undefined}
+          sub={rev ? <><T s="في {0}، بمعدل {1} يومياً." a={[countNoun(rev.coveredDays, DAY), countNoun(rev.coveredDays > 0 ? Math.round(rev.orders / rev.coveredDays) : 0, ORDER)]} /></> : undefined}
         />
         <KeyFigure
           icon={CreditCard}
@@ -107,7 +109,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           icon={Clock}
           label="أكثر ساعة مبيعاً"
           value={busiest ? <span className="nums">{busiest.hour}:00</span> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={busiest ? <><T s="بيع فيها {0} هذا الشهر في {1} طلباً." a={[<Money key="0" minor={busiest.paidMinor} />, busiest.orders]} /></> : undefined}
+          sub={busiest ? <><T s="بيع فيها {0} هذا الشهر في {1}." a={[<Money key="0" minor={busiest.paidMinor} />, countNoun(busiest.orders, ORDER)]} /></> : undefined}
           href="#when"
         />
       </div>
@@ -117,7 +119,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           <ol className="flex h-40 min-w-[36rem] items-end gap-1" aria-label="مبيعات الأيام">
             {a.days.map((d) => (
               <li key={d.day} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end" title={`${formatWeekday(d.day)} ${formatDay(d.day)}`}>
-                <span className="sr-only"><T s="{0}: {1} ريالاً" a={[formatDay(d.day), (d.paidMinor / 100).toFixed(0)]} /></span>
+                <span className="sr-only"><T s="{0}: {1} ريال" a={[formatDay(d.day), formatRiyalsDisplay(d.paidMinor)]} /></span>
                 <span aria-hidden className="block w-full rounded-t bg-accent/80 transition-colors group-hover:bg-accent" style={{ height: `${Math.max(2, (d.paidMinor / maxDay) * 100)}%` }} />
                 <span aria-hidden className="mt-1 block text-center text-[9px] text-muted">{Number(d.day.slice(8, 10))}</span>
               </li>
@@ -191,8 +193,8 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
       <Section title="ما نقص من الإيراد" icon={Info} hint="وصفٌ لما حدث، وليس اتهاماً لأحد.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`${a.leaks.discountedOrders} طلباً عليها خصم.`} />
-          <Leak label="مبالغ أُعيدت للزبائن" minor={a.leaks.refundsMinor} sub={`${a.leaks.refundOrders} طلباً مرتجعاً.`} />
+          <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`خصمٌ على ${countNoun(a.leaks.discountedOrders, ORDER)}.`} />
+          <Leak label="مبالغ أُعيدت للزبائن" minor={a.leaks.refundsMinor} sub={`مرتجعات: ${countNoun(a.leaks.refundOrders, ORDER)}.`} />
           <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
             <p className="text-[11px] font-bold text-muted">طلبات ملغاة</p>
             <p className="mt-2 text-lg font-semibold"><span className="nums">{a.leaks.voidOrders}</span></p>
@@ -201,7 +203,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
             <p className="text-[11px] font-bold text-muted">مشروبات الموظفين</p>
             <p className="mt-2 text-lg font-semibold"><MaybeMoney minor={a.leaks.staffCostMinor} why="فيها صنف بلا وصفة" /></p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted"><T s="بتكلفتها، في {0} طلباً، وقيمتها بسعر القائمة {1}. هي استهلاك بلا إيراد، وتدخل في تكلفة المبيعات." a={[a.leaks.staffOrders, <Money key="1" minor={a.leaks.staffListMinor} />]} /></p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted"><T s="بتكلفتها، في {0}، وقيمتها بسعر القائمة {1}. هي استهلاك بلا إيراد، وتدخل في تكلفة المبيعات." a={[countNoun(a.leaks.staffOrders, ORDER), <Money key="1" minor={a.leaks.staffListMinor} />]} /></p>
           </div>
         </div>
       </Section>

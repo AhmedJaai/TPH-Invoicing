@@ -97,3 +97,19 @@ describe("تسامح الريال في القاعدة هو الثابت في ا�
     expect(Number(last.m?.[1]), last.f).toBe(TOTAL_ROUNDING_TOLERANCE_MINOR);
   });
 });
+
+/* ── المالُ لا يُقسَم عشريّاً للعرض ── */
+
+/**
+ * `(paidMinor / 100).toFixed(0)` في سطرِ قارئ الشاشة لمبيعات اليوم: قسمةٌ عشريّة تُسقط
+ * الهللات وتكتب «7832» بلا فاصل. العرضُ من `formatRiyalsDisplay` وحده. ويُستثنى تقريبُ
+ * الريال الصحيح لوقائع القراءة الذكيّة (`Math.round(minor / 100)`) — عددٌ صحيح لا يُعرض مالاً.
+ */
+describe("لا قسمةَ عشريّة للمال", () => {
+  it("لا `minor / 100` مع toFixed أو بلا تقريبٍ إلى عددٍ صحيح", () => {
+    const offenders = SRC.flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => [f, i + 1, l] as const))
+      .filter(([, , l]) => /[mM]inor\)?\s*\/\s*100\b/.test(l) && !/Math\.(round|floor)\(\s*(Math\.abs\()?\w*[mM]inor\)?\s*\/\s*100\s*\)/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .map(([f, n]) => `${f}:${n}`);
+    expect(offenders).toEqual([]);
+  });
+});

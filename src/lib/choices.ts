@@ -10,6 +10,7 @@
  * هذا الملفّ نقيّ: يحوّل ما تعرضه شاشاتُ القرار نفسُها إلى صفوف الدفتر، بلا قاعدةٍ
  * ماليّة جديدة — الحكمُ «أتُحسب؟» يأتي محسوباً من `vat-return.ts`.
  */
+import { formatRiyalsDisplay } from "./money";
 import type { Capability } from "./permissions";
 
 export type ChoiceGroupId =
@@ -177,10 +178,9 @@ export function vatInvoiceChoiceRows(invoices: readonly VatInvoiceChoiceInput[],
   });
 }
 
+/* المبلغُ بلا إشارته — من منسِّق المال الواحد لا نسخةٍ منه */
 function riyals(minor: number): string {
-  const whole = Math.floor(Math.abs(minor) / 100);
-  const frac = String(Math.abs(minor) % 100).padStart(2, "0");
-  return `${String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${frac}`;
+  return formatRiyalsDisplay(Math.abs(minor));
 }
 
 /* ───────────────────── الخلاصة ───────────────────── */

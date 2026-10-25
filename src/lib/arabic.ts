@@ -176,6 +176,14 @@ export function mustBeResolved(n: number): string {
   return abs === 1 ? "يجب حلّه" : abs === 2 ? "يجب حلّهما" : "يجب حلّها";
 }
 
+export const ORDER: NounForms = {
+  one: "طلب واحد",
+  two: "طلبان",
+  few: "طلبات",
+  many: "طلباً",
+  zero: "لا طلبات",
+};
+
 export const CHECK: NounForms = {
   one: "فحص واحد",
   two: "فحصان",

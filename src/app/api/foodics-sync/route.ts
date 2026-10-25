@@ -60,9 +60,9 @@ export async function POST(request: Request) {
   }
   const c = result.counts;
   const parts = [
-    c.salesWritten > 0 ? `${c.salesWritten} طلباً جديداً` : null,
-    c.salesRestated > 0 ? `${c.salesRestated} طلباً أُعيدت قراءته` : null,
-    c.linesRevised > 0 ? `${c.linesRevised} سطراً تغيّر` : null,
+    c.salesWritten > 0 ? `طلبات جديدة (${c.salesWritten})` : null,
+    c.salesRestated > 0 ? `طلبات أُعيدت قراءتها (${c.salesRestated})` : null,
+    c.linesRevised > 0 ? `أسطر تغيّرت (${c.linesRevised})` : null,
     c.rejected > 0 ? `${c.rejected} لم تُقرأ` : null,
   ].filter(Boolean);
   return NextResponse.json({

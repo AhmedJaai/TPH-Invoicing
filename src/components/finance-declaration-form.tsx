@@ -43,8 +43,16 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   const ready = fromMonth !== "" && toMonth !== "" && fromMonth <= toMonth
     && (kind !== "OFF_BOOK" || amount.trim() !== "") && (kind !== "SPREAD" || txId !== "");
 
+  /* المعطّلُ بسببٍ يُضغط ليقوله (ui-ux.md) — كان «احفظ» معطّلاً صامتاً لا يُعرف ما ينقصه */
+  const missing = fromMonth === "" || toMonth === "" ? "اختر شهر البداية وشهر النهاية."
+    : fromMonth > toMonth ? "شهر النهاية قبل شهر البداية."
+    : kind === "OFF_BOOK" && amount.trim() === "" ? "اكتب مبلغ الشهر الواحد."
+    : kind === "SPREAD" && txId === "" ? "اختر حركة البنك التي تريد توزيعها."
+    : null;
+
   async function save() {
-    if (busy || !ready) return;
+    if (busy) return;
+    if (!ready) { setError(missing ?? "أكمل الحقول ثم احفظ."); return; }
     setBusy(true);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/finance/declaration", {
@@ -105,7 +113,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
       {fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">شهر النهاية قبل شهر البداية.</p>}
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs font-bold text-danger">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy || !ready} aria-busy={busy} className={buttonClass("primary")}>احفظ</button>
+        <button type="submit" disabled={busy} aria-disabled={!ready || undefined} aria-busy={busy} className={`${buttonClass("primary")} ${ready ? "" : "opacity-60"}`}>احفظ</button>
         <p className="min-w-0 flex-1 basis-56 text-[11px] leading-relaxed text-muted">
           هذه الإضافة لا تنشئ مصروفاً ولا دفعة، ولا تغيّر أي مبلغ مسجّل. تظهر في قائمة الدخل باسمها، وتُسجَّل في سجل التدقيق، ويمكنك سحبها متى شئت.
         </p>
