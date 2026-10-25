@@ -38,6 +38,7 @@ import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service"
 import { loadFinanceAttentionFacts } from "@/services/finance-attention.service";
 import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { loadRepeatDeliveries } from "@/services/repeat-delivery.service";
+import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { loadPayrollAttentionFacts } from "@/services/payroll.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
 import { loadSealDrift } from "@/services/month-seal.service";
@@ -49,9 +50,9 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, payroll, drift, aiLow] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
-    loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(),
+    loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
     /* فحوصُ الصباح تُقرأ ولا تُعاد: آخرُ ما وجده `/api/cron/daily` */
     loadSealDrift(), loadLowAiBalance(),
@@ -65,6 +66,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       supplierName: r.supplierName, firstNumber: r.first.number, secondNumber: r.second.number, gapDays: r.gapDays,
       atStakeMinor: r.atStakeMinor, bothPaid: r.bothPaid, foodicsReceipts: r.foodicsReceipts,
     })),
+    duplicateHandPayments: groupBySupplier(handDups),
     foodicsCardGaps: foodics.cardGaps,
     foodicsPurchaseDiffers: foodics.purchaseDiffers,
     foodicsPurchaseMissing: foodics.purchaseMissing,
@@ -98,6 +100,18 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     } : null,
   });
 });
+
+/** سطرٌ لكلّ مورّد — المبلغُ ما يظهر «رصيداً لك» من دفعاته المكرّرة. */
+function groupBySupplier(list: readonly { supplierId: string; supplierName: string; supplierSlug: string; creditMinor: number }[]) {
+  const by = new Map<string, { supplierName: string; supplierSlug: string; creditMinor: number; count: number }>();
+  for (const d of list) {
+    const g = by.get(d.supplierId) ?? { supplierName: d.supplierName, supplierSlug: d.supplierSlug, creditMinor: 0, count: 0 };
+    g.creditMinor += d.creditMinor;
+    g.count += 1;
+    by.set(d.supplierId, g);
+  }
+  return [...by.values()].sort((a, b) => b.creditMinor - a.creditMinor);
+}
 
 /**
  * المفتوحُ والمؤجَّل («أجِّله إلى…»، `attention-snooze.ts`). المؤجَّلُ يخرج من العدّ

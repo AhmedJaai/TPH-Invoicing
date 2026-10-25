@@ -230,6 +230,11 @@ export interface AttentionFacts {
    * توريدٌ يبدو مقيَّداً مرّتين (`repeat-delivery.service.ts`): فاتورتان للمورّد نفسِه ببنودٍ
    * وكمّيّاتٍ واحدة بينهما أيّامٌ أقلّ من إيقاعه — ملغاةٌ وبديلتُها بقيتا معاً.
    */
+  /**
+   * سدادٌ قُيّد بيدٍ مرّتين فظهر «رصيداً لك» (`hand-duplicate.service.ts`) — سطرٌ لكلّ مورّد.
+   * مود القهوة وجملة التقنية: نسختان من فاتورة وُسمتا «مسدّدتين» ثمّ دُمجتا.
+   */
+  duplicateHandPayments?: { supplierName: string; supplierSlug: string; creditMinor: number; count: number }[];
   repeatDeliveries?: {
     supplierName: string; firstNumber: string; secondNumber: string; gapDays: number;
     atStakeMinor: number; bothPaid: boolean; foodicsReceipts: number | null;
@@ -741,6 +746,37 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     توريدٌ واحد بفاتورتين: أفال ألغت 00080 وأصدرت 00084 بالبنود نفسها بعد يومين، وكشفُها
     حملهما معاً فدُفعتا — ‏١٬٩٩٨٫٧٠ لم يرها أحدٌ شهرين. سؤالٌ لا حكم: يُغلق بـ«توريدان فعلاً».
   */
+  /*
+    رصيدٌ «لك» عند المورّد هو دفعةٌ قُيّدت مرّتين بيد: إن بقي خُصم من فاتورته القادمة فلا
+    تُدفع وهي مستحقّة. تحذيرٌ يُحسم بضغطة المالك — لا إلغاءٌ آليّ.
+  */
+  if ((f.duplicateHandPayments?.length ?? 0) > 0) {
+    const list = f.duplicateHandPayments!;
+    const total = list.reduce((s, r) => s + r.creditMinor, 0);
+    out.push({
+      id: "duplicate-hand-payments",
+      area: "PAYMENTS",
+      severity: "HIGH",
+      title: list.length === 1
+        ? `دفعة قُيّدت مرتين بيدك لـ${list[0].supplierName}، فيظهر لك عنده رصيد ليس لك`
+        : `${countNoun(list.length, SUPPLIER)} يظهر لك عندهم رصيد من دفعات قُيّدت مرتين بيدك`,
+      detail: "سجّلت الفاتورة مسدّدة بيدك، ثم سُجّلت مسدّدة مرة أخرى، أو دُمجت نسختها المسدّدة أو حُذف قيدها. لا حوالة في الكشف ولا إيصال يشهد بأن المال خرج مرتين، فالرصيد على الورق فقط، وإن بقي خُصم من فاتورة المورّد القادمة.",
+      action: "افتح الدفعة وراجع سبب عدّها مكرّرة. إن كانت مكرّرة فألغِ القيد المكرّر، وإن كنت دفعت فعلاً مرتين فأبقِها رصيداً.",
+      actionLabel: "ألغِ القيد المكرّر",
+      href: "/attention?item=duplicate-hand-payments",
+      count: list.length,
+      amountMinor: total,
+      impact: { kind: "AT_RISK", amountMinor: total },
+      evidence: list.slice(0, 6).map((r) => ({
+        label: r.supplierName.slice(0, 45),
+        sub: r.count === 1 ? "دفعة واحدة بلا حوالة ولا إيصال" : `${r.count} دفعات بلا حوالة ولا إيصال`,
+        amountMinor: r.creditMinor,
+        href: `/suppliers/${r.supplierSlug}`,
+      })),
+      needs: "invoice:remove",
+    });
+  }
+
   if ((f.repeatDeliveries?.length ?? 0) > 0) {
     const list = f.repeatDeliveries!;
     const total = list.reduce((s, r) => s + r.atStakeMinor, 0);

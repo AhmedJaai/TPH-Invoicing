@@ -18,7 +18,8 @@ export const runtime = "nodejs";
 
 const Id = z.string().trim().min(1).max(64);
 const Choice = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("release"), reallocate: z.boolean() }).strict(),
+  /* `voidHand`: سدادٌ بيدٍ لم يسدّد إلّا هذه يُلغى معها — لا يبقى «رصيداً لك» لم يخرج */
+  z.object({ mode: z.literal("release"), reallocate: z.boolean(), voidHand: z.boolean().optional() }).strict(),
   z.object({ mode: z.literal("move"), targetId: Id }).strict(),
 ]);
 const Body = z.object({
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     const out = await db.transaction((t) => removeInvoiceEntry(t, { invoiceId, choice, actorId: user.id }));
     const parts = [
       `حُذف قيد ${out.number}`,
+      out.voidedMinor > 0 ? `وأُلغي سدادها المكرّر بيد (${formatRiyalsDisplay(out.voidedMinor)})` : null,
       out.movedMinor > 0 && out.target ? `وانتقل سداده (${formatRiyalsDisplay(out.movedMinor)}) إلى ${out.target.number}` : null,
       out.reappliedMinor > 0 ? `ووُزّع ${formatRiyalsDisplay(out.reappliedMinor)} على أقدم المفتوح` : null,
       out.leftAsCreditMinor > 0 ? `وبقي ${formatRiyalsDisplay(out.leftAsCreditMinor)} رصيداً لك عند المورّد` : null,

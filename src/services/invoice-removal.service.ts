@@ -11,6 +11,11 @@
  * - **انقل سداده** (`move`): ما خُصّص لها ينتقل إلى فاتورةٍ أخرى للمورّد نفسه (بسقف ما بقي
  *   عليها)، ومعه حوالةُ البنك المربوطة بالدفعة، ثمّ يُحذف القيد. وما زاد يبقى رصيداً.
  *
+ * - **وسدادٌ بيدٍ لم يسدّد إلّا هذه** (`voidHand`، مع «حذف القيد»): يُلغى (`VOID`) بسببٍ مكتوب
+ *   بدل أن يبقى «رصيداً لك» لم يخرج مالُه — مود القهوة وجملة التقنية. والمعاينةُ تقترحه إن
+ *   كان للمورّد سدادٌ آخر بالمبلغ نفسه في أيّامه (`findTwin`). وما شهد له البنكُ أو الإيصالُ
+ *   لا يُلغى من هنا أبداً.
+ *
  * والقواعد: الشهرُ المقفل يُردّ بأسمائه؛ والمتصفّحُ لا يرسل إلّا المعرّفات والاختيار، والخادمُ
  * يعيد الحساب كلَّه داخل معاملةٍ واحدة (`t`)؛ وفاتورةٌ دخلت ضريبتُها إقراراً قُدِّم لا تُحذف —
  * هي دليلُ الخصم. والتخصيصُ بـ`allocate()` و`applySupplierCredit()` وحدهما: لا خوارزميّةَ ثانية.
@@ -30,11 +35,24 @@ import { assertMonthsOpen, closedMonthsAmong } from "./month-guard";
 import { loadSupplierBalances } from "./supplier-balance.service";
 import { refreshStatementFindings } from "./statement-reconcile.service";
 import { STATEMENT_LINE_ORIGIN } from "./invoice.service";
+import { handPaymentRows, handPaymentsOnlyFor, voidHandPayment } from "./hand-duplicate.service";
+import { findTwin } from "@/lib/hand-duplicate";
 import type { Conn, Tx } from "./types";
 
 export type RemovalChoice =
-  | { mode: "release"; reallocate: boolean }
+  /** `voidHand`: يُلغى السدادُ بيدٍ الذي لم يسدّد إلّا هذه — الغائبُ يبقيه رصيداً */
+  | { mode: "release"; reallocate: boolean; voidHand?: boolean }
   | { mode: "move"; targetId: string };
+
+/** سدادٌ بيدٍ لم يسدّد إلّا هذه الفاتورة — يُلغى مع قيدها إن اختار المالك. */
+export interface RemovalHandPayment {
+  paymentId: string;
+  amountMinor: number;
+  method: string;
+  paidOn: string;
+  /** للمورّد سدادٌ آخر بالمبلغ نفسه في أيّامه سدّد فاتورة — فالإلغاءُ مقترَح */
+  hasTwin: boolean;
+}
 
 export interface RemovalAllocation {
   paymentId: string;
@@ -60,6 +78,8 @@ export interface RemovalFacts {
   allocations: RemovalAllocation[];
   allocatedMinor: number;
   statementLines: number;
+  /** سداداتٌ بيدٍ لم تسدّد إلّا هذه — «ألغِ السداد مع القيد» */
+  handOnly: RemovalHandPayment[];
   /** فواتيرُ المورّد الأخرى التي بقي عليها شيء — الأقدمُ أوّلاً، وأوّلُها المقترَح */
   targets: RemovalTarget[];
   /** لماذا لا يُحذف — `null` يُحذف */
@@ -77,6 +97,8 @@ export interface RemovalOutcome {
   reappliedMinor: number;
   /** ما بقي رصيداً للمورّد من الدفعات المفكوكة */
   leftAsCreditMinor: number;
+  /** سداداتٌ بيدٍ أُلغيت مع القيد */
+  voidedMinor: number;
   target: { id: string; number: string } | null;
   balance: { before: BalanceView; after: BalanceView };
 }
@@ -150,6 +172,15 @@ export async function loadRemovalFacts(invoiceId: string, conn: Conn = db): Prom
     eq(issues.code, ISSUE.FILE_MISSING_IN_DRIVE), eq(issues.status, "OPEN"), eq(issues.entityId, inv.documentId),
   )).limit(1);
 
+  const onlyThis = await handPaymentsOnlyFor(conn, invoiceId);
+  const supplierRows = onlyThis.length > 0 ? await handPaymentRows(conn, inv.supplierId) : [];
+  const handOnly = onlyThis.map((h) => {
+    const row = supplierRows.find((r) => r.id === h.paymentId);
+    /* التوأمُ يُسأل عنها لو كانت رصيداً — فتُعدّ هنا بلا تخصيص */
+    const twin = row ? findTwin({ ...row, allocatedMinor: 0 }, supplierRows.filter((r) => r.id !== row.id)) : null;
+    return { paymentId: h.paymentId, amountMinor: h.amountMinor, method: h.method, paidOn: h.day, hasTwin: Boolean(twin) };
+  });
+
   const closed = [...await closedMonthsAmong(conn, [inv.month])];
   const vat = await filedVatPeriod(conn, invoiceId);
   const refusal = closed.length > 0
@@ -167,6 +198,7 @@ export async function loadRemovalFacts(invoiceId: string, conn: Conn = db): Prom
     allocations: allocs,
     allocatedMinor: allocs.reduce((s, a) => s + a.amountMinor, 0),
     statementLines: Number(lineCount),
+    handOnly,
     targets,
     refusal,
     closedMonths: closed,
@@ -205,11 +237,23 @@ export async function removeInvoiceEntry(
   const [doc] = await t.select({ id: documents.id, fileName: documents.fileName, origin: documents.origin, status: documents.status })
     .from(documents).where(eq(documents.id, inv.documentId)).limit(1);
 
-  /* ── التخصيصات: تُفكّ، والدفعاتُ باقية ── */
-  const allocs = await t.select({ id: paymentAllocations.id, paymentId: paymentAllocations.paymentId, amountMinor: paymentAllocations.amountMinor, paidAt: payments.paidAt })
+  /* ── التخصيصات: تُفكّ، والدفعاتُ باقية — إلّا سداداً بيدٍ لم يسدّد غيرها واختار المالكُ إلغاءه ── */
+  const allAllocs = await t.select({ id: paymentAllocations.id, paymentId: paymentAllocations.paymentId, amountMinor: paymentAllocations.amountMinor, paidAt: payments.paidAt })
     .from(paymentAllocations).innerJoin(payments, eq(payments.id, paymentAllocations.paymentId))
     .where(eq(paymentAllocations.invoiceId, inv.id))
     .orderBy(payments.paidAt, payments.id);
+  const voids = input.choice.mode === "release" && input.choice.voidHand ? await handPaymentsOnlyFor(t, inv.id) : [];
+  let voidedMinor = 0;
+  for (const v of voids) {
+    voidedMinor += await voidHandPayment(t, {
+      paymentId: v.paymentId,
+      actorId: input.actorId,
+      reason: `قيد سداد بيد لم يسدّد إلا ${inv.number}، وقد حُذف قيدها، فأُلغي معها ولم يبقَ رصيداً للمورّد`,
+      context: { حذف_القيد: { الفاتورة: inv.number } },
+    });
+  }
+  const voidedIds = new Set(voids.map((v) => v.paymentId));
+  const allocs = allAllocs.filter((a) => !voidedIds.has(a.paymentId));
   const releasedMinor = allocs.reduce((s, a) => s + a.amountMinor, 0);
   if (allocs.length > 0) await t.delete(paymentAllocations).where(eq(paymentAllocations.invoiceId, inv.id));
   const paymentIds = [...new Set(allocs.map((a) => a.paymentId))];
@@ -283,7 +327,7 @@ export async function removeInvoiceEntry(
         المعرّف: inv.id, الرقم: inv.number, الإجمالي: inv.total, التاريخ: isoDay(inv.date), الشهر: inv.month,
         المستند: inv.documentId, الملف: doc?.fileName ?? null,
       },
-      التخصيصات: allocs.map((a) => ({ الدفعة: a.paymentId, المبلغ: a.amountMinor })),
+      التخصيصات: allAllocs.map((a) => ({ الدفعة: a.paymentId, المبلغ: a.amountMinor })),
       حوالات_البنك: bankLinked.map((b) => ({ الحركة: b.id, الدفعة: b.paymentId })),
       سطور_الكشف: lines.map((l) => l.id),
       "عليك قبل (هللة)": before.owedMinor,
@@ -291,6 +335,7 @@ export async function removeInvoiceEntry(
     },
     after: {
       الاختيار: input.choice.mode === "move" ? "نقل السداد إلى فاتورة أخرى" : input.choice.reallocate ? "حذف القيد وتوزيع الرصيد بالأقدم أولاً" : "حذف القيد وإبقاء السداد رصيداً",
+      أُلغي_مكرّراً: voids.map((v) => ({ الدفعة: v.paymentId, المبلغ: v.amountMinor })),
       الفاتورة_الأخرى: target ? { المعرّف: target.id, الرقم: target.number } : null,
       انتقل: moved,
       "فُكّ (هللة)": releasedMinor,
@@ -304,7 +349,7 @@ export async function removeInvoiceEntry(
   }, t);
 
   return {
-    invoiceId: inv.id, number: inv.number, releasedMinor, movedMinor, reappliedMinor, leftAsCreditMinor,
+    invoiceId: inv.id, number: inv.number, releasedMinor, movedMinor, reappliedMinor, leftAsCreditMinor, voidedMinor,
     target: target ? { id: target.id, number: target.number } : null,
     balance: { before, after },
   };
@@ -322,18 +367,25 @@ class DryRun extends Error {
  */
 export async function previewInvoiceRemoval(
   invoiceId: string,
-  choice: RemovalChoice,
+  requested: RemovalChoice,
   actorId: string,
-): Promise<{ facts: RemovalFacts; outcome: RemovalOutcome | null }> {
+): Promise<{ facts: RemovalFacts; outcome: RemovalOutcome | null; choice: RemovalChoice }> {
   const facts = await loadRemovalFacts(invoiceId);
-  if (facts.refusal) return { facts, outcome: null };
+  /*
+    لم يُسأل بعد عن السداد بيد (`voidHand` غائب): إن كان له توأمٌ فهو مكرّر، فالإلغاءُ مقترَح —
+    والاختيارُ الفعليّ يعود مع المعاينة، فما تراه الشاشةُ محسوبٌ به.
+  */
+  const choice: RemovalChoice = requested.mode === "release" && requested.voidHand === undefined
+    ? { ...requested, voidHand: facts.handOnly.some((h) => h.hasTwin) }
+    : requested;
+  if (facts.refusal) return { facts, outcome: null, choice };
   try {
     await db.transaction(async (t) => {
       throw new DryRun(await removeInvoiceEntry(t, { invoiceId, choice, actorId }));
     });
   } catch (e) {
-    if (e instanceof DryRun) return { facts, outcome: e.outcome };
+    if (e instanceof DryRun) return { facts, outcome: e.outcome, choice };
     throw e;
   }
-  return { facts, outcome: null };
+  return { facts, outcome: null, choice };
 }

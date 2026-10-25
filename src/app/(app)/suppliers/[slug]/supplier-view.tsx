@@ -41,6 +41,8 @@ import { SupplierEdit } from "@/components/supplier-edit";
 import { SUPPLIER_CATEGORY_LABEL, pastDueOf, whatsappHref } from "@/lib/supplier-edit";
 import { formatRiyals } from "@/lib/money";
 import { AccountReview } from "@/components/account-review";
+import { SupplierHandDuplicates } from "@/components/hand-duplicate";
+import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
 import { buttonClass } from "@/components/ui-tokens";
 import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
@@ -285,6 +287,8 @@ export async function SupplierView({
   const offsetting = balance === 0 && creditLeft === 0 && (bal?.openMinor ?? 0) > 0;
   const paidNet = bal?.paidNetMinor ?? n("paid");
   const creditSplit = splitSupplierCredit(creditLeft, n("advance"));
+  /* رصيدٌ «لك» هو دفعةٌ قُيّدت مرّتين بيد — يُقال بجانب الرقم وبابُه معه (`hand-duplicate.service.ts`) */
+  const handDups = showAmounts && (creditLeft > 0 || unapplied > 0) ? await loadDuplicateHandPayments(db, s.id) : [];
   const ageing = ageOwed(ages.get(s.id) ?? [], balance);
   const ageOf = new Map((ages.get(s.id) ?? []).map((a) => [a.id, a.ageDays]));
 
@@ -455,6 +459,7 @@ export async function SupplierView({
                       ? "لا فاتورة منه ولا دفعة له حتى الآن، فلا حساب يُعرض."
                       : "لا توجد فاتورة مفتوحة ولا رصيد لك عنده."}
             </p>
+            <SupplierHandDuplicates list={handDups} canAct={can(user.role, "invoice:remove")} />
             {/* ما يتقابل لا يُقال «متّزناً» وتُترك — بابُه بجانبه */}
             {unapplied > 0 && (bal?.openMinor ?? 0) > 0 && can(user.role, "payment:approve") && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-warn-bg px-3 py-2 text-[11px] text-warn">

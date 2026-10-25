@@ -83,6 +83,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "stock-gap-over": Boxes,
   "proforma-without-invoice": FileWarning,
   "repeat-delivery": CopyX,
+  "duplicate-hand-payments": CopyX,
   "recurring-anomalies": RotateCcw,
   "obligations-expiring": FileClock,
   "missing-statements": FileClock,

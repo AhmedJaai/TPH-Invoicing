@@ -8,6 +8,9 @@
  *      نفسه باليوم والمبلغ نفسيهما — مرشّحةٌ لـ«نسخة مكرّرة؟ ادمجها» من صفحتها.
  *   ٢. فواتيرُ ملفُّها غاب من الدرايف (`FILE_MISSING_IN_DRIVE` مفتوح) وعليها تخصيصات —
  *      مرشّحةٌ لـ«حذف القيد» (أو نقل سدادها) من صفحتها.
+ *   ٣. سداداتٌ بيدٍ مكرّرة (`hand-duplicate.service.ts`): قُيّدت بيد بلا حوالةٍ ولا إيصال وتظهر
+ *      «رصيداً لك»، ولها توأمٌ مخصَّص بالمبلغ نفسه في سبعة أيّام أو فكّها دمجٌ أو «حذف القيد» —
+ *      مود القهوة وجملة التقنية. مرشّحةٌ لـ«ألغِ القيد المكرّر» من صفحة المورّد.
  *
  * الإصلاحُ ضغطةُ المالك من الصفحة، لا من هنا.
  *
@@ -16,6 +19,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { formatRiyalsDisplay } from "../src/lib/money";
+import { loadDuplicateHandPayments } from "../src/services/hand-duplicate.service";
 
 type Twin = { supplier: string; id: string; number: string; day: string; total: number; twin_id: string; twin_number: string; twin_origin: string | null; twin_allocated: number; allocated: number };
 type Missing = { supplier: string; id: string; number: string; day: string; total: number; allocated: number; file_name: string; payments: number };
@@ -50,7 +54,9 @@ async function main() {
        where x.code = 'FILE_MISSING_IN_DRIVE' and x.status = 'OPEN'
        group by s.name_ar, v.id, v.invoice_number, v.invoice_date, v.total_minor, d.file_name
        order by s.name_ar, v.invoice_date`)).rows;
-    return { twins, missing };
+    /* الحكمُ نفسُه الذي تعرضه «يحتاج قرارك» وصفحةُ المورّد — لا نسخةٌ ثانية منه */
+    const hand = await loadDuplicateHandPayments(t);
+    return { twins, missing, hand };
   });
 
   const money = (m: number | string) => formatRiyalsDisplay(Number(m));
@@ -63,7 +69,11 @@ async function main() {
   for (const r of out.missing) {
     console.log(`  - ${r.supplier} · ${r.day} · «${r.number}» (${r.id}) · إجماليها ${money(r.total)} · مخصّص ${money(r.allocated)} من ${r.payments} دفعة · ${r.file_name}`);
   }
-  console.log("\nالإصلاح من صفحة كل فاتورة: «نسخة مكررة؟ ادمجهما» أو «احذف القيد». لم يُكتب شيء.");
+  console.log(`\n٣. دفعات قُيّدت مرتين بيدك وتظهر رصيداً للمورّد: ${out.hand.length}`);
+  for (const d of out.hand) {
+    console.log(`  - ${d.supplierName} · ${d.day} · ${d.method} · ${money(d.amountMinor)} (${d.paymentId}) · يظهر رصيداً ${money(d.creditMinor)} · ${d.why}`);
+  }
+  console.log("\nالإصلاح من صفحة كل فاتورة: «نسخة مكررة؟ ادمجهما» أو «احذف القيد»، ومن صفحة المورّد: «ألغِ القيد المكرّر». لم يُكتب شيء.");
   process.exit(0);
 }
 
