@@ -20,7 +20,7 @@ const Fields = z.object({
   phone: optionalText(20).refine((v) => v === null || /^\+?[0-9 ]{7,20}$/.test(v), "رقم الجوال أرقام فقط"),
   nationalId: optionalText(20).refine((v) => v === null || /^[0-9]{6,20}$/.test(v), "رقم الهوية أو الإقامة أرقام فقط"),
   bankBeneficiaryId: optionalText(20).refine((v) => v === null || /^[0-9]{4,20}$/.test(v), "رقم المستفيد أرقام فقط"),
-  iban: optionalText(34).transform((v) => (v ? v.replace(/\s+/g, "").toUpperCase() : null)).refine((v) => v === null || /^SA[0-9]{22}$/.test(v), "الآيبان يبدأ بـ SA ثم ٢٢ رقماً"),
+  iban: optionalText(34).transform((v) => (v ? v.replace(/\s+/g, "").toUpperCase() : null)).refine((v) => v === null || /^SA[0-9]{22}$/.test(v), "الآيبان يبدأ بـ SA ثم 22 رقماً"),
   hiredOn: Day,
   leftOn: Day.nullable().optional().transform((v) => v ?? null),
   shiftStart: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "اكتب الوقت مثل 16:00").nullable().optional().transform((v) => v ?? null),
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     const minutes = shiftMinutes(b.shiftHours);
-    if (minutes === null) return NextResponse.json({ error: "طول الدوام بالساعات بين ١ و١٦، مثل 8 أو 7:30" }, { status: 400 });
+    if (minutes === null) return NextResponse.json({ error: "طول الدوام بالساعات بين 1 و16، مثل 8 أو 7:30" }, { status: 400 });
     const input = {
       name: b.name, kind: b.kind, jobTitle: b.jobTitle, phone: b.phone, nationalId: b.nationalId,
       bankBeneficiaryId: b.bankBeneficiaryId, iban: b.iban, hiredOn: b.hiredOn, leftOn: b.leftOn,

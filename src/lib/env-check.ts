@@ -30,16 +30,16 @@ const EXPECTED: Record<string, { schema: z.ZodType; why: string }> = {
   GOOGLE_CLIENT_SECRET: { schema: present, why: "الدخول بجوجل والدرايف" },
   COMPANY_VAT_NUMBER: { schema: z.string().regex(/^3\d{13}3$/), why: "خمسة عشر رقماً تبدأ بالرقم 3 وتنتهي به" },
   DRIVE_ACCOUNTS_FOLDER_ID: { schema: present, why: "مجلد الحسابات في الدرايف" },
-  DRIVE_YEAR_2026_FOLDER_ID: { schema: present, why: "مجلد سنة ٢٠٢٦" },
-  DRIVE_YEAR_2027_FOLDER_ID: { schema: present, why: "مجلد سنة ٢٠٢٧" },
+  DRIVE_YEAR_2026_FOLDER_ID: { schema: present, why: "مجلد سنة 2026" },
+  DRIVE_YEAR_2027_FOLDER_ID: { schema: present, why: "مجلد سنة 2027" },
   DEEPSEEK_API_KEY: { schema: present, why: "قراءة المستندات" },
 };
 
 /** اختياريٌّ اليوم — يُفحَص شكلُه **إن ضُبط** وحده، وغيابُه ليس مشكلة. */
 const OPTIONAL: Record<string, { schema: z.ZodType; why: string }> = {
-  TOKEN_ENCRYPTION_KEY: { schema: z.string().min(32), why: "٣٢ حرفاً أو أكثر" },
-  TOKEN_ENCRYPTION_KEY_PREVIOUS: { schema: z.string().min(32), why: "٣٢ حرفاً أو أكثر" },
-  DB_POOL_MAX: { schema: z.string().regex(/^([1-9]|10)$/), why: "عدد صحيح من ١ إلى ١٠، وأي قيمة أخرى تُهمل" },
+  TOKEN_ENCRYPTION_KEY: { schema: z.string().min(32), why: "32 حرفاً أو أكثر" },
+  TOKEN_ENCRYPTION_KEY_PREVIOUS: { schema: z.string().min(32), why: "32 حرفاً أو أكثر" },
+  DB_POOL_MAX: { schema: z.string().regex(/^([1-9]|10)$/), why: "عدد صحيح من 1 إلى 10، وأي قيمة أخرى تُهمل" },
   AI_DAILY_BUDGET_USD: { schema: z.string().regex(/^\d+(\.\d+)?$/), why: "مبلغ بالدولار، وإن تعذّرت قراءته صار الإنفاق بلا سقف" },
   DEEPSEEK_BASE_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "رابط يبدأ بـ http" },
   AUTH_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "رابط يبدأ بـ http" },

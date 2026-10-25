@@ -201,7 +201,7 @@ export function validateInvoice(
         findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
           severity: "INFO",
           variant: "RATE",
-          message: `الضريبة ${formatRiyalsDisplay(vatMinor)} تختلف عن ١٥٪ من الصافي (${formatRiyalsDisplay(expected)}). تأكد هل فيها بنود معفاة`,
+          message: `الضريبة ${formatRiyalsDisplay(vatMinor)} تختلف عن 15٪ من الصافي (${formatRiyalsDisplay(expected)}). تأكد هل فيها بنود معفاة`,
         }));
       }
     }
@@ -253,7 +253,7 @@ export function validateInvoice(
   const isFixedAsset = totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
   if (isFixedAsset) {
     findings.push(finding(ISSUE.POSSIBLE_FIXED_ASSET, {
-      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة ٣٬٠٠٠. راجع هل هي معدّة تُستهلك بالاستخدام`,
+      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة 3,000. راجع هل هي معدّة تُستهلك بالاستخدام`,
     }));
   }
 

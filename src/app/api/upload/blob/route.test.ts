@@ -56,7 +56,7 @@ describe("/api/upload/blob", () => {
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
     const res = await POST(tokenRequest("staging/a.pdf", "application/pdf"));
     expect(res.status).toBe(404);
-    expect((await res.json()).error).toContain("٣ ميجابايت");
+    expect((await res.json()).error).toContain("3 ميجابايت");
     expect(handleUploadMock).not.toHaveBeenCalled();
   });
 

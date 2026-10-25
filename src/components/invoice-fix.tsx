@@ -280,7 +280,7 @@ function vatHint(v: string): Hint {
   if (!v.trim()) return null;
   return isValidSaudiVat(v)
     ? { tone: "ok", text: "رقم ضريبي صيغته سليمة" }
-    : { tone: "warn", text: "يجب أن يكون ١٥ رقماً، يبدأ بـ3 وينتهي بـ3" };
+    : { tone: "warn", text: "يجب أن يكون 15 رقماً، يبدأ بـ3 وينتهي بـ3" };
 }
 
 function amountHint(v: string, required = false): Hint {

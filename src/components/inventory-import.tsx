@@ -142,7 +142,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                 <Upload className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
               <span className="text-sm font-bold">اختر ملف مبيعات فودكس</span>
-              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV لا يتجاوز ٤ ميجابايت، ويغطي أسبوعاً واحداً. رفع الملف نفسه مرتين لا يكرر المبيعات.</span>
+              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV لا يتجاوز 4 ميجابايت، ويغطي أسبوعاً واحداً. رفع الملف نفسه مرتين لا يكرر المبيعات.</span>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

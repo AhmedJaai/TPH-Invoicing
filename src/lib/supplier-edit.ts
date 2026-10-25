@@ -93,7 +93,7 @@ export const supplierProfileRequest = z.object({
   nameAr: text(200).min(2, "اسم المورّد يجب أن يكون حرفين على الأقل").optional(),
   nameEn: text(200).optional(),
   vatNumber: text(30).optional()
-    .refine((v) => !v || isValidSaudiVat(v), "الرقم الضريبي ١٥ رقماً يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً"),
+    .refine((v) => !v || isValidSaudiVat(v), "الرقم الضريبي 15 رقماً يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً"),
   crNumber: text(30).optional(),
   category: z.enum(SUPPLIER_CATEGORIES).optional(),
   /** أيّامٌ صحيحة نصّاً — والفارغ «غير معروف». */
@@ -108,7 +108,7 @@ export const supplierProfileRequest = z.object({
     .refine((v) => !v || z.email().safeParse(v).success, "البريد الإلكتروني غير صالح"),
   contactName: text(120).optional(),
   iban: text(40).optional()
-    .refine((v) => !v || isValidSaudiIban(v), "الآيبان غير صحيح: يجب أن يبدأ بـSA ثم ٢٢ رقماً، ورقما التحقق لا يتطابقان. راجعه رقماً رقماً"),
+    .refine((v) => !v || isValidSaudiIban(v), "الآيبان غير صحيح: يجب أن يبدأ بـSA ثم 22 رقماً، ورقما التحقق لا يتطابقان. راجعه رقماً رقماً"),
   /** «نعم، غيّر الرقم الضريبيّ/الآيبان رغم التنبيه» — بعد ردّ 409 `warnings`. */
   confirm: z.boolean().optional(),
 }).strict();

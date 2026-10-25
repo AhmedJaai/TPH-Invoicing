@@ -72,7 +72,7 @@ describe("VAT_MATH_MISMATCH بصوره الثلاث — لا تتّهم فاتو
     const m = r.find((x) => x.code === "VAT_MATH_MISMATCH");
     expect(m?.severity).toBe("INFO");
     expect(m?.what).not.toContain("لا يساوي");
-    expect(m?.what).toContain("١٥٪");
+    expect(m?.what).toContain("15٪");
   });
 
   it("تقريب المورّد ← للعلم", () => {

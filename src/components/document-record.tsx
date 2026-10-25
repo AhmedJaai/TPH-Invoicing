@@ -242,10 +242,10 @@ export function DocumentRecord({
         <Field id={`${ids}-t`} label="الإجمالي" value={f.total} onChange={(v) => set({ total: v })} ltr decimal missing={miss("الإجمالي")}
           hint={total === null ? { tone: "danger", text: f.total.trim() ? "المبلغ غير مفهوم" : "مطلوب" } : { tone: "ok", text: <><T s="سيُحفظ {0}" a={[<Money key="0" minor={total} />]} /></> }} />
         <Field id={`${ids}-sv`} label="الرقم الضريبي للبائع" value={f.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr
-          hint={f.sellerVat.trim() ? (isValidSaudiVat(f.sellerVat) ? { tone: "ok", text: "صيغته سليمة" } : { tone: "warn", text: "يجب أن يكون ١٥ رقماً، يبدأ بـ3 وينتهي بـ3" }) : null} />
+          hint={f.sellerVat.trim() ? (isValidSaudiVat(f.sellerVat) ? { tone: "ok", text: "صيغته سليمة" } : { tone: "warn", text: "يجب أن يكون 15 رقماً، يبدأ بـ3 وينتهي بـ3" }) : null} />
         {/* رقمُ المنشأة كما على الورقة — كان يُرسَل ولا يُرى، فمن رأى «لا يطابق» لم يجد أين يصحّحه */}
         <Field id={`${ids}-bv`} label="الرقم الضريبي للمشتري (المنشأة)" value={f.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr
-          hint={f.buyerVat.trim() ? (isValidSaudiVat(f.buyerVat) ? { tone: "ok", text: "صيغته سليمة" } : { tone: "warn", text: "يجب أن يكون ١٥ رقماً، فقارنه بالورقة" }) : { tone: "warn", text: "فارغ، ولا تُخصم ضريبة الفاتورة بدون رقم المنشأة" }} />
+          hint={f.buyerVat.trim() ? (isValidSaudiVat(f.buyerVat) ? { tone: "ok", text: "صيغته سليمة" } : { tone: "warn", text: "يجب أن يكون 15 رقماً، فقارنه بالورقة" }) : { tone: "warn", text: "فارغ، ولا تُخصم ضريبة الفاتورة بدون رقم المنشأة" }} />
       </div>
 
       {sumOk !== null && (

@@ -39,7 +39,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
         {rises.length > 0 ? "أسعار ارتفعت عن آخر توريد" : "أسعار انخفضت عن آخر توريد"}
       </h4>
       <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">
-        <T s="سعر الوحدة في الفاتورة مقارنةً بآخر سعر مسجّل للصنف نفسه عند {0}. لا تظهر التغيّرات الأقل من ٣٪." a={[supplierName]} /></p>
+        <T s="سعر الوحدة في الفاتورة مقارنةً بآخر سعر مسجّل للصنف نفسه عند {0}. لا تظهر التغيّرات الأقل من 3٪." a={[supplierName]} /></p>
       <ul className="mt-2 space-y-1.5">
         {moves.map((m) => {
           const up = m.deltaBp > 0;

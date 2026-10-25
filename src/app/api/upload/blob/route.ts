@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   const auth = blobAuthOptions();
   if (!auth) {
-    return NextResponse.json({ error: "رفع الملفات الكبيرة غير مفعّل. الحد الأقصى ٣ ميجابايت للملف." }, { status: 404 });
+    return NextResponse.json({ error: "رفع الملفات الكبيرة غير مفعّل. الحد الأقصى 3 ميجابايت للملف." }, { status: 404 });
   }
 
   let raw: unknown;

@@ -103,6 +103,11 @@ export async function SupplierView({
   const showAmounts = can(user.role, "amounts:view");
 
   const [s] = await db.select().from(suppliers).where(eq(suppliers.slug, slug));
+  /* رابطٌ بالمعرّف لا بالاسم المختصر (كانت «الوضع الآن» تبنيه) يُحوَّل ولا يقع في «لم نجد هذه الصفحة» */
+  if (!s && /^[0-9a-f-]{36}$/i.test(slug)) {
+    const [byId] = await db.select({ slug: suppliers.slug }).from(suppliers).where(eq(suppliers.id, slug));
+    if (byId) redirect(`/suppliers/${encodeURIComponent(byId.slug)}${sp.tab ? `?tab=${encodeURIComponent(sp.tab)}` : ""}`);
+  }
   if (!s) {
     /* في اللوح يُقال الخبرُ في اللوح نفسه — صفحةُ ٤٠٤ العامّة كانت تأخذ مكانَه بلا إطاره ولا زرّ إغلاقه */
     if (mode !== "drawer") notFound();

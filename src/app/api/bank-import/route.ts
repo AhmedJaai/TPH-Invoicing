@@ -29,7 +29,7 @@ async function handle(request: Request) {
   const apply = form?.get("apply") === "true";
 
   if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "الملف أكبر من ٤ ميجابايت" }, { status: 400 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "الملف أكبر من 4 ميجابايت" }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const userId = user.id;

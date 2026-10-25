@@ -495,7 +495,7 @@ export async function addAdjustment(input: { employeeId: string; month: string; 
       const cap = input.kind === "FINE" ? damageCapMinor(wage) : loanCapMinor(wage);
       const room = cap - Number(total);
       if (input.amountMinor > room) {
-        const what = input.kind === "FINE" ? "لا يُحسم لتعويض الضرر في الشهر أكثر من أجر خمسة أيام (نظام العمل، م ٩١)" : "لا يزيد قسط السلفة على ١٠٪ من الراتب (نظام العمل، م ٩٢)";
+        const what = input.kind === "FINE" ? "لا يُحسم لتعويض الضرر في الشهر أكثر من أجر خمسة أيام (نظام العمل، م 91)" : "لا يزيد قسط السلفة على 10٪ من الراتب (نظام العمل، م 92)";
         throw new PayrollRefused(`${what}: الحد ${formatRiyalsDisplay(cap)} ريال${Number(total) > 0 ? `، وسُجّل منه ${formatRiyalsDisplay(Number(total))}` : ""}. سجّل الباقي في الشهر القادم.`);
       }
     }
@@ -785,7 +785,7 @@ async function saveSetting(key: string, value: string | null, actorId: string): 
 export async function saveCafePlace(place: { latMicro: number; lngMicro: number; radiusM: number | null } | null, actorId: string): Promise<void> {
   if (place && (Math.abs(place.latMicro) > 90_000_000 || Math.abs(place.lngMicro) > 180_000_000)) throw new PayrollRefused("الإحداثيات غير صحيحة.");
   const radiusM = place?.radiusM ?? DEFAULT_RADIUS_M;
-  if (place && (radiusM < 30 || radiusM > 1000)) throw new PayrollRefused("نصف القطر بين ٣٠ و١٠٠٠ متر.");
+  if (place && (radiusM < 30 || radiusM > 1000)) throw new PayrollRefused("نصف القطر بين 30 و1000 متر.");
   await saveSetting(PLACE_KEY, place ? JSON.stringify({ latMicro: place.latMicro, lngMicro: place.lngMicro, radiusM }) : null, actorId);
 }
 

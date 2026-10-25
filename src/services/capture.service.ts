@@ -122,7 +122,7 @@ export interface InspectedFile {
 export async function inspectFile(file: unknown): Promise<InspectedFile> {
   if (!(file instanceof File)) throw new CaptureInputError("لم تصل أي صورة. صوّر الفاتورة مرة أخرى.");
   if (file.size === 0) throw new CaptureInputError("الصورة فارغة. صوّرها مرة أخرى.");
-  if (file.size > CAPTURE_MAX_BYTES) throw new CaptureInputError("الصورة أكبر من ٤ ميجابايت. صوّر صفحات أقل في المرة الواحدة.");
+  if (file.size > CAPTURE_MAX_BYTES) throw new CaptureInputError("الصورة أكبر من 4 ميجابايت. صوّر صفحات أقل في المرة الواحدة.");
   const declared = uploadMimeType(file.type, file.name);
   if (!isSupportedUpload(declared)) throw new CaptureInputError("هذا الملف ليس صورة. صوّر الفاتورة بالكاميرا.");
   const buffer = Buffer.from(await file.arrayBuffer());

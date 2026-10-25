@@ -74,7 +74,7 @@ async function handle(request: Request) {
       return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "حجم الملف أكبر من ٤ ميجابايت. صغّره (صوّره بدقة أقل) ثم أعد المحاولة." }, { status: 400 });
+      return NextResponse.json({ error: "حجم الملف أكبر من 4 ميجابايت. صغّره (صوّره بدقة أقل) ثم أعد المحاولة." }, { status: 400 });
     }
     incoming = { buffer: Buffer.from(await file.arrayBuffer()), size: file.size, type: file.type, name: file.name };
   }

@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     file = await downloadFile(driveForUser(token), ref.driveFileId);
   } catch (e) {
     if (isDriveAuthError(e)) return fail(new DriveAuthExpiredError().message, 428);
-    if (e instanceof DriveFileTooLargeError) return fail("الملف أكبر من ٢٥ ميجابايت فلا يُعرض هنا. افتحه في الدرايف", 413);
+    if (e instanceof DriveFileTooLargeError) return fail("الملف أكبر من 25 ميجابايت فلا يُعرض هنا. افتحه في الدرايف", 413);
     if (isDriveNotFound(e)) return fail("الملف لم يعد في مكانه في الدرايف، أو لا تملك صلاحية فتحه", 404);
     /* نصُّ خطأ جوجل (وفيه معرّفُ الملفّ) لسجلّ الخادم لا للشاشة */
     console.error("[document-file] تعذّر تنزيل الورقة:", e);

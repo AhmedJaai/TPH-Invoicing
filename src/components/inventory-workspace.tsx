@@ -242,7 +242,7 @@ export function InventoryWorkspace({
         )}
         {top.length > 0 && (
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            <T s="النسبة = الفرق ÷ ما صُرف للمبيعات بحسب الوصفات. أي: من كل ١٠٠ جرام كان يُفترض أن تُصرف، كم ذهب بلا بيع؟ والمبلغ قيمة الفرق بالريال. {0}" a={[valuationNote(report)]} /></p>
+            <T s="النسبة = الفرق ÷ ما صُرف للمبيعات بحسب الوصفات. أي: من كل 100 جرام كان يُفترض أن تُصرف، كم ذهب بلا بيع؟ والمبلغ قيمة الفرق بالريال. {0}" a={[valuationNote(report)]} /></p>
         )}
       </Section>
 
@@ -268,7 +268,7 @@ export function InventoryWorkspace({
       {/* المرتجعُ المحضَّر: رقمٌ تغيّر بقرار أحمد (٢٤ أكتوبر ٢٠٢٦) — يُقال لماذا */}
       {(report.totals.returnedAfterPrep?.lines ?? 0) > 0 && report.totals.returnedAfterPrep && (
         <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
-          <T s="{0} {1} وحدة حُضّرت ثم أُرجعت{2}. تُحسب مستهلكة وهدراً معاً («مرتجع بعد التحضير»)، فلم تعد تُنقص الاستهلاك المتوقع كما كانت قبل ٢٤ أكتوبر ٢٠٢٦. والجاهز الذي يعود إلى الرف ما زال يُنقصه." a={[<strong key="0" className="text-ink">مرتجع بعد التحضير:</strong>, <span key="1" className="nums">{trim(report.totals.returnedAfterPrep.unitsMilli / 1000)}</span>, showAmounts && (
+          <T s="{0} {1} وحدة حُضّرت ثم أُرجعت{2}. تُحسب مستهلكة وهدراً معاً («مرتجع بعد التحضير»)، فلا تُنقص الاستهلاك المتوقع. والجاهز الذي يعود إلى الرف يُنقصه." a={[<strong key="0" className="text-ink">مرتجع بعد التحضير:</strong>, <span key="1" className="nums">{trim(report.totals.returnedAfterPrep.unitsMilli / 1000)}</span>, showAmounts && (
             report.totals.returnedAfterPrep.costMinor === null
               ? <Fragment key="2">، وتكلفة مكوناتها غير معروفة كلها</Fragment>
               : <Fragment key="2"><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.returnedAfterPrep.costMinor} />]} /></Fragment>

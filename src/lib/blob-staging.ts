@@ -57,7 +57,7 @@ export async function readStaged(url: string): Promise<Buffer> {
     throw new StagedFileError("لم يعد الملف المؤقت موجوداً (يُحذف بعد يوم). أعد اختيار الملف من جهازك.");
   }
   if (got.blob.size > MAX_STAGED_BYTES) {
-    throw new StagedFileError("الملف أكبر من ٢٥ ميجابايت.");
+    throw new StagedFileError("الملف أكبر من 25 ميجابايت.");
   }
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -68,7 +68,7 @@ export async function readStaged(url: string): Promise<Buffer> {
     total += value.byteLength;
     if (total > MAX_STAGED_BYTES) {
       await reader.cancel().catch(() => undefined);
-      throw new StagedFileError("الملف أكبر من ٢٥ ميجابايت.");
+      throw new StagedFileError("الملف أكبر من 25 ميجابايت.");
     }
     chunks.push(value);
   }

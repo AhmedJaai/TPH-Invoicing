@@ -96,10 +96,10 @@ describe("بالمفتاح", () => {
 
   it("ما جاوز ٢٥ ميجابايت يُردّ — بالحجم المعلن، أو وهو يُقرأ", async () => {
     getMock.mockResolvedValue({ statusCode: 200, stream: streamOf(), blob: { size: 26 * 1024 * 1024 } });
-    await expect(readStaged(OURS)).rejects.toThrow("٢٥");
+    await expect(readStaged(OURS)).rejects.toThrow("25");
     const big = new Uint8Array(13 * 1024 * 1024);
     getMock.mockResolvedValue({ statusCode: 200, stream: streamOf(big, big), blob: { size: 10 } });
-    await expect(readStaged(OURS)).rejects.toThrow("٢٥");
+    await expect(readStaged(OURS)).rejects.toThrow("25");
   });
 
   it("الكنسُ يحذف ما جاوز يوماً وحده", async () => {

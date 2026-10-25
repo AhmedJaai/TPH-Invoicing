@@ -27,10 +27,10 @@ export const dynamic = "force-dynamic";
  * القاعدةُ نفسها: يُعرَض ما وقع، ولا يُمدّ خطٌّ إلى المستقبل.
  */
 const WINDOWS = [
-  { key: "4", label: "آخر ٤ أسابيع", weeks: 4 },
-  { key: "8", label: "آخر ٨ أسابيع", weeks: 8 },
-  { key: "13", label: "آخر ٣ أشهر", weeks: 13 },
-  { key: "26", label: "آخر ٦ أشهر", weeks: 26 },
+  { key: "4", label: "آخر 4 أسابيع", weeks: 4 },
+  { key: "8", label: "آخر 8 أسابيع", weeks: 8 },
+  { key: "13", label: "آخر 3 أشهر", weeks: 13 },
+  { key: "26", label: "آخر 6 أشهر", weeks: 26 },
 ];
 
 export default async function InventoryTrendPage({
@@ -96,7 +96,7 @@ export default async function InventoryTrendPage({
               : `في السجل ${countNoun(finalisedAll, COUNT)} مقفلة خارج هذه المدة. وسّع المدة لتراها.`}
             action={finalisedAll === 0
               ? <LinkButton href="/inventory" variant="primary" size="sm">إلى الجرد الحالي</LinkButton>
-              : <LinkButton href="/inventory/trend?window=26" variant="primary" size="sm">آخر ٦ أشهر</LinkButton>}
+              : <LinkButton href="/inventory/trend?window=26" variant="primary" size="sm">آخر 6 أشهر</LinkButton>}
           />
         </div>
       ) : (

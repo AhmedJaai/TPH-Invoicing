@@ -316,7 +316,7 @@ export function buildPnl(input: PnlInput): Pnl {
   const viaStaffMinor = input.excluded.filter((x) => x.kind === "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);
   if (viaStaffMinor > 0) lines.push({ id: "excluded-purchases", label: "مبالغ أعطيتها موظفين ليسددوا فواتير مورّدين، محسوبة في المشتريات لا في المصروفات", amountMinor: viaStaffMinor, kind: "memo" });
   if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروبات الموظفين بتكلفتها، وهي داخلة في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
-  if (c.returnedMinor != null && c.returnedMinor > 0) lines.push({ id: "returned-after-prep", label: "مشروبات حُضّرت ثم أُرجعت بتكلفتها: داخلة في تكلفة المبيعات وتُعدّ هدراً (لم تعد تُنقص التكلفة منذ ٢٤ أكتوبر ٢٠٢٦)", amountMinor: c.returnedMinor, kind: "memo" });
+  if (c.returnedMinor != null && c.returnedMinor > 0) lines.push({ id: "returned-after-prep", label: "مشروبات حُضّرت ثم أُرجعت بتكلفتها: داخلة في تكلفة المبيعات وتُعدّ هدراً", amountMinor: c.returnedMinor, kind: "memo" });
 
   return {
     month,

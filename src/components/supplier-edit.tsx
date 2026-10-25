@@ -120,7 +120,7 @@ export function SupplierEdit({
           <label className="text-xs font-bold">
             <T s="الاسم بالإنجليزية{0}" a={[<input key="0" value={form.nameEn} onChange={(e) => set({ nameEn: e.target.value })} disabled={busy} dir="ltr" className={FIELD} />]} /></label>
           <label className="text-xs font-bold">
-            <T s="الرقم الضريبي{0}" a={[<input key="0" value={form.vatNumber} onChange={(e) => set({ vatNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="١٥ رقماً" className={`nums ${FIELD}`} />]} /></label>
+            <T s="الرقم الضريبي{0}" a={[<input key="0" value={form.vatNumber} onChange={(e) => set({ vatNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="15 رقماً" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
             <T s="السجل التجاري{0}" a={[<input key="0" value={form.crNumber} onChange={(e) => set({ crNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
@@ -153,7 +153,7 @@ export function SupplierEdit({
           <label className="text-xs font-bold">
             <T s="البريد الإلكتروني{0}" a={[<input key="0" value={form.email} onChange={(e) => set({ email: e.target.value })} disabled={busy} dir="ltr" inputMode="email" className={FIELD} />]} /></label>
           <label className="text-xs font-bold sm:col-span-2">
-            <T s="الآيبان{0}{1}" a={[<input key="0" value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. (٢٤ خانة)" className={`nums font-mono ${FIELD}`} />, <span key="1" className="mt-1 block text-[11px] font-normal text-muted">
+            <T s="الآيبان{0}{1}" a={[<input key="0" value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. (24 خانة)" className={`nums font-mono ${FIELD}`} />, <span key="1" className="mt-1 block text-[11px] font-normal text-muted">
               يُتحقق من صحته تلقائياً، ويُستخدم في ملف التحويلات. أما الحساب الذي حوّلت له من قبل فيُقرأ تلقائياً من الكشوف، فاكتبه فقط إن لم تحوّل له قبل الآن أو غيّر حسابه.
             </span>]} /></label>
         </div>

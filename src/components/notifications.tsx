@@ -131,7 +131,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         open={open}
         onClose={() => setOpen(false)}
         title="الإشعارات"
-        description="ما استجد منذ آخر زيارة، وملخص آخر ٢٤ ساعة."
+        description="ما استجد منذ آخر زيارة، وملخص آخر 24 ساعة."
         footer={
           <>
             <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-ink-soft hover:bg-hover sm:min-h-8">
@@ -230,7 +230,7 @@ function DigestPanel({ feed }: { feed: NoticeFeed }) {
     <div>
       {quiet && (
         <p className="mb-3 rounded-lg bg-sunken px-3 py-2 text-xs text-muted">
-          يوم هادئ: لم يصل مستند ولم يُتخذ قرار في آخر ٢٤ ساعة.
+          يوم هادئ: لم يصل مستند ولم يُتخذ قرار في آخر 24 ساعة.
         </p>
       )}
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">

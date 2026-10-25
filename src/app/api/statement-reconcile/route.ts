@@ -139,7 +139,7 @@ async function handle(request: Request) {
   } else {
     if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
     if (file.size === 0) return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
-    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف أكبر من ٤ ميجابايت، وهو الحد الأقصى" }, { status: 400 });
+    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف أكبر من 4 ميجابايت، وهو الحد الأقصى" }, { status: 400 });
     if (!isSupportedUpload(file.type)) {
       return NextResponse.json({ error: "نوع الملف غير مدعوم. المقبول: PDF أو صورة." }, { status: 400 });
     }

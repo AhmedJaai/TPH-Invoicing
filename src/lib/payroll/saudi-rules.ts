@@ -52,15 +52,15 @@ const FIRE: Penalty = { kind: "DISMISSAL", withGratuity: true };
 
 /** جدولُ «مخالفات تتعلّق بمواعيد العمل» وما يكثر في المقهى من غيره — بأرقام بنوده في اللائحة. */
 export const RULES: Readonly<Record<string, ViolationRule>> = {
-  "1/1": { code: "1/1", label: "تأخر حتى ١٥ دقيقة دون تعطيل غيره", ladder: [W, P(5), P(10), P(20)], plusTimeWage: true },
-  "1/2": { code: "1/2", label: "تأخر حتى ١٥ دقيقة وعطّل غيره", ladder: [W, P(15), P(25), P(50)], plusTimeWage: true },
-  "1/3": { code: "1/3", label: "تأخر من ١٥ إلى ٣٠ دقيقة دون تعطيل غيره", ladder: [P(10), P(15), P(25), P(50)], plusTimeWage: true },
-  "1/4": { code: "1/4", label: "تأخر من ١٥ إلى ٣٠ دقيقة وعطّل غيره", ladder: [P(25), P(50), P(75), D(1)], plusTimeWage: true },
-  "1/5": { code: "1/5", label: "تأخر من ٣٠ إلى ٦٠ دقيقة دون تعطيل غيره", ladder: [P(25), P(50), P(75), D(1)], plusTimeWage: true },
-  "1/6": { code: "1/6", label: "تأخر من ٣٠ إلى ٦٠ دقيقة وعطّل غيره", ladder: [P(30), P(50), D(1), D(2)], plusTimeWage: true },
+  "1/1": { code: "1/1", label: "تأخر حتى 15 دقيقة دون تعطيل غيره", ladder: [W, P(5), P(10), P(20)], plusTimeWage: true },
+  "1/2": { code: "1/2", label: "تأخر حتى 15 دقيقة وعطّل غيره", ladder: [W, P(15), P(25), P(50)], plusTimeWage: true },
+  "1/3": { code: "1/3", label: "تأخر من 15 إلى 30 دقيقة دون تعطيل غيره", ladder: [P(10), P(15), P(25), P(50)], plusTimeWage: true },
+  "1/4": { code: "1/4", label: "تأخر من 15 إلى 30 دقيقة وعطّل غيره", ladder: [P(25), P(50), P(75), D(1)], plusTimeWage: true },
+  "1/5": { code: "1/5", label: "تأخر من 30 إلى 60 دقيقة دون تعطيل غيره", ladder: [P(25), P(50), P(75), D(1)], plusTimeWage: true },
+  "1/6": { code: "1/6", label: "تأخر من 30 إلى 60 دقيقة وعطّل غيره", ladder: [P(30), P(50), D(1), D(2)], plusTimeWage: true },
   "1/7": { code: "1/7", label: "تأخر أكثر من ساعة", ladder: [W, D(1), D(2), D(3)], plusTimeWage: true },
-  "1/8": { code: "1/8", label: "انصراف قبل الموعد حتى ١٥ دقيقة", ladder: [W, P(10), P(25), D(1)], plusTimeWage: true },
-  "1/9": { code: "1/9", label: "انصراف قبل الموعد أكثر من ١٥ دقيقة", ladder: [P(10), P(25), P(50), D(1)], plusTimeWage: true },
+  "1/8": { code: "1/8", label: "انصراف قبل الموعد حتى 15 دقيقة", ladder: [W, P(10), P(25), D(1)], plusTimeWage: true },
+  "1/9": { code: "1/9", label: "انصراف قبل الموعد أكثر من 15 دقيقة", ladder: [P(10), P(25), P(50), D(1)], plusTimeWage: true },
   "1/11": { code: "1/11", label: "غياب دون إذن من يوم إلى ثلاثة أيام", ladder: [D(1), D(2), D(3), D(4)], plusTimeWage: true },
   "1/12": { code: "1/12", label: "غياب دون إذن من أربعة إلى ستة أيام", ladder: [D(2), D(3), D(4), FIRE], plusTimeWage: true },
   "1/13": { code: "1/13", label: "غياب دون إذن من سبعة إلى عشرة أيام", ladder: [D(4), D(5), FIRE], plusTimeWage: true },

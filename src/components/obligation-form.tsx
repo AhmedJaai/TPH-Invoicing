@@ -94,7 +94,7 @@ export function ObligationForm({ existing, preset }: {
           <Field label="تاريخ الانتهاء" required error={tried ? dateError : null} hint="بالتاريخ الميلادي.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="date" dir="ltr" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} />}
           </Field>
-          <Field label="ذكّرني قبلها بكم يوم؟" required error={tried ? remindError : null} hint="مثلاً: ٣٠ يوماً للرخص و٩٠ يوماً لعقد الإيجار.">
+          <Field label="ذكّرني قبلها بكم يوم؟" required error={tried ? remindError : null} hint="مثلاً: 30 يوماً للرخص و90 يوماً لعقد الإيجار.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="text" inputMode="numeric" dir="ltr" className="nums" value={remindDays} onChange={(e) => setRemindDays(e.target.value.replace(/[^\d]/g, ""))} />}
           </Field>
           <Field label="الجهة المصدرة">

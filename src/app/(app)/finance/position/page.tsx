@@ -27,7 +27,9 @@ const tillColumns: Column<TillRow>[] = [
       if (!t.closed || t.varianceMinor === null) return <span className="text-[11px] text-muted">—</span>;
       /* أُقفل بلا عدّ: المعدودُ صفرٌ والمتوقَّعُ مال — «لم يُعَدّ» لا نقص */
       if (t.countedMinor === 0 && (t.expectedMinor ?? 0) > 0) return <span className="text-[11px] font-bold text-warn">أُقفل بلا عدّ</span>;
-      if (Math.abs(t.varianceMinor) < TILL_SMALL_MINOR) return <span className="text-[11px] text-muted">فكّة</span>;
+      /* «فكّة» كانت تُقال فوق فرقٍ صفر وفوق سبعة عشر ريالاً معاً — المطابقُ يُسمّى، والصغيرُ يُرى رقمُه خافتاً */
+      if (t.varianceMinor === 0) return <span className="text-[11px] text-ok">مطابق</span>;
+      if (Math.abs(t.varianceMinor) < TILL_SMALL_MINOR) return <span className="text-muted"><Money minor={t.varianceMinor} signed /> <span className="text-[11px]">فكّة</span></span>;
       return <Money minor={t.varianceMinor} signed />;
     },
   },
@@ -94,7 +96,7 @@ export default async function FinancePositionPage() {
           {pos.suppliers.top.length === 0 ? (
             <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد مبالغ مستحقة لأي مورّد الآن.</p>
           ) : (
-            <BarList items={pos.suppliers.top.map((s) => ({ key: s.supplierId, label: s.name, minor: s.owedMinor, href: `/suppliers/${s.supplierId}` }))} />
+            <BarList items={pos.suppliers.top.map((s) => ({ key: s.supplierId, label: s.name, minor: s.owedMinor, href: s.slug ? `/suppliers/${encodeURIComponent(s.slug)}` : "/suppliers" }))} />
           )}
         </Section>
 
@@ -102,7 +104,7 @@ export default async function FinancePositionPage() {
           <ul className="space-y-2">
             {pos.vat.map((v) => (
               <li key={v.periodKey} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-line bg-raised px-4 py-3 text-sm shadow-raised">
-                <span><T s="ضريبة {0}{1}، حتى {2}" a={[v.label, v.accruing && <span key="1" className="ms-1 text-[11px] text-muted">(تتراكم)</span>, <bdi key="2">{formatDay(v.deadline)}</bdi>]} /></span>
+                <span><T s="ضريبة {0}{1}، حتى {2}" a={[v.label, v.accruing && <span key="1" className="text-[11px] text-muted"> (تتراكم)</span>, <bdi key="2">{formatDay(v.deadline)}</bdi>]} /></span>
                 <span className="font-bold"><MaybeMoney minor={v.amountMinor} why="أيام بلا كشف" /></span>
               </li>
             ))}

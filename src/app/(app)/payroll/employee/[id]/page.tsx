@@ -154,7 +154,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                   note={[slip!.warnings > 0 ? `${slip!.warnings} إنذار كتابي بلا خصم` : null, slip!.penaltiesDroppedMinor > 0 ? `وزاد ${formatRiyalsDisplay(slip!.penaltiesDroppedMinor)} على حد أجر خمسة أيام فلا يُحسم` : null].filter(Boolean).join(" · ") || undefined}
                   minor={slip!.penaltiesMinor} sign="−" />
               )}
-              {slip!.overHalfMinor > 0 && <p className="py-2 text-[11px] font-bold text-warn">زادت الخصومات على نصف الراتب، فلم يُحسم {formatRiyalsDisplay(slip!.overHalfMinor)} ريال (نظام العمل، م ٩٢)</p>}
+              {slip!.overHalfMinor > 0 && <p className="py-2 text-[11px] font-bold text-warn">زادت الخصومات على نصف الراتب، فلم يُحسم {formatRiyalsDisplay(slip!.overHalfMinor)} ريال (نظام العمل، م 92)</p>}
               <Line label="المستحق عن الشهر" minor={slip!.earnedMinor} strong />
               {slip!.advancesMinor > 0 && <Line label="سلف نقداً على الراتب" minor={slip!.advancesMinor} sign="−" />}
               <Line label="حُوّل له" minor={slip!.paidMinor} sign="−" note={slip!.paidOutsideMinor > 0 ? `منها ${formatRiyalsDisplay(slip!.paidOutsideMinor)} خارج كشف البنك` : undefined} />
@@ -220,10 +220,10 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
       {row && employee.kind === "MONTHLY" && (
         <Section id="violations" title="المخالفات والجزاءات" icon={Scale} count={row.violations.length}
-          hint="من جدول المخالفات في لائحة تنظيم العمل النموذجية: الجزاء بنوع المخالفة ومرتها خلال ١٨٠ يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
+          hint="من جدول المخالفات في لائحة تنظيم العمل النموذجية: الجزاء بنوع المخالفة ومرتها خلال 180 يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
           {row.article80.map((a) => (
             <Callout key={a.start} tone="danger" icon={TriangleAlert} className="mb-3" title={`غاب ${a.days} أيام متصلة من ${formatDay(a.start)}`}>
-              الغياب أكثر من عشرة أيام متصلة يجيز الفصل دون مكافأة بشرط إنذاره كتابةً بعد خمسة أيام غياب (نظام العمل، م ٨٠). هذا قرارك، ولا يُحسم له مبلغ هنا غير أجر أيام الغياب.
+              الغياب أكثر من عشرة أيام متصلة يجيز الفصل دون مكافأة بشرط إنذاره كتابةً بعد خمسة أيام غياب (نظام العمل، م 80). هذا قرارك، ولا يُحسم له مبلغ هنا غير أجر أيام الغياب.
             </Callout>
           ))}
           {row.violations.length === 0 ? <EmptyState compact icon={Scale} title="لا مخالفات هذا الشهر." /> : (
@@ -302,7 +302,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </Section>
       )}
 
-      <Section id="salary" title="الراتب" icon={Wallet} count={employee.rates.length} hint={employee.kind === "MONTHLY" ? "كل تغيير يسري من شهره حتى التغيير التالي: مثلاً من مايو ٣٠٠٠، ومن سبتمبر ٣٥٠٠." : "أجر الساعة، يسري من شهره."}>
+      <Section id="salary" title="الراتب" icon={Wallet} count={employee.rates.length} hint={employee.kind === "MONTHLY" ? "كل تغيير يسري من شهره حتى التغيير التالي: مثلاً من مايو 3000، ومن سبتمبر 3500." : "أجر الساعة، يسري من شهره."}>
         {employee.rates.length > 0 && (
           <ul className="mb-3 divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {[...employee.rates].reverse().map((r) => (

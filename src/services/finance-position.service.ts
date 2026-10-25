@@ -35,7 +35,7 @@ export const TILL_SMALL_MINOR = 20_00;
 
 export interface FinancePosition {
   bank: { balanceMinor: number | null; asOf: string | null };
-  suppliers: { totals: BalanceTotals; overdue: OverdueBalance[]; top: { supplierId: string; name: string; owedMinor: number }[] };
+  suppliers: { totals: BalanceTotals; overdue: OverdueBalance[]; top: { supplierId: string; slug: string | null; name: string; owedMinor: number }[] };
   vat: VatDue[];
   /** ضريبةُ مبيعات فودكس للربع الجاري — شاهدٌ بجانب رقم الإقرار. */
   cash: {
@@ -88,9 +88,10 @@ export async function loadFinancePosition(): Promise<FinancePosition> {
         from foodics_tills group by 1
     `),
     loadTills(30),
-    db.execute<{ id: string; name: string }>(sql`select id, name_ar as name from suppliers`),
+    db.execute<{ id: string; name: string; slug: string }>(sql`select id, name_ar as name, slug from suppliers`),
   ]);
   const nameOf = new Map(names.rows.map((r) => [r.id, r.name]));
+  const slugOf = new Map(names.rows.map((r) => [r.id, r.slug]));
   const tillOf = new Map(tillMonths.rows.map((r) => [r.month, r]));
   const months = cash.rows.map((r) => {
     const t = tillOf.get(r.month);
@@ -101,7 +102,7 @@ export async function loadFinancePosition(): Promise<FinancePosition> {
     suppliers: {
       totals: balances.totals, overdue,
       top: balances.rows.filter((r) => r.owedMinor > 0).sort((a, b) => b.owedMinor - a.owedMinor).slice(0, 8)
-        .map((r) => ({ supplierId: r.supplierId, name: nameOf.get(r.supplierId) ?? "مورّد", owedMinor: r.owedMinor })),
+        .map((r) => ({ supplierId: r.supplierId, slug: slugOf.get(r.supplierId) ?? null, name: nameOf.get(r.supplierId) ?? "مورّد", owedMinor: r.owedMinor })),
     },
     vat,
     cash: {

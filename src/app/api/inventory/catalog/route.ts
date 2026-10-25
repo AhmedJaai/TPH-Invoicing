@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   }
   for (const f of uploads) {
     if (f.size > MAX_BYTES) {
-      return NextResponse.json({ error: `«${f.name}» أكبر من ٤ ميجابايت` }, { status: 400 });
+      return NextResponse.json({ error: `«${f.name}» أكبر من 4 ميجابايت` }, { status: 400 });
     }
   }
 

@@ -40,7 +40,7 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
       v.amountMinor === null ? "—" : v.amountMinor === 0 ? "إنذار" : `− ${money(v.amountMinor)}`,
     ]),
     ...(s.penaltiesDroppedMinor > 0 ? [["ما زاد على حد أجر خمسة أيام للجزاءات فلا يُحسم", `+ ${money(s.penaltiesDroppedMinor)}`] as [string, string]] : []),
-    ...(s.overHalfMinor > 0 ? [["ما زاد على نصف الراتب فلا يُحسم (م ٩٢)", `+ ${money(s.overHalfMinor)}`] as [string, string]] : []),
+    ...(s.overHalfMinor > 0 ? [["ما زاد على نصف الراتب فلا يُحسم (م 92)", `+ ${money(s.overHalfMinor)}`] as [string, string]] : []),
     ["المستحق", money(s.earnedMinor), true],
     ...(s.advancesMinor > 0 ? [["سلف نقداً", `− ${money(s.advancesMinor)}`] as [string, string]] : []),
     ...row.links.filter((l) => l.purpose === "SALARY" || l.purpose === "ADVANCE").map((l): [string, string] => [`${PURPOSE_LABEL[l.purpose]} محوّل ${formatDay(l.txDay)}`, `− ${money(l.amountMinor)}`]),

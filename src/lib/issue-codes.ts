@@ -44,7 +44,7 @@ export const ISSUE_TEXT: Record<IssueCode, { severity: Severity; message: string
   ZERO_VAT: { severity: "WARN", message: "لا ضريبة على الفاتورة، فلا يُخصم منها شيء" },
   NOT_A_TAX_INVOICE: { severity: "BLOCKER", message: "عرض سعر أو طلبية مبدئية، فلا تُسجَّل فاتورةً" },
   VAT_MATH_MISMATCH: { severity: "WARN", message: "الأرقام غير متطابقة: الإجمالي لا يساوي الصافي مع الضريبة" },
-  POSSIBLE_FIXED_ASSET: { severity: "WARN", message: "قد تكون أصلاً ثابتاً (فوق ٣٬٠٠٠ ريال)، فتُرسمَل ولا تُسجَّل مصروفاً" },
+  POSSIBLE_FIXED_ASSET: { severity: "WARN", message: "قد تكون أصلاً ثابتاً (فوق 3,000 ريال)، فتُرسمَل ولا تُسجَّل مصروفاً" },
   SUPPLIER_WITHOUT_CONTRACT: { severity: "WARN", message: "مورّد لا يصدر فواتير وليس له عقد توريد" },
   LOW_CONFIDENCE_FIELD: { severity: "WARN", message: "حقول قُرئت بثقة ضعيفة، وتحتاج إلى مراجعتك" },
   TAX_STATUS_UNKNOWN: { severity: "WARN", message: "لم يُقرأ التفصيل الضريبي، فحالة الفاتورة غير معروفة لا غير صالحة. اقرأ المستند لتتأكد" },

@@ -121,7 +121,7 @@ describe("/api/document-file", () => {
     downloadMock.mockRejectedValue(new DriveFileTooLargeError(40 * 1024 * 1024));
     const res = await get();
     expect(res.status).toBe(413);
-    expect((await res.json()).error).toContain("٢٥");
+    expect((await res.json()).error).toContain("25");
   });
 
   it("التفويضُ المنتهي يُقال ٤٢٨، والغائبُ من الدرايف ٤٠٤، وغيرُهما ٥٠٢ بلا نصّ جوجل", async () => {

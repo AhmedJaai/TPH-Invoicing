@@ -230,7 +230,7 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
               {rule && (
                 <span className="block">
                   وفوقه جزاء البند {rule.code} من لائحة تنظيم العمل «{rule.label}»: {rule.ladder.map((p, i) => `${ORDINAL[i]} ${penaltyLabel(p)}`).join("، ")}.
-                  تُحسب المرة من سجله خلال ١٨٠ يوماً.
+                  تُحسب المرة من سجله خلال 180 يوماً.
                 </span>
               )}
             </span>}

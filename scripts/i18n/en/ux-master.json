@@ -25,5 +25,7 @@
 "الأرجح أن القراءة أخطأت اليوم والشهر. فالفاتورة تُحتسب في شهر لم يأتِ، فتغيب عن ضريبة شهرها وإقفاله، وتجعل «آخر تعامل» مع المورّد يوماً لم يأتِ.": "The reading most likely swapped the day and month. The invoice is counted in a month that hasn't come, so it's missing from its own month's VAT and close, and makes the supplier's last activity a future day.",
 "افتحها وصحّح التاريخ كما على الورقة.": "Open it and correct the date as on the paper.",
 "صحّح التاريخ": "Correct the date",
-"الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة.": "The reading most likely swapped the day and month. Correct it as on the paper."
+"الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة.": "The reading most likely swapped the day and month. Correct it as on the paper.",
+"مطابق": "Matches",
+"فكّة": "small change"
 }

@@ -25,7 +25,7 @@ const Body = z.object({
     والفارغُ «غير معروف» ومقبول.
   */
   vatNumber: z.string().max(30).optional()
-    .refine((v) => !v?.trim() || isValidSaudiVat(v), "الرقم الضريبي ١٥ رقماً يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً."),
+    .refine((v) => !v?.trim() || isValidSaudiVat(v), "الرقم الضريبي 15 رقماً يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً."),
   /** «هو غيرُ من يشبهونه» — بعد ردّ 409 `similar`. */
   confirmNew: z.boolean().optional(),
 });

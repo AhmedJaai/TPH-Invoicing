@@ -84,7 +84,7 @@ export default async function RecurringPage() {
               icon={CalendarClock}
               label="مجموعها في السنة"
               value={<Money minor={w.annualMinor} />}
-              sub="المبلغ المعتاد لكل جهة × ١٢. هذا تقدير، لا مبلغ فعلي."
+              sub="المبلغ المعتاد لكل جهة × 12. هذا تقدير، لا مبلغ فعلي."
             />
             <KeyFigure
               icon={Plus}

@@ -198,7 +198,7 @@ export async function GET() {
       healthy: overall,
       checks: { ...checks, providerReachable, aiBalance, driveToken },
       ...(tokenKeyMissing
-        ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر)، فيُحفظ رمز الدرايف بلا تشفير. اضبطه في Vercel، ثم سجّل الخروج وادخل من جديد."] }
+        ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (32 حرفاً فأكثر)، فيُحفظ رمز الدرايف بلا تشفير. اضبطه في Vercel، ثم سجّل الخروج وادخل من جديد."] }
         : {}),
       ...(envProblems.length > 0 ? { env: envProblems } : {}),
       at: new Date().toISOString(),

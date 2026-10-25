@@ -173,7 +173,7 @@ export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): E
       conflicts.push({
         code: "VAT_FORMAT",
         fields: ["sellerVatNumber"],
-        message: `الرقم الضريبيّ للبائع «${sellerVat}» ليس ١٥ رقماً أوّلها وآخرها ٣`,
+        message: `الرقم الضريبيّ للبائع «${sellerVat}» ليس 15 رقماً أوّلها وآخرها 3`,
       });
     }
   }
@@ -216,7 +216,7 @@ export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): E
           code: "VAT_RATE_ODD",
           fields: ["subtotalAmount", "vatAmount"],
           message:
-            `الضريبة ${x.vatAmount} تخالف ١٥٪ من الصافي ` +
+            `الضريبة ${x.vatAmount} تخالف 15٪ من الصافي ` +
             `(المتوقَّع ${formatRiyalsDisplay(expected)})`,
         });
       }

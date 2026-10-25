@@ -131,7 +131,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         {board.length === 0 ? <EmptyState icon={Users} title="لا موظفين يعملون في هذا اليوم." /> : <DataTable columns={columns} rows={board} keyOf={(b) => b.employee.id} hrefOf={(b) => `/payroll/employee/${b.employee.id}?month=${month}`} />}
       </Section>
 
-      <Section id="review" title="تسجيلات تحتاج حكمك" icon={ShieldCheck} count={unreviewed.length} hint="سُجّلت والجوال بعيد عن المقهى، أو بلا موقع، ولم يكن على شبكة المقهى. اقبلها إن كان في المقهى فعلاً، أو ردّها فلا تُحسب ويسقط ما حُسب منها. وإن سجّل وهو خارج المقهى عمداً فهي مخالفة «التلاعب في إثبات الحضور» (البند ٢/٧).">
+      <Section id="review" title="تسجيلات تحتاج حكمك" icon={ShieldCheck} count={unreviewed.length} hint="سُجّلت والجوال بعيد عن المقهى، أو بلا موقع، ولم يكن على شبكة المقهى. اقبلها إن كان في المقهى فعلاً، أو ردّها فلا تُحسب ويسقط ما حُسب منها. وإن سجّل وهو خارج المقهى عمداً فهي مخالفة «التلاعب في إثبات الحضور» (البند 2/7).">
         {unreviewed.length === 0 ? <EmptyState compact icon={ShieldCheck} title="لا شيء ينتظر." /> : (
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {unreviewed.map((c) => (

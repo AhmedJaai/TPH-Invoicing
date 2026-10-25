@@ -683,7 +683,7 @@ export function Uploader({
     if (staged && file.size > MAX_STAGED_BYTES) {
       const tooBig: Item = {
         id, fileName: file.name, state: "failed", mime: file.type, captureId, file,
-        error: "الملف أكبر من ٢٥ ميجابايت، وهو الحد الأقصى للرفع. صغّره أو قسّمه ثم أعد المحاولة.",
+        error: "الملف أكبر من 25 ميجابايت، وهو الحد الأقصى للرفع. صغّره أو قسّمه ثم أعد المحاولة.",
       };
       setItems((prev) => prev.map((it) => (it.id === id ? tooBig : it)));
       return;
@@ -692,8 +692,8 @@ export function Uploader({
       const tooBig: Item = {
         id, fileName: file.name, state: "failed", mime: file.type, captureId, file,
         error: file.type.startsWith("image/")
-          ? "الصورة أكبر من ٣ ميجابايت، ولم يستطع المتصفح تصغيرها. صدّرها بصيغة JPG من تطبيق الصور ثم أعد المحاولة."
-          : "الملف أكبر من ٣ ميجابايت، وهو الحد الأقصى للأرشفة. صغّر ملف PDF ثم أعد المحاولة.",
+          ? "الصورة أكبر من 3 ميجابايت، ولم يستطع المتصفح تصغيرها. صدّرها بصيغة JPG من تطبيق الصور ثم أعد المحاولة."
+          : "الملف أكبر من 3 ميجابايت، وهو الحد الأقصى للأرشفة. صغّر ملف PDF ثم أعد المحاولة.",
       };
       setItems((prev) => prev.map((it) => (it.id === id ? tooBig : it)));
       return;
@@ -1107,7 +1107,7 @@ export function Uploader({
         if (built.length <= MAX_BYTES) { pdf = built; break; }
       }
       if (!pdf) {
-        setMergeError("الصفحات المضمومة أكبر من ٣ ميجابايت حتى بعد التصغير. اضمم عدداً أقل منها، أو ارفعها مستندات منفصلة.");
+        setMergeError("الصفحات المضمومة أكبر من 3 ميجابايت حتى بعد التصغير. اضمم عدداً أقل منها، أو ارفعها مستندات منفصلة.");
         return;
       }
       const file = new File([pdf], `مستند-${chosenPages.length}-صفحات.pdf`, { type: "application/pdf" });
@@ -1521,8 +1521,8 @@ export function Uploader({
         {!compact && (
           <p className="mt-5 text-center text-[11px] text-muted">
             {largeUploads
-              ? "حتى ٢٥ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"
-              : "حتى ٣ ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"}
+              ? "حتى 25 ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"
+              : "حتى 3 ميجابايت للملف · لا يُحفظ شيء قبل أن تؤكد ما قرأه النظام"}
           </p>
         )}
       </div>

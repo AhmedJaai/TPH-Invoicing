@@ -44,7 +44,7 @@ export async function WasteBoardSection() {
               <T s="سُجّل فيها هدر {0}{1}" a={[countNoun(b.recordCount, TIME), b.unknownCount > 0 && <span key="1" className="font-bold text-warn"> <T s=" · منها {0} تكلفتها غير معروفة، وهي خارج المجموع" a={[countNoun(b.unknownCount, TIME)]} /></span>]} /></p>
             {b.returnedAfterPrep.lines > 0 && (
               <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                <T s="منذ ٢٤ أكتوبر ٢٠٢٦: المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً ({0} مرتجعاً بعد التحضير، من أسطر البيع لا من سجل يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
+                <T s="المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً ({0} مرتجعاً بعد التحضير، من أسطر البيع لا من سجل يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
             )}
             <div className="mt-4">
               <BarList
