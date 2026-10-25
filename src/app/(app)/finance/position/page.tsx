@@ -92,7 +92,10 @@ export default async function FinancePositionPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-        <Section title="لمن تدين" icon={HandCoins} action={<LinkButton href="/payments" size="sm" variant="quiet">دفعة الشهر</LinkButton>}>
+        {/* «دفعة الشهر» لمن يعتمد الدفعة وحده — كانت تفتح للمحاسب «خارج صلاحيتك» (زاحفُ الأدوار) */}
+        <Section title="لمن تدين" icon={HandCoins} action={can(user.role, "payment:approve")
+          ? <LinkButton href="/payments" size="sm" variant="quiet">دفعة الشهر</LinkButton>
+          : <LinkButton href="/suppliers" size="sm" variant="quiet">حسابات المورّدين</LinkButton>}>
           {pos.suppliers.top.length === 0 ? (
             <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد مبالغ مستحقة لأي مورّد الآن.</p>
           ) : (
