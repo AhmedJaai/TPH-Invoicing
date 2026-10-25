@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, FolderSync, X } from "lucide-react";
-import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
+import { DOCUMENT, FILE, INVOICE, QUOTATION, countNoun } from "@/lib/arabic";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
@@ -370,7 +370,7 @@ export function DriveSync() {
 
           {result?.applied && (
             <p className="mt-3 flex items-start gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
-              <T s="{0}سُجّل {1} مستنداً، منها {2}{3}{4}" a={[<CircleCheck key="0" className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />, s.created ?? 0, countNoun(s.invoicesCreated ?? 0, INVOICE), s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : "", s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج إلى قراءة` : ""]} /></p>
+              <T s="{0}سُجّل {1}، منها {2}{3}{4}" a={[<CircleCheck key="0" className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />, countNoun(s.created ?? 0, DOCUMENT), countNoun(s.invoicesCreated ?? 0, INVOICE), s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : "", s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج إلى قراءة` : ""]} /></p>
           )}
 
           {/*

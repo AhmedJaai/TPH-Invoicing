@@ -1,5 +1,5 @@
 import {
-  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms,
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms, EMPLOYEE, MONTH,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import type { Capability } from "./permissions";
@@ -764,7 +764,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       impact: { kind: paid > 0 ? "RECOVERABLE" : "AT_RISK", amountMinor: total },
       evidence: list.slice(0, 6).map((r) => ({
         label: `${r.supplierName} · ${r.firstNumber} و${r.secondNumber}`,
-        sub: `بينهما ${r.gapDays === 0 ? "اليوم نفسه" : r.gapDays === 1 ? "يوم" : r.gapDays === 2 ? "يومان" : `${r.gapDays} أيام`}`
+        sub: `بينهما ${r.gapDays === 0 ? "اليوم نفسه" : r.gapDays === 1 ? "يوم" : r.gapDays === 2 ? "يومان" : countNoun(r.gapDays, DAY)}`
           + (r.foodicsReceipts === 1 ? " · وفودكس سجّل استلاماً واحداً" : r.foodicsReceipts === 0 ? " · ولا يوجد استلام في فودكس" : "")
           + (r.bothPaid ? " · سُدّدتا" : ""),
         amountMinor: r.atStakeMinor,
@@ -785,7 +785,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "HIGH",
       title: list.length === 1
         ? `فاتورة مبدئية من ${list[0].supplierName} بلا فاتورتها الضريبية`
-        : `${list.length} فواتير مبدئية بلا فواتيرها الضريبية`,
+        : list.length === 2 ? "فاتورتان مبدئيتان بلا فاتورتيهما الضريبيتين"
+        : list.length <= 10 ? `${list.length} فواتير مبدئية بلا فواتيرها الضريبية` : `${list.length} فاتورةً مبدئيةً بلا فواتيرها الضريبية`,
       detail: "الموجود في الدرايف فاتورة مبدئية (Proforma) لا الفاتورة الضريبية، فلا تُسجَّل ولا تُخصم ضريبتها. وما تحوّله للمورّد على أساسها يُخصَّص على أقدم فواتيره المفتوحة.",
       action: "اطلب الفاتورة الضريبية من المورّد وارفعها، ثم راجع الفواتير التي خُصّص عليها ما حوّلته له.",
       actionLabel: list.length === 1 ? "افتح حساب المورّد" : "افتح المستندات",
@@ -814,7 +815,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: short.length > 0 ? "HIGH" : "MEDIUM",
       title: gaps.length === 1
         ? `دفعة شبكة ${formatDay(gaps[0].day)} لا تطابق بطاقات فودكس`
-        : `${gaps.length} دفعات شبكة لا تطابق بطاقات فودكس`,
+        : gaps.length === 2 ? "دفعتا شبكة لا تطابقان بطاقات فودكس"
+        : gaps.length <= 10 ? `${gaps.length} دفعات شبكة لا تطابق بطاقات فودكس` : `${gaps.length} دفعةَ شبكة لا تطابق بطاقات فودكس`,
       detail: short.length > 0
         ? "في بعض الأيام سجّل فودكس بطاقات أكثر مما دخل الحساب، وفي أيام أخرى دخل الحساب أكثر مما سجّله."
         : "دخل الحساب من الشبكة أكثر مما سجّله فودكس بالبطاقة. ربما بيع سُجّل نقداً ودُفع بالبطاقة، أو عملية على الجهاز بلا طلب.",
@@ -860,7 +862,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "MEDIUM",
       title: list.length === 1
         ? `شراء من ${list[0].supplierName} في فودكس بلا فاتورة عندنا`
-        : `${list.length} حركات شراء في فودكس بلا فاتورة عندنا`,
+        : list.length === 2 ? "حركتا شراء في فودكس بلا فاتورة عندنا"
+        : list.length <= 10 ? `${list.length} حركات شراء في فودكس بلا فاتورة عندنا` : `${list.length} حركةَ شراء في فودكس بلا فاتورة عندنا`,
       detail: "حركة شراء مرحّلة في فودكس لمورّد مربوط، ولا توجد في الدرايف فاتورة برقمها نفسه أو بتاريخها ومبلغها.",
       action: "اطلب الفاتورة من المورّد أو ارفعها. وإن لم تكن هناك فاتورة متوقعة فأسكت التنبيه من صفحته.",
       actionLabel: "افتح فودكس والفواتير",
@@ -979,7 +982,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "PAYMENTS",
       severity: "HIGH",
       title: `رواتب ${formatMonth(o.month)}: باقٍ ${formatRiyalsDisplay(o.remainingMinor)} ريال لم يُحوَّل`,
-      detail: `${o.people === 1 ? "موظف واحد" : `${o.people} موظفين`} لم يصلهم مستحقهم كاملاً بعد الخصومات والسلف. وإن كنت حوّلت فالحوالة لم توزَّع على أصحابها بعد.`,
+      detail: `${countNoun(o.people, EMPLOYEE)} لم يصلهم مستحقهم كاملاً بعد الخصومات والسلف. وإن كنت حوّلت فالحوالة لم توزَّع على أصحابها بعد.`,
       action: "حوّل الباقي، ثم وزّع الحوالات على أصحابها من المسيّر.",
       actionLabel: "افتح المسيّر",
       href: `/payroll?month=${o.month}`,
@@ -1013,7 +1016,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "MEDIUM",
       title: pay.unlinkedSalary.count > 0
         ? `${countNoun(pay.unlinkedSalary.count, TRANSFER)} رواتب في الكشف لم تُنسب لموظف`
-        : `${pay.missingRates.length === 1 ? pay.missingRates[0] : `${pay.missingRates.length} موظفين`} بلا راتب مكتوب`,
+        : `${pay.missingRates.length === 1 ? pay.missingRates[0] : countNoun(pay.missingRates.length, EMPLOYEE)} بلا راتب مكتوب`,
       detail: [
         pay.unlinkedSalary.count > 0 ? "بدون نسبتها لا يعرف المسيّر ما حُوّل لكل موظف، ولا كم بقي له." : null,
         pay.missingRates.length > 0 ? `لم يُكتب راتب ${pay.missingRates.join("، ")} لهذا الشهر، فمستحقه غير معروف.` : null,
@@ -1086,7 +1089,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "MEDIUM",
       title: shortages.length === 1
-        ? `«${shortages[0].name}» يخرج من المخزون أكثر مما تفسّره وصفته، منذ ${shortages[0].months} أشهر متتالية`
+        ? `«${shortages[0].name}» يخرج من المخزون أكثر مما تفسّره وصفته، منذ ${countNoun(shortages[0].months, MONTH)} على التوالي`
         : `${countNoun(shortages.length, PRODUCT)} تخرج من المخزون أكثر مما تفسّره وصفاتها`,
       detail: "الفرق تكرر شهرين فأكثر، فيبعد أن يكون خطأ عدّ عابراً. قد يكون هدراً غير مسجّل، أو وصفة أقل من الكمية المستخدمة فعلاً (جرعة أكبر، أو ضبط الطحن)، أو تسرّباً. والبيانات وحدها لا تحدد السبب.",
       action: "راجع الوصفة: هل تطابق الكمية المستخدمة فعلاً؟ وسجّل الهدر حين يقع ليخرج من الفرق.",
@@ -1095,7 +1098,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: shortages.length,
       impact: { kind: "AT_RISK", amountMinor: shortages.reduce((s, g) => s + g.totalMinor, 0) },
       evidence: shortages.slice(0, 6).map((g) => ({
-        label: g.name, sub: `${g.months} أشهر متتالية${g.byWitness ? " · بمشتريات فودكس" : ""}`, amountMinor: g.totalMinor,
+        label: g.name, sub: `${countNoun(g.months, MONTH)} على التوالي${g.byWitness ? " · بمشتريات فودكس" : ""}`, amountMinor: g.totalMinor,
         href: `/finance/stock/item?id=${g.productId}&month=all`,
       })),
     });
@@ -1114,7 +1117,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/finance/stock#recurring",
       count: overs.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: overs.reduce((s, g) => s + g.totalMinor, 0) },
-      evidence: overs.slice(0, 6).map((g) => ({ label: g.name, sub: `${g.months} أشهر متتالية`, amountMinor: g.totalMinor, href: `/finance/stock/item?id=${g.productId}&month=all` })),
+      evidence: overs.slice(0, 6).map((g) => ({ label: g.name, sub: `${countNoun(g.months, MONTH)} على التوالي`, amountMinor: g.totalMinor, href: `/finance/stock/item?id=${g.productId}&month=all` })),
     });
   }
 

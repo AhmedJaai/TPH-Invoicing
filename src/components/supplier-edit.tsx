@@ -1,5 +1,7 @@
 "use client";
 
+import { DAY, INVOICE, countNoun } from "@/lib/arabic";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
@@ -138,7 +140,7 @@ export function SupplierEdit({
           <label className="text-xs font-bold">
             <T s="مهلة السداد (بالأيام){0}{1}{2}" a={[<input key="0" value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً، والفراغ = غير معروف" className={`nums ${FIELD}`} />, <span key="1" className="mt-1 block text-[11px] font-normal text-muted">بها تُحسب حالة «تجاوز المهلة» في صفحة المورّد، بدلاً من مهلة ثابتة (ستين يوماً) للجميع.</span>, termsHint && form.paymentTermsDays.trim() === "" && (
               <span key="2" className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-accent-line bg-accent-soft px-2.5 py-1.5 text-[11px] font-normal text-ink-soft">
-                <span><T s="تدفع له عادةً بعد {0} يوماً (الوسيط لـ{1} فاتورة مسدّدة)." a={[<bdi key="0" className="nums font-bold text-ink">{termsHint.medianDays}</bdi>, <bdi key="1" className="nums">{termsHint.sampleCount}</bdi>]} /></span>
+                <span><T s="تدفع له عادةً بعد {0} (الوسيط لـ{1} مسدّدة)." a={[<bdi key="0" className="nums font-bold text-ink">{countNoun(termsHint.medianDays, DAY)}</bdi>, <bdi key="1" className="nums">{countNoun(termsHint.sampleCount, INVOICE)}</bdi>]} /></span>
                 <button type="button" disabled={busy} onClick={() => set({ paymentTermsDays: String(termsHint.medianDays) })} className="font-bold text-accent hover:underline">
                   اعتمدها مهلة للسداد
                 </button>

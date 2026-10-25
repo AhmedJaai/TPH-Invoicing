@@ -1,3 +1,4 @@
+import { INVOICE, countNoun } from "@/lib/arabic";
 /**
  * «قيّد الناقصة من الكشف» — فواتيرُ يذكرها كشفُ المورّد ولا ملفَّ لها.
  * الطلبُ معرّفُ الكشف وحده (zod)، والخادمُ يقرأ أسطرَه ويقيّد في معاملةٍ واحدة.
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const out = await db.transaction((tx) => recordStatementOnlyInvoices(tx, read.body.statementId, user.id));
     const total = out.created.reduce((s, c) => s + c.amountMinor, 0);
     const parts = [
-      out.created.length > 0 ? `سُجّلت ${out.created.length} فاتورة من الكشف بمبلغ ${formatRiyalsDisplay(total)}. لا تُخصم ضريبتها حتى يصل ملفها.` : "لا توجد فواتير ناقصة لتُسجَّل",
+      out.created.length > 0 ? `سُجّلت من الكشف ${countNoun(out.created.length, INVOICE)} بمبلغ ${formatRiyalsDisplay(total)}. لا تُخصم ضريبتها حتى يصل ملفها.` : "لا توجد فواتير ناقصة لتُسجَّل",
       out.matchedByAmount.length > 0 ? `و${out.matchedByAmount.length} مرجعها في الكشف مقروء خطأً، فطوبقت بفاتورتنا التي باليوم والمبلغ نفسيهما (${out.matchedByAmount.map((m) => m.invoiceNumber).join("، ")}) ولم تُسجَّل ثانية` : null,
       out.ambiguous.length > 0 ? `و${out.ambiguous.length} لها عندنا أكثر من فاتورة باليوم والمبلغ نفسيهما فلم تُسجَّل (${out.ambiguous.map((a) => `${a.date} · ${formatRiyalsDisplay(a.amountMinor)}`).join("، ")}). قارنها بورقة الكشف` : null,
       out.unclear.length > 0 ? `و${out.unclear.length} مرجعها ملتبس (${out.unclear.map((u) => u.ref).join("، ")}) فلم تُسجَّل. إن كانت فاتورة فعلاً فارفع ملفها أو سجّلها بيدك` : null,

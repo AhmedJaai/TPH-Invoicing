@@ -1,3 +1,4 @@
+import { MONTH, PRODUCT, countNoun } from "@/lib/arabic";
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -137,7 +138,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
           icon={ShoppingCart}
           label={month ? "المشترى في الشهر" : "المشترى"}
           value={<Money minor={t.purchasedMinor} currency />}
-          sub={<><T s="من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في {0} صنفاً، وفودكس أكمل في {1}، ويتفقان في {2}.{3}" a={[<strong key="0" className="text-ink">{t.invoicesBetter}</strong>, <strong key="1" className="text-ink">{t.foodicsBetter}</strong>, t.sourcesAgree, b.unlinkedInvoiceMinor > 0 && <Fragment key="3"> <T s=" وهناك بنود فواتير بقيمة {0} لم تُربط بعد." a={[<Money key="0" minor={b.unlinkedInvoiceMinor} />]} /></Fragment>]} /></>}
+          sub={<><T s="من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في {0}، وفودكس أكمل في {1}، ويتفقان في {2}.{3}" a={[<strong key="0" className="text-ink">{countNoun(t.invoicesBetter, PRODUCT)}</strong>, <strong key="1" className="text-ink">{countNoun(t.foodicsBetter, PRODUCT)}</strong>, countNoun(t.sourcesAgree, PRODUCT), b.unlinkedInvoiceMinor > 0 && <Fragment key="3"> <T s=" وهناك بنود فواتير بقيمة {0} لم تُربط بعد." a={[<Money key="0" minor={b.unlinkedInvoiceMinor} />]} /></Fragment>]} /></>}
           href="/finance/stock/links"
         />
         <KeyFigure
@@ -158,14 +159,14 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
           tone={(t.lostMinor ?? 0) > 0 ? "warn" : undefined}
           value={t.lostMinor === null ? <span className="text-xl text-muted">لا يوجد جرد يقيسه</span> : <Money minor={t.lostMinor} currency />}
           sub={b.countDay
-            ? <><T s="المتوقع يوم العدّ {0} مطروحاً منه ما عُدّ فعلاً، في {1} صنفاً.{2}" a={[<bdi key="0">{formatDay(b.countDay)}</bdi>, t.counted, t.foundMinor !== null && t.foundMinor < 0 && <Fragment key="2"> <T s=" ووُجد في أصناف أخرى أكثر مما سُجّل شراؤه بقيمة {0}." a={[<Money key="0" minor={-t.foundMinor} />]} /></Fragment>]} /></>
+            ? <><T s="المتوقع يوم العدّ {0} مطروحاً منه ما عُدّ فعلاً، في {1}.{2}" a={[<bdi key="0">{formatDay(b.countDay)}</bdi>, countNoun(t.counted, PRODUCT), t.foundMinor !== null && t.foundMinor < 0 && <Fragment key="2"> <T s=" ووُجد في أصناف أخرى أكثر مما سُجّل شراؤه بقيمة {0}." a={[<Money key="0" minor={-t.foundMinor} />]} /></Fragment>]} /></>
             : "لم يُعدّ الرف بعد، وقد يكون «المتوقع» كله موجوداً عليه."}
           href="/inventory"
         />
       </div>
 
       {short.length > 0 && (
-        <Callout tone="warn" icon={Info} className="mt-4" title={`${short.length} صنفاً بيع منها أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
+        <Callout tone="warn" icon={Info} className="mt-4" title={`${countNoun(short.length, PRODUCT)} بيع منها أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
           action={<LinkButton href="/finance/stock/links" size="sm">اربط البنود</LinkButton>}>
           هذا ليس خطأً من المقهى، بل مشتريات لم تدخل الحساب: فاتورة لم تُربط بصنفها، أو لم تُدخل في فودكس، أو بضاعة اشتُريت قبل الافتتاح. اربط بنود الفواتير لتكتمل الصورة.
         </Callout>
@@ -178,7 +179,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
               <li key={`${g.productId}${g.kind}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3">
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="text-sm font-bold">
-                    <T s="{0} — {1}: {2} في {3} أشهر" a={[<Link key="0" href={`/finance/stock/item?id=${g.productId}&month=all`} className="hover:underline">{g.name}</Link>, g.kind === "SHORTAGE" ? "يخرج من الرف أكثر مما تفسّره وصفته" : "بيع منه أكثر مما اشتريت", <Money key="2" minor={g.totalMinor} />, g.months.length]} /></p>
+                    <T s="{0} — {1}: {2} في {3}" a={[<Link key="0" href={`/finance/stock/item?id=${g.productId}&month=all`} className="hover:underline">{g.name}</Link>, g.kind === "SHORTAGE" ? "يخرج من الرف أكثر مما تفسّره وصفته" : "بيع منه أكثر مما اشتريت", <Money key="2" minor={g.totalMinor} />, countNoun(g.months.length, MONTH)]} /></p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                     {g.months.map((m) => formatMonth(m)).join(" · ")}.{" "}
                     {g.kind === "SHORTAGE" ? "راجع الوصفة وتأكد أنها تطابق ما يُصرف فعلاً، وسجّل الهدر حين يحدث." : "ربما توجد فاتورة ناقصة. افتح الصنف وراجع فواتيره."}

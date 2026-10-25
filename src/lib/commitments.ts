@@ -14,7 +14,7 @@
  */
 import { occursIn, PAYDAY, withoutPayrollDuplicates, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
 import { daysInMonth, formatMonth } from "@/lib/riyadh-time";
-import { countNoun, SUPPLIER } from "./arabic";
+import { countNoun, EMPLOYEE, SUPPLIER } from "./arabic";
 import { addMonths } from "./filing";
 
 export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY" | "PAYROLL";
@@ -117,7 +117,7 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
     if (p.amountMinor <= 0) continue;
     put(`${p.month}-${String(PAYDAY).padStart(2, "0")}`, {
       id: `pay:${p.month}`, kind: "PAYROLL", label: `رواتب ${formatMonth(p.month)}${p.month < thisMonth ? "، لم تُحوَّل كاملة" : ""}`,
-      sub: `${p.people === 1 ? "موظف واحد" : p.people === 2 ? "موظفان" : `${p.people} موظفين`}${p.unknownPeople > 0 ? ` · ومعهم ${p.unknownPeople} بلا راتب مكتوب لم يُحسب` : ""}`,
+      sub: `${countNoun(p.people, EMPLOYEE)}${p.unknownPeople > 0 ? ` · ومعهم ${countNoun(p.unknownPeople, EMPLOYEE)} بلا راتب مكتوب لم يُحسب` : ""}`,
       amountMinor: p.amountMinor,
       ...(input.payrollHref ? { href: `/payroll?month=${p.month}` } : {}),
     });

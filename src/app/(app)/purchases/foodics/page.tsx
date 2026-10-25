@@ -10,7 +10,7 @@ import { FoodicsStatusBar } from "@/components/foodics-status";
 import { FoodicsSupplierLink } from "@/components/foodics-supplier-link";
 import { SignalControls } from "@/components/signal-controls";
 import { Badge, Callout, DataTable, EmptyState, KeyFigure, LinkButton, NoAccess, Section } from "@/components/ui";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { milliToDecimal } from "@/lib/inventory/units";
@@ -224,7 +224,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                     <div className="min-w-0 flex-1 basis-56">
                       <p className="text-sm font-bold">{s.name}</p>
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                        <T s="{0} حركة بمجموع {1}. {2}" a={[<span key="0" className="nums">{s.purchases}</span>, <Money key="1" minor={s.totalMinor} />, hint
+                        <T s="{0} بمجموع {1}. {2}" a={[<span key="0" className="nums">{countNoun(s.purchases, TRANSACTION)}</span>, <Money key="1" minor={s.totalMinor} />, hint
                           ? <Fragment key="2"><T s="المورّد المقترح «{0}»: طابقت {1} من حركاته فواتيرَه رقماً ومبلغاً." a={[hint.supplierName, <span key="1" className="nums">{hint.evidence}</span>]} /></Fragment>
                           : byName
                             ? <Fragment key="2"><T s="لم تطابق حركاته أي فاتورة برقمها بعد. الاسم يشبه «{0}»، لكن {1}، فتأكد قبل الربط." a={[byName.supplierName, <strong key="1">تشابه الأسماء ليس دليلاً</strong>]} /></Fragment>
@@ -391,7 +391,7 @@ function LinkedRow({ s, canLink, suppliers }: { s: FoodicsSupplierRow; canLink: 
     <li className="flex flex-wrap items-center gap-3">
       <p className="min-w-0 flex-1 basis-56">
         <span className="font-bold text-ink">{s.name}</span> ← {s.linkedSupplierName}
-        <span className="ms-2 text-muted"><T s="{0} حركة" a={[<span key="0" className="nums">{s.purchases}</span>]} /></span>
+        <span className="ms-2 text-muted"><span className="nums">{countNoun(s.purchases, TRANSACTION)}</span></span>
       </p>
       {canLink && (
         <div className="min-w-0 flex-1 basis-72">
@@ -403,7 +403,7 @@ function LinkedRow({ s, canLink, suppliers }: { s: FoodicsSupplierRow; canLink: 
 }
 
 function RepeatRow({ r, canSilence }: { r: RepeatDelivery; canSilence: boolean }) {
-  const gap = r.gapDays === 0 ? "في اليوم نفسه" : r.gapDays === 1 ? "بينهما يوم" : r.gapDays === 2 ? "بينهما يومان" : `بينهما ${r.gapDays} أيام`;
+  const gap = r.gapDays === 0 ? "في اليوم نفسه" : r.gapDays === 1 ? "بينهما يوم" : r.gapDays === 2 ? "بينهما يومان" : `بينهما ${countNoun(r.gapDays, DAY)}`;
   return (
     <li className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${r.silenced ? "border-line bg-surface" : "border-warn/30 bg-warn-bg"}`}>
       <div className="min-w-0 flex-1 basis-56">

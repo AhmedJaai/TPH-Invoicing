@@ -1,3 +1,4 @@
+import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CalendarClock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
@@ -136,7 +137,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 label={employee.kind === "PART_TIME" ? `أجر الأسابيع (${row.weeks.length})` : "الراتب"}
                 minor={slip!.baseMinor}
                 note={employee.kind === "MONTHLY" && slip!.days && slip!.days.worked < slip!.days.of
-                  ? `${slip!.days.worked} يوماً من ${slip!.days.of} من راتب ${rate !== null ? formatRiyalsDisplay(rate) : "غير معروف"}`
+                  ? `${countNoun(slip!.days.worked, DAY)} من ${slip!.days.of} من راتب ${rate !== null ? formatRiyalsDisplay(rate) : "غير معروف"}`
                   : employee.kind === "PART_TIME" && rate !== null ? `أجر الساعة ${formatRiyalsDisplay(rate)}` : undefined}
               />
               {row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a) => (
@@ -222,7 +223,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <Section id="violations" title="المخالفات والجزاءات" icon={Scale} count={row.violations.length}
           hint="من جدول المخالفات في لائحة تنظيم العمل النموذجية: الجزاء بنوع المخالفة ومرتها خلال 180 يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
           {row.article80.map((a) => (
-            <Callout key={a.start} tone="danger" icon={TriangleAlert} className="mb-3" title={`غاب ${a.days} أيام متصلة من ${formatDay(a.start)}`}>
+            <Callout key={a.start} tone="danger" icon={TriangleAlert} className="mb-3" title={`غاب ${countNoun(a.days, DAY)} متصلة من ${formatDay(a.start)}`}>
               الغياب أكثر من عشرة أيام متصلة يجيز الفصل دون مكافأة بشرط إنذاره كتابةً بعد خمسة أيام غياب (نظام العمل، م 80). هذا قرارك، ولا يُحسم له مبلغ هنا غير أجر أيام الغياب.
             </Callout>
           ))}

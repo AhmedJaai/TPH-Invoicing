@@ -29,7 +29,7 @@ export async function SupplierLeverage() {
         </li>
         {spend && (
           <li>
-            <T s="أكبر {0} يمثّلون {1} من مشترياتك ({2} عند {3}): {4}.{5}" a={[spend.top.length === 1 ? "مورّد" : `${spend.top.length} مورّدين`, <bdi key="1" className="font-bold text-ink">{shareText(spend.topShareBp)}</bdi>, <Money key="2" minor={spend.totalMinor} />, countNoun(spend.supplierCount, SUPPLIER), spend.top.map((t, i) => (
+            <T s="أكبر {0} يمثّلون {1} من مشترياتك ({2} عند {3}): {4}.{5}" a={[spend.top.length === 1 ? "مورّد" : countNoun(spend.top.length, SUPPLIER), <bdi key="1" className="font-bold text-ink">{shareText(spend.topShareBp)}</bdi>, <Money key="2" minor={spend.totalMinor} />, countNoun(spend.supplierCount, SUPPLIER), spend.top.map((t, i) => (
               <span key={t.supplierId}>
                 {i > 0 && "، "}
                 <Link href={`/suppliers/${t.slug}`} className="font-bold hover:underline" dir="auto">{t.name}</Link> <bdi>{shareText(t.shareBp)}</bdi>

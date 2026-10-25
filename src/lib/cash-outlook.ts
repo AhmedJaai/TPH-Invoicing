@@ -21,6 +21,7 @@
 import { formatDay, formatMonth, addDays, daysInMonth } from "./riyadh-time";
 import { MAX_AMOUNT_MINOR, formatRiyalsDisplay } from "./money";
 import { addMonths, monthsBetween } from "./filing";
+import { EMPLOYEE, countNoun } from "./arabic";
 
 export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
 
@@ -229,8 +230,8 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     label: `رواتب ${formatMonth(p.month)}`,
     sub: [
       p.month < thisMonth ? "لم تُحوَّل كاملة" : `يوم ${PAYDAY}`,
-      `${p.people === 1 ? "موظف واحد" : p.people === 2 ? "موظفان" : `${p.people} موظفين`}`,
-      p.unknownPeople > 0 ? `ومعهم ${p.unknownPeople === 1 ? "موظف" : `${p.unknownPeople} موظفين`} بلا راتب مكتوب لم يُحسب` : null,
+      countNoun(p.people, EMPLOYEE),
+      p.unknownPeople > 0 ? `ومعهم ${countNoun(p.unknownPeople, EMPLOYEE)} بلا راتب مكتوب لم يُحسب` : null,
       (p.undistributedMinor ?? 0) > 0 ? `بعد خصم ${formatRiyalsDisplay(p.undistributedMinor ?? 0)} حُوّلت ولم توزَّع` : null,
     ].filter(Boolean).join(" · "),
     amountMinor: p.amountMinor,

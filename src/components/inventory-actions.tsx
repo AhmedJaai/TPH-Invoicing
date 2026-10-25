@@ -7,7 +7,7 @@ import { buttonClass } from "./ui";
 import { ConfirmAction, Sheet, toast } from "./ui-client";
 import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
 import { weekOf, type Week } from "@/lib/inventory/week";
-import { ITEM, countNoun } from "@/lib/arabic";
+import { ITEM, PRODUCT, countNoun } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
 import { addDays, MS_PER_DAY } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
@@ -220,7 +220,7 @@ export function FinaliseCount({
         consequence={
           `ستُجمَّد الأرقام كما هي الآن، وتُحفظ مصادرها (نسخ الوصفات وبنود الفواتير).`
           + ` ولن يتغيّر هذا التقرير بعدها، حتى لو عدّلت وصفة أو وصلت فاتورة.`
-          + (uncounted > 0 ? ` و${uncounted} صنفاً لم يُدخل لها عدّ فعلي، فستُقفل دون حساب فرقها.` : "")
+          + (uncounted > 0 ? ` و${countNoun(uncounted, PRODUCT)} لم يُدخل لها عدّ فعلي، فستُقفل دون حساب فرقها.` : "")
           + (partial ? " والتقرير جزئي: بعض المبيعات غير محسوبة، وهذا مذكور فيه." : "")
         }
         acknowledgement="أفهم أن التقرير سيُجمَّد، وأن إعادة فتحه تحتاج إلى صلاحية المالك وسبب مكتوب."

@@ -1,3 +1,4 @@
+import { ITEM, countNoun } from "@/lib/arabic";
 /**
  * إقرارُ اقتراحات ربط بنود الفواتير بأصناف المخزون — ما أيّده فودكس بشاهدَين فأكثر.
  *
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     if (done.linked === 0) return NextResponse.json({ error: "لم يُربط أي بند، لأن الاقتراحات تغيّرت. حدّث الصفحة." }, { status: 409 });
     return NextResponse.json({
       ok: true,
-      message: `رُبط ${done.linked} بنداً بقيمة ${formatRiyalsDisplay(done.valueMinor)} ريال${done.skipped > 0 ? `، وتُخطّي ${done.skipped} لأن اقتراحه تغيّر` : ""}`,
+      message: `رُبط ${countNoun(done.linked, ITEM)} بقيمة ${formatRiyalsDisplay(done.valueMinor)} ريال${done.skipped > 0 ? `، وتُخطّي ${countNoun(done.skipped, ITEM)} لأن اقتراحه تغيّر` : ""}`,
     });
   } catch (e) {
     const mapped = respondTo(e);

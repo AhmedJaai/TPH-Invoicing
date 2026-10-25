@@ -1,3 +1,4 @@
+import { TRANSACTION, countNoun } from "@/lib/arabic";
 import { Fragment } from "react";
 import { CircleAlert, CircleCheck, PlugZap, RefreshCw } from "lucide-react";
 import { formatDay, formatMoment } from "@/lib/riyadh-time";
@@ -44,7 +45,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
         <p className="mt-0.5 text-xs leading-relaxed text-muted">
           {failed && status.lastRun?.error ? <>{status.lastRun.error} · </> : null}
           {status.orders > 0
-            ? <><T s="{0} طلباً من {1} إلى {2} · {3} حركة شراء. القراءة فقط، ولا يُكتب شيء في فودكس." a={[<span key="0" className="nums">{status.orders.toLocaleString("ar-SA-u-nu-latn")}</span>, <bdi key="1">{formatDay(status.firstDay)}</bdi>, <bdi key="2">{formatDay(status.lastDay)}</bdi>, <span key="3" className="nums">{status.purchases}</span>]} /></>
+            ? <><T s="{0} طلباً من {1} إلى {2} · {3} شراء. القراءة فقط، ولا يُكتب شيء في فودكس." a={[<span key="0" className="nums">{status.orders.toLocaleString("ar-SA-u-nu-latn")}</span>, <bdi key="1">{formatDay(status.firstDay)}</bdi>, <bdi key="2">{formatDay(status.lastDay)}</bdi>, <span key="3" className="nums">{countNoun(status.purchases, TRANSACTION)}</span>]} /></>
             : "لم تُقرأ أي طلبات بعد. اضغط «زامن الآن» لقراءة الأيام الأخيرة."}
         </p>
         <div className="mt-1.5"><ScheduledRunLine run={status.scheduled} cadence="كل ثلاث ساعات" /></div>
