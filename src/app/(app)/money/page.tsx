@@ -160,7 +160,7 @@ export default async function MoneyPage({
           title="أين ذهب الخارج"
           icon={PieChart}
           className="mt-0!"
-          hint={`ما خرج في ${periodLabel} موزّعاً على تصنيفاته، ومجموعها هو كل ما خرج. سداد المورّدين محسوب ضمن المشتريات، وسحب المالك ليس مصروفاً.`}
+          hint={`ما خرج في ${periodLabel} موزّعاً على تصنيفاته، ومجموعها هو كل ما خرج. سداد المورّدين محسوب ضمن المشتريات. وتحويلاتك الشخصية خارج «مصروفات التشغيل» هنا، وتُطرح من «الربح» كما اخترت.`}
           action={
             <Link href={month ? `/money/expenses?month=${month}` : "/money/expenses"} className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
               <T s="تفاصيل المصروفات {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>

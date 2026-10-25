@@ -27,5 +27,10 @@
 "صحّح التاريخ": "Correct the date",
 "الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة.": "The reading most likely swapped the day and month. Correct it as on the paper.",
 "مطابق": "Matches",
-"فكّة": "small change"
+"فكّة": "small change",
+"افتح المسيّر {0}": "Open payroll {0}",
+"الإيجار والفواتير الثابتة لا تظهر بعد": "Rent and fixed bills aren't shown yet",
+"لا توجد مصروفات متكررة مسجّلة، فالجدول أعلاه يعرض دفعات المورّدين والرواتب والضريبة. سجّل الإيجار وما يتكرر كل شهر مع يومه ليدخل في التقدير.": "No recurring expenses are recorded, so the table above shows supplier payments, salaries and VAT. Record rent and anything that repeats monthly, with its day, to include it.",
+"{0} يُحسب ما سيخرج وحده لا ما سيدخل، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}": "{0} Only what will go out is counted, not what will come in, and expenses not recorded as recurring don't appear. So the balance after each stage is the least you can expect to remain.{1}",
+"{0} في الكشف لم توزَّع بعد": "{0} in the statement not yet distributed"
 }

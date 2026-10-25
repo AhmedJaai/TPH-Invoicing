@@ -37,7 +37,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   }
 
   const withVat = (await searchParams).vat !== "off";
-  const o = await loadCashOutlook({ withVat });
+  const o = await loadCashOutlook({ withVat, canSeePayroll: can(user.role, "payroll:view") });
+  const hasPayroll = o.buckets.some((b) => b.lines.some((l) => l.kind === "PAYROLL"));
   /* المحاسبُ لا يعتمد الدفعة — فسطرُ المورّد يفتح حساباته لا صفحةً تقول «خارج صلاحيتك» */
   const canPay = can(user.role, "payment:approve");
   const payHref = canPay ? "/payments" : "/suppliers";
@@ -56,7 +57,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       user={user}
       width="wide"
       title="السيولة القادمة"
-      intro="المبالغ المعروفة التي ستخرج من الحساب في الأسابيع القادمة: دفعات المورّدين والمصروفات المتكررة وضريبة القيمة المضافة، مقارنةً بآخر رصيد معروف."
+      intro="المبالغ المعروفة التي ستخرج من الحساب في الأسابيع القادمة: دفعات المورّدين والرواتب والمصروفات المتكررة وضريبة القيمة المضافة، مقارنةً بآخر رصيد معروف."
       actions={
         <LinkButton href="/settings#recurring" icon={Plus} variant="secondary">
           مصروف متكرر
@@ -112,7 +113,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       )}
 
       <Callout tone="info" icon={Info} className="mt-4">
-        <T s="{0} لا تُحسب المبالغ الداخلة لأن مبيعات فودكس غير مربوطة، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}" a={[<strong key="0" className="text-ink">تقدير لا تنبؤ:</strong>, o.heldMinor > 0 && <Fragment key="1"> <T s=" وهناك {0} محجوزة إلى أن تصل الفواتير الصحيحة، ولا تُحسب هنا." a={[<Money key="0" minor={o.heldMinor} />]} /></Fragment>]} /></Callout>
+        <T s="{0} يُحسب ما سيخرج وحده لا ما سيدخل، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}" a={[<strong key="0" className="text-ink">تقدير لا تنبؤ:</strong>, o.heldMinor > 0 && <Fragment key="1"> <T s=" وهناك {0} محجوزة إلى أن تصل الفواتير الصحيحة، ولا تُحسب هنا." a={[<Money key="0" minor={o.heldMinor} />]} /></Fragment>]} /></Callout>
 
       {/* ── حدُّ الرصيد: تحذيرٌ بما يكسره — لا يمنع دفعةً ولا يغيّر رقماً ── */}
       {o.breach && (
@@ -190,10 +191,12 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           tone="accent"
           icon={Repeat}
           className="mt-6"
-          title="الإيجار والرواتب لا يظهران بعد"
+          title={hasPayroll ? "الإيجار والفواتير الثابتة لا تظهر بعد" : "الإيجار والرواتب لا يظهران بعد"}
           action={<LinkButton href="/settings#recurring" variant="primary" size="sm" icon={Plus}>سجّلها</LinkButton>}
         >
-          لا توجد مصروفات متكررة مسجّلة، فالجدول أعلاه يعرض دفعات المورّدين فقط. سجّل ما يتكرر كل شهر مع يومه ليدخل في التقدير.
+          {hasPayroll
+            ? "لا توجد مصروفات متكررة مسجّلة، فالجدول أعلاه يعرض دفعات المورّدين والرواتب والضريبة. سجّل الإيجار وما يتكرر كل شهر مع يومه ليدخل في التقدير."
+            : "لا توجد مصروفات متكررة مسجّلة، فالجدول أعلاه يعرض دفعات المورّدين فقط. سجّل ما يتكرر كل شهر مع يومه ليدخل في التقدير."}
         </Callout>
       )}
 
@@ -232,8 +235,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
 function overdueSub(lines: readonly { kind: string }[]): string {
   const suppliers = lines.filter((l) => l.kind === "SUPPLIER").length;
   const vat = lines.some((l) => l.kind === "VAT");
+  const payroll = lines.some((l) => l.kind === "PAYROLL");
   const parts = [
-    ...(suppliers > 0 ? [`${countNoun(suppliers, SUPPLIER)} من دفعة الشهر الماضي لم تُحوَّل مستحقاتهم بعد`] : []),
+    /* «مورّد واحد … لم تُحوَّل مستحقاتهم» — الضميرُ يتبع العدد */
+    ...(suppliers > 0 ? [`${countNoun(suppliers, SUPPLIER)} من دفعة الشهر الماضي لم ${suppliers === 1 ? "تُحوَّل مستحقاته" : suppliers === 2 ? "تُحوَّل مستحقاتهما" : "تُحوَّل مستحقاتهم"} بعد`] : []),
+    ...(payroll ? ["رواتب شهر مضى لم تُحوَّل كاملة"] : []),
     ...(vat ? ["ضريبة فات موعد إقرارها"] : []),
   ];
   return parts.join(" · ");

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, Fragment } from "react";
-import { CircleAlert, FlaskConical, Repeat, RotateCcw, Store, Percent } from "lucide-react";
+import { CircleAlert, FlaskConical, Repeat, RotateCcw, Store, Percent, Users } from "lucide-react";
 import { Money } from "./money";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -127,9 +127,11 @@ export function CashTimeline({
                             className="h-4 w-4 accent-[var(--accent)]"
                           />
                         </label>
+{/* بلا وجهةٍ لهذا الدور (الرواتب للمالك وحده) يُعرض السطرُ ولا يُفتح على «خارج صلاحيتك» */}
+                        {l.href ? (
                         <Link href={l.href} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 transition-colors hover:text-accent">
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
-                            {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
+                            {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "PAYROLL" ? <Users className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[13px]">
                             {l.label}
@@ -138,6 +140,19 @@ export function CashTimeline({
                           </span>
                           <span className="nums-col shrink-0 text-[13px] font-bold"><Money minor={l.amountMinor} /></span>
                         </Link>
+                        ) : (
+                        <div className="flex min-w-0 flex-1 items-center gap-3 py-2.5">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
+                            {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "PAYROLL" ? <Users className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[13px]">
+                            {l.label}
+                            {l.sub && <span className="ms-2 text-[11px] text-muted">{l.sub}</span>}
+                            {moved && <span className="ms-2 text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
+                          </span>
+                          <span className="nums-col shrink-0 text-[13px] font-bold"><Money minor={l.amountMinor} /></span>
+                        </div>
+                        )}
                       </li>
                     );
                   })}

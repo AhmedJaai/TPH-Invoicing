@@ -8,6 +8,9 @@
  *      وتكبر كلّما وصلت فاتورة؛ فيُقال «حتى اليوم».
  *   ٣. المصروفاتُ المتكرّرة المسجّلة — في يومها إن عُرف، وإلّا في شهرها
  *      بلا يوم («يومٌ غير محدَّد») ولا يُخترَع لها يوم.
+ *   ٤. الرواتبُ من المسيّر — ما بقي من الشهر الماضي متأخّر، وما بقي من الجاري
+ *      يومَ ٢٥ (موعدُ الرواتب)، والشهرُ القادم كاملاً من الرواتب المكتوبة. كانت
+ *      الصفحةُ تقول «الإيجار والرواتب لا يظهران» والمسيّرُ يعرف الباقي بالهللة.
  *
  * والوارد لا يُحسَب: المبيعاتُ غير موصولة، فالإسقاطُ حدٌّ أدنى للنقد لا
  * توقّعٌ له — ويُقال ذلك. والرصيدُ الابتدائيّ آخرُ رصيدٍ ختاميٍّ معروف؛
@@ -62,6 +65,8 @@ export interface OutlookInput {
   /** آخرُ رصيدٍ معروف — `null` مجهول. */
   balanceMinor: number | null;
   balanceAsOf: string | null;
+  /** الرواتبُ الباقية من المسيّر — غيابُها: لا يُسقَط شيء. */
+  payroll?: readonly PayrollDue[];
   /**
    * ضريبةُ القيمة المضافة المستحقّة للهيئة — إقرارٌ انقضت فترتُه ولم يُقدَّم، والفترةُ
    * الجارية «حتى اليوم». غيابُها: لا يُسقَط شيء (كما كان). انظر `VatDue`.
@@ -85,13 +90,29 @@ export interface VatDue {
   accruing: boolean;
 }
 
+/** ما بقي من رواتب شهرٍ في المسيّر — يُجمَع سطراً واحداً (الرواتبُ فرادى للمالك وحده). */
+export interface PayrollDue {
+  month: string;
+  amountMinor: number;
+  /** من بقي له شيء */
+  people: number;
+  /** موظّفون بلا راتبٍ مكتوب — مجموعُهم غير معروف فلا يُحسب، ويُقال */
+  unknownPeople: number;
+  /** حوالاتُ رواتب في الكشف لم توزَّع بعد خُصمت من الباقي — خرجت من الرصيد فعلاً */
+  undistributedMinor?: number;
+}
+
+/** يومُ الرواتب في المقهى (`docs/decisions/payroll.md`) */
+export const PAYDAY = 25;
+
 export interface OutflowLine {
   id: string;
   label: string;
   sub?: string;
   amountMinor: number;
-  kind: "SUPPLIER" | "RECURRING" | "VAT";
-  href: string;
+  kind: "SUPPLIER" | "RECURRING" | "VAT" | "PAYROLL";
+  /** وجهةُ السطر — وغيابُها: لا صفحةَ يفتحها هذا الدور (الرواتب للمالك وحده) */
+  href?: string;
 }
 
 export interface OutlookBucket {
@@ -195,6 +216,22 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   });
   const vatIn = (pick: (deadlineMonth: string) => boolean) =>
     vatKnown.filter((v) => pick(v.deadline.slice(0, 7))).map(vatLine);
+  const payrollLine = (p: PayrollDue): OutflowLine => ({
+    id: `pay:${p.month}`,
+    label: `رواتب ${formatMonth(p.month)}`,
+    sub: [
+      p.month < thisMonth ? "لم تُحوَّل كاملة" : `يوم ${PAYDAY}`,
+      `${p.people === 1 ? "موظف واحد" : p.people === 2 ? "موظفان" : `${p.people} موظفين`}`,
+      p.unknownPeople > 0 ? `ومعهم ${p.unknownPeople === 1 ? "موظف" : `${p.unknownPeople} موظفين`} بلا راتب مكتوب لم يُحسب` : null,
+      (p.undistributedMinor ?? 0) > 0 ? `بعد خصم ${formatRiyalsDisplay(p.undistributedMinor ?? 0)} حُوّلت ولم توزَّع` : null,
+    ].filter(Boolean).join(" · "),
+    amountMinor: p.amountMinor,
+    kind: "PAYROLL" as const,
+    href: `/payroll?month=${p.month}`,
+  });
+  const payrollIn = (pick: (month: string) => boolean) =>
+    (input.payroll ?? []).filter((p) => p.amountMinor > 0 && pick(p.month)).map(payrollLine);
+
   const vatIncluded = vatKnown.filter((v) => v.deadline.slice(0, 7) <= nextMonth);
   const vatAhead = vatKnown.filter((v) => v.deadline.slice(0, 7) > nextMonth);
   const vatUnknown = vat.filter((v) => v.amountMinor === null);
@@ -205,14 +242,14 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
       title: "متأخر الآن",
       when: `دفعة ${formatMonth(input.runMonth)} التي كان موعدها أول ${formatMonth(thisMonth)}`,
       tone: "danger",
-      lines: [...supplierLines(input.overdueRun, "run"), ...vatIn((m) => m < thisMonth)],
+      lines: [...supplierLines(input.overdueRun, "run"), ...payrollIn((m) => m < thisMonth), ...vatIn((m) => m < thisMonth)],
     },
     {
       id: "rest",
       title: `باقي ${formatMonth(thisMonth)}`,
       when: `مصروفات متكررة لم يُسجَّل دفعها هذا الشهر، ولم يحن موعدها أو موعدها غير محدد${settledNote}`,
       tone: "warn",
-      lines: [...recurringLines(thisMonth, (day) => day === null || day >= todayDay), ...vatIn((m) => m === thisMonth)],
+      lines: [...recurringLines(thisMonth, (day) => day === null || day >= todayDay), ...payrollIn((m) => m === thisMonth), ...vatIn((m) => m === thisMonth)],
     },
     {
       id: "next-run",
@@ -226,7 +263,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
       title: `خلال ${formatMonth(nextMonth)}`,
       when: "المصروفات المتكررة المسجّلة عندك",
       tone: "neutral",
-      lines: [...recurringLines(nextMonth, (day) => day !== 1), ...vatIn((m) => m === nextMonth)],
+      lines: [...recurringLines(nextMonth, (day) => day !== 1), ...payrollIn((m) => m === nextMonth), ...vatIn((m) => m === nextMonth)],
     },
   ];
 
@@ -241,7 +278,8 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         if (running < 0 && shortfallAt === null) shortfallAt = b.id;
       }
       /* عنوانُ المرحلة يصف الدفعةَ والمتكرّر — فإن دخلتها الضريبةُ قيل */
-      const when = b.lines.some((l) => l.kind === "VAT") ? `${b.when} · ومعها ضريبة القيمة المضافة عند موعد الإقرار` : b.when;
+      const withPay = b.lines.some((l) => l.kind === "PAYROLL") ? `${b.when} · ورواتب الموظفين من المسيّر` : b.when;
+      const when = b.lines.some((l) => l.kind === "VAT") ? `${withPay} · ومعها ضريبة القيمة المضافة عند موعد الإقرار` : withPay;
       return { ...b, when, totalMinor, afterMinor: running };
     });
 
@@ -346,7 +384,7 @@ export interface WeekDue {
  * في آخره. وما لا يومَ له يُعَدّ ولا يُوضَع في يومٍ مخترَع.
  */
 export function dueThisWeek(
-  input: Pick<OutlookInput, "today" | "overdueRun" | "recurring">,
+  input: Pick<OutlookInput, "today" | "overdueRun" | "recurring" | "payroll">,
   days = 7,
 ): WeekDue {
   const to = addDays(input.today, days - 1);
@@ -384,6 +422,22 @@ export function dueThisWeek(
         date,
       });
     }
+  }
+
+  /* الرواتب: الباقي من شهرٍ مضى مستحقٌّ الآن، والجاري يومَ ٢٥ إن وقع في الأيّام السبعة */
+  for (const p of input.payroll ?? []) {
+    if (p.amountMinor <= 0) continue;
+    const date = p.month < input.today.slice(0, 7) ? null : `${p.month}-${String(PAYDAY).padStart(2, "0")}`;
+    if (date !== null && (date > to || (date < input.today && p.month !== input.today.slice(0, 7)))) continue;
+    lines.push({
+      id: `pay:${p.month}`,
+      label: `رواتب ${formatMonth(p.month)}`,
+      amountMinor: p.amountMinor,
+      kind: "PAYROLL",
+      href: `/payroll?month=${p.month}`,
+      /* يومُ ٢٥ مضى والشهرُ لم ينتهِ: مستحقٌّ الآن */
+      date: date !== null && date < input.today ? null : date,
+    });
   }
 
   lines.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || b.amountMinor - a.amountMinor);

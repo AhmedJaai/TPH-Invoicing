@@ -169,7 +169,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           <div className="mt-5">
             <StatGrid>
               <Stat label={month === current ? "المستحق عن الشهر كاملاً" : "المستحق للشهر"} minor={totals.dueMinor} sub={totals.unknown > 0 ? `ومعه ${countNoun(totals.unknown, EMPLOYEE)} بلا راتب مكتوب، فالمجموع ناقص` : countNoun(sheet.rows.length, EMPLOYEE)} tone={totals.unknown > 0 ? "warn" : undefined} />
-              <Stat label="حُوّل من الرواتب" minor={totals.paidMinor} sub="ما وُزّع من الحوالات راتباً أو سلفة، وما دُفع خارج الكشف" />
+              {/* «٠٫٠٠ حُوّل» فوق حوالاتٍ لم توزَّع يُقرأ «لم أحوّل شيئاً» — فيُقال ما ينتظر التوزيع بجانب الرقم ويُفتح */}
+              <Stat
+                label="حُوّل من الرواتب"
+                minor={totals.paidMinor}
+                sub={salaryOpen.length > 0
+                  ? <><a href="#transfers" className="font-bold text-warn hover:underline">{countNoun(salaryOpen.length, TRANSFER)} في الكشف لم توزَّع بعد</a>، فما يُعدّ هنا ما وُزّع منها</>
+                  : "ما وُزّع من الحوالات راتباً أو سلفة، وما دُفع خارج الكشف"}
+              />
               <Stat label="الباقي للتحويل" minor={totals.remainingMinor} tone={totals.remainingMinor > 0 ? "warn" : "ok"} sub={totals.overpaidMinor > 0 ? `وحُوّل زيادةً ${formatRiyalsDisplay(totals.overpaidMinor)} لبعضهم` : "هذا ما يلزمك تحويله الآن"} />
             </StatGrid>
             {totals.dueMinor > 0 && (

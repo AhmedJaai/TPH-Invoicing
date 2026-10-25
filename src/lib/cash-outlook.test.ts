@@ -288,3 +288,42 @@ describe("parseStoredMinor — الحدّ المخزّن", () => {
     for (const v of [null, undefined, "", "0", "-5", "12.5", "abc", "99999999999"]) expect(parseStoredMinor(v)).toBeNull();
   });
 });
+
+describe("الرواتب في الإسقاط", () => {
+  const base = { today: "2026-10-25", runMonth: "2026-09", overdueRun: [], heldMinor: 0, nextRun: [], recurring: [], balanceMinor: 100_000_00, balanceAsOf: "2026-10-22" };
+
+  it("الماضي متأخّر، والجاري في بقيّة الشهر، والقادم خلاله — بسطرٍ واحدٍ لكلّ شهر", () => {
+    const o = buildCashOutlook({ ...base, payroll: [
+      { month: "2026-09", amountMinor: 7_094_00, people: 9, unknownPeople: 0, undistributedMinor: 12_040_00 },
+      { month: "2026-10", amountMinor: 24_134_00, people: 10, unknownPeople: 0 },
+      { month: "2026-11", amountMinor: 24_634_00, people: 10, unknownPeople: 1 },
+    ] });
+    const where = (id: string) => o.buckets.find((b) => b.lines.some((l) => l.id === id))?.id;
+    expect(where("pay:2026-09")).toBe("overdue");
+    expect(where("pay:2026-10")).toBe("rest");
+    expect(where("pay:2026-11")).toBe("next-month");
+    expect(o.totalMinor).toBe(7_094_00 + 24_134_00 + 24_634_00);
+    const sept = o.buckets.flatMap((b) => b.lines).find((l) => l.id === "pay:2026-09");
+    expect(sept?.sub).toMatch(/بعد خصم 12,040.00 حُوّلت ولم توزَّع/);
+    expect(o.buckets.flatMap((b) => b.lines).find((l) => l.id === "pay:2026-11")?.sub).toMatch(/بلا راتب مكتوب/);
+  });
+
+  it("ما لم يبقَ منه شيء لا يدخل", () => {
+    const o = buildCashOutlook({ ...base, payroll: [{ month: "2026-10", amountMinor: 0, people: 0, unknownPeople: 0 }] });
+    expect(o.buckets).toHaveLength(0);
+  });
+
+  it("هذا الأسبوع: الماضي مستحقٌّ الآن، والجاري يومَ ٢٥", () => {
+    const w = dueThisWeek({ today: "2026-10-22", overdueRun: [], recurring: [], payroll: [
+      { month: "2026-09", amountMinor: 100_00, people: 1, unknownPeople: 0 },
+      { month: "2026-10", amountMinor: 200_00, people: 2, unknownPeople: 0 },
+    ] });
+    expect(w.lines.map((l) => [l.id, l.date])).toEqual([["pay:2026-09", null], ["pay:2026-10", "2026-10-25"]]);
+    expect(w.totalMinor).toBe(300_00);
+  });
+
+  it("ويوم ٢٥ بعد الأسبوع لا يدخله", () => {
+    const w = dueThisWeek({ today: "2026-10-05", overdueRun: [], recurring: [], payroll: [{ month: "2026-10", amountMinor: 200_00, people: 2, unknownPeople: 0 }] });
+    expect(w.lines).toHaveLength(0);
+  });
+});

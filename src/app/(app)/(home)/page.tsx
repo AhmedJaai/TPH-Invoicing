@@ -29,7 +29,7 @@ import { SinceYesterdayLine } from "@/components/since-yesterday";
 import { loadStartState } from "@/services/start.service";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
-import { loadRecurringInputs, weekDue } from "@/services/cash-outlook.service";
+import { loadPayrollDues, loadRecurringInputs, weekDue } from "@/services/cash-outlook.service";
 import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 import { T } from "@/components/i18n/t";
@@ -79,7 +79,7 @@ export default async function HomePage() {
   const yesterday = addDays(todayInRiyadh(), -1);
   /* لا ينتظره ما فوق الصفحة — ورفضُه يُلتقَط هنا كي لا يسقط بلا قارئ إن لم يُرسم قسمُه */
   factsP.catch(() => undefined);
-  const [attention, balances, overdue, start, run, cash, recurring, snap] = await Promise.all([
+  const [attention, balances, overdue, start, run, cash, recurring, snap, payroll] = await Promise.all([
     attentionP,
     loadBalanceTotals(),
     loadOverdueBalances(),
@@ -88,9 +88,11 @@ export default async function HomePage() {
     canBank ? loadCashPosition() : Promise.resolve(null),
     canPay || canBank ? loadRecurringInputs() : Promise.resolve([]),
     loadDayFigures(yesterday),
+    /* الرواتبُ من المسيّر — كانت «مدفوعات هذا الأسبوع ٢٤٠» ورواتبُ الشهر تُستحقّ يوم ٢٥ */
+    canPay || canBank ? loadPayrollDues([runMonth, currentMonthRiyadh()]) : Promise.resolve([]),
   ]);
-  /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر، كما في «النقد القادم» */
-  const week = run ? weekDue(run, recurring) : null;
+  /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر والرواتب، كما في «النقد القادم» */
+  const week = run ? weekDue(run, recurring, payroll) : null;
 
   const { totals } = balances;
   const owedSince = sinceYesterday(totals.owedMinor, snap ? snap.owedMinor : undefined, yesterday);
@@ -215,6 +217,10 @@ export default async function HomePage() {
               {canPay && run && run.ready.length > 0 && (
                 <Link href="/payments" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
                   <T s="جهّز الدفعة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+              )}
+              {can(user.role, "payroll:view") && week.lines.some((l) => l.kind === "PAYROLL") && (
+                <Link href="/payroll" className="ms-4 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+                  <T s="افتح المسيّر {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
               )}
             </KeyFigure>
           )}
@@ -423,6 +429,7 @@ function weekSummary(week: WeekDue, runMonth: string): string {
   if (recurring.length > 0 && recurring[0].date) {
     parts.push(`${recurring[0].label} ${formatWeekday(recurring[0].date)}${recurring.length > 1 ? ` و${countNoun(recurring.length - 1, ITEM)} آخر` : ""}`);
   }
+  for (const p of week.lines.filter((l) => l.kind === "PAYROLL")) parts.push(`${p.label} ${!p.date ? "مستحقة الآن" : p.date === todayInRiyadh() ? "اليوم" : formatWeekday(p.date)}`);
   if (week.undated > 0) parts.push(`و${countNoun(week.undated, ITEM)} مصروف متكرر بلا يوم محدد`);
-  return parts.length > 0 ? parts.join(" · ") : "لا دفعات متأخرة ولا مصروفات متكررة مستحقة خلال الأيام السبعة القادمة.";
+  return parts.length > 0 ? parts.join(" · ") : "لا دفعات متأخرة ولا رواتب ولا مصروفات متكررة مستحقة خلال الأيام السبعة القادمة.";
 }
