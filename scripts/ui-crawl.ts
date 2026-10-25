@@ -104,15 +104,21 @@ const FACTS_SCRIPT = `(() => {
   const deadLinks = Array.from(document.querySelectorAll("a"))
     .filter(function (a) { const h = a.getAttribute("href"); return h === null || h === "" || h === "#"; })
     .map(function (a) { return (a.textContent || "").trim().slice(0, 40) || a.outerHTML.slice(0, 60); });
+  /* الاسمُ من النصّ كلّه (\`textContent\` كما تحسبه شجرةُ الوصول) لا من المرسوم: زرٌّ في لوحٍ مطويّ
+     بـ\`visibility: hidden\` كان \`innerText\`ـه فارغاً فيُعَدّ بلا اسم وهو «إلغاء» */
   const nameOf = function (el) {
-    return (el.getAttribute("aria-label") || el.getAttribute("title") || el.innerText || "").trim();
+    return (el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || "").trim();
+  };
+  /* ما لا يُرى لا يُفحَص — المطويُّ يُفحَص حين يُفتح */
+  const shown = function (el) {
+    return el.offsetParent !== null && (!el.checkVisibility || el.checkVisibility({ visibilityProperty: true }));
   };
   const unnamedButtons = Array.from(document.querySelectorAll("button"))
-    .filter(function (b) { return b.offsetParent !== null && !nameOf(b) && !b.getAttribute("aria-labelledby"); })
+    .filter(function (b) { return shown(b) && !nameOf(b) && !b.getAttribute("aria-labelledby"); })
     .map(function (b) { return b.outerHTML.slice(0, 80); });
   const unnamedFields = Array.from(document.querySelectorAll("input, select, textarea"))
     .filter(function (el) {
-      if (el.type === "hidden" || el.offsetParent === null) return false;
+      if (el.type === "hidden" || !shown(el)) return false;
       if (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby")) return false;
       if (el.closest("label")) return false;
       return !(el.id && document.querySelector('label[for="' + el.id + '"]'));
