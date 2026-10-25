@@ -1,4 +1,5 @@
-import { INVOICE, MONTH, SUPPLIER, TRANSACTION, countNoun } from "./arabic";
+import { DAY, INVOICE, MONTH, SUPPLIER, TRANSACTION, countNoun } from "./arabic";
+import { addDays, formatDay } from "./riyadh-time";
 /**
  * صحّة البيانات.
  *
@@ -42,6 +43,16 @@ export interface HealthInput {
   /** حركات بنكية لم تُصنَّف بعد */
   unclassifiedBankTx: number;
   bankTx: number;
+  /**
+   * المبيعاتُ من فودكس (`sales`): أيّامٌ فيها مبيعات، وأوّلُها وآخرُها. كان البندُ
+   * مكتوباً «غير موصولة» بيدٍ وفودكس موصولٌ وقائمةُ الدخل تقرأ إيراده — والغيابُ
+   * (`undefined`) لا يُقرأ صفراً: «غير موصولة» حتى تصل أوّلُ مبيعات.
+   */
+  sales?: { days: number; firstDay: string | null; lastDay: string | null };
+  /** الجردُ المعتمد: عددُه وآخرُ يومٍ عُدّ */
+  inventory?: { counts: number; lastDay: string | null };
+  /** اليوم بتوقيت الرياض — لقياس تغطية المبيعات وقِدَم الجرد */
+  today?: string;
 }
 
 export interface DataHealth {
@@ -155,27 +166,65 @@ export function buildDataHealth(input: HealthInput): DataHealth {
    * ما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر ولا ببيانات وهمية.
    * صفرُ المبيعات يوحي بأنّ المقهى لم يبع شيئاً، وذلك أسوأ من الفراغ.
    */
-  metrics.push({
-    id: "sales",
-    label: "المبيعات",
-    state: "NOT_CONNECTED",
-    coverage: null,
-    known: 0,
-    total: 0,
-    detail: "غير موصولة: لا مصدر للمبيعات بعد",
-    action: "حين تُربط نقطة البيع يمكن حساب هامش الربح وتكلفة المبيعات",
-  });
+  const sales = input.sales;
+  if (!sales || sales.days === 0 || !sales.firstDay || !sales.lastDay || !input.today) {
+    metrics.push({
+      id: "sales",
+      label: "المبيعات",
+      state: "NOT_CONNECTED",
+      coverage: null,
+      known: 0,
+      total: 0,
+      detail: "غير موصولة: لم تصل مبيعات من فودكس بعد",
+      action: "زامن فودكس من «المالية ← المبيعات»، أو ارفع ملف مبيعاته من «الجرد ← الاستيراد»",
+    });
+  } else {
+    /* الأيّامُ من أوّل يوم بيعٍ حتى أمس — اليومُ لم يُقفل بعد */
+    const until = addDays(input.today, -1) < sales.lastDay ? sales.lastDay : addDays(input.today, -1);
+    const expected = Math.round((Date.parse(`${until}T00:00:00Z`) - Date.parse(`${sales.firstDay}T00:00:00Z`)) / 86_400_000) + 1;
+    const cov = ratio(Math.min(sales.days, expected), expected);
+    const stale = sales.lastDay < addDays(input.today, -3);
+    metrics.push({
+      id: "sales",
+      label: "المبيعات",
+      state: stale ? "PARTIAL" : stateOf(cov, expected),
+      coverage: cov,
+      known: sales.days,
+      total: expected,
+      detail: `${sales.days} من ${countNoun(expected, DAY)} منذ ${formatDay(sales.firstDay)} فيها مبيعات (${pct(cov)}) · آخرها ${formatDay(sales.lastDay)}`,
+      action: stale
+        ? "آخر مبيعات وصلت قبل أكثر من ثلاثة أيام، فزامن فودكس من «المالية ← المبيعات»"
+        : cov >= 0.95 ? undefined : "الأيام الناقصة بلا مبيعات في فودكس: إن كان المقهى مفتوحاً فيها فزامن فودكس",
+    });
+  }
 
-  metrics.push({
-    id: "inventory",
-    label: "المخزون",
-    state: "NOT_CONNECTED",
-    coverage: null,
-    known: 0,
-    total: 0,
-    detail: "غير موصول",
-    action: "يحتاج إلى المبيعات والوصفات أولاً",
-  });
+  const inv = input.inventory;
+  if (!inv || inv.counts === 0 || !inv.lastDay || !input.today) {
+    metrics.push({
+      id: "inventory",
+      label: "المخزون",
+      state: "NOT_CONNECTED",
+      coverage: null,
+      known: 0,
+      total: 0,
+      detail: "لا جرد معتمد بعد",
+      action: "اعتمد جرداً من «الجرد» ليُحسب المخزون وتكلفة المبيعات بالجرد",
+    });
+  } else {
+    const ageDays = Math.round((Date.parse(`${input.today}T00:00:00Z`) - Date.parse(`${inv.lastDay}T00:00:00Z`)) / 86_400_000);
+    /* جردٌ كلّ شهرٍ على الأقلّ يجعل تكلفةَ كلّ شهرٍ بالجرد — وما فات الأربعين يوماً ناقص */
+    const fresh = ageDays <= 40;
+    metrics.push({
+      id: "inventory",
+      label: "المخزون",
+      state: fresh ? "GOOD" : "PARTIAL",
+      coverage: fresh ? 1 : 0.5,
+      known: inv.counts,
+      total: inv.counts,
+      detail: `${inv.counts === 1 ? "جرد معتمد واحد" : inv.counts === 2 ? "جردان معتمدان" : `${inv.counts} جرود معتمدة`}، آخرها ${formatDay(inv.lastDay)} (قبل ${countNoun(ageDays, DAY)})`,
+      action: fresh ? undefined : "مضى على آخر جرد أكثر من أربعين يوماً، فاعتمد جرداً جديداً لتُحسب تكلفة الشهر بالجرد",
+    });
+  }
 
   const measurable = metrics.filter((m) => m.coverage !== null);
   const confidence =

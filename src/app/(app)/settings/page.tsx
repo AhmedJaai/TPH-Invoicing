@@ -227,7 +227,7 @@ export default async function SettingsPage() {
               id="recurring"
               title="المصروفات المتكررة"
               icon={Repeat}
-              hint="مصروفات تتكرر بلا فاتورة: الإيجار والرواتب والاشتراكات. يعتمد عليها «النقد القادم»، ويقارن بها المتوقع بالفعلي."
+              hint="مصروفات تتكرر بلا فاتورة: الإيجار والاشتراكات والخدمات. يعتمد عليها «النقد القادم»، ويقارن بها المتوقع بالفعلي. والرواتب يحملها مسيّر الرواتب."
               action={can(user.role, "bank:view") ? <Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link> : undefined}
             >
               <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />

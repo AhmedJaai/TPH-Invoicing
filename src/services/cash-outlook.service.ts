@@ -7,7 +7,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses, recurringExpenses } from "@/db/schema";
 import {
-  asCadence, buildCashOutlook, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue,
+  asCadence, buildCashOutlook, withoutPayrollDuplicates, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue,
 } from "@/lib/cash-outlook";
 import { addMonths } from "@/lib/filing";
 import { payrollTotals, suggestedPayMonth } from "@/lib/payroll/calc";
@@ -41,6 +41,7 @@ export async function loadRecurringInputs(): Promise<RecurringInput[]> {
     cadence: asCadence(r.cadence),
     startsOn: r.startsOn,
     endsOn: r.endsOn,
+    category: r.category,
   }));
 }
 
@@ -50,7 +51,7 @@ export async function loadRecurringInputs(): Promise<RecurringInput[]> {
  * فلا يُنتظَر استعلامٌ بعد استعلام.
  */
 export function weekDue(run: PaymentRun, recurring: readonly RecurringInput[], payroll: readonly PayrollDue[] = []): WeekDue {
-  return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: [...recurring], payroll });
+  return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: withoutPayrollDuplicates(recurring, payroll), payroll });
 }
 
 /**
@@ -123,6 +124,8 @@ export interface OutlookInputs {
   recurring: RecurringInput[];
   paidThisMonth: Set<string>;
   vat: VatDue[];
+  payroll: PayrollDue[];
+  payrollHref: boolean;
 }
 
 /**
@@ -168,7 +171,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
     overdueRun: dues(overdue),
     heldMinor: overdue.heldTotalMinor,
     nextRun: dues(next),
-    recurring,
+    recurring: withoutPayrollDuplicates(recurring, payroll),
     paidThisMonth,
     balanceMinor: cash.balanceMinor,
     balanceAsOf: cash.asOf,
@@ -180,7 +183,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
   /* ما أُخرج بطلب صاحبه يُسمّى — فلا يُظنّ أنّ الضريبةَ صفر */
   return {
     ...outlook, runMonth, thisMonth, vatOff: withVat ? [] : vat, floorMinor, breach: floorBreach(outlook.buckets, floorMinor),
-    inputs: { overdueRun: dues(overdue), nextRun: dues(next), recurring, paidThisMonth, vat },
+    inputs: { overdueRun: dues(overdue), nextRun: dues(next), recurring, paidThisMonth, vat, payroll, payrollHref: opts.canSeePayroll ?? false },
   };
 }
 
@@ -191,9 +194,9 @@ export const COMMITMENT_MONTHS = 3;
  * تقويمُ الالتزامات — من وقائع «النقد القادم» نفسها ووثائقِ الانتهاء.
  * وجدولُ الوثائق إن لم تُطبَّق هجرتُه بعد (`42P01`) يُقرأ «لا وثائق».
  */
-export async function loadCommitments(): Promise<Commitments & { fromMonth: string; hasObligations: boolean }> {
+export async function loadCommitments(opts: { canSeePayroll?: boolean } = {}): Promise<Commitments & { fromMonth: string; hasObligations: boolean }> {
   const [outlook, docs] = await Promise.all([
-    loadCashOutlook(),
+    loadCashOutlook({ canSeePayroll: opts.canSeePayroll }),
     loadObligations().then((v) => v.open).catch((e: unknown) => {
       if (pgErrorCode(e) === "42P01") return [];
       throw e;

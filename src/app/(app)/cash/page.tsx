@@ -178,7 +178,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           <EmptyState
             icon={CalendarClock}
             title="لا توجد مبالغ معروفة ستخرج في الأسابيع القادمة."
-            hint="لا توجد دفعة مورّدين مفتوحة ولا مصروفات متكررة مسجّلة. سجّل الإيجار والرواتب كمصروفات متكررة لتظهر هنا في مواعيدها."
+            hint="لا توجد دفعة مورّدين مفتوحة ولا مصروفات متكررة مسجّلة. سجّل الإيجار والاشتراكات كمصروفات متكررة، وأضف الموظفين في مسيّر الرواتب، لتظهر هنا في مواعيدها."
             action={<LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرراً</LinkButton>}
           />
         ) : (

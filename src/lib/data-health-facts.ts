@@ -5,6 +5,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { HealthInput } from "./data-health";
+import { todayInRiyadh } from "./riyadh-time";
 
 export async function gatherHealthFacts(): Promise<HealthInput> {
   const [row] = (
@@ -13,6 +14,8 @@ export async function gatherHealthFacts(): Promise<HealthInput> {
       months_invoices: number; months_bank: number;
       suppliers_invoices: number; suppliers_statements: number;
       bank_tx: number; unclassified: number;
+      sales_days: number; sales_first: string | null; sales_last: string | null;
+      counts: number; last_count: string | null;
     }>(sql`
       select
         (select count(*)::int from documents where status <> 'REJECTED')                 as documents,
@@ -24,7 +27,12 @@ export async function gatherHealthFacts(): Promise<HealthInput> {
         (select count(distinct supplier_id)::int from invoices)                          as suppliers_invoices,
         (select count(distinct supplier_id)::int from statements)                        as suppliers_statements,
         (select count(*)::int from bank_transactions)                                    as bank_tx,
-        (select count(*)::int from bank_transactions where category = 'UNKNOWN')         as unclassified
+        (select count(*)::int from bank_transactions where category = 'UNKNOWN')         as unclassified,
+        (select count(distinct business_date)::int from sales)                           as sales_days,
+        (select to_char(min(business_date), 'YYYY-MM-DD') from sales)                    as sales_first,
+        (select to_char(max(business_date), 'YYYY-MM-DD') from sales)                    as sales_last,
+        (select count(*)::int from inventory_counts where status = 'FINALISED')          as counts,
+        (select max(period_end) from inventory_counts where status = 'FINALISED')        as last_count
     `)
   ).rows;
 
@@ -39,5 +47,8 @@ export async function gatherHealthFacts(): Promise<HealthInput> {
     suppliersWithStatements: Number(row?.suppliers_statements ?? 0),
     unclassifiedBankTx: Number(row?.unclassified ?? 0),
     bankTx: Number(row?.bank_tx ?? 0),
+    sales: { days: Number(row?.sales_days ?? 0), firstDay: row?.sales_first ?? null, lastDay: row?.sales_last ?? null },
+    inventory: { counts: Number(row?.counts ?? 0), lastDay: row?.last_count ?? null },
+    today: todayInRiyadh(),
   };
 }

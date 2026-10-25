@@ -288,7 +288,7 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
           {lastThumb && <img src={lastThumb} alt="" className="h-full w-full object-cover" />}
           {pageCount > 0 && (
             <span className="absolute -end-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-yellow-300 px-1 text-[11px] font-bold text-black">
-              {pageCount.toLocaleString("ar-SA")}
+              {pageCount.toLocaleString("ar-SA-u-nu-latn")}
             </span>
           )}
         </button>

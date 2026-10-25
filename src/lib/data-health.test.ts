@@ -68,3 +68,31 @@ describe("buildDataHealth", () => {
     expect(m.state).toBe("GOOD"); // ٨ من ١٤٢٨ تغطية عالية
   });
 });
+
+describe("المبيعات والمخزون من البيانات لا مكتوبةً بيد", () => {
+  it("بلا مبيعات: «غير موصولة» لا صفر", () => {
+    const h = buildDataHealth({ ...full, sales: { days: 0, firstDay: null, lastDay: null }, today: "2026-10-25" });
+    expect(get(h, "sales")?.state).toBe("NOT_CONNECTED");
+    expect(get(h, "sales")?.coverage).toBeNull();
+  });
+
+  it("فودكس موصول: الأيّامُ من أوّل يوم بيعٍ حتى أمس", () => {
+    const h = buildDataHealth({ ...full, sales: { days: 169, firstDay: "2026-05-05", lastDay: "2026-10-25" }, today: "2026-10-25" });
+    const m = get(h, "sales");
+    expect(m?.state).toBe("GOOD");
+    expect(m?.total).toBe(174);
+    expect(m?.detail).toMatch(/169 من 174 يوماً/);
+  });
+
+  it("آخرُ مبيعاتٍ قبل أكثر من ثلاثة أيّام: ناقصة، وفعلُها المزامنة", () => {
+    const m = get(buildDataHealth({ ...full, sales: { days: 100, firstDay: "2026-05-05", lastDay: "2026-10-10" }, today: "2026-10-25" }), "sales");
+    expect(m?.state).toBe("PARTIAL");
+    expect(m?.action).toMatch(/زامن فودكس/);
+  });
+
+  it("الجرد: آخرُه قريب «مكتمل»، وبعد أربعين يوماً «ناقص»", () => {
+    expect(get(buildDataHealth({ ...full, inventory: { counts: 4, lastDay: "2026-10-17" }, today: "2026-10-25" }), "inventory")?.state).toBe("GOOD");
+    expect(get(buildDataHealth({ ...full, inventory: { counts: 4, lastDay: "2026-08-01" }, today: "2026-10-25" }), "inventory")?.state).toBe("PARTIAL");
+    expect(get(buildDataHealth({ ...full, inventory: { counts: 0, lastDay: null }, today: "2026-10-25" }), "inventory")?.state).toBe("NOT_CONNECTED");
+  });
+});

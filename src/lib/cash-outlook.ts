@@ -37,6 +37,8 @@ export interface RecurringInput {
   /** YYYY-MM-DD أو YYYY-MM أو فارغ. */
   startsOn: string | null;
   endsOn: string | null;
+  /** بابُ المصروف — «راتب» منه يُترك حين يحمل المسيّرُ الرواتب، كي لا تُطرح مرّتين */
+  category?: string;
 }
 
 export interface SupplierDue {
@@ -160,6 +162,12 @@ export function occursIn(r: RecurringInput, month: string): { occurs: boolean; d
   const gap = monthsBetween(start, month);
   const period = r.cadence === "QUARTERLY" ? 3 : 12;
   return { occurs: gap >= 0 && gap % period === 0, day };
+}
+
+/** متكرّرٌ بباب «راتب» والمسيّرُ يحمل الرواتب: يُترك، وإلّا طُرحت الرواتبُ مرّتين */
+export function withoutPayrollDuplicates(recurring: readonly RecurringInput[], payroll: readonly PayrollDue[] | undefined): RecurringInput[] {
+  const hasPayroll = (payroll ?? []).some((p) => p.people > 0 || p.amountMinor > 0 || p.unknownPeople > 0);
+  return hasPayroll ? recurring.filter((r) => r.category !== "SALARY") : [...recurring];
 }
 
 export function buildCashOutlook(input: OutlookInput): CashOutlook {

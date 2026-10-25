@@ -12,18 +12,19 @@
  *
  * دالّةٌ خالصة.
  */
-import { occursIn, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
-import { daysInMonth } from "@/lib/riyadh-time";
+import { occursIn, PAYDAY, withoutPayrollDuplicates, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
+import { daysInMonth, formatMonth } from "@/lib/riyadh-time";
 import { countNoun, SUPPLIER } from "./arabic";
 import { addMonths } from "./filing";
 
-export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY";
+export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY" | "PAYROLL";
 
 export const COMMITMENT_LABEL: Record<CommitmentKind, string> = {
   SUPPLIER_RUN: "دفعة المورّدين",
   RECURRING: "متكرر",
   VAT: "ضريبة",
   EXPIRY: "وثيقة تنتهي",
+  PAYROLL: "رواتب",
 };
 
 export interface Commitment {
@@ -33,7 +34,8 @@ export interface Commitment {
   sub?: string;
   /** `null`: لا مبلغَ له (وثيقة) أو لا يُعرف (ضريبةٌ ينقصها كشف). */
   amountMinor: number | null;
-  href: string;
+  /** غيابُه: لا صفحةَ يفتحها هذا الدور (الرواتب للمالك وحده) */
+  href?: string;
 }
 
 export interface CommitmentDay {
@@ -64,6 +66,10 @@ export interface CommitmentsInput {
   paidThisMonth?: ReadonlySet<string>;
   vat: readonly VatDue[];
   expiries: readonly { id: string; title: string; kindLabel: string; expiresOn: string }[];
+  /** الرواتبُ الباقية من المسيّر — يومُها ٢٥، والماضي متأخّر */
+  payroll?: readonly PayrollDue[];
+  /** يرى المسيّر — وإلّا يُعرض السطرُ بلا رابط */
+  payrollHref?: boolean;
 }
 
 export interface Commitments {
@@ -107,8 +113,18 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
     });
   }
 
+  for (const p of input.payroll ?? []) {
+    if (p.amountMinor <= 0) continue;
+    put(`${p.month}-${String(PAYDAY).padStart(2, "0")}`, {
+      id: `pay:${p.month}`, kind: "PAYROLL", label: `رواتب ${formatMonth(p.month)}${p.month < thisMonth ? "، لم تُحوَّل كاملة" : ""}`,
+      sub: `${p.people === 1 ? "موظف واحد" : p.people === 2 ? "موظفان" : `${p.people} موظفين`}${p.unknownPeople > 0 ? ` · ومعهم ${p.unknownPeople} بلا راتب مكتوب لم يُحسب` : ""}`,
+      amountMinor: p.amountMinor,
+      ...(input.payrollHref ? { href: `/payroll?month=${p.month}` } : {}),
+    });
+  }
+
   for (const month of months) {
-    for (const r of input.recurring) {
+    for (const r of withoutPayrollDuplicates(input.recurring, input.payroll)) {
       const o = occursIn(r, month);
       if (!o.occurs) continue;
       if (month === thisMonth && input.paidThisMonth?.has(r.id)) continue;

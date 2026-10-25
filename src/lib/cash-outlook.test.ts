@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addMonths } from "./filing";
-import { buildCashOutlook, dueThisWeek, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { buildCashOutlook, dueThisWeek, withoutPayrollDuplicates, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",
@@ -325,5 +325,16 @@ describe("الرواتب في الإسقاط", () => {
   it("ويوم ٢٥ بعد الأسبوع لا يدخله", () => {
     const w = dueThisWeek({ today: "2026-10-05", overdueRun: [], recurring: [], payroll: [{ month: "2026-10", amountMinor: 200_00, people: 2, unknownPeople: 0 }] });
     expect(w.lines).toHaveLength(0);
+  });
+});
+
+describe("الرواتب لا تُطرح مرّتين", () => {
+  const rec = (id: string, category: string): RecurringInput => ({ id, label: id, amountMinor: 100, cadence: "MONTHLY", startsOn: null, endsOn: null, category });
+  it("متكرّرٌ بباب «راتب» يُترك حين يحمل المسيّرُ الرواتب، ويبقى غيرُه", () => {
+    const out = withoutPayrollDuplicates([rec("rent", "RENT"), rec("sal", "SALARY")], [{ month: "2026-10", amountMinor: 1, people: 1, unknownPeople: 0 }]);
+    expect(out.map((r) => r.id)).toEqual(["rent"]);
+  });
+  it("وبلا مسيّر يبقى «الراتب» المتكرّر", () => {
+    expect(withoutPayrollDuplicates([rec("sal", "SALARY")], []).map((r) => r.id)).toEqual(["sal"]);
   });
 });

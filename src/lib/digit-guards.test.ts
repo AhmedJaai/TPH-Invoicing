@@ -52,6 +52,14 @@ export function indicLiterals(file: string, source: string): string[] {
 }
 
 describe("أرقامُ نصّ الواجهة لاتينيّة", () => {
+  it("لا تنسيقَ بالعربيّة بلا `nu-latn` — «أرسل ١٤١» كانت تُكتب بالهنديّة بجانب «قبل 3 أيّام»", () => {
+    const bad = files("src").filter((f) => !EXEMPT.some((e) => f.startsWith(e)))
+      .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => [f, i + 1, l] as const))
+      .filter(([, , l]) => /(toLocale(?:Date|Time)?String|Intl\.(?:NumberFormat|DateTimeFormat))\(\s*["']ar(?:-SA)?["']/.test(l))
+      .map(([f, n]) => `${f}:${n}`);
+    expect(bad).toEqual([]);
+  });
+
   it("يمسك الرقمَ الهنديّ في النصّ ويترك SQL", () => {
     expect(indicLiterals("x.tsx", `const a = <p>آخر ٢٤ ساعة</p>; const b = sql\`/* ١ */ select 1\`;`)).toHaveLength(1);
   });

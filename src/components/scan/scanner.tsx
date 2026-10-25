@@ -599,7 +599,7 @@ function Busy({ text, startedAt }: { text: string; startedAt?: number }) {
       <p className="mt-4 text-sm font-bold">{text}</p>
       {startedAt && (
         <p className="mt-1 text-xs text-muted">
-          <span className="nums">{seconds.toLocaleString("ar-SA")}</span> ثانية{seconds > 20 ? " — قد تأخذ نصف دقيقة" : ""}
+          <span className="nums">{seconds.toLocaleString("ar-SA-u-nu-latn")}</span> ثانية{seconds > 20 ? " — قد تأخذ نصف دقيقة" : ""}
         </p>
       )}
     </section>
@@ -813,7 +813,7 @@ function Pages({
             <img src={p.url} alt={`الصفحة ${i + 1}`} className="block max-h-[55dvh] w-full bg-white object-contain" />
             {/* الحذفُ تحت الصفحة لا فوقها — كان يغطّي أوّلَ سطرٍ منها */}
             <div className="flex items-center justify-between border-t border-line-soft px-3 py-1">
-              <span className="text-xs text-muted">الصفحة {(i + 1).toLocaleString("ar-SA")}</span>
+              <span className="text-xs text-muted">الصفحة {(i + 1).toLocaleString("ar-SA-u-nu-latn")}</span>
               <span className="flex gap-1">
                 <button type="button" onClick={() => onAdjust(p.id)} className={buttonClass("quiet", "sm")}>
                   <Crop className="h-3.5 w-3.5" aria-hidden /> عدّل الحدود

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, FileBadge, Percent, Plus, Repeat, Store, TriangleAlert, type LucideIcon } from "lucide-react";
+import { CalendarDays, FileBadge, Percent, Plus, Repeat, Store, TriangleAlert, Users, type LucideIcon } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -13,7 +13,7 @@ import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
-const ICON: Record<CommitmentKind, LucideIcon> = { SUPPLIER_RUN: Store, RECURRING: Repeat, VAT: Percent, EXPIRY: FileBadge };
+const ICON: Record<CommitmentKind, LucideIcon> = { SUPPLIER_RUN: Store, RECURRING: Repeat, VAT: Percent, EXPIRY: FileBadge, PAYROLL: Users };
 
 /**
  * تقويمُ الالتزامات — يوماً بيوم ما يُدفع وما ينتهي، في الأشهر الثلاثة القادمة.
@@ -32,16 +32,16 @@ export default async function CommitmentsPage() {
     );
   }
 
-  const c = await loadCommitments();
+  const c = await loadCommitments({ canSeePayroll: can(user.role, "payroll:view") });
   const canPay = can(user.role, "payment:approve");
   const canVat = can(user.role, "month:close");
   const canDocs = can(user.role, "reports:view");
   /* سطرٌ لا يملك الدورُ صفحتَه يُقرأ ولا يُفتح — لا رابطَ إلى «خارج صلاحيتك» */
   const hrefFor = (i: Commitment): string | null =>
-    i.kind === "SUPPLIER_RUN" ? (canPay ? i.href : "/suppliers")
-    : i.kind === "VAT" ? (canVat ? i.href : null)
-    : i.kind === "EXPIRY" ? (canDocs ? i.href : null)
-    : i.href;
+    i.kind === "SUPPLIER_RUN" ? (canPay ? i.href ?? null : "/suppliers")
+    : i.kind === "VAT" ? (canVat ? i.href ?? null : null)
+    : i.kind === "EXPIRY" ? (canDocs ? i.href ?? null : null)
+    : i.href ?? null;
   const nothing = c.days.length === 0 && c.undated.length === 0 && c.overdue.length === 0;
   const months = [...new Set(c.days.map((d) => d.day.slice(0, 7)))];
 
@@ -49,14 +49,14 @@ export default async function CommitmentsPage() {
     <PageShell
       user={user}
       title="تقويم الالتزامات"
-      intro={`ما ستدفعه وما سينتهي يوماً بيوم في ${COMMITMENT_MONTHS === 3 ? "الأشهر الثلاثة" : `${COMMITMENT_MONTHS} أشهر`} القادمة: دفعات المورّدين، والمصروفات المتكررة، وموعد الإقرار الضريبي، وانتهاء الوثائق.`}
+      intro={`ما ستدفعه وما سينتهي يوماً بيوم في ${COMMITMENT_MONTHS === 3 ? "الأشهر الثلاثة" : `${COMMITMENT_MONTHS} أشهر`} القادمة: دفعات المورّدين، والرواتب، والمصروفات المتكررة، وموعد الإقرار الضريبي، وانتهاء الوثائق.`}
       actions={<LinkButton href="/settings#recurring" icon={Plus} variant="secondary">مصروف متكرر</LinkButton>}
     >
       {nothing ? (
         <EmptyState
           icon={CalendarDays}
           title="لا توجد التزامات معروفة في الأشهر القادمة."
-          hint="يُبنى التقويم من أربعة مصادر: دفعات المورّدين، والمصروفات المتكررة المسجّلة بأيامها، والإقرار الضريبي، والوثائق التي لها تاريخ انتهاء. سجّل الإيجار والرواتب كمصروفات متكررة، وأضف وثائق المقهى."
+          hint="يُبنى التقويم من خمسة مصادر: دفعات المورّدين، والرواتب من المسيّر، والمصروفات المتكررة المسجّلة بأيامها، والإقرار الضريبي، والوثائق التي لها تاريخ انتهاء. سجّل الإيجار والاشتراكات كمصروفات متكررة، وأضف وثائق المقهى."
           action={
             <>
               <LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرراً</LinkButton>

@@ -100,8 +100,8 @@ export function CaptureLinks({ links }: { links: CaptureLinkItem[] }) {
                   <Link2 className="h-3.5 w-3.5 text-muted" aria-hidden /> {l.label}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted">
-                  {l.sent === 0 ? "لم يرسل شيئاً بعد" : `أرسل ${l.sent.toLocaleString("ar-SA")}`}
-                  {l.waiting > 0 && ` · ${l.waiting.toLocaleString("ar-SA")} تنتظر`}
+                  {l.sent === 0 ? "لم يرسل شيئاً بعد" : `أرسل ${l.sent.toLocaleString("ar-SA-u-nu-latn")}`}
+                  {l.waiting > 0 && ` · ${l.waiting.toLocaleString("ar-SA-u-nu-latn")} تنتظر`}
                   {l.lastUsedAt && ` · آخر إرسال ${timeAgo(l.lastUsedAt)}`}
                 </span>
               </span>

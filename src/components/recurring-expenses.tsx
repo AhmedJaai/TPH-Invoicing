@@ -137,7 +137,7 @@ export function RecurringExpenses({
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-          لا مصروفات متكررة مسجّلة بعد. سجّل الإيجار والرواتب هنا لتظهر في «النقد القادم»، ويُقارن المتوقع بالفعلي.
+          لا مصروفات متكررة مسجّلة بعد. سجّل الإيجار والاشتراكات هنا لتظهر في «النقد القادم»، ويُقارن المتوقع بالفعلي. والرواتب يحملها مسيّر الرواتب.
         </p>
       )}
 
