@@ -8,10 +8,12 @@ import { Money } from "@/components/money";
 import { FoodicsStatusBar } from "@/components/foodics-status";
 import { SignalControls } from "@/components/signal-controls";
 import { Badge, Callout, DataTable, EmptyState, KeyFigure, LinkButton, NoAccess, Section } from "@/components/ui";
-import { currentMonthRiyadh, formatDay, formatMoment, formatMonth } from "@/lib/riyadh-time";
+import { addDays, currentMonthRiyadh, formatDay, formatMoment, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
+import { CARD_LOOKBACK_DAYS } from "@/services/foodics-attention.service";
+import { DAY, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CARD_RECENT_DAYS, CARD_SMALL_MINOR, type CardBatchRow, type CardMonth, type CashMonth } from "@/lib/foodics/takings";
-import { cardGapKey, loadFoodicsSilenced, loadFoodicsTakings } from "@/services/foodics-takings.service";
+import { cardGapKey, loadCardComparison, loadFoodicsSilenced, loadFoodicsTakings } from "@/services/foodics-takings.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { T } from "@/components/i18n/t";
 
@@ -60,7 +62,15 @@ export default async function FoodicsBankPage() {
   const thisMonth = currentMonthRiyadh();
   const month = t.card.months.find((m) => m.month < thisMonth) ?? t.card.months[0] ?? null;
   const cashMonth = t.cash.find((m) => m.month === month?.month) ?? t.cash[0] ?? null;
-  const flagged = t.card.batches.filter((b) => (b.verdict === "BANK_SHORT" || b.verdict === "BANK_OVER") && !silenced.has(cardGapKey(b.day)));
+  /*
+    «يحتاج قرارك» يعدّ دفعات آخر CARD_LOOKBACK_DAYS يوماً — والصفحةُ كانت تعدّ كلَّ ما في الكشف
+    (٦ هنا و٣ هناك تحت الاسم نفسه). فالمعروضُ للمراجعة دفعاتُ البند نفسُه — المقارنةُ بمداه
+    نفسه (قصُّ المدى الكامل عند يومٍ يغيّر الدفعات حوله، فيختلف العددان)، والأقدمُ يُطوى بعدده.
+  */
+  const since = addDays(todayInRiyadh(), -CARD_LOOKBACK_DAYS);
+  const isGap = (b: CardBatchRow) => (b.verdict === "BANK_SHORT" || b.verdict === "BANK_OVER") && !silenced.has(cardGapKey(b.day));
+  const flagged = (await loadCardComparison(since)).card.batches.filter(isGap);
+  const olderGaps = t.card.batches.filter((b) => isGap(b) && b.day < since);
   const silencedRows = t.card.batches.filter((b) => silenced.has(cardGapKey(b.day)));
   const shown = t.card.batches.slice(0, BATCHES_SHOWN);
   const cashTotal = t.cash.reduce((s, m) => s + m.cashMinor, 0);
@@ -149,6 +159,19 @@ export default async function FoodicsBankPage() {
               </li>
             ))}
           </ul>
+        )}
+        {olderGaps.length > 0 && (
+          <details className="mt-3 text-xs text-muted">
+            <summary className="cursor-pointer font-bold"><T s="أقدم من {0}، فلا تدخل «يحتاج قرارك» ({1})" a={[countNoun(CARD_LOOKBACK_DAYS, DAY), olderGaps.length]} /></summary>
+            <ul className="mt-2 space-y-1">
+              {olderGaps.map((b) => (
+                <li key={b.day} className="flex flex-wrap items-center gap-2">
+                  <span><T s="دفعة {0} · {1}" a={[<bdi key="0">{formatDay(b.day)}</bdi>, <GapWords key="1" gapMinor={b.gapMinor} agrees={false} />]} /></span>
+                  {canEdit && <SignalControls signalKey={cardGapKey(b.day)} dismissLabel="عرفت سببه" />}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
         {silencedRows.length > 0 && (
           <details className="mt-3 text-xs text-muted">

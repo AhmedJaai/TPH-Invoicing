@@ -144,7 +144,7 @@ export async function foodicsCronJob(actor: SystemActor, deps: FoodicsCronDeps):
     if (r.busy) {
       return rounds === 0
         ? { ok: true, record: false, result: "مزامنة أخرى مع فودكس تجري الآن، فلم يُعَد شيء" }
-        : { ok: true, record: true, result: `قُرئ ${written} طلباً جديداً، والباقي تكمله المزامنة الجارية` };
+        : { ok: true, record: true, result: `قُرئت طلبات جديدة (${written})، والباقي تكمله المزامنة الجارية` };
     }
     rounds++;
     const { result } = r;
@@ -153,12 +153,15 @@ export async function foodicsCronJob(actor: SystemActor, deps: FoodicsCronDeps):
     revised += result.counts.linesRevised;
     if (result.status === "OK") break;
     if (deps.now() - startedAt > FOODICS_TOTAL_MS) {
-      return { ok: true, record: true, result: `قُرئ ${written} طلباً جديداً، وبقي جزء يُكمَل في التشغيل القادم` };
+      return { ok: true, record: true, result: `قُرئت طلبات جديدة (${written})، وبقي جزء يُكمَل في التشغيل القادم` };
     }
   }
   return {
     ok: true, record: true,
-    result: written + revised > 0 ? `قُرئ ${written} طلباً جديداً و${revised} سطراً تغيّر` : "لا جديد في فودكس",
+    /* «قُرئ 8 طلباً جديداً و0 سطراً تغيّر» — العددُ بمعدوده، والصفرُ لا يُذكر خبراً */
+    result: written + revised > 0
+      ? [written > 0 ? `قُرئت طلبات جديدة (${written})` : null, revised > 0 ? `وتغيّرت أسطر (${revised})` : null].filter(Boolean).join(" ")
+      : "لا جديد في فودكس",
   };
 }
 
