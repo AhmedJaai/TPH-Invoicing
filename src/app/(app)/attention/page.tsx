@@ -12,6 +12,7 @@ import { inLens, landing, parseLens } from "@/lib/attention-triage";
 import { loadStartState } from "@/services/start.service";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { FirstTransferWorkspace, IbanGuardWorkspace } from "@/components/iban-guard";
+import { HandDuplicateWorkspace } from "@/components/hand-duplicate";
 import { SnoozeControl } from "@/components/attention-snooze";
 import { SnoozedList } from "@/components/attention-snoozed";
 import { snoozeOptions } from "@/lib/attention-snooze";
@@ -133,6 +134,8 @@ export default async function AttentionPage({
       <IbanGuardWorkspace canEdit={canEdit} />
     ) : id === "first-transfers" ? (
       <FirstTransferWorkspace canEdit={canEdit} />
+    ) : id === "duplicate-hand-payments" ? (
+      <HandDuplicateWorkspace canAct={can(user.role, "invoice:remove")} />
     ) : undefined;
 
   return shell(

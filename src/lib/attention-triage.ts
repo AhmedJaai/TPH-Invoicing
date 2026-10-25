@@ -45,6 +45,7 @@ export const ATTENTION_IDS = [
   "stock-gap-over",
   "proforma-without-invoice",
   "repeat-delivery",
+  "duplicate-hand-payments",
   "recurring-anomalies",
   "obligations-expiring",
   "missing-statements",
@@ -78,6 +79,7 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "duplicate-payments",
   "duplicate-payments-claimed",
   "unbacked-payments",
+  "duplicate-hand-payments",
   "price-rises",
   "statement-ledger-gap",
   "lifecycle-anomalies",
@@ -113,6 +115,7 @@ export const IN_PLACE_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "missing-statements",
   "iban-mismatch",
   "first-transfers",
+  "duplicate-hand-payments",
 ]);
 
 export function resolvesInPlace(item: Pick<AttentionItem, "id">): boolean {

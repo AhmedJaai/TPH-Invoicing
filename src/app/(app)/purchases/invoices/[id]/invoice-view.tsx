@@ -271,7 +271,7 @@ export async function InvoiceView({
           <p className="mb-3 text-xs font-bold text-muted">الخطوة التالية</p>
           {p.settled ? (
             <p className="text-sm leading-relaxed text-ink-soft">
-              <T s="لا شيء مطلوب منك. {0}" a={[p.allocations.length > 0 && <Link href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>]} /></p>
+              <T s="لا شيء مطلوب منك. {0}" a={[p.allocations.length > 0 && <Link key="0" href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>]} /></p>
           ) : canPay ? (
             <>
               <MarkInvoicePaid invoiceId={inv.id} label={formatRiyals(p.remainingMinor)} layout="panel" startOpen={act === "pay"} invoiceDay={todayInRiyadh(inv.date)} />
@@ -327,7 +327,7 @@ export async function InvoiceView({
             <li className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
               <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
               <span className="min-w-0 flex-1 leading-relaxed">
-                <T s="الحالة الضريبية المحفوظة «{0}» قديمة، وبيانات الفاتورة الحالية تجعلها «{1}»{2}.{3}" a={[TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus, TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus, gaps.length > 0 && <> <T s=" (ينقصها: {0})" a={[gaps.join("، ")]} /></>, monthClosed && <> <T s=" وشهر {0} مقفل، فأعد فتحه لتصحيحها، لأنها تؤثر في إقراره الضريبي." a={[formatMonth(inv.month)]} /></>]} /></span>
+                <T s="الحالة الضريبية المحفوظة «{0}» قديمة، وبيانات الفاتورة الحالية تجعلها «{1}»{2}.{3}" a={[TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus, TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus, gaps.length > 0 && <span key="2"> <T s=" (ينقصها: {0})" a={[gaps.join("، ")]} /></span>, monthClosed && <span key="3"> <T s=" وشهر {0} مقفل، فأعد فتحه لتصحيحها، لأنها تؤثر في إقراره الضريبي." a={[formatMonth(inv.month)]} /></span>]} /></span>
               {canEdit && !monthClosed && <InvoiceRejudge invoiceId={inv.id} />}
             </li>
           )}
