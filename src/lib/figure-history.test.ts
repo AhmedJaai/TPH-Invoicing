@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ACTION_LABEL } from "./audit-labels";
-import { FIGURE_ACTIONS, describeMover, isFigureId, type AuditRow } from "./figure-history";
+import { FIGURE_ACTIONS, describeMover, isFigureId, isRecordId, type AuditRow } from "./figure-history";
 
 const row = (o: Partial<AuditRow>): AuditRow => ({
   action: "PAYMENT_RECORDED", entityType: "payment", entityId: "p1", after: null, actorId: "u1", actorName: "أحمد", ...o,
@@ -45,8 +45,16 @@ describe("لماذا هذا الرقم؟", () => {
   });
 
   it("الفاتورة تفتح بملفّها، ووسم السداد (المقيّد بالمورّد) بلا رابط مخترع", () => {
-    expect(describeMover(row({ action: "INVOICE_FIELDS_CORRECTED", entityType: "invoice", entityId: "i1" }), "u1").href).toBe("/purchases/invoices/i1");
+    expect(describeMover(row({ action: "INVOICE_FIELDS_CORRECTED", entityType: "invoice", entityId: "e72fefcd-0feb-4de5-b05c-4b7ecbb1dd16" }), "u1").href).toBe("/purchases/invoices/e72fefcd-0feb-4de5-b05c-4b7ecbb1dd16");
+    expect(describeMover(row({ action: "VAT_INVOICE_CHOSEN", entityType: "invoice", entityId: "14 فاتورة" }), "u1").href).toBeNull();
     expect(describeMover(row({ action: "INVOICES_MARKED_PAID", entityType: "invoice", entityId: "s1", after: { الفواتير: ["A-1", "A-2"] } }), "u1"))
       .toMatchObject({ href: null, detail: "A-1، A-2" });
+  });
+});
+
+describe("isRecordId", () => {
+  it("المعرّفُ وحده رابط، والقيدُ الجماعيّ نصّ", () => {
+    expect(isRecordId("fed72843-fb77-44f9-90a7-f1f99c1c0233")).toBe(true);
+    for (const v of ["14 فاتورة", "11 حركة", "manual", "bulk:0", "repair-months:6"]) expect(isRecordId(v)).toBe(false);
   });
 });

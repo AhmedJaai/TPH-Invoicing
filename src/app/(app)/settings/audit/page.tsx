@@ -5,6 +5,7 @@ import {
   Boxes, FileText, Landmark, Sparkles, Store, UserRound, Users, Wallet, CircleDot, type LucideIcon,
 } from "lucide-react";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { isRecordId } from "@/lib/figure-history";
 import { db } from "@/db";
 import { auditLogs, users } from "@/db/schema";
 import { currentUser } from "@/lib/session";
@@ -80,6 +81,10 @@ function Detail({ value, label }: { value: unknown; label: string }) {
 }
 
 function entityLink(entityType: string, entityId: string): React.ReactNode {
+  /* قيدٌ جماعيّ («14 فاتورة») لا معرّفَ له يُفتح — يُقال نصّاً */
+  if ((entityType === "invoice" || entityType === "bank_transaction") && !isRecordId(entityId)) {
+    return /\d/.test(entityId) && /\p{L}/u.test(entityId) ? entityId : ENTITY_LABEL[entityType] ?? "سجل";
+  }
   if (entityType === "invoice") return <Link href={invoiceHref(entityId)} className="font-bold text-accent hover:underline">فاتورة</Link>;
   if (entityType === "bank_transaction") return <Link href={txHref(encodeURIComponent(entityId))} className="font-bold text-accent hover:underline">حركة بنكية</Link>;
   if (entityType === "month") return <Link href="/close" className="font-bold text-accent hover:underline">إقفال الشهر</Link>;

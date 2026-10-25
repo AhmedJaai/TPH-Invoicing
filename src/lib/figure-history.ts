@@ -38,6 +38,14 @@ export const FIGURE_ACTIONS: Record<FigureId, readonly string[]> = {
   ],
 };
 
+/**
+ * معرّفُ سجلٍّ لا وصفُ دفعة. قيودُ التدقيق الجماعيّة تحمل نصّاً مكانَ المعرّف («14 فاتورة»،
+ * «11 حركة»، `manual`، `bulk:0`) فكان رابطُها يفتح «لم نجد هذه الصفحة» (زاحفُ دور المحاسب).
+ */
+export function isRecordId(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 export function isFigureId(v: string | null | undefined): v is FigureId {
   return typeof v === "string" && Object.hasOwn(FIGURE_ACTIONS, v);
 }
@@ -87,7 +95,8 @@ export function describeMover(row: AuditRow, viewerId: string): Mover {
       : typeof detail === "string" ? detail.slice(0, 80) : null,
     amountMinor: typeof amount === "number" && Number.isSafeInteger(amount) ? amount : null,
     /* «وسمُ فواتير مسدَّدة» يُقيَّد بمعرّف المورّد لا الفاتورة — فلا رابطَ يُخترَع له */
-    href: row.entityType === "invoice" && row.action !== "INVOICES_MARKED_PAID" ? invoiceHref(row.entityId)
+    href: !isRecordId(row.entityId) ? null
+      : row.entityType === "invoice" && row.action !== "INVOICES_MARKED_PAID" ? invoiceHref(row.entityId)
       : row.entityType === "document" ? `/documents/file/${encodeURIComponent(row.entityId)}`
       : row.entityType === "bank_transaction" ? txHref(encodeURIComponent(row.entityId))
       : null,
