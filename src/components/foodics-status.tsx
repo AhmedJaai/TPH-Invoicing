@@ -51,7 +51,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
         <div className="mt-1.5"><ScheduledRunLine run={status.scheduled} cadence="كل ثلاث ساعات" /></div>
       </div>
       {canSync && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
           <PostAction url="/api/foodics-sync" body={{}} variant="secondary" size="md" done="زُومن فودكس">
             <T s="{0}زامن الآن" a={[<RefreshCw key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></PostAction>
         </div>

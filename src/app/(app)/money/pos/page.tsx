@@ -130,7 +130,7 @@ export default async function PosPage() {
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                     <T s="لم تصل تسوية لهذا اليوم، مع أنها وصلت في مثله في {0} من الأسابيع الستة الماضية{1}. راجع تقرير الجهاز لذلك اليوم ثم البنك، وإن كان المقهى مغلقاً فتجاهل التنبيه." a={[m.seenWeeks, m.usualMinor !== null && <Fragment key="1"><T s="، ووسيطها {0} (تقدير لا مبلغ فعلي)" a={[<Money key="0" minor={m.usualMinor} />]} /></Fragment>]} /></p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-1">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
                   <LinkButton href={`/bank?show=in&month=${m.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">الداخل في ذلك الشهر</LinkButton>
                   {canEdit && <SignalControls signalKey={missingSettlementKey(m.day)} dismissLabel="كان مغلقاً / وصلت" />}
                 </div>

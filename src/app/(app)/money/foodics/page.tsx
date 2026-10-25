@@ -142,7 +142,7 @@ export default async function FoodicsBankPage() {
                       ? " راجع تقرير إقفال الجهاز لتلك الليلة."
                       : " راجع طلبات تلك الليلة في فودكس، فربما دُفع بيع بالبطاقة وسُجّل نقداً."]} /></p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-1">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
                   <LinkButton href={`/bank?show=in&month=${b.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">الداخل في ذلك الشهر</LinkButton>
                   {canEdit && <SignalControls signalKey={cardGapKey(b.day)} dismissLabel="عرفت سببه" />}
                 </div>

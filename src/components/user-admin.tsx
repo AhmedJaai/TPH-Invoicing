@@ -62,7 +62,7 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                 </span>
                 <bdi dir="ltr" className="block truncate text-[11px] text-muted">{u.email}</bdi>
               </span>
-              <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <span className="flex max-w-full shrink-0 flex-wrap items-center gap-1.5">
                 <Badge tone={u.isActive ? "ok" : "danger"} dot>{u.isActive ? "مفعّل" : "معطّل"}</Badge>
                 <Badge>{ROLE_LABEL[u.role]}</Badge>
               </span>

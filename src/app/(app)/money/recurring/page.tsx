@@ -124,7 +124,7 @@ export default async function RecurringPage() {
                         )}
                       </p>
                     </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-1">
+                    <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
                       <LinkButton href={`/bank?show=all&q=${encodeURIComponent(s.label.slice(0, 30))}#transactions`} variant="secondary" size="sm">حركاتها</LinkButton>
                       {canSilence && <SignalControls signalKey={key} snoozeDays={30} />}
                     </div>

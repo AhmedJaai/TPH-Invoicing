@@ -188,3 +188,30 @@ describe("زرُّ الإرسال يقول ما ينقص", () => {
     expect(found).toEqual([]);
   });
 });
+
+/**
+ * ── حاويةُ الأفعال لا تتجاوز أمَّها ──
+ *
+ * `flex shrink-0 flex-wrap` لا ينكمش، فيأخذ عرضَ ما فيه على سطرٍ واحد: لوحٌ مطويٌّ في
+ * أفعال قسمٍ من «الإقرار الضريبي» مدّ الصفحةَ على الجوّال ١٠٢٩ بكسلاً (يساراً في العربيّة)،
+ * وأزرارُ «تقرير المحاسب» ١٤٠. ومعه `max-w-full` يلتفّ ما فيه داخل عرض أمّه.
+ */
+export function unboundedActionRows(source: string): string[] {
+  const out: string[] = [];
+  for (const m of source.matchAll(/className=\{?[`"]([^`"]*)[`"]/g)) {
+    const toks = m[1].split(/\s+/);
+    if (toks.includes("shrink-0") && toks.includes("flex-wrap") && !toks.includes("max-w-full")) out.push(m[1].slice(0, 80));
+  }
+  return out;
+}
+
+describe("حاويةُ الأفعال تلتفّ داخل أمّها", () => {
+  it("يمسك shrink-0 flex-wrap بلا max-w-full", () => {
+    expect(unboundedActionRows(`<div className="flex shrink-0 flex-wrap gap-2">`)).toHaveLength(1);
+    expect(unboundedActionRows(`<div className="flex max-w-full shrink-0 flex-wrap gap-2">`)).toHaveLength(0);
+  });
+  it("لا حاويةَ أفعالٍ بلا حدّ", () => {
+    const found = walk("src").flatMap((f) => unboundedActionRows(readFileSync(f, "utf8")).map((x) => `${f}: ${x}`));
+    expect(found).toEqual([]);
+  });
+});

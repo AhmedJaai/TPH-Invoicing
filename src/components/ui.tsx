@@ -112,7 +112,7 @@ export function Section({
             <span className="nums nums-count rounded-full bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">{count}</span>
           )}
         </h2>
-        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
+        {action && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
       {hint && (
         <p className="-mt-1 mb-3 max-w-3xl text-xs leading-relaxed text-muted">
@@ -575,7 +575,7 @@ export function Callout({
         {title && <p className={`text-[13px] font-bold ${TONE_TEXT[tone]}`}>{title}</p>}
         {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
       </div>
-      {action && <div className="flex shrink-0 flex-wrap gap-2">{action}</div>}
+      {action && <div className="flex max-w-full shrink-0 flex-wrap gap-2">{action}</div>}
     </div>
   );
 }

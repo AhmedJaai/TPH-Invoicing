@@ -135,7 +135,7 @@ export default async function FinancePositionPage() {
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                     <T s="{0}{1} وإن كنت تعرف السبب فاضغط «أعرف السبب» ولن يظهر التنبيه مرة أخرى." a={[t.userName && <Fragment key="0"><T s="فتحه {0}. " a={[t.userName]} /></Fragment>, t.uncounted ? <Fragment key="1"><T s="يتوقع فودكس فيه {0}، ولم يُسجَّل المبلغ المعدود." a={[<Money key="0" minor={Math.abs(t.varianceMinor)} />]} /></Fragment> : "اسأل من أقفله: هل عدّ المبلغ؟ وهل أخذ منه شيئاً دون تسجيله؟"]} /></p>
                 </div>
-                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={tillSignalKey(t.id)} dismissLabel="أعرف السبب" /></div>}
+                {canSilence && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={tillSignalKey(t.id)} dismissLabel="أعرف السبب" /></div>}
               </li>
             ))}
           </ul>

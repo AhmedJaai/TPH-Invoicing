@@ -466,7 +466,7 @@ function Notice({
           {children && <div className="mt-0.5">{children}</div>}
         </div>
       </div>
-      {action && <div className="flex shrink-0 flex-wrap gap-2 ps-[30px] sm:ps-0">{action}</div>}
+      {action && <div className="flex max-w-full shrink-0 flex-wrap gap-2 ps-[30px] sm:ps-0">{action}</div>}
     </div>
   );
 }

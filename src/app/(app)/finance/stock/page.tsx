@@ -185,7 +185,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
                     {g.kind === "SHORTAGE" ? "راجع الوصفة وتأكد أنها تطابق ما يُصرف فعلاً، وسجّل الهدر حين يحدث." : "ربما توجد فاتورة ناقصة. افتح الصنف وراجع فواتيره."}
                   </p>
                 </div>
-                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف السبب" snoozeDays={30} /></div>}
+                {canSilence && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف السبب" snoozeDays={30} /></div>}
               </li>
             ))}
           </ul>

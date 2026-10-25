@@ -33,7 +33,7 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
           </p>
         </div>
         {canAsk && (
-          <span className="no-print flex shrink-0 flex-wrap items-center gap-2">
+          <span className="no-print flex max-w-full shrink-0 flex-wrap items-center gap-2">
             <PostAction url="/api/finance/reading" body={{ month }} variant={stored && !stored.stale ? "quiet" : "primary"} done="كُتبت القراءة">
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               {stored ? "اقرأ من جديد" : "اقرأ هذا الشهر"}

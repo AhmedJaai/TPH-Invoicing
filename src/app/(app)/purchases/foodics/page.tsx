@@ -148,7 +148,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
               <p className="mt-1 text-xs text-ink-soft">
                 <T s="في فودكس {0}{1}" a={[<Money key="0" minor={openPurchase.totalMinor} />, openPair ? <Fragment key="1"> <T s=" · عندنا {0} ({1} · {2})" a={[<Money key="0" minor={openPair.invoice.totalMinor} />, openPair.invoice.supplierName, <bdi key="2" dir="ltr">{openPair.invoice.invoiceNumber}</bdi>]} /></Fragment> : " · لا فاتورة تقابلها عندنا"]} /></p>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div className="flex max-w-full shrink-0 flex-wrap gap-2">
               {openPair && <LinkButton href={invoiceHref(openPair.invoice.id)} variant="secondary" size="sm">افتح فاتورتنا</LinkButton>}
               <LinkButton href="/purchases/foodics" variant="quiet" size="sm" icon={X}>أغلق</LinkButton>
             </div>
@@ -412,7 +412,7 @@ function RepeatRow({ r, canSilence }: { r: RepeatDelivery; canSilence: boolean }
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           <T s="البنود والكميات متطابقة، {0}: {1} و{2}.{3}{4}{5}{6}." a={[gap, <Money key="1" minor={r.first.totalMinor} />, <Money key="2" minor={r.second.totalMinor} />, r.foodicsReceipts === 1 && " وسجّل فودكس استلاماً واحداً فقط من المورّد في تلك الأيام.", r.foodicsReceipts === 0 && " ولم يسجّل فودكس أي استلام من المورّد في تلك الأيام.", r.bothPaid ? " والفاتورتان مسدّدتان، فإن كانت إحداهما ملغاة فلك مبلغها عند المورّد " : " إن كانت إحداهما ملغاة فلا تدفعها ", <Money key="6" minor={r.atStakeMinor} />]} /></p>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-1">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
         <LinkButton href={invoiceHref(r.first.id)} variant="secondary" size="sm">الأولى</LinkButton>
         <LinkButton href={invoiceHref(r.second.id)} variant="secondary" size="sm">الثانية</LinkButton>
         {canSilence && (r.silenced
@@ -432,7 +432,7 @@ function DiffersRow({ m, canSilence }: { m: MatchedPair; canSilence: boolean }) 
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           <T s="في فودكس {0} وعندنا {1}، والفرق {2}.{3}" a={[<Money key="0" minor={m.purchase.totalMinor} />, <Money key="1" minor={m.invoice.totalMinor} />, <Money key="2" minor={m.gapMinor} signed />, m.supplierConflict && " ومورّد فودكس مربوط بمورّد غير مورّد هذه الفاتورة، فراجع الربط."]} /></p>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-1">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
         <LinkButton href={`/purchases/foodics?p=${encodeURIComponent(m.purchase.id)}`} variant="secondary" size="sm">قارن البنود</LinkButton>
         <LinkButton href={invoiceHref(m.invoice.id)} variant="secondary" size="sm">افتح الفاتورة</LinkButton>
         {canSilence && <SignalControls signalKey={purchaseKey(m.purchase.id)} dismissLabel="عرفت سببه" snoozeDays={30} />}

@@ -234,7 +234,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                     <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
                   </span>
                 </span>
-                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                <span className="flex max-w-full shrink-0 flex-wrap items-center gap-1.5">
                   {canUpload && <ConfirmDocument documentId={d.id} />}
                   {canUpload && <RejectDocument documentId={d.id} />}
                 </span>

@@ -178,7 +178,7 @@ export function PageShell({
               <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-soft">{intro}</p>
             )}
           </div>
-          {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+          {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
         </div>
         <div className="mt-5">
           <AreaTabs role={user.role} />
