@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { PauseCircle, PlayCircle } from "lucide-react";
 import { ActionButton, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
@@ -41,7 +41,7 @@ export function AutoWorkSwitch({ paused, since }: { paused: boolean; since: stri
         <p className="text-sm font-bold">{paused ? "العمل الآلي موقوف" : "العمل الآلي يعمل"}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           {paused
-            ? <><T s="لا يُسجَّل ولا يُعتمد ولا يُزامَن شيء في الخلفية{0}، على كل الأجهزة. زر «زامن الآن» يعمل حين تضغطه." a={[since ? <> <T s=" منذ {0}" a={[since]} /></> : null]} /></>
+            ? <><T s="لا يُسجَّل ولا يُعتمد ولا يُزامَن شيء في الخلفية{0}، على كل الأجهزة. زر «زامن الآن» يعمل حين تضغطه." a={[since ? <Fragment key="0"> <T s=" منذ {0}" a={[since]} /></Fragment> : null]} /></>
             : "يسجّل الفواتير المقروءة كاملة، ويعتمد ما اجتمعت شروطه، ويخبرك بما فعله وبمقدار ما زاد عليك. تجد ما نفّذه في «آخر ما فعله» أدناه، وافتح المستند لتصحّحه أو ترفضه."}
         </p>
         {error && <p role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}

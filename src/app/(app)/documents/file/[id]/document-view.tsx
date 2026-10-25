@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -143,7 +144,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         ومتى، إن عُرف. وما سبق عمودَ المصدر يبقى على ما كان يُقال.
       */
       body: p.source === "DRIVE_SYNC"
-        ? <><T s="من مزامنة الدرايف{0}{1}" a={[p.driveModifiedBy ? <><T s="، وآخر من عدّله هناك {0}" a={[<bdi key="0">{p.driveModifiedBy}</bdi>]} /></> : null, p.driveCreatedAt ? <> <T s=" · أُضيف إلى الدرايف في {0}" a={[formatDay(p.driveCreatedAt)]} /></> : null]} /></>
+        ? <><T s="من مزامنة الدرايف{0}{1}" a={[p.driveModifiedBy ? <Fragment key="0"><T s="، وآخر من عدّله هناك {0}" a={[<bdi key="0">{p.driveModifiedBy}</bdi>]} /></Fragment> : null, p.driveCreatedAt ? <Fragment key="1"> <T s=" · أُضيف إلى الدرايف في {0}" a={[formatDay(p.driveCreatedAt)]} /></Fragment> : null]} /></>
         : p.uploadedBy ? <><T s="رفعه {0}" a={[<bdi key="0">{p.uploadedBy}</bdi>]} /></> : "من مزامنة الدرايف",
     },
   ];

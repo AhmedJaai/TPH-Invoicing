@@ -394,7 +394,7 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
               {m.nameAr}
             </Link>
             <span className="block text-[11px] text-muted">
-              <T s="آخر فاتورة {0}" a={[m.lastInvoiceDate ? <bdi className="nums">{formatDay(m.lastInvoiceDate)}</bdi> : "غير معروف"]} /></span>
+              <T s="آخر فاتورة {0}" a={[m.lastInvoiceDate ? <bdi key="0" className="nums">{formatDay(m.lastInvoiceDate)}</bdi> : "غير معروف"]} /></span>
           </span>
           <span className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
             <a

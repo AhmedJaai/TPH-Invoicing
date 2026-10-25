@@ -90,7 +90,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
             <T s="حركة البنك التي تريد توزيعها{0}{1}" a={[<select key="0" value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy} className={field}>
               <option value="">— اختر —</option>
               {options.map((c) => <option key={c.id} value={c.id}>{c.dayLabel} · {c.amountText} ريال · {c.label}</option>)}
-            </select>, options.length === 0 && <span className="mt-1 block text-[11px] text-warn"><T s="لا توجد في الكشف حركة مصنّفة «{0}» لم تُوزَّع بعد. صنّف الحركة أولاً من «حركة البنك»." a={[categoryLabel]} /></span>]} /></label>
+            </select>, options.length === 0 && <span key="1" className="mt-1 block text-[11px] text-warn"><T s="لا توجد في الكشف حركة مصنّفة «{0}» لم تُوزَّع بعد. صنّف الحركة أولاً من «حركة البنك»." a={[categoryLabel]} /></span>]} /></label>
         )}
         {kind === "OFF_BOOK" && (
           <label className="text-xs font-medium text-ink-soft">

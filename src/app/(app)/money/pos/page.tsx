@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { CalendarX, CreditCard, Info, Landmark, Percent, TrendingUp, Upload } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -90,7 +91,7 @@ export default async function PosPage() {
           value={<Money minor={latest.feeMinor + latest.fixedFeeMinor + latest.vatMinor} />}
           sub={
             <>
-              <T s="رسم العمليات {0}{1} · ضريبة الرسم {2}" a={[<Money key="0" minor={latest.feeMinor} />, latest.fixedFeeMinor > 0 && <> <T s=" · رسم ثابت {0}" a={[<Money key="0" minor={latest.fixedFeeMinor} />]} /></>, <Money key="2" minor={latest.vatMinor} />]} /></>
+              <T s="رسم العمليات {0}{1} · ضريبة الرسم {2}" a={[<Money key="0" minor={latest.feeMinor} />, latest.fixedFeeMinor > 0 && <Fragment key="1"> <T s=" · رسم ثابت {0}" a={[<Money key="0" minor={latest.fixedFeeMinor} />]} /></Fragment>, <Money key="2" minor={latest.vatMinor} />]} /></>
           }
           href={`/bank?show=fees&month=${latest.month}#transactions`}
         />
@@ -117,7 +118,7 @@ export default async function PosPage() {
       >
         {w.missing.length === 0 ? (
           <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-muted shadow-raised">
-            <T s="لا يوجد يوم معتاد بلا تسوية في الفترة التي يغطيها الكشف حتى {0}.{1}" a={[<bdi key="0">{formatDay(w.lastBankDay)}</bdi>, w.silencedMissing.length > 0 && <> <T s=" وتجاهلتَ {0}، تجدها أدناه." a={[countNoun(w.silencedMissing.length, DAY)]} /></>]} /></p>
+            <T s="لا يوجد يوم معتاد بلا تسوية في الفترة التي يغطيها الكشف حتى {0}.{1}" a={[<bdi key="0">{formatDay(w.lastBankDay)}</bdi>, w.silencedMissing.length > 0 && <Fragment key="1"> <T s=" وتجاهلتَ {0}، تجدها أدناه." a={[countNoun(w.silencedMissing.length, DAY)]} /></Fragment>]} /></p>
         ) : (
           <ul className="space-y-2">
             {w.missing.map((m) => (
@@ -127,7 +128,7 @@ export default async function PosPage() {
                     {formatWeekday(m.day)} <bdi>{formatDay(m.day)}</bdi>
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                    <T s="لم تصل تسوية لهذا اليوم، مع أنها وصلت في مثله في {0} من الأسابيع الستة الماضية{1}. راجع تقرير الجهاز لذلك اليوم ثم البنك، وإن كان المقهى مغلقاً فتجاهل التنبيه." a={[m.seenWeeks, m.usualMinor !== null && <><T s="، ووسيطها {0} (تقدير لا مبلغ فعلي)" a={[<Money key="0" minor={m.usualMinor} />]} /></>]} /></p>
+                    <T s="لم تصل تسوية لهذا اليوم، مع أنها وصلت في مثله في {0} من الأسابيع الستة الماضية{1}. راجع تقرير الجهاز لذلك اليوم ثم البنك، وإن كان المقهى مغلقاً فتجاهل التنبيه." a={[m.seenWeeks, m.usualMinor !== null && <Fragment key="1"><T s="، ووسيطها {0} (تقدير لا مبلغ فعلي)" a={[<Money key="0" minor={m.usualMinor} />]} /></Fragment>]} /></p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-1">
                   <LinkButton href={`/bank?show=in&month=${m.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">الداخل في ذلك الشهر</LinkButton>

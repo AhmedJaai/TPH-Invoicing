@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { Equal, TriangleAlert } from "lucide-react";
@@ -116,7 +116,7 @@ export function FlowStep({
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
           <TriangleAlert className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
-            <T s="{0}{1}ولا يُحسب فرق لهذه الأصناف بدون هذه البيانات." a={[missingOpening > 0 && <><T s="{0} رصيده الافتتاحي غير معروف. " a={[<span key="0" className="font-bold text-ink">{countNoun(missingOpening, PRODUCT)}</span>]} /></>, missingPurchases > 0 && <><T s="{0} كمية مشترياته غير معروفة. " a={[<span key="0" className="font-bold text-ink">{countNoun(missingPurchases, PRODUCT)}</span>]} /></>]} /></p>
+            <T s="{0}{1}ولا يُحسب فرق لهذه الأصناف بدون هذه البيانات." a={[missingOpening > 0 && <Fragment key="0"><T s="{0} رصيده الافتتاحي غير معروف. " a={[<span key="0" className="font-bold text-ink">{countNoun(missingOpening, PRODUCT)}</span>]} /></Fragment>, missingPurchases > 0 && <Fragment key="1"><T s="{0} كمية مشترياته غير معروفة. " a={[<span key="0" className="font-bold text-ink">{countNoun(missingPurchases, PRODUCT)}</span>]} /></Fragment>]} /></p>
           <button type="button" onClick={() => setOnlyMissing((v) => !v)} className={buttonClass("secondary", "sm")}>
             {onlyMissing ? "اعرض الكل" : "اعرض الأصناف الناقصة"}
           </button>

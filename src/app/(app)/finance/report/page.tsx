@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileSpreadsheet } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -81,8 +82,8 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
           <li><T s="الإيراد: ما دفعه الزبائن في فودكس (نقداً وبالبطاقة) بعد المرتجعات {0}، مطروحاً منه ضريبة المبيعات {1}. ومشروبات الموظفين («House Account») ليست إيراداً." a={[<Money key="0" minor={view.revenue?.paidMinor ?? 0} />, <Money key="1" minor={view.revenue?.vatMinor ?? 0} />]} /></li>
           <li>
             <T s="تكلفة المبيعات: {0}" a={[p.cogsMethod === "STOCK" && c.stock
-              ? <><T s="بالجرد: مشتريات الشهر + مخزون عُدّ في {0} ({1}) − مخزون عُدّ في {2} ({3})، والمعدود {4}، مقيَّماً بآخر تكلفة معروفة." a={[<bdi key="0">{formatDay(c.stock.openingDay)}</bdi>, <Money key="1" minor={c.stock.openingValueMinor} />, <bdi key="2">{formatDay(c.stock.closingDay)}</bdi>, <Money key="3" minor={c.stock.closingValueMinor} />, countNoun(c.stock.countedItems, PRODUCT)]} /></>
-              : <><T s="مشتريات الشهر ({0})، وهي ليست تكلفة ما بيع." a={[c.stockMissing ?? "لا يوجد جرد"]} /></>]} /></li>
+              ? <Fragment key="0"><T s="بالجرد: مشتريات الشهر + مخزون عُدّ في {0} ({1}) − مخزون عُدّ في {2} ({3})، والمعدود {4}، مقيَّماً بآخر تكلفة معروفة." a={[<bdi key="0">{formatDay(c.stock.openingDay)}</bdi>, <Money key="1" minor={c.stock.openingValueMinor} />, <bdi key="2">{formatDay(c.stock.closingDay)}</bdi>, <Money key="3" minor={c.stock.closingValueMinor} />, countNoun(c.stock.countedItems, PRODUCT)]} /></Fragment>
+              : <Fragment key="0"><T s="مشتريات الشهر ({0})، وهي ليست تكلفة ما بيع." a={[c.stockMissing ?? "لا يوجد جرد"]} /></Fragment>]} /></li>
           <li>المصروفات: ما سُجّل من كشف البنك بتصنيفه، وما أضافه المالك مما لا يظهر في الكشف. سداد المورّدين محسوب في المشتريات لا هنا، وضريبة الرسوم وسداد الهيئة ليسا مصروفاً.</li>
           {p.gaps.length === 0
             ? <li className="font-bold">لا ينقصه عنصر أساسي.</li>

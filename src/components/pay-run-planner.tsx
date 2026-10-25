@@ -3,7 +3,7 @@
 import { DateChips } from "./date-chips";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore, Fragment } from "react";
 import { Check, ChevronDown, CircleAlert, CircleCheck, Download, MessageCircle, RotateCcw, ShieldAlert, Wallet } from "lucide-react";
 import { Money } from "./money";
 import { CopyValue } from "./copy-value";
@@ -319,7 +319,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         {customised && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-soft">
             <span>
-              <T s="عدّلتَ الدفعة:{0}{1}{2}. اختيارك محفوظ على هذا الجهاز." a={[skippedSuppliers > 0 && <> <T s=" استثنيتَ {0}" a={[countNoun(skippedSuppliers, SUPPLIER)]} /></>, skippedInvoices > 0 && <>{skippedSuppliers > 0 ? " و" : " استثنيتَ "}{countNoun(skippedInvoices, INVOICE)}</>, partialCount > 0 && <><T s="{0}مبلغ جزئي لـ{1}" a={[skippedSuppliers + skippedInvoices > 0 ? " · " : " ", countNoun(partialCount, SUPPLIER)]} /></>]} /></span>
+              <T s="عدّلتَ الدفعة:{0}{1}{2}. اختيارك محفوظ على هذا الجهاز." a={[skippedSuppliers > 0 && <Fragment key="0"> <T s=" استثنيتَ {0}" a={[countNoun(skippedSuppliers, SUPPLIER)]} /></Fragment>, skippedInvoices > 0 && <Fragment key="1">{skippedSuppliers > 0 ? " و" : " استثنيتَ "}{countNoun(skippedInvoices, INVOICE)}</Fragment>, partialCount > 0 && <Fragment key="2"><T s="{0}مبلغ جزئي لـ{1}" a={[skippedSuppliers + skippedInvoices > 0 ? " · " : " ", countNoun(partialCount, SUPPLIER)]} /></Fragment>]} /></span>
             <button type="button" onClick={() => change(EMPTY_SELECTION)} className="inline-flex min-h-8 items-center gap-1 font-bold text-accent hover:underline">
               <T s="{0}أعد الكل بمبالغها الكاملة" a={[<RotateCcw key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />]} /></button>
           </p>
@@ -431,7 +431,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               </div>
               {plan.on && after.state === "over" && (
                 <p className="border-t border-line-soft bg-warn-bg px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
-                  <T s="المستحق عليك له الآن {0}، وهذه الدفعة {1}. ربما قُيّد سداد أو إشعار دائن بعد تجهيز الدفعة. راجع {2} قبل التحويل، أو استثنِ فاتورة، أو اكتب مبلغاً جزئياً." a={[<Money key="0" minor={s.owedMinor ?? 0} />, <Money key="1" minor={plan.payingMinor} />, s.slug ? <Link href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">صفحة المورّد</Link> : "صفحة المورّد"]} /></p>
+                  <T s="المستحق عليك له الآن {0}، وهذه الدفعة {1}. ربما قُيّد سداد أو إشعار دائن بعد تجهيز الدفعة. راجع {2} قبل التحويل، أو استثنِ فاتورة، أو اكتب مبلغاً جزئياً." a={[<Money key="0" minor={s.owedMinor ?? 0} />, <Money key="1" minor={plan.payingMinor} />, s.slug ? <Link key="2" href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">صفحة المورّد</Link> : "صفحة المورّد"]} /></p>
               )}
               {plan.on && plan.creditAppliedMinor > 0 && (
                 <p className="border-t border-line-soft bg-accent-soft/50 px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
@@ -644,7 +644,7 @@ export function HoldOverride({
           <p className="text-sm font-bold text-ink">
             <T s="{0} على {1}" a={[<Money key="0" minor={openMinor} currency />, countNoun(invoiceIds.length, INVOICE)]} /></p>
           <p className="mt-1">
-            <T s="السداد قبل وصول الفاتورة الضريبية الصحيحة يُضعف موقفك في التفاوض مع المورّد.{0}{1}" a={[vatAtRiskMinor > 0 && <> <T s=" وضريبة المدخلات ({0}) لا يمكن خصمها قبل وصول الفاتورة الصحيحة." a={[<b key="0"><Money minor={vatAtRiskMinor} /></b>]} /></>, vatAtRiskUnknown > 0 && <> <T s=" و{0} لم تُقرأ ضريبتها، فمقدار الضريبة المهددة منها غير معروف." a={[countNoun(vatAtRiskUnknown, INVOICE)]} /></>]} /></p>
+            <T s="السداد قبل وصول الفاتورة الضريبية الصحيحة يُضعف موقفك في التفاوض مع المورّد.{0}{1}" a={[vatAtRiskMinor > 0 && <Fragment key="0"> <T s=" وضريبة المدخلات ({0}) لا يمكن خصمها قبل وصول الفاتورة الصحيحة." a={[<b key="0"><Money minor={vatAtRiskMinor} /></b>]} /></Fragment>, vatAtRiskUnknown > 0 && <Fragment key="1"> <T s=" و{0} لم تُقرأ ضريبتها، فمقدار الضريبة المهددة منها غير معروف." a={[countNoun(vatAtRiskUnknown, INVOICE)]} /></Fragment>]} /></p>
         </div>
         <label className="mt-3 block">
           <span className="text-xs font-bold">لماذا تدفعها الآن؟</span>

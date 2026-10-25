@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronDown, CircleAlert, CircleCheck, Download, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
@@ -165,7 +165,7 @@ export function MonthClose({
                   {isClosed ? "الشهر مقفل" : report.canClose ? "جاهز للإقفال" : "غير جاهز للإقفال"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                  <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <> <T s=" · {0} {1}" a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></>, report.warnings.length > 0 && <> <T s=" · {0} {1} الإقفال" a={[countNoun(report.warnings.length, WARNING), doesNotBlock(report.warnings.length)]} /></>]} /></p>
+                  <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <Fragment key="2"> <T s=" · {0} {1}" a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></Fragment>, report.warnings.length > 0 && <Fragment key="3"> <T s=" · {0} {1} الإقفال" a={[countNoun(report.warnings.length, WARNING), doesNotBlock(report.warnings.length)]} /></Fragment>]} /></p>
               </div>
               {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
               {!isClosed && firstBlocker && (

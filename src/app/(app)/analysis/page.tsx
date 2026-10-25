@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
@@ -258,7 +259,7 @@ export default async function ItemsAndPricesPage({
                       <Monogram name={i.supplierName} />
                       <span className="min-w-0">
                         <span className="block truncate font-bold" dir="auto">{i.displayName}</span>
-                        <span className="block text-[11px] font-normal text-muted"><T s="{0} · طُلب {1}" a={[supplierCell(i), countNoun(i.orderCount, TIME)]} /></span>
+                        <span className="block text-[11px] font-normal text-muted"><T s="{0} · طُلب {1}" a={[<Fragment key="0">{supplierCell(i)}</Fragment>, countNoun(i.orderCount, TIME)]} /></span>
                       </span>
                     </span>
                   ),

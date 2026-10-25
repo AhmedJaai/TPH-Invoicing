@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useState, Fragment } from "react";
 import { CircleAlert, CircleCheck, Info, PenLine, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
@@ -312,7 +312,7 @@ function SumCheck({ subtotal, vat, total, discount, charges }: { subtotal: strin
       aria-live="polite"
       className={`mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${ok ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}
     >
-      <T s="{0}الصافي + الضريبة{1}{2} = {3}{4}" a={[ok ? <CircleCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />, check.discountMinor !== null && <> − الخصم</>, check.chargesMinor !== null && <> + الرسوم</>, <Money key="3" minor={sum} />, ok ? " (يطابق الإجمالي)" : <> <T s=" (يخالف الإجمالي بـ{0})" a={[<Money key="0" minor={Math.abs(sum - t)} />]} /></>]} /></p>
+      <T s="{0}الصافي + الضريبة{1}{2} = {3}{4}" a={[ok ? <CircleCheck key="0" className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert key="0" className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />, check.discountMinor !== null && <Fragment key="1"> − الخصم</Fragment>, check.chargesMinor !== null && <Fragment key="2"> + الرسوم</Fragment>, <Money key="3" minor={sum} />, ok ? " (يطابق الإجمالي)" : <Fragment key="4"> <T s=" (يخالف الإجمالي بـ{0})" a={[<Money key="0" minor={Math.abs(sum - t)} />]} /></Fragment>]} /></p>
   );
 }
 

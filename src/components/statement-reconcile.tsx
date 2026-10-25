@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, Copy, FileSearch, GitCompareArrows, MessageCircle, ScrollText, Upload } from "lucide-react";
 import { postJson, request } from "@/lib/http-client";
@@ -333,7 +333,7 @@ function ResultView({ result }: { result: Result }) {
         </Callout>
       ) : (
         <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="كشفه يختلف عن فواتيرك">
-          <T s="{0}{1}المذكرة أسفله جاهزة لإرسالها إلى المورّد." a={[s.missingFromArchive > 0 && <><T s="{0} سجّلها عليك وليس لها ملف عندك. " a={[countNoun(s.missingFromArchive, INVOICE)]} /></>, s.amountMismatches > 0 && <><T s="و{0} فيها فرق في المبلغ. " a={[s.amountMismatches]} /></>]} /></Callout>
+          <T s="{0}{1}المذكرة أسفله جاهزة لإرسالها إلى المورّد." a={[s.missingFromArchive > 0 && <Fragment key="0"><T s="{0} سجّلها عليك وليس لها ملف عندك. " a={[countNoun(s.missingFromArchive, INVOICE)]} /></Fragment>, s.amountMismatches > 0 && <Fragment key="1"><T s="و{0} فيها فرق في المبلغ. " a={[s.amountMismatches]} /></Fragment>]} /></Callout>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -362,7 +362,7 @@ function ResultView({ result }: { result: Result }) {
               </li>
             ))}
           </ul>, !allUnread && result.unreadLines.length > 12 && (
-            <button type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-8 text-[11px] font-bold text-accent hover:underline">
+            <button key="1" type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-8 text-[11px] font-bold text-accent hover:underline">
               <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{result.unreadLines.length - 12}</span>]} /></button>
           )]} /></Callout>
       )}
@@ -514,7 +514,7 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
   return (
     <span className="relative z-10 flex max-w-64 flex-col items-end gap-1 text-end">
       <span className="text-[11px] text-warn">
-        <T s="{0} في الكشف ليس لها ملف ({1})" a={[count === 1 ? "فاتورة" : <><T s="{0} فواتير" a={[<span key="0" className="nums">{count}</span>]} /></>, <Money key="1" minor={minor} />]} /></span>
+        <T s="{0} في الكشف ليس لها ملف ({1})" a={[count === 1 ? "فاتورة" : <Fragment key="0"><T s="{0} فواتير" a={[<span key="0" className="nums">{count}</span>]} /></Fragment>, <Money key="1" minor={minor} />]} /></span>
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
         {busy ? "يسجّل…" : "سجّلها من الكشف"}
       </button>

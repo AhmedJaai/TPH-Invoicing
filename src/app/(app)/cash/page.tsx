@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, Fragment } from "react";
 import { RunwayLine } from "@/components/cash-runway";
 import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
@@ -112,7 +112,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       )}
 
       <Callout tone="info" icon={Info} className="mt-4">
-        <T s="{0} لا تُحسب المبالغ الداخلة لأن مبيعات فودكس غير مربوطة، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}" a={[<strong key="0" className="text-ink">تقدير لا تنبؤ:</strong>, o.heldMinor > 0 && <> <T s=" وهناك {0} محجوزة إلى أن تصل الفواتير الصحيحة، ولا تُحسب هنا." a={[<Money key="0" minor={o.heldMinor} />]} /></>]} /></Callout>
+        <T s="{0} لا تُحسب المبالغ الداخلة لأن مبيعات فودكس غير مربوطة، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}" a={[<strong key="0" className="text-ink">تقدير لا تنبؤ:</strong>, o.heldMinor > 0 && <Fragment key="1"> <T s=" وهناك {0} محجوزة إلى أن تصل الفواتير الصحيحة، ولا تُحسب هنا." a={[<Money key="0" minor={o.heldMinor} />]} /></Fragment>]} /></Callout>
 
       {/* ── حدُّ الرصيد: تحذيرٌ بما يكسره — لا يمنع دفعةً ولا يغيّر رقماً ── */}
       {o.breach && (
@@ -139,7 +139,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         >
           <T s="{0}لذلك زاد «يخرج حتى نهاية الشهر القادم» ونقص «يتبقى بعدها» بالقدر نفسه." a={[o.vatIncluded.map((v) => (
             <span key={v.periodKey} className="block">
-              <T s="{0}: {1} {2} — آخر موعد {3}. {4}" a={[v.label, <Money key="1" minor={v.amountMinor ?? 0} />, v.accruing ? "حتى اليوم (تزيد مع المبيعات)" : "لم يُسجَّل تقديم إقرارها", <bdi key="3">{formatDay(v.deadline)}</bdi>, canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">احسبها</Link>]} /></span>
+              <T s="{0}: {1} {2} — آخر موعد {3}. {4}" a={[v.label, <Money key="1" minor={v.amountMinor ?? 0} />, v.accruing ? "حتى اليوم (تزيد مع المبيعات)" : "لم يُسجَّل تقديم إقرارها", <bdi key="3">{formatDay(v.deadline)}</bdi>, canVat && <Link key="4" href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">احسبها</Link>]} /></span>
           ))]} /></Callout>
       )}
       {o.vatOff.some((v) => (v.amountMinor ?? 0) > 0) && (
@@ -158,14 +158,14 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <Callout tone="accent" icon={Percent} className="mt-3" title="خصّص مبلغاً للضريبة">
           <T s="{0}موعدها بعد الفترة التي يغطيها الجدول أدناه، فلا تُطرح من «يتبقى بعدها»، لكنها ستُدفع لاحقاً." a={[o.vatAhead.map((v) => (
             <span key={v.periodKey} className="block">
-              <T s="{0}: {1} {2} · تُسدَّد قبل {3}. {4}" a={[v.label, <Money key="1" minor={v.amountMinor ?? 0} />, v.accruing ? "حتى اليوم، وتزيد مع كل يوم بيع" : "", <bdi key="3">{formatDay(v.deadline)}</bdi>, canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">احسبها</Link>]} /></span>
+              <T s="{0}: {1} {2} · تُسدَّد قبل {3}. {4}" a={[v.label, <Money key="1" minor={v.amountMinor ?? 0} />, v.accruing ? "حتى اليوم، وتزيد مع كل يوم بيع" : "", <bdi key="3">{formatDay(v.deadline)}</bdi>, canVat && <Link key="4" href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">احسبها</Link>]} /></span>
           ))]} /></Callout>
       )}
       {o.vatUnknown.length > 0 && (
         <Callout tone="warn" icon={Percent} className="mt-3" title="ضريبة قادمة مبلغها غير معروف">
           {o.vatUnknown.map((v) => (
             <span key={v.periodKey} className="block">
-              <T s="{0} (موعدها {1}): أحد أشهرها بلا كشف بنك، فمبيعاته غير معروفة، ولن نكتب مبلغ الضريبة المستحقة. {2}" a={[v.label, <bdi key="1">{formatDay(v.deadline)}</bdi>, canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">الناقص</Link>]} /></span>
+              <T s="{0} (موعدها {1}): أحد أشهرها بلا كشف بنك، فمبيعاته غير معروفة، ولن نكتب مبلغ الضريبة المستحقة. {2}" a={[v.label, <bdi key="1">{formatDay(v.deadline)}</bdi>, canVat && <Link key="2" href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">الناقص</Link>]} /></span>
           ))}
         </Callout>
       )}
@@ -218,8 +218,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       {nextRun && (
         <p className="mt-6 text-xs leading-relaxed text-muted">
           <T s="تُجهَّز دفعة الشهر القادم من الفواتير المسجّلة حتى اليوم، وتكبر مع كل فاتورة جديدة{0}" a={[canPay ? (
-            <>
-              <T s=". أما دفعة الشهر الماضي فتُعتمد من {0}." a={[<Link key="0" href="/payments" className="font-bold text-accent hover:underline">دفعة الشهر</Link>]} /></>
+            <Fragment key="0">
+              <T s=". أما دفعة الشهر الماضي فتُعتمد من {0}." a={[<Link key="0" href="/payments" className="font-bold text-accent hover:underline">دفعة الشهر</Link>]} /></Fragment>
           ) : (
             "، ويعتمدها المالك."
           )]} /></p>

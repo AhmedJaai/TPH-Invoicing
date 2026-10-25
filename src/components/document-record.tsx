@@ -250,7 +250,7 @@ export function DocumentRecord({
 
       {sumOk !== null && (
         <p className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${sumOk ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}>
-          <T s="{0}الصافي + الضريبة = {1}{2}" a={[sumOk ? <CircleCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />, <Money key="1" minor={(sub ?? 0) + (vat ?? 0)} />, sumOk ? " (يطابق الإجمالي)" : " (يخالف الإجمالي)"]} /></p>
+          <T s="{0}الصافي + الضريبة = {1}{2}" a={[sumOk ? <CircleCheck key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden /> : <TriangleAlert key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />, <Money key="1" minor={(sub ?? 0) + (vat ?? 0)} />, sumOk ? " (يطابق الإجمالي)" : " (يخالف الإجمالي)"]} /></p>
       )}
 
       {/* ── حكمُ الخادم قبل القيد ── */}

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, Fragment } from "react";
 import { sql } from "drizzle-orm";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, CircleCheck, ClipboardList, Download, FileWarning, Landmark, Receipt, SearchCheck, TriangleAlert } from "lucide-react";
 import { db } from "@/db";
@@ -179,7 +179,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
               icon={ArrowDownLeft}
               label="ضريبة المخرجات"
               value={<Money minor={r.output.vatMinor} currency />}
-              sub={<><T s="15/115 من {0} مبيعات دخلت البنك ({1}){2}." a={[<Money key="0" minor={r.output.grossMinor} />, countNoun(r.output.count, TRANSACTION), r.output.cashGrossMinor > 0 && <> <T s=" ومن {0} مبيعات نقدية أدخلتها" a={[<Money key="0" minor={r.output.cashGrossMinor} />]} /></>]} /></>}
+              sub={<><T s="15/115 من {0} مبيعات دخلت البنك ({1}){2}." a={[<Money key="0" minor={r.output.grossMinor} />, countNoun(r.output.count, TRANSACTION), r.output.cashGrossMinor > 0 && <Fragment key="2"> <T s=" ومن {0} مبيعات نقدية أدخلتها" a={[<Money key="0" minor={r.output.cashGrossMinor} />]} /></Fragment>]} /></>}
             />
             <KeyFigure
               icon={ArrowUpRight}
@@ -274,7 +274,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 title={`خرجت من الخصم ${countNoun(awaiting.length, INVOICE)} لأن مستنداتها لم تُراجَع: ${riyalsText(awaiting.reduce((s, i) => s + i.vatUsedMinor, 0))}`}
               >
                 <T s="فواتير مستوفية للشروط قرأها النظام ولم يعتمد أحد قراءتها بعد، لذلك لا تُحسب تلقائياً. راجعها من «المراجعة» لتدخل في الخصم، أو أضفها هنا بنفسك. تفاصيلها في {0}، ولكل فاتورة زر خاص بها.{1}" a={[<a key="0" href="#invoices" className="font-bold underline underline-offset-2">«فواتير لا تُخصم ضريبتها»</a>, !filing && (
-                  <span className="mt-2 block">
+                  <span key="1" className="mt-2 block">
                     <VatBulk kind="invoice" ids={awaiting.map((i) => i.id)} included variant="subtle">
                       {`أضفها كلها (${awaiting.length})`}
                     </VatBulk>

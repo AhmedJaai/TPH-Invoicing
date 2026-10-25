@@ -1,5 +1,5 @@
 import { DocumentsBulk } from "@/components/documents-bulk";
-import { Suspense } from "react";
+import { Suspense, Fragment } from "react";
 import { SavedViews } from "@/components/saved-views";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -542,7 +542,7 @@ export default async function DocumentsPage({
                           {r.status === "REJECTED" && (
                             <span className="block text-[11px] leading-relaxed text-muted">
                               {j
-                                ? <><T s="رُفض في {0}{1}: {2}" a={[formatDay(j.at), j.by ? <> <T s=" بواسطة {0}" a={[<bdi key="0">{j.by}</bdi>]} /></> : null, j.reason ?? "بلا سبب مكتوب"]} /></>
+                                ? <><T s="رُفض في {0}{1}: {2}" a={[formatDay(j.at), j.by ? <Fragment key="1"> <T s=" بواسطة {0}" a={[<bdi key="0">{j.by}</bdi>]} /></Fragment> : null, j.reason ?? "بلا سبب مكتوب"]} /></>
                                 : "مرفوض، ولا يوجد سبب مسجّل."}
                             </span>
                           )}

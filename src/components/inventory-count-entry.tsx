@@ -296,7 +296,7 @@ export function InventoryCountEntry({
                 <div className="col-span-2 min-w-0 md:col-span-1">
                   <p className="truncate text-[14px] font-bold">{row.productName}</p>
                   <p className="mt-0.5 text-xs text-muted">
-                    <T s="المتوقع: {0}{1}" a={[<span key="0" className={row.expected ? "nums font-bold text-ink-soft" : "text-warn"}>{row.expected === null ? "غير معروف" : `${row.expected} ${row.unitLabel}`}</span>, row.flags.length > 0 && row.expected === null && <span className="text-warn"> · {row.flags[0]}</span>]} /></p>
+                    <T s="المتوقع: {0}{1}" a={[<span key="0" className={row.expected ? "nums font-bold text-ink-soft" : "text-warn"}>{row.expected === null ? "غير معروف" : `${row.expected} ${row.unitLabel}`}</span>, row.flags.length > 0 && row.expected === null && <span key="1" className="text-warn"> · {row.flags[0]}</span>]} /></p>
                 </div>
 
                 <label className="flex min-w-0 items-center gap-2">

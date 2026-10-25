@@ -1119,7 +1119,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
         <>
           {formatRange(from, to)}
           {showAmounts && (
-            <> <T s=" · رصيده الختامي {0}" a={[e.amountMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={e.amountMinor} />]} /></>
+            <> <T s=" · رصيده الختامي {0}" a={[e.amountMinor === null ? <span key="0" className="text-muted">غير معروف</span> : <Money key="0" minor={e.amountMinor} />]} /></>
           )}
         </>
       ),

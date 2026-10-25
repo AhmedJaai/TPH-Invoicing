@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -88,7 +89,7 @@ export default async function MoneyPage({
       title="أين ذهب المال"
       eyebrow={
         <span className={stale ? "font-bold text-warn" : ""}>
-          <T s="{0}من كشف البنك: {1} إلى {2}{3}" a={[stale && <CircleAlert className="me-1 inline-block h-3.5 w-3.5 align-[-2px]" strokeWidth={2} aria-hidden />, <bdi key="1">{formatDay(v.firstDay)}</bdi>, <bdi key="2">{formatDay(v.lastDay)}</bdi>, stale && <> <T s=" · آخر تحديث قبل {0}" a={[countNoun(staleDays, DAY)]} /></>]} /></span>
+          <T s="{0}من كشف البنك: {1} إلى {2}{3}" a={[stale && <CircleAlert key="0" className="me-1 inline-block h-3.5 w-3.5 align-[-2px]" strokeWidth={2} aria-hidden />, <bdi key="1">{formatDay(v.firstDay)}</bdi>, <bdi key="2">{formatDay(v.lastDay)}</bdi>, stale && <Fragment key="3"> <T s=" · آخر تحديث قبل {0}" a={[countNoun(staleDays, DAY)]} /></Fragment>]} /></span>
       }
       intro="كل ريال خرج من حسابك وإلى أين ذهب، وما دخل إليه. الأرقام من الكشف نفسه لا تقديرات، وما لم يُصنَّف يظهر بمبلغه."
       actions={stale ? <LinkButton href="/bank#import" icon={Upload} variant="primary">استورد الأحدث</LinkButton> : undefined}

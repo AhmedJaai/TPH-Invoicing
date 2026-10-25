@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { CircleAlert, CircleCheck, PlugZap, RefreshCw } from "lucide-react";
 import { formatDay, formatMoment } from "@/lib/riyadh-time";
 import type { FoodicsStatus } from "@/services/foodics-sync.service";
@@ -19,7 +20,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
         <div className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-ink-soft">
           <p className="text-[13px] font-bold text-warn">فودكس غير مربوط بهذا الخادم</p>
           <p className="mt-0.5">
-            <T s="مفتاح الربط {0} غير مضبوط في هذه البيئة، فلا تُقرأ بيانات جديدة.{1}" a={[<bdi key="0" dir="ltr" className="font-mono">FOODICS_API_TOKEN</bdi>, status.orders > 0 && <> <T s=" والمعروض أدناه بيانات قُرئت من قبل حتى {0}." a={[<bdi key="0">{formatDay(status.lastDay)}</bdi>]} /></>]} /></p>
+            <T s="مفتاح الربط {0} غير مضبوط في هذه البيئة، فلا تُقرأ بيانات جديدة.{1}" a={[<bdi key="0" dir="ltr" className="font-mono">FOODICS_API_TOKEN</bdi>, status.orders > 0 && <Fragment key="1"> <T s=" والمعروض أدناه بيانات قُرئت من قبل حتى {0}." a={[<bdi key="0">{formatDay(status.lastDay)}</bdi>]} /></Fragment>]} /></p>
         </div>
       </div>
     );

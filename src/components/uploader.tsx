@@ -3,7 +3,7 @@
 import { ExtractionEvidencePanel } from "@/components/extraction-evidence";
 import { PriceMovesNote, readPriceMoves } from "./price-moves-note";
 import { parseEvidence } from "@/lib/extraction/evidence";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -1767,7 +1767,7 @@ function ReviewCard({
             <p className="flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-bg px-3.5 py-2.5 text-xs font-bold text-warn">
               <TriangleAlert className="mt-px h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
               <span>
-                <T s="{0} {1} إلى مراجعتك قبل الأرشفة، وعليها علامة «راجعه».{2}" a={[countNoun(decisions, FIELD), decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج", otherWeak.length > 0 && <span className="block font-normal text-ink-soft"><T s="وقُرئ بثقة ضعيفة: {0}." a={[otherWeak.join(" · ")]} /></span>]} /></span>
+                <T s="{0} {1} إلى مراجعتك قبل الأرشفة، وعليها علامة «راجعه».{2}" a={[countNoun(decisions, FIELD), decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج", otherWeak.length > 0 && <span key="2" className="block font-normal text-ink-soft"><T s="وقُرئ بثقة ضعيفة: {0}." a={[otherWeak.join(" · ")]} /></span>]} /></span>
             </p>
           )}
 
@@ -1965,7 +1965,7 @@ function ReviewCard({
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             <div>
               <p className="font-bold">
-                <T s="فشلت الأرشفة{0}" a={[item.finishedInMs !== undefined && <> <T s=" بعد {0} ثانية" a={[<span key="0" className="nums">{(item.finishedInMs / 1000).toFixed(1)}</span>]} /></>]} /></p>
+                <T s="فشلت الأرشفة{0}" a={[item.finishedInMs !== undefined && <Fragment key="0"> <T s=" بعد {0} ثانية" a={[<span key="0" className="nums">{(item.finishedInMs / 1000).toFixed(1)}</span>]} /></Fragment>]} /></p>
               <p className="mt-0.5 text-ink-soft">{item.archiveError}</p>
             </div>
           </div>

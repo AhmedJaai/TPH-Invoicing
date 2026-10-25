@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, CircleCheck, FileSpreadsheet, Link2, Lock, OctagonAlert, Package, ShieldCheck, TriangleAlert,
@@ -260,8 +261,8 @@ export function InventoryWorkspace({
         <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
           <T s="{0} {1} وحدة في {2} بيع{3}. وهي محسوبة في الاستهلاك المتوقع، فلا تدخل في الفرق." a={[<strong key="0" className="text-ink">خرج مجاناً هذا الأسبوع:</strong>, <span key="1" className="nums">{trim(report.totals.complimentary.unitsMilli / 1000)}</span>, countNoun(report.totals.complimentary.lines, LINE), showAmounts && (
             report.totals.complimentary.costMinor === null
-              ? <>، وتكلفة مكوناتها غير معروفة كلها</>
-              : <><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.complimentary.costMinor} />]} /></>
+              ? <Fragment key="3">، وتكلفة مكوناتها غير معروفة كلها</Fragment>
+              : <Fragment key="3"><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.complimentary.costMinor} />]} /></Fragment>
           )]} /></p>
       )}
       {/* المرتجعُ المحضَّر: رقمٌ تغيّر بقرار أحمد (٢٤ أكتوبر ٢٠٢٦) — يُقال لماذا */}
@@ -269,8 +270,8 @@ export function InventoryWorkspace({
         <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
           <T s="{0} {1} وحدة حُضّرت ثم أُرجعت{2}. تُحسب مستهلكة وهدراً معاً («مرتجع بعد التحضير»)، فلم تعد تُنقص الاستهلاك المتوقع كما كانت قبل ٢٤ أكتوبر ٢٠٢٦. والجاهز الذي يعود إلى الرف ما زال يُنقصه." a={[<strong key="0" className="text-ink">مرتجع بعد التحضير:</strong>, <span key="1" className="nums">{trim(report.totals.returnedAfterPrep.unitsMilli / 1000)}</span>, showAmounts && (
             report.totals.returnedAfterPrep.costMinor === null
-              ? <>، وتكلفة مكوناتها غير معروفة كلها</>
-              : <><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.returnedAfterPrep.costMinor} />]} /></>
+              ? <Fragment key="2">، وتكلفة مكوناتها غير معروفة كلها</Fragment>
+              : <Fragment key="2"><T s="، وتكلفة مكوناتها {0}" a={[<Money key="0" minor={report.totals.returnedAfterPrep.costMinor} />]} /></Fragment>
           )]} /></p>
       )}
 
@@ -518,7 +519,7 @@ function CoverageBanner({
         */}
         {coverage.scope.excluded > 0 && (
           <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-            <T s="و{0} خارج هذا الجرد باختيارك: مبيعاتها محسوبة، لكن لا يُحسب لها فرق ولا تدخل في المجاميع{1}." a={[<span key="0" className="font-bold">{countNoun(coverage.scope.excluded, PRODUCT)}</span>, coverage.scope.excludedNames.length > 0 && <span className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>]} /></p>
+            <T s="و{0} خارج هذا الجرد باختيارك: مبيعاتها محسوبة، لكن لا يُحسب لها فرق ولا تدخل في المجاميع{1}." a={[<span key="0" className="font-bold">{countNoun(coverage.scope.excluded, PRODUCT)}</span>, coverage.scope.excludedNames.length > 0 && <span key="1" className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>]} /></p>
         )}
       </div>
 

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
@@ -202,7 +203,7 @@ export async function ItemView({
             {usage.length === 0 ? (
               <Callout tone="warn" icon={BookOpen} title="لا توجد وصفة تستخدمه">
                 <T s="بدون وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه «فرقاً».{0}" a={[can(user.role, "recipe:edit") && (
-                  <> <Link href="/inventory/recipes" className="font-bold text-accent hover:underline">افتح الوصفات</Link>.</>
+                  <Fragment key="0"> <Link href="/inventory/recipes" className="font-bold text-accent hover:underline">افتح الوصفات</Link>.</Fragment>
                 )]} /></Callout>
             ) : (
               <ul className="flex flex-wrap gap-1.5">
@@ -235,7 +236,7 @@ function countItem(h: ItemHistoryRow, showAmounts: boolean): TimelineItem {
     href: `/inventory/counts/${h.countId}`,
     title: (
       <>
-        <T s="جرد أسبوع {0}{1}{2}" a={[formatWeek(h.periodStart, h.periodEnd), h.status === "DRAFT" && <span className="ms-2 align-middle"><Badge tone="accent">مسودة</Badge></span>, !h.inScope && <span className="ms-2 align-middle"><Badge>خارج الجرد</Badge></span>]} /></>
+        <T s="جرد أسبوع {0}{1}{2}" a={[formatWeek(h.periodStart, h.periodEnd), h.status === "DRAFT" && <span key="1" className="ms-2 align-middle"><Badge tone="accent">مسودة</Badge></span>, !h.inScope && <span key="2" className="ms-2 align-middle"><Badge>خارج الجرد</Badge></span>]} /></>
     ),
     meta: h.varianceMilli === null ? "لم يُحسب فرق" : (
       <span className={`font-bold ${d ? DIRECTION[d].text : ""}`}>
@@ -251,7 +252,7 @@ function countItem(h: ItemHistoryRow, showAmounts: boolean): TimelineItem {
     */
     body: (
       <span className="nums">
-        <T s="الافتتاحي {0}{1} + المشتريات {2}{3} − الاستهلاك {4}{5} = المتوقع {6} · الفعلي {7}" a={[formatQuantity(h.openingMilli, h.baseUnit), h.openingMilli !== null && ` (${OPENING_SOURCE_LABEL[h.openingSource]})`, formatQuantity(h.purchasesMilli, h.baseUnit), h.manualReceiptsMilli > 0 && ` (منها ${formatQuantity(h.manualReceiptsMilli, h.baseUnit)} يدوياً)`, formatQuantity(h.theoreticalConsumptionMilli, h.baseUnit), h.recordedWasteMilli > 0 && <><T s=" − هدر {0}" a={[formatQuantity(h.recordedWasteMilli, h.baseUnit)]} /></>, formatQuantity(h.theoreticalClosingMilli, h.baseUnit), formatQuantity(h.actualMilli, h.baseUnit)]} /></span>
+        <T s="الافتتاحي {0}{1} + المشتريات {2}{3} − الاستهلاك {4}{5} = المتوقع {6} · الفعلي {7}" a={[formatQuantity(h.openingMilli, h.baseUnit), h.openingMilli !== null && ` (${OPENING_SOURCE_LABEL[h.openingSource]})`, formatQuantity(h.purchasesMilli, h.baseUnit), h.manualReceiptsMilli > 0 && ` (منها ${formatQuantity(h.manualReceiptsMilli, h.baseUnit)} يدوياً)`, formatQuantity(h.theoreticalConsumptionMilli, h.baseUnit), h.recordedWasteMilli > 0 && <Fragment key="5"><T s=" − هدر {0}" a={[formatQuantity(h.recordedWasteMilli, h.baseUnit)]} /></Fragment>, formatQuantity(h.theoreticalClosingMilli, h.baseUnit), formatQuantity(h.actualMilli, h.baseUnit)]} /></span>
     ),
   };
 }

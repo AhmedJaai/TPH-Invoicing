@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { BankBounce } from "@/components/bank-bounce";
 import { findBouncePartner } from "@/services/bank-bounce.service";
 import { db } from "@/db";
@@ -125,7 +126,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
             <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
               <p className="font-bold">سبق أن سجّلت سدادها يدوياً</p>
               <p className="mt-1 text-ink-soft">
-                <T s="في {0} سجّلت دفعة لـ{1} بمبلغ {2}{3}، فأُغلقت فاتورته، ولذلك لم يجد النظام فاتورة مفتوحة يطابقها. هذه الحوالة هي ذلك السداد نفسه{4}" a={[formatDay(handLink.paymentDay), handLink.supplierName, <Money key="2" minor={handLink.paymentMinor} />, handLink.invoices.length > 0 && <> <T s=" عن {0}" a={[handLink.invoices.map((i) => i.number).join("، ")]} /></>, handLink.exact ? "." : <><T s="، وهي أكبر منه بـ{0} (هل أُضيف رسم توصيل إلى الفاتورة؟ صحّح إجماليها)." a={[<Money key="0" minor={handLink.extraMinor} />]} /></>]} /></p>
+                <T s="في {0} سجّلت دفعة لـ{1} بمبلغ {2}{3}، فأُغلقت فاتورته، ولذلك لم يجد النظام فاتورة مفتوحة يطابقها. هذه الحوالة هي ذلك السداد نفسه{4}" a={[formatDay(handLink.paymentDay), handLink.supplierName, <Money key="2" minor={handLink.paymentMinor} />, handLink.invoices.length > 0 && <Fragment key="3"> <T s=" عن {0}" a={[handLink.invoices.map((i) => i.number).join("، ")]} /></Fragment>, handLink.exact ? "." : <Fragment key="4"><T s="، وهي أكبر منه بـ{0} (هل أُضيف رسم توصيل إلى الفاتورة؟ صحّح إجماليها)." a={[<Money key="0" minor={handLink.extraMinor} />]} /></Fragment>]} /></p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <AccountReview size="sm" variant="primary" />
                 {!handLink.exact && handLink.invoices[0] && (

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { sql } from "drizzle-orm";
 import { QrCode } from "lucide-react";
@@ -32,7 +33,7 @@ export async function SupplierQrLine({ supplierId, slug }: { supplierId: string;
           <><T s="غير معروف: {0} ضريبية قُرئت قبل أن يُحفظ دليل الرمز. أعد قراءة واحدة منها ليُفحص رمزها." a={[countNoun(c.invoices, INVOICE)]} /></>
         ) : (
           <>
-            <T s="{0} من {1} فاتورة مفحوصة تحمل رمزاً مقروءاً{2}{3}{4}{5}." a={[<bdi key="0" className="nums font-bold text-ink">{c.withQr}</bdi>, <bdi key="1" className="nums">{checked}</bdi>, c.phase2 > 0 && <> <T s=" (منها {0} بتوقيع المرحلة الثانية)" a={[<bdi key="0" className="nums">{c.phase2}</bdi>]} /></>, c.withoutQr > 0 && <span className="font-bold text-warn"> <T s=" · {0} بلا رمز" a={[<bdi key="0" className="nums">{c.withoutQr}</bdi>]} /></span>, c.foreignQr > 0 && <> <T s=" · {0} برمز ليس رمز الهيئة" a={[<bdi key="0" className="nums">{c.foreignQr}</bdi>]} /></>, c.unchecked > 0 && <span className="text-muted"> <T s=" · {0} لم تُفحص" a={[<bdi key="0" className="nums">{c.unchecked}</bdi>]} /></span>]} /></>
+            <T s="{0} من {1} فاتورة مفحوصة تحمل رمزاً مقروءاً{2}{3}{4}{5}." a={[<bdi key="0" className="nums font-bold text-ink">{c.withQr}</bdi>, <bdi key="1" className="nums">{checked}</bdi>, c.phase2 > 0 && <Fragment key="2"> <T s=" (منها {0} بتوقيع المرحلة الثانية)" a={[<bdi key="0" className="nums">{c.phase2}</bdi>]} /></Fragment>, c.withoutQr > 0 && <span key="3" className="font-bold text-warn"> <T s=" · {0} بلا رمز" a={[<bdi key="0" className="nums">{c.withoutQr}</bdi>]} /></span>, c.foreignQr > 0 && <Fragment key="4"> <T s=" · {0} برمز ليس رمز الهيئة" a={[<bdi key="0" className="nums">{c.foreignQr}</bdi>]} /></Fragment>, c.unchecked > 0 && <span key="5" className="text-muted"> <T s=" · {0} لم تُفحص" a={[<bdi key="0" className="nums">{c.unchecked}</bdi>]} /></span>]} /></>
         )}{" "}
         <Link href={`/purchases/invoices?supplier=${slug}`} className="font-bold text-accent hover:underline">فواتيره</Link>
       </span>

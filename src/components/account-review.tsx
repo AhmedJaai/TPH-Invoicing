@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CircleHelp, Copy, FileCheck2, FileQuestion, Link2, ScanSearch } from "lucide-react";
@@ -195,7 +195,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={e.amountMinor} />
                           </span>
                           <span className="mt-1 block leading-relaxed text-muted">
-                            <T s="الحوالة في الكشف {0} · والسداد اليدوي {1}{2}" a={[formatDay(e.bankDay), formatDay(e.manualDay), e.invoices.length > 0 && <> <T s=" سدّدت {0}" a={[e.invoices.map((i) => i.number).join("، ")]} /></>]} /></span>
+                            <T s="الحوالة في الكشف {0} · والسداد اليدوي {1}{2}" a={[formatDay(e.bankDay), formatDay(e.manualDay), e.invoices.length > 0 && <Fragment key="2"> <T s=" سدّدت {0}" a={[e.invoices.map((i) => i.number).join("، ")]} /></Fragment>]} /></span>
                         </span>
                       </label>
                       {e.supplierSlug && (
@@ -233,7 +233,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={e.amountMinor} />
                           </span>
                           <span className="mt-1 block leading-relaxed text-muted">
-                            <T s="سداد يدوي {0}{1} · من حوالة {2}" a={[formatDay(e.manualDay), e.invoices.length > 0 && <> <T s=" لـ{0}" a={[e.invoices.map((i) => i.number).join("، ")]} /></>, e.sources.map((x) => formatDay(x.day)).join(" و")]} /></span>
+                            <T s="سداد يدوي {0}{1} · من حوالة {2}" a={[formatDay(e.manualDay), e.invoices.length > 0 && <Fragment key="1"> <T s=" لـ{0}" a={[e.invoices.map((i) => i.number).join("، ")]} /></Fragment>, e.sources.map((x) => formatDay(x.day)).join(" و")]} /></span>
                         </span>
                       </label>
                     </li>
@@ -269,9 +269,9 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={l.transferMinor} />
                           </span>
                           <span id={`${l.key}-why`} className="mt-1 block leading-relaxed text-muted">
-                            <T s="حوالة {0} · وسداد يدوي {1} بـ{2}{3}{4}" a={[formatDay(l.transferDay), formatDay(l.paymentDay), <Money key="2" minor={l.paymentMinor} />, l.invoices.length > 0 && <> <T s=" لـ{0}" a={[l.invoices.map((i) => i.number).join("، ")]} /></>, l.exact
+                            <T s="حوالة {0} · وسداد يدوي {1} بـ{2}{3}{4}" a={[formatDay(l.transferDay), formatDay(l.paymentDay), <Money key="2" minor={l.paymentMinor} />, l.invoices.length > 0 && <Fragment key="3"> <T s=" لـ{0}" a={[l.invoices.map((i) => i.number).join("، ")]} /></Fragment>, l.exact
                               ? "، بالمبلغ نفسه، فتُربط تلقائياً."
-                              : <> <T s="، والحوالة أكبر بـ{0} يبقى رصيداً لك عند المورّد. فإن كان من ضمن الفاتورة (كالتوصيل) فصحّح إجماليها ليُخصم منه." a={[<Money key="0" minor={l.extraMinor} />]} /></>]} /></span>
+                              : <Fragment key="4"> <T s="، والحوالة أكبر بـ{0} يبقى رصيداً لك عند المورّد. فإن كان من ضمن الفاتورة (كالتوصيل) فصحّح إجماليها ليُخصم منه." a={[<Money key="0" minor={l.extraMinor} />]} /></Fragment>]} /></span>
                         </span>
                       </label>
                       {!l.exact && l.invoices[0] && (

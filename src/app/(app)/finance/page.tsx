@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleHelp, FileSpreadsheet, Info, Lock, Scale, Snowflake, TrendingUp } from "lucide-react";
@@ -194,7 +195,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       <Section title="تكلفة المبيعات بثلاث طرق" icon={Scale} hint="تُحسب الطرق الثلاث وتُعرض معاً، والفرق بينها يساعدك على كشف هدر أو تسريب أو فاتورة ناقصة.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Card tone={p.cogsMethod === "STOCK" ? "accent" : undefined} href={`/finance/rows?month=${month}&line=cogs`}>
-            <p className="flex items-center justify-between gap-2 text-xs font-bold"><T s="بالجرد {0}" a={[p.cogsMethod === "STOCK" && <Badge tone="accent">المعتمدة</Badge>]} /></p>
+            <p className="flex items-center justify-between gap-2 text-xs font-bold"><T s="بالجرد {0}" a={[p.cogsMethod === "STOCK" && <Badge key="0" tone="accent">المعتمدة</Badge>]} /></p>
             <p className="mt-2 text-lg font-semibold"><MaybeMoney minor={c.stock?.minor ?? null} why={c.stockMissing ?? undefined} /></p>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
               {c.stock
@@ -204,10 +205,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             </p>
           </Card>
           <Card tone={p.cogsMethod === "PURCHASES" ? "accent" : undefined} href={`/finance/rows?month=${month}&line=purchases`}>
-            <p className="flex items-center justify-between gap-2 text-xs font-bold"><T s="بالمشتريات {0}" a={[p.cogsMethod === "PURCHASES" && <Badge tone="warn">المعتمدة (لا يوجد جرد)</Badge>]} /></p>
+            <p className="flex items-center justify-between gap-2 text-xs font-bold"><T s="بالمشتريات {0}" a={[p.cogsMethod === "PURCHASES" && <Badge key="0" tone="warn">المعتمدة (لا يوجد جرد)</Badge>]} /></p>
             <p className="mt-2 text-lg font-semibold">{c.purchasesInvoices === 0 ? <Unknown why="لا توجد فاتورة مسجّلة" /> : <Money minor={c.purchasesMinor} />}</p>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
-              <T s="{0} دخلت بضاعتها في هذا الشهر، بدون ضريبتها. وما بقي منها على الرف يُحسب هنا كأنه بيع.{1}" a={[countNoun(c.purchasesInvoices, INVOICE), c.purchasesGrossOnly > 0 && <> <T s=" {0} منها بإجماليها (لم يُقرأ صافيها)." a={[c.purchasesGrossOnly]} /></>]} /></p>
+              <T s="{0} دخلت بضاعتها في هذا الشهر، بدون ضريبتها. وما بقي منها على الرف يُحسب هنا كأنه بيع.{1}" a={[countNoun(c.purchasesInvoices, INVOICE), c.purchasesGrossOnly > 0 && <Fragment key="1"> <T s=" {0} منها بإجماليها (لم يُقرأ صافيها)." a={[c.purchasesGrossOnly]} /></Fragment>]} /></p>
           </Card>
           <Card href={`/finance/stock?month=${month}`}>
             <p className="text-xs font-bold">النظرية (الوصفات × ما بيع)</p>
@@ -215,8 +216,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
               <T s="ما كان يُفترض صرفه حسب الوصفات. {0}" a={[p.unexplainedMinor !== null && (
                 p.unexplainedMinor >= 0
-                  ? <><T s="خرج من الرف أكثر منها بـ{0}، وهو فرق غير مفسَّر." a={[<strong key="0" className="text-ink"><Money minor={p.unexplainedMinor} /></strong>]} /></>
-                  : <><T s="وهي {0} مما خرج من الرف بـ{1}، وقد يكون السبب فاتورة لم تُسجَّل أو وصفة تفترض كمية أكبر من الواقع." a={[<strong key="0" className="text-ink">أكثر</strong>, <strong key="1" className="text-ink"><Money minor={-p.unexplainedMinor} /></strong>]} /></>
+                  ? <Fragment key="0"><T s="خرج من الرف أكثر منها بـ{0}، وهو فرق غير مفسَّر." a={[<strong key="0" className="text-ink"><Money minor={p.unexplainedMinor} /></strong>]} /></Fragment>
+                  : <Fragment key="0"><T s="وهي {0} مما خرج من الرف بـ{1}، وقد يكون السبب فاتورة لم تُسجَّل أو وصفة تفترض كمية أكبر من الواقع." a={[<strong key="0" className="text-ink">أكثر</strong>, <strong key="1" className="text-ink"><Money minor={-p.unexplainedMinor} /></strong>]} /></Fragment>
               )]} /></p>
           </Card>
           <Card>

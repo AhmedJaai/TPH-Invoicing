@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CircleHelp, TriangleAlert } from "lucide-react";
@@ -60,7 +60,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
                 <>
                   {"، تشبه "}
                   <Link href={`/bank/tx/${r.against.id}`} className="font-bold text-accent hover:underline">
-                    <T s="حركة {0} بـ{1}{2}" a={[<bdi key="0" className="nums">{r.against.day}</bdi>, formatRiyalsDisplay(r.against.amountMinor), r.against.operationRef ? <> <T s=" (مرجع {0})" a={[<bdi key="0" className="nums">{r.against.operationRef}</bdi>]} /></> : null]} /></Link>
+                    <T s="حركة {0} بـ{1}{2}" a={[<bdi key="0" className="nums">{r.against.day}</bdi>, formatRiyalsDisplay(r.against.amountMinor), r.against.operationRef ? <Fragment key="2"> <T s=" (مرجع {0})" a={[<bdi key="0" className="nums">{r.against.operationRef}</bdi>]} /></Fragment> : null]} /></Link>
                 </>
               )}
             </p>

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Coffee, Info, Receipt, Scale } from "lucide-react";
@@ -70,18 +71,18 @@ export default async function StockItemPage({ searchParams }: { searchParams: Pr
         <Card>
           <p className="text-[11px] font-bold text-muted">{month ? "المباع منه في الشهر" : "المباع منه"}</p>
           <p className="nums mt-1.5 text-[17px] font-semibold">{qty(item.soldMilli)}</p>
-          <p className="mt-1 text-[11px] text-muted">{item.soldMilli === null ? "لا توجد وصفة تستخدمه" : <><T s="حسب الوصفات{0}{1}" a={[item.staffMilli > 0 && <> <T s=" · لمشروبات الموظفين {0}" a={[<span key="0" className="nums">{qty(item.staffMilli)}</span>]} /></>, item.wasteMilli > 0 && <> <T s=" · هدر مسجّل {0}" a={[<span key="0" className="nums">{qty(item.wasteMilli)}</span>]} /></>]} /></>}</p>
+          <p className="mt-1 text-[11px] text-muted">{item.soldMilli === null ? "لا توجد وصفة تستخدمه" : <><T s="حسب الوصفات{0}{1}" a={[item.staffMilli > 0 && <Fragment key="0"> <T s=" · لمشروبات الموظفين {0}" a={[<span key="0" className="nums">{qty(item.staffMilli)}</span>]} /></Fragment>, item.wasteMilli > 0 && <Fragment key="1"> <T s=" · هدر مسجّل {0}" a={[<span key="0" className="nums">{qty(item.wasteMilli)}</span>]} /></Fragment>]} /></>}</p>
         </Card>
         <Card tone={short ? "warn" : undefined}>
           <p className="text-[11px] font-bold text-muted">المتوقع بقاؤه</p>
           <p className="nums mt-1.5 text-[17px] font-semibold">{item.expectedMilli === null ? "غير معروف" : short ? `−${qty(-item.expectedMilli)}` : qty(item.expectedMilli)}</p>
-          <p className="mt-1 text-[11px] text-muted">{short ? "بيع منه أكثر مما سُجّل شراؤه، فهناك مشتريات لم تدخل الحساب" : <><T s="كل ما اشتُري منذ البداية − كل ما بيع{0}" a={[item.expectedMinor !== null && <> · <Money minor={item.expectedMinor} /></>]} /></>}</p>
+          <p className="mt-1 text-[11px] text-muted">{short ? "بيع منه أكثر مما سُجّل شراؤه، فهناك مشتريات لم تدخل الحساب" : <><T s="كل ما اشتُري منذ البداية − كل ما بيع{0}" a={[item.expectedMinor !== null && <Fragment key="0"> · <Money minor={item.expectedMinor} /></Fragment>]} /></>}</p>
         </Card>
         <Card tone={item.lostMilli !== null && item.lostMilli > 0 ? "warn" : undefined}>
           <p className="flex items-center gap-1.5 text-[11px] font-bold text-muted"><T s="{0} المفقود" a={[<Scale key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></p>
           <p className="nums mt-1.5 text-[17px] font-semibold">{item.lostMilli === null ? "—" : item.lostMilli >= 0 ? qty(item.lostMilli) : `وُجد أكثر بـ${qty(-item.lostMilli)}`}</p>
           <p className="mt-1 text-[11px] text-muted">
-            {item.count === null ? "لم يُعدّ على الرف، فلا يمكن قياس المفقود" : <><T s="عُدّ في {0}: {1}{2}" a={[<bdi key="0">{formatDay(item.count.day)}</bdi>, <span key="1" className="nums">{qty(item.count.milli)}</span>, item.lostMinor !== null && <> · <MaybeMoney minor={item.lostMinor} signed /></>]} /></>}
+            {item.count === null ? "لم يُعدّ على الرف، فلا يمكن قياس المفقود" : <><T s="عُدّ في {0}: {1}{2}" a={[<bdi key="0">{formatDay(item.count.day)}</bdi>, <span key="1" className="nums">{qty(item.count.milli)}</span>, item.lostMinor !== null && <Fragment key="2"> · <MaybeMoney minor={item.lostMinor} signed /></Fragment>]} /></>}
           </p>
         </Card>
       </div>

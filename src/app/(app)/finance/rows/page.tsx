@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { ArrowRight, Info } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -105,7 +106,7 @@ export default async function FinanceRowsPage({ searchParams }: { searchParams: 
         stock ? (
           <>
             <Callout tone="info" icon={Info} title="المعادلة بالأرقام">
-              <T s="مشتريات الشهر {0} + مخزون عُدّ في {1} {2} − مخزون عُدّ في {3} {4}{5} = {6}. يُقيَّم المخزون بآخر تكلفة معروفة لكل صنف في نهاية الشهر، وبسعر واحد للطرفين، فلا يتحول تغيّر السعر إلى تكلفة. وما لا يُعدّ (كالحلويات اليومية والحليب) يُحسب مستهلكاً عند شرائه." a={[<strong key="0"><Money minor={stock.purchasesMonthMinor} /></strong>, <bdi key="1">{formatDay(stock.openingDay)}</bdi>, <strong key="2"><Money minor={stock.openingValueMinor} /></strong>, <bdi key="3">{formatDay(stock.closingDay)}</bdi>, <strong key="4"><Money minor={stock.closingValueMinor} /></strong>, stock.adjustedDays > 0 && <><T s="، ثم عُدّلت الأيام ({0}) بين يوم العدّ ونهاية الشهر بما اشتُري وما يُفترض أنه صُرف فيها" a={[stock.adjustedDays]} /></>, <strong key="6"><Money minor={stock.minor} currency /></strong>]} /></Callout>
+              <T s="مشتريات الشهر {0} + مخزون عُدّ في {1} {2} − مخزون عُدّ في {3} {4}{5} = {6}. يُقيَّم المخزون بآخر تكلفة معروفة لكل صنف في نهاية الشهر، وبسعر واحد للطرفين، فلا يتحول تغيّر السعر إلى تكلفة. وما لا يُعدّ (كالحلويات اليومية والحليب) يُحسب مستهلكاً عند شرائه." a={[<strong key="0"><Money minor={stock.purchasesMonthMinor} /></strong>, <bdi key="1">{formatDay(stock.openingDay)}</bdi>, <strong key="2"><Money minor={stock.openingValueMinor} /></strong>, <bdi key="3">{formatDay(stock.closingDay)}</bdi>, <strong key="4"><Money minor={stock.closingValueMinor} /></strong>, stock.adjustedDays > 0 && <Fragment key="5"><T s="، ثم عُدّلت الأيام ({0}) بين يوم العدّ ونهاية الشهر بما اشتُري وما يُفترض أنه صُرف فيها" a={[stock.adjustedDays]} /></Fragment>, <strong key="6"><Money minor={stock.minor} currency /></strong>]} /></Callout>
             <Section title="المخزون المعدود في البداية والنهاية" count={stock.items.length} hint="الأصناف التي عُدّت في الجردين ولها تكلفة معروفة، وهي وحدها التي تدخل في فرق المخزون.">
               <DataTable
                 columns={[

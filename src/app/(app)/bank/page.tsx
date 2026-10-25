@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { parseLedgerSearch } from "@/lib/bank/ledger-search";
 import { parseLedgerPage } from "@/lib/bank/ledger-window";
 import { BankHeldRows } from "@/components/bank-held-rows";
@@ -201,7 +202,7 @@ export default async function BankPage({
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-ok">لا توجد في الكشف حركات تنتظر التصنيف.</p>
                   <p className="mt-0.5 text-xs text-ink-soft">
-                    <T s="صُنّفت كل الحركات المستوردة{0}{1} أما حوالات المورّدين التي تنتظر فواتيرها فتجدها في «يحتاج قرارك»." a={[coverage.lastDay ? <> <T s=" حتى {0}" a={[<bdi key="0">{formatDay(coverage.lastDay)}</bdi>]} /></> : null, stale ? "، وما بعد ذلك لم يُستورد بعد." : "."]} /></p>
+                    <T s="صُنّفت كل الحركات المستوردة{0}{1} أما حوالات المورّدين التي تنتظر فواتيرها فتجدها في «يحتاج قرارك»." a={[coverage.lastDay ? <Fragment key="0"> <T s=" حتى {0}" a={[<bdi key="0">{formatDay(coverage.lastDay)}</bdi>]} /></Fragment> : null, stale ? "، وما بعد ذلك لم يُستورد بعد." : "."]} /></p>
                 </div>
                 <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
                   <T s="افتح «يحتاج قرارك» {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
@@ -256,7 +257,7 @@ export default async function BankPage({
 
             {search ? (
               <p className="mb-3 text-xs text-ink-soft" role="status">
-                <T s="{0} «{1}»{2} في «{3}»{4}{5}{6}" a={[ledger.total === 0 ? "لا توجد حركات مطابقة" : <><T s="{0} نتيجة مطابقة" a={[<span key="0" className="nums">{ledger.total}</span>]} /></>, <bdi key="1">{search.text}</bdi>, search.amount ? " (مبلغ أو نص)" : "", VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : " في كل الأشهر", ledger.total > ledger.rows.length && <><T s=". المعروض هو أحدث {0}، فضيّق البحث أو اختر شهراً" a={[<span key="0" className="nums">{ledger.rows.length}</span>]} /></>, view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></>]} /></p>
+                <T s="{0} «{1}»{2} في «{3}»{4}{5}{6}" a={[ledger.total === 0 ? "لا توجد حركات مطابقة" : <Fragment key="0"><T s="{0} نتيجة مطابقة" a={[<span key="0" className="nums">{ledger.total}</span>]} /></Fragment>, <bdi key="1">{search.text}</bdi>, search.amount ? " (مبلغ أو نص)" : "", VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : " في كل الأشهر", ledger.total > ledger.rows.length && <Fragment key="5"><T s=". المعروض هو أحدث {0}، فضيّق البحث أو اختر شهراً" a={[<span key="0" className="nums">{ledger.rows.length}</span>]} /></Fragment>, view !== "all" && <Fragment key="6"> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></Fragment>]} /></p>
             ) : !month && ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />

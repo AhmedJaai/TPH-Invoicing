@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
@@ -68,7 +68,7 @@ export function PosProductMapping({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold" dir="auto">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted">
-                <T s="{0} وحدة مباعة · {1}{2}" a={[<span key="0" className="nums">{row.soldUnits}</span>, <Money key="1" minor={row.soldMinor} />, row.category && <> · {row.category}</>]} /></p>
+                <T s="{0} وحدة مباعة · {1}{2}" a={[<span key="0" className="nums">{row.soldUnits}</span>, <Money key="1" minor={row.soldMinor} />, row.category && <Fragment key="2"> · {row.category}</Fragment>]} /></p>
             </div>
 
             {canEdit ? (

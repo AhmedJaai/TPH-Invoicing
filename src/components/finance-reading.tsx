@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Sparkles } from "lucide-react";
 import { PostAction } from "./post-action";
 import { Badge } from "./ui";
@@ -85,7 +86,7 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
             })}
           </div>
           <p className="mt-4 text-[11px] text-muted">
-            <T s="كُتبت في {0}{1}" a={[<bdi key="0">{formatMoment(new Date(stored.createdAt))}</bdi>, stored.reading.dropped > 0 && <> <T s=" · حُذفت {0} جملة لأنها ذكرت رقماً من خارج الأرقام المحسوبة" a={[stored.reading.dropped]} /></>]} /></p>
+            <T s="كُتبت في {0}{1}" a={[<bdi key="0">{formatMoment(new Date(stored.createdAt))}</bdi>, stored.reading.dropped > 0 && <Fragment key="1"> <T s=" · حُذفت {0} جملة لأنها ذكرت رقماً من خارج الأرقام المحسوبة" a={[stored.reading.dropped]} /></Fragment>]} /></p>
         </>
       )}
     </div>

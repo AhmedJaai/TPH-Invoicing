@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Link2, Sparkles } from "lucide-react";
 import { postJson } from "@/lib/http-client";
@@ -145,7 +145,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           <span className="text-muted"> · {row.supplierName}</span>
         </p>
         <p className="text-[11px] text-muted">
-          <T s="الكمية {0} · {1}{2}" a={[<span key="0" className="nums">{row.qtyText}</span>, row.lines === 1 ? "بند واحد" : <><T s="{0} بنود" a={[<span key="0" className="nums">{row.lines}</span>]} /></>, row.invoiceNumbers.length > 0 && <> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></>]} /></p>
+          <T s="الكمية {0} · {1}{2}" a={[<span key="0" className="nums">{row.qtyText}</span>, row.lines === 1 ? "بند واحد" : <Fragment key="1"><T s="{0} بنود" a={[<span key="0" className="nums">{row.lines}</span>]} /></Fragment>, row.invoiceNumbers.length > 0 && <Fragment key="2"> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></Fragment>]} /></p>
       </div>
 
       {isLinked ? (

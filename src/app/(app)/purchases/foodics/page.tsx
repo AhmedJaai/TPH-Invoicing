@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleCheck, CopyX, FileQuestion, FileX2, Link2, PackageSearch, Scale, Undo2, X } from "lucide-react";
@@ -145,7 +146,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
               <h2 className="mt-0.5 text-base font-bold">
                 <T s="{0} · {1} · فاتورة {2}" a={[<bdi key="0" dir="ltr">{openPurchase.reference}</bdi>, openPurchase.foodicsSupplierName ?? "بلا مورّد", <bdi key="2" dir="ltr">{openPurchase.invoiceNumber ?? "—"}</bdi>]} /></h2>
               <p className="mt-1 text-xs text-ink-soft">
-                <T s="في فودكس {0}{1}" a={[<Money key="0" minor={openPurchase.totalMinor} />, openPair ? <> <T s=" · عندنا {0} ({1} · {2})" a={[<Money key="0" minor={openPair.invoice.totalMinor} />, openPair.invoice.supplierName, <bdi key="2" dir="ltr">{openPair.invoice.invoiceNumber}</bdi>]} /></> : " · لا فاتورة تقابلها عندنا"]} /></p>
+                <T s="في فودكس {0}{1}" a={[<Money key="0" minor={openPurchase.totalMinor} />, openPair ? <Fragment key="1"> <T s=" · عندنا {0} ({1} · {2})" a={[<Money key="0" minor={openPair.invoice.totalMinor} />, openPair.invoice.supplierName, <bdi key="2" dir="ltr">{openPair.invoice.invoiceNumber}</bdi>]} /></Fragment> : " · لا فاتورة تقابلها عندنا"]} /></p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               {openPair && <LinkButton href={invoiceHref(openPair.invoice.id)} variant="secondary" size="sm">افتح فاتورتنا</LinkButton>}
@@ -224,9 +225,9 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                       <p className="text-sm font-bold">{s.name}</p>
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                         <T s="{0} حركة بمجموع {1}. {2}" a={[<span key="0" className="nums">{s.purchases}</span>, <Money key="1" minor={s.totalMinor} />, hint
-                          ? <><T s="المورّد المقترح «{0}»: طابقت {1} من حركاته فواتيرَه رقماً ومبلغاً." a={[hint.supplierName, <span key="1" className="nums">{hint.evidence}</span>]} /></>
+                          ? <Fragment key="2"><T s="المورّد المقترح «{0}»: طابقت {1} من حركاته فواتيرَه رقماً ومبلغاً." a={[hint.supplierName, <span key="1" className="nums">{hint.evidence}</span>]} /></Fragment>
                           : byName
-                            ? <><T s="لم تطابق حركاته أي فاتورة برقمها بعد. الاسم يشبه «{0}»، لكن {1}، فتأكد قبل الربط." a={[byName.supplierName, <strong key="1">تشابه الأسماء ليس دليلاً</strong>]} /></>
+                            ? <Fragment key="2"><T s="لم تطابق حركاته أي فاتورة برقمها بعد. الاسم يشبه «{0}»، لكن {1}، فتأكد قبل الربط." a={[byName.supplierName, <strong key="1">تشابه الأسماء ليس دليلاً</strong>]} /></Fragment>
                             : "لا اقتراح، لأن حركاته لم تطابق فواتير مورّد واحد. وإن كان اسماً عاماً يجمع عدة مورّدين (مثل «مورد حبوب قهوة») فاتركه بلا ربط."]} /></p>
                     </div>
                     {canLink && (

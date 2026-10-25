@@ -252,7 +252,7 @@ export default async function PaymentsPage({
                       {!phone && (
                         <p className="mt-2 text-[11px] text-muted">
                           <T s="لا يوجد عندنا رقم لهذا المورّد، فاختر جهة الاتصال من داخل واتساب. {0}" a={[slugBy.get(supplierId) && (
-                            <Link href={`/suppliers/${slugBy.get(supplierId)}`} className="font-bold text-accent hover:underline">أضف رقمه في صفحته</Link>
+                            <Link key="0" href={`/suppliers/${slugBy.get(supplierId)}`} className="font-bold text-accent hover:underline">أضف رقمه في صفحته</Link>
                           )]} /></p>
                       )}
                       {unconfirmed.length > 0 && (

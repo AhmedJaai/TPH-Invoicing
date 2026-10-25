@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { catchError, type ErrorInfo } from "next/error";
-import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useRef, useState, Fragment } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert, CircleCheck, Info, RotateCw, Search, TriangleAlert, Undo2, X } from "lucide-react";
 import { buttonClass, fieldClass, type ButtonVariant } from "./ui-tokens";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
@@ -592,7 +592,7 @@ export const SectionBoundary = catchError(
       <p className="flex items-center gap-2 text-sm font-bold text-danger">
         <T s="{0}تعذّر عرض {1}" a={[<CircleAlert key="0" className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />, props.what]} /></p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        <T s="باقي الصفحة ظاهر كما هو، ولم يُحفظ أي تغيير. السبب غالباً انقطاع عابر في الاتصال بقاعدة البيانات.{0}" a={[isDigested(error) && <> <T s=" إن تكرر الخطأ فأبلغ الدعم الفني بهذا الرمز: {0}" a={[<span key="0" className="nums nums-count" dir="ltr">{error.digest}</span>]} /></>]} /></p>
+        <T s="باقي الصفحة ظاهر كما هو، ولم يُحفظ أي تغيير. السبب غالباً انقطاع عابر في الاتصال بقاعدة البيانات.{0}" a={[isDigested(error) && <Fragment key="0"> <T s=" إن تكرر الخطأ فأبلغ الدعم الفني بهذا الرمز: {0}" a={[<span key="0" className="nums nums-count" dir="ltr">{error.digest}</span>]} /></Fragment>]} /></p>
       <button type="button" onClick={() => retry()} className={`mt-3 ${buttonClass("secondary", "sm")}`}>
         <T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
     </div>

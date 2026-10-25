@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { Money } from "./money";
 import { Badge, type Tone } from "./ui";
@@ -262,11 +262,11 @@ function FindingCard({
       {state === "preview" && preview && (
         <p className="mt-3 rounded-lg border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
           <T s="ستُسجَّل الفاتورة {0} مسدّدة من حسابك بمبلغ {1}{2}{3}" a={[preview.invoiceNumber, formatRiyalsDisplay(preview.ownerPaymentMinor), preview.freed.length > 0 && (
-            <>
+            <Fragment key="2">
               <T s=" · وستُفك عنها حوالات المقهى ({0}){1}" a={[formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0)), preview.reapplied.length > 0 && (
-                <> <T s=" وسيُخصم من: {0}" a={[preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بمبلغ ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")]} /></>
-              )]} /></>
-          ), preview.creditLeftMinor > 0 && <> <T s=" · ويبقى لك عنده {0}" a={[formatRiyalsDisplay(preview.creditLeftMinor)]} /></>]} /></p>
+                <Fragment key="1"> <T s=" وسيُخصم من: {0}" a={[preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بمبلغ ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")]} /></Fragment>
+              )]} /></Fragment>
+          ), preview.creditLeftMinor > 0 && <Fragment key="3"> <T s=" · ويبقى لك عنده {0}" a={[formatRiyalsDisplay(preview.creditLeftMinor)]} /></Fragment>]} /></p>
       )}
 
       {state === "dismissing" && (

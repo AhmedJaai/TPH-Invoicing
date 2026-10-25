@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { and, asc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { issues, suppliers } from "@/db/schema";
@@ -271,7 +272,7 @@ export async function InvoiceView({
           <p className="mb-3 text-xs font-bold text-muted">الخطوة التالية</p>
           {p.settled ? (
             <p className="text-sm leading-relaxed text-ink-soft">
-              <T s="لا شيء مطلوب منك. {0}" a={[p.allocations.length > 0 && <Link href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>]} /></p>
+              <T s="لا شيء مطلوب منك. {0}" a={[p.allocations.length > 0 && <Link key="0" href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>]} /></p>
           ) : canPay ? (
             <>
               <MarkInvoicePaid invoiceId={inv.id} label={formatRiyals(p.remainingMinor)} layout="panel" startOpen={act === "pay"} invoiceDay={todayInRiyadh(inv.date)} />
@@ -327,7 +328,7 @@ export async function InvoiceView({
             <li className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
               <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
               <span className="min-w-0 flex-1 leading-relaxed">
-                <T s="الحالة الضريبية المحفوظة «{0}» قديمة، وبيانات الفاتورة الحالية تجعلها «{1}»{2}.{3}" a={[TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus, TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus, gaps.length > 0 && <> <T s=" (ينقصها: {0})" a={[gaps.join("، ")]} /></>, monthClosed && <> <T s=" وشهر {0} مقفل، فأعد فتحه لتصحيحها، لأنها تؤثر في إقراره الضريبي." a={[formatMonth(inv.month)]} /></>]} /></span>
+                <T s="الحالة الضريبية المحفوظة «{0}» قديمة، وبيانات الفاتورة الحالية تجعلها «{1}»{2}.{3}" a={[TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus, TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus, gaps.length > 0 && <Fragment key="2"> <T s=" (ينقصها: {0})" a={[gaps.join("، ")]} /></Fragment>, monthClosed && <Fragment key="3"> <T s=" وشهر {0} مقفل، فأعد فتحه لتصحيحها، لأنها تؤثر في إقراره الضريبي." a={[formatMonth(inv.month)]} /></Fragment>]} /></span>
               {canEdit && !monthClosed && <InvoiceRejudge invoiceId={inv.id} />}
             </li>
           )}
@@ -450,7 +451,7 @@ export async function InvoiceView({
                 {p.statementLines.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                     <span>
-                      <T s="كشف {0} · {1}{2}" a={[formatMonth(monthOf(s.periodEnd)), formatDay(s.date), s.ref && <> · <bdi className="nums">{s.ref}</bdi></>]} /></span>
+                      <T s="كشف {0} · {1}{2}" a={[formatMonth(monthOf(s.periodEnd)), formatDay(s.date), s.ref && <Fragment key="2"> · <bdi className="nums">{s.ref}</bdi></Fragment>]} /></span>
                     <span className="flex items-center gap-2">
                       <Money minor={s.debitMinor} />
                       <Badge tone={s.matchStatus === "MATCHED" ? "ok" : s.matchStatus === "DISPUTED" ? "danger" : "muted"} dot>
@@ -529,7 +530,7 @@ export async function InvoiceView({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-bold" dir="auto" title={doc.fileName}>{doc.fileName}</p>
                   <p className="mt-0.5 text-[11px] text-muted">
-                    <T s="وصلت {0}{1} · {2}" a={[formatDay(doc.uploadedAt), doc.uploadedBy && <> · <bdi>{doc.uploadedBy}</bdi></>, doc.textSource === "TEXT" ? "قُرئت من نص الملف مباشرة" : doc.textSource === "VISION" ? "قُرئت من صورة الملف (قراءة تقريبية)" : "لم يُسجَّل مصدر القراءة"]} /></p>
+                    <T s="وصلت {0}{1} · {2}" a={[formatDay(doc.uploadedAt), doc.uploadedBy && <Fragment key="1"> · <bdi>{doc.uploadedBy}</bdi></Fragment>, doc.textSource === "TEXT" ? "قُرئت من نص الملف مباشرة" : doc.textSource === "VISION" ? "قُرئت من صورة الملف (قراءة تقريبية)" : "لم يُسجَّل مصدر القراءة"]} /></p>
                 </div>
               </div>
 

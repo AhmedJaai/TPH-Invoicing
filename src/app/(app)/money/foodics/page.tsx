@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { Banknote, CircleCheck, Coffee, CreditCard, Info, Landmark, Scale, TriangleAlert } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -85,7 +86,7 @@ export default async function FoodicsBankPage() {
             value={month.notable ? <Money minor={Math.abs(month.gapMinor)} /> : <span className="text-2xl">متطابقان</span>}
             sub={
               <>
-                <T s="{0}سجّل فودكس {1}، ودخل البنك {2}." a={[month.notable && <strong className="text-ink">{month.gapMinor > 0 ? "ما دخل البنك أقل مما سجّله فودكس. " : "دخل البنك أكثر مما سجّله فودكس. "}</strong>, <Money key="1" minor={month.foodicsMinor} />, <Money key="2" minor={month.bankMinor} />]} /></>
+                <T s="{0}سجّل فودكس {1}، ودخل البنك {2}." a={[month.notable && <strong key="0" className="text-ink">{month.gapMinor > 0 ? "ما دخل البنك أقل مما سجّله فودكس. " : "دخل البنك أكثر مما سجّله فودكس. "}</strong>, <Money key="1" minor={month.foodicsMinor} />, <Money key="2" minor={month.bankMinor} />]} /></>
             }
             href="#months"
           />
@@ -97,7 +98,7 @@ export default async function FoodicsBankPage() {
           label={cashMonth ? `نقد لم يدخل البنك: ${formatMonth(cashMonth.month)}` : "النقد"}
           value={cashMonth ? <Money minor={cashMonth.notBankedMinor} /> : <span className="text-xl text-muted">غير معروف</span>}
           sub={cashMonth
-            ? <><T s="سجّل فودكس مقبوضات نقدية بقيمة {0}{1} وهي مبيعات تخضع للضريبة." a={[<Money key="0" minor={cashMonth.cashMinor} />, cashMonth.bankOtherCreditsMinor === 0 ? "، ولا يوجد في الكشف إيداع من خارج الشبكة." : <><T s="، ودخل البنك من خارج الشبكة {0}." a={[<Money key="0" minor={cashMonth.bankOtherCreditsMinor} />]} /></>]} /></>
+            ? <><T s="سجّل فودكس مقبوضات نقدية بقيمة {0}{1} وهي مبيعات تخضع للضريبة." a={[<Money key="0" minor={cashMonth.cashMinor} />, cashMonth.bankOtherCreditsMinor === 0 ? "، ولا يوجد في الكشف إيداع من خارج الشبكة." : <Fragment key="1"><T s="، ودخل البنك من خارج الشبكة {0}." a={[<Money key="0" minor={cashMonth.bankOtherCreditsMinor} />]} /></Fragment>]} /></>
             : undefined}
           href="#cash"
         />
@@ -128,7 +129,7 @@ export default async function FoodicsBankPage() {
       >
         {flagged.length === 0 ? (
           <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-muted shadow-raised">
-            <T s="لا توجد دفعة بفرق واضح في الفترة التي يغطيها الكشف.{0}" a={[silencedRows.length > 0 && <> <T s=" وتجاهلتَ {0} دفعة، تجدها أدناه." a={[silencedRows.length]} /></>]} /></p>
+            <T s="لا توجد دفعة بفرق واضح في الفترة التي يغطيها الكشف.{0}" a={[silencedRows.length > 0 && <Fragment key="0"> <T s=" وتجاهلتَ {0} دفعة، تجدها أدناه." a={[silencedRows.length]} /></Fragment>]} /></p>
         ) : (
           <ul className="space-y-2">
             {flagged.map((b) => (

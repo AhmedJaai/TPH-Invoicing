@@ -35,7 +35,7 @@ export async function SupplierLeverage() {
                 <Link href={`/suppliers/${t.slug}`} className="font-bold hover:underline" dir="auto">{t.name}</Link> <bdi>{shareText(t.shareBp)}</bdi>
               </span>
             )), spend.dominant && (
-              <span className="mt-0.5 block font-bold text-warn">
+              <span key="5" className="mt-0.5 block font-bold text-warn">
                 <T s="{0} وحده يتجاوز أربعين بالمئة من مشترياتك. انقطاعه يوقف عملك، وحجم مشترياتك منه يمنحك فرصة للتفاوض على خصم كمية." a={[spend.dominant.name]} /></span>
             )]} /></li>
         )}

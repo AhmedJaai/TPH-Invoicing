@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Scale } from "lucide-react";
 import { Money } from "./money";
 import { Badge, LinkButton } from "./ui";
@@ -46,11 +47,11 @@ function Line({ w, foodicsCashMinor }: { w: SalesWitness; foodicsCashMinor: numb
       <dl className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[11px]">
         <dt className="text-muted">
           <T s="ضريبة المبيعات في فودكس{0}" a={[<span key="0" className="block">
-            <T s="يغطي {0} من {1}{2}" a={[countNoun(w.coveredDays, DAY), w.expectedDays, missing > 0 && <span className="font-bold text-warn"> <T s=" · ينقصه {0}" a={[countNoun(missing, DAY)]} /></span>]} /></span>]} /></dt>
+            <T s="يغطي {0} من {1}{2}" a={[countNoun(w.coveredDays, DAY), w.expectedDays, missing > 0 && <span key="2" className="font-bold text-warn"> <T s=" · ينقصه {0}" a={[countNoun(missing, DAY)]} /></span>]} /></span>]} /></dt>
         <dd className="text-end text-xs font-bold"><Money minor={w.vatMinor ?? 0} /></dd>
         <dt className="text-muted">
           <T s="ضريبة المبيعات في الإقرار{0}" a={[<span key="0" className="block">
-            <T s="من الداخل إلى البنك{0}" a={[w.cashTypedGrossMinor === null ? "، ولم تُدخل مبيعات نقدية لهذا الشهر" : <> <T s=" ومن {0} نقداً أدخلتها" a={[<Money key="0" minor={w.cashTypedGrossMinor} />]} /></>]} /></span>]} /></dt>
+            <T s="من الداخل إلى البنك{0}" a={[w.cashTypedGrossMinor === null ? "، ولم تُدخل مبيعات نقدية لهذا الشهر" : <Fragment key="0"> <T s=" ومن {0} نقداً أدخلتها" a={[<Money key="0" minor={w.cashTypedGrossMinor} />]} /></Fragment>]} /></span>]} /></dt>
         <dd className="text-end text-xs font-bold"><Money minor={w.returnOutputVatMinor} /></dd>
         {foodicsCashMinor !== null && (
           <>

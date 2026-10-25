@@ -445,7 +445,7 @@ function ScopePicker({
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-[13px] font-bold ${on ? "" : "text-muted"}`}>{row.productName}</span>
                     <span className="block truncate text-[11px] text-muted">
-                      <T s="{0} · يُعدّ بوحدة {1}{2}" a={[row.categoryLabel, row.unitLabel, row.actual.trim() !== "" && <span className="nums"> <T s=" · العدّ: {0}" a={[row.actual]} /></span>]} /></span>
+                      <T s="{0} · يُعدّ بوحدة {1}{2}" a={[row.categoryLabel, row.unitLabel, row.actual.trim() !== "" && <span key="2" className="nums"> <T s=" · العدّ: {0}" a={[row.actual]} /></span>]} /></span>
                   </span>
                   {picked[row.productId] !== row.inScope && (
                     <span className="shrink-0 rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">تغيّر</span>

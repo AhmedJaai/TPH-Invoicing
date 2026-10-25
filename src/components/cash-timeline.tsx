@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { CircleAlert, FlaskConical, Repeat, RotateCcw, Store, Percent } from "lucide-react";
 import { Money } from "./money";
 import { buttonClass } from "./ui-tokens";
@@ -74,7 +74,7 @@ export function CashTimeline({
           <FlaskConical className="h-4 w-4 shrink-0 text-info" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 basis-56 leading-relaxed text-ink-soft">
             <T s="{0} أجّلتَ {1} إلى المرحلة التالية{2}{3}" a={[<b key="0" className="text-ink">هذه تجربة، ولم يُحفظ شيء.</b>, <Money key="1" minor={view.deferredMinor} />, view.lowestMinor !== null && (
-              <> <T s=" · أدنى رصيد يصل إليه {0}" a={[<b key="0" className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b>]} /></>
+              <Fragment key="2"> <T s=" · أدنى رصيد يصل إليه {0}" a={[<b key="0" className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b>]} /></Fragment>
             ), view.shortfallAt === null && balanceMinor !== null ? " · الرصيد المعروف يكفي بهذا الترتيب." : ""]} /></p>
           <button type="button" onClick={() => setDeferred(new Set())} className={buttonClass("quiet", "sm")}>
             <T s="{0}ألغِ التجربة" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>

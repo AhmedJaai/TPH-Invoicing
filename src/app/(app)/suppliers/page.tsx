@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, Fragment } from "react";
 import { SupplierLeverage } from "@/components/supplier-leverage";
 import { SectionBoundary } from "@/components/ui-client";
 import { whatsappHref } from "@/lib/supplier-edit";
@@ -545,12 +545,12 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
                       <li key={p.paymentId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[11px]">
                         <span className="min-w-0 text-muted">
                           <T s="{0} · من أصل {1}{2}" a={[formatDay(p.paidOn), <Money key="1" minor={p.amountMinor} />, p.bankTransactionId && (
-                            <>
+                            <Fragment key="2">
                               {" · "}
                               <Link href={txHref(p.bankTransactionId)} className="inline-flex min-h-11 items-center font-medium text-accent hover:underline sm:min-h-0">
                                 الحركة البنكية
                               </Link>
-                            </>
+                            </Fragment>
                           )]} /></span>
                         <span className="font-bold"><Money minor={p.unbackedMinor} /></span>
                       </li>
