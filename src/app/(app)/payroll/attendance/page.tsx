@@ -1,3 +1,4 @@
+import { EMPLOYEE, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarDays, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-react";
@@ -127,7 +128,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         </form>
       </div>
 
-      <Section title={day === today ? "اليوم" : formatDay(day)} icon={CalendarDays} count={board.length} hint={missing.length > 0 ? `${missing.length} لم يسجّلوا حضوراً في يوم عملهم. إن غاب أحدهم فاضغط «غائب» ليُخصم يومه، أو «إجازة» فلا يُخصم.` : undefined}>
+      <Section title={day === today ? "اليوم" : formatDay(day)} icon={CalendarDays} count={board.length} hint={missing.length > 0 ? `${countNoun(missing.length, EMPLOYEE)} ${missing.length === 1 ? "لم يسجّل" : missing.length === 2 ? "لم يسجّلا" : "لم يسجّلوا"} حضوراً في يوم عملهم. إن غاب أحدهم فاضغط «غائب» ليُخصم يومه، أو «إجازة» فلا يُخصم.` : undefined}>
         {board.length === 0 ? <EmptyState icon={Users} title="لا موظفين يعملون في هذا اليوم." /> : <DataTable columns={columns} rows={board} keyOf={(b) => b.employee.id} hrefOf={(b) => `/payroll/employee/${b.employee.id}?month=${month}`} />}
       </Section>
 

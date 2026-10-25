@@ -20,7 +20,7 @@ import { formatDay } from "@/lib/riyadh-time";
 
 /* ما يُعَدّ في هذه المساحة وحدها — ويُرفَع إلى `arabic.ts` إن احتاجه غيرها */
 export const RECIPE: NounForms = { one: "وصفة واحدة", two: "وصفتان", few: "وصفات", many: "وصفة", zero: "لا وصفات" };
-export const COUNT: NounForms = { one: "جرد واحد", two: "جردان", few: "جردات", many: "جرداً", zero: "لا جرد" };
+export const COUNT: NounForms = { one: "جرد واحد", two: "جردان", few: "جرود", many: "جرداً", zero: "لا جرد" };
 export const WEEK: NounForms = { one: "أسبوع واحد", two: "أسبوعان", few: "أسابيع", many: "أسبوعاً", zero: "لا أسابيع" };
 
 /* ─────────────────────────── خطواتُ الجرد ─────────────────────────── */

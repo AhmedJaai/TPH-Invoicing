@@ -124,7 +124,7 @@ export async function ItemView({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 @4xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-10">
           {/* ── الفرقُ عبر الجرودات: جهتان لا صافٍ ── */}
-          <Section title="الفرق في الجردات المقفلة" className="mt-0!" hint={finalised.length > 0 ? `حُسب فرقه في آخر ${finalised.length === 1 ? "جرد واحد" : finalised.length === 2 ? "جردين" : `${finalised.length} جردات`}.` : undefined}>
+          <Section title="الفرق في الجرود المقفلة" className="mt-0!" hint={finalised.length > 0 ? `حُسب فرقه في آخر ${finalised.length === 1 ? "جرد واحد" : finalised.length === 2 ? "جردين" : `${finalised.length} جردات`}.` : undefined}>
             {finalised.length === 0 ? (
               <EmptyState
                 compact
