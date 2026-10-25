@@ -353,12 +353,12 @@ export async function InvoiceView({
               cta="عالجها"
             >
               {problems[0].what}
-              {problems.length > 1 && ` و${countNoun(problems.length - 1, REASON)} أخرى`}.
+              {problems.length > 1 && ` (ومعه ${countNoun(problems.length - 1, REASON)} غيره)`}.
             </Notice>
           )}
           {weak.length > 0 && (
             <Notice tone="warn" icon={ScanText} href="#source" cta="راجع المصدر">
-              <T s="قرأ النظام {0} بثقة ضعيفة، فقارنها بالورقة قبل اعتمادها." a={[weak.join(" و")]} /></Notice>
+              <T s="قرأ النظام {0} بثقة ضعيفة، فقارنه بالورقة وصحّح ما يخالفها." a={[weak.join(" و")]} /></Notice>
           )}
           {risen.length > 0 && (
             <Notice tone="warn" icon={TrendingUp} href="#lines" cta="انظر البنود">

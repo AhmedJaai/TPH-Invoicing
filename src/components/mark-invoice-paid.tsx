@@ -6,7 +6,7 @@ import { Banknote, Landmark, Wallet } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { postJson } from "@/lib/http-client";
 import { readDrawn } from "@/lib/drawn-credit";
-import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
+import { addDays, formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { ACT } from "@/lib/ui-terms";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -67,8 +67,9 @@ async function post(body: unknown): Promise<{ ok: boolean; status: number; data:
   return { ok: res.ok, status: res.status, data };
 }
 
-function describePreview(p: Preview): string[] {
-  const parts = [`ستُسجَّل دفعة من حسابك بمبلغ ${formatRiyalsDisplay(p.ownerPaymentMinor)}`];
+function describePreview(p: Preview, invoiceDay?: string): string[] {
+  /* اليومُ يومُ الفاتورة (`markPaidByOwner`: دفعها صاحبُها عند الشراء) — يُقال قبل الحفظ، فيومُها يحدّد شهرَها */
+  const parts = [`ستُسجَّل دفعة من حسابك بمبلغ ${formatRiyalsDisplay(p.ownerPaymentMinor)}${invoiceDay ? ` بتاريخ الفاتورة ${formatDay(invoiceDay)}` : ""}`];
   const freed = p.freed.reduce((s, f) => s + f.amountMinor, 0);
   if (freed > 0) {
     const moved = p.reapplied
@@ -252,7 +253,7 @@ export function MarkInvoicePaid({
       {(state === "confirm-owner" || (state === "busy" && preview)) && preview && (
         <div className={panel ? "rounded-xl border border-line bg-sunken/60 p-3.5" : "flex max-w-md flex-wrap items-center justify-end gap-1.5"}>
           <ul className={panel ? "space-y-1 text-xs leading-relaxed text-ink-soft" : "text-[11px] leading-relaxed text-ink-soft"}>
-            {describePreview(preview).map((line) => <li key={line}>{line}</li>)}
+            {describePreview(preview, invoiceDay).map((line) => <li key={line}>{line}</li>)}
           </ul>
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
             <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("OWNER")} className={buttonClass("primary", "sm")}>

@@ -34,5 +34,6 @@
 "{0} يُحسب ما سيخرج وحده لا ما سيدخل، ولا تظهر المصروفات غير المسجّلة كمتكررة. لذلك فالرصيد بعد كل مرحلة هو أقل ما يُتوقع أن يتبقى.{1}": "{0} Only what will go out is counted, not what will come in, and expenses not recorded as recurring don't appear. So the balance after each stage is the least you can expect to remain.{1}",
 "{0} في الكشف لم توزَّع بعد": "{0} in the statement not yet distributed",
 "صنف واحد": "one item",
-"صنفان": "two items"
+"صنفان": "two items",
+"قرأ النظام {0} بثقة ضعيفة، فقارنه بالورقة وصحّح ما يخالفها.": "The system read {0} with low confidence — compare it with the paper and correct anything that differs."
 }
