@@ -148,7 +148,9 @@ export default async function PaymentsPage({
               )}
               {(run.vatAtRiskMinor > 0 || run.vatAtRiskUnknown > 0) && (
                 <Stat
-                  label="ضريبة مهددة بالضياع"
+                  /* «في هذه الدفعة»: «يحتاج قرارك» يعدّ الضريبةَ المهدّدة في كلّ الفواتير — رقمان مختلفان
+                     تحت اسمٍ واحد كانا يُقرآن تناقضاً (١٣٥ هنا و١٬٦٣٣ هناك) */
+                  label="ضريبة مهددة في هذه الدفعة"
                   icon={ShieldCheck}
                   value={vatUnknownOnly ? "غير معروف" : undefined}
                   minor={vatUnknownOnly ? undefined : run.vatAtRiskMinor}

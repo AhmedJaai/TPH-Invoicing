@@ -38,5 +38,6 @@
 "قرأ النظام {0} بثقة ضعيفة، فقارنه بالورقة وصحّح ما يخالفها.": "The system read {0} with low confidence — compare it with the paper and correct anything that differs.",
 "{0} جرود": "{0} counts",
 "الفرق في الجرود المقفلة": "Difference in closed counts",
-"أقدم من {0}، فلا تدخل «يحتاج قرارك» ({1})": "Older than {0}, so not in “Needs your decision” ({1})"
+"أقدم من {0}، فلا تدخل «يحتاج قرارك» ({1})": "Older than {0}, so not in “Needs your decision” ({1})",
+"ضريبة مهددة في هذه الدفعة": "VAT at risk in this run"
 }
