@@ -3,6 +3,7 @@
  * كلُّ زرٍّ ولا يُمسّ المقهى.
  *
  *   npm run test-env -- dev [port]   خادمُ تطويرٍ على فرع «test» (الافتراضيّ ٣١٠٠)، ووضعُ التجربة
+ *   npm run test-env -- start [port] نسخةُ الإنتاج المبنيّة (`next build` أوّلاً) — أسرع للزاحف بعشرة أضعاف
  *   npm run test-env -- reset        يعيد الفرعَ نسخةً من الإنتاج الآن (يمحو ما كُتب فيه)
  *   npm run test-env -- status       الفرعُ ومتى نُسخ آخرَ مرّة
  *
@@ -45,7 +46,7 @@ async function neon(path: string, init?: RequestInit): Promise<unknown> {
 }
 
 async function main() {
-  if (cmd === "dev") {
+  if (cmd === "dev" || cmd === "start") {
     const problem = testDatabaseProblem(test.TEST_DATABASE_URL, base.DATABASE_URL);
     if (problem) fail(problem);
     const port = arg ?? "3100";
@@ -58,8 +59,10 @@ async function main() {
       AUTH_URL: `http://localhost:${port}`,
     };
     delete env.VERCEL_ENV;
+    /* البناءُ المحلّيّ إنتاجٌ في NODE_ENV — ووضعُ التجربة يتبع VERCEL_ENV حيث وُجد (preview-mode.ts) */
+    if (cmd === "start") env.VERCEL_ENV = "preview";
     console.log(`بيئةُ الاختبار على http://localhost:${port} — فرع «test»، لا الإنتاج.`);
-    const child = spawn("npx", ["next", "dev", "-p", port], { env, stdio: "inherit" });
+    const child = spawn("npx", ["next", cmd, "-p", port], { env, stdio: "inherit" });
     child.on("exit", (code) => process.exit(code ?? 0));
     return;
   }
@@ -84,7 +87,7 @@ async function main() {
     return;
   }
 
-  fail(`أمرٌ غير معروف «${cmd}». المتاح: dev · reset · status`);
+  fail(`أمرٌ غير معروف «${cmd}». المتاح: dev · start · reset · status`);
 }
 
 main().catch((e) => fail(e instanceof Error ? e.message : String(e)));
