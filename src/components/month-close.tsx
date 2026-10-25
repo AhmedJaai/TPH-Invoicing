@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
 import { BusyStatus, ConfirmAction, toast } from "./ui-client";
-import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
+import { countNoun, doesNotBlock, mustBeResolved, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
@@ -35,10 +35,10 @@ interface Response {
 type State = CheckItem["state"];
 
 const STEPS: { id: string; title: string; icon: LucideIcon; ids: readonly string[] }[] = [
-  { id: "documents", title: "المستندات", icon: Receipt, ids: ["has-invoices", "no-pending-review", "no-blockers"] },
-  { id: "tax", title: "الضريبة", icon: ShieldCheck, ids: ["tax-unknown", "tax-valid", "fixed-assets"] },
+  { id: "documents", title: "المستندات", icon: Receipt, ids: ["month-ended", "has-invoices", "no-pending-review", "no-blockers"] },
+  { id: "tax", title: "الضريبة", icon: ShieldCheck, ids: ["tax-unknown", "tax-valid", "fixed-assets", "vat-return"] },
   { id: "payables", title: "السداد والكشوف", icon: Wallet, ids: ["paid", "statements"] },
-  { id: "bank", title: "البنك", icon: Landmark, ids: ["bank", "bank-coverage", "bank-balance", "bank-unexplained"] },
+  { id: "bank", title: "البنك", icon: Landmark, ids: ["bank", "bank-coverage", "bank-balance", "bank-unexplained", "bank-supplier-unposted"] },
 ];
 
 const RANK: Record<State, number> = { PASS: 0, WARN: 1, BLOCK: 2 };
@@ -165,7 +165,7 @@ export function MonthClose({
                   {isClosed ? "الشهر مقفل" : report.canClose ? "جاهز للإقفال" : "غير جاهز للإقفال"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                  <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <> <T s=" · {0} يجب حلّها" a={[countNoun(report.blockers.length, BLOCKER)]} /></>, report.warnings.length > 0 && <> <T s=" · {0} لا يمنع الإقفال" a={[countNoun(report.warnings.length, WARNING)]} /></>]} /></p>
+                  <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <> <T s=" · {0} {1}" a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></>, report.warnings.length > 0 && <> <T s=" · {0} {1} الإقفال" a={[countNoun(report.warnings.length, WARNING), doesNotBlock(report.warnings.length)]} /></>]} /></p>
               </div>
               {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
               {!isClosed && firstBlocker && (
@@ -330,7 +330,7 @@ export function MonthClose({
                 </>
               ) : (
                 <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                  <T s="{0} هذه أخطاء في البيانات نفسها، لا أمور تقرّ بها. أصلحها بأزرار «أصلح» أعلاه، ثم أعد الفحص." a={[<span key="0" className="font-bold text-danger"><T s="{0} يجب حلّها قبل الإقفال." a={[countNoun(report.blockers.length, BLOCKER)]} /></span>]} /></p>
+                  <T s="{0} هذه أخطاء في البيانات نفسها، لا أمور تقرّ بها. أصلحها بأزرار «أصلح» أعلاه، ثم أعد الفحص." a={[<span key="0" className="font-bold text-danger"><T s="{0} {1} قبل الإقفال." a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></span>]} /></p>
               )}
             </section>
           ) : (

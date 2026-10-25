@@ -15,7 +15,7 @@ import { monthBalances, type MonthFacts } from "./month-close";
 import { ISSUE } from "./issue-codes";
 import { periodKey, quarterOfMonth } from "./vat-return";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
-import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
+import { MS_PER_DAY, currentMonthRiyadh, isoDay } from "@/lib/riyadh-time";
 
 export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const start = new Date(`${month}-01T00:00:00Z`);
@@ -199,6 +199,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
 
   return {
     month,
+    currentMonth: currentMonthRiyadh(),
     vatFiled: Number(filed?.n ?? 0) > 0,
     invoiceCount: Number(inv?.invoiceCount ?? 0),
     notTaxValidCount: Number(inv?.notTaxValidCount ?? 0),

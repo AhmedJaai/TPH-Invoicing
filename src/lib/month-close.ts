@@ -34,6 +34,12 @@ export interface CheckItem {
 
 export interface MonthFacts {
   month: string;
+  /**
+   * شهرُ اليوم بتوقيت الرياض وقتَ الفحص. كان الإقفالُ يقبل الشهرَ الجاري
+   * (أكتوبر في الخامس والعشرين منه) والقادمَ (نوفمبر، لأنّ فاتورةً أُرّخت به):
+   * إقفالُه يرفض كلَّ فاتورةٍ تصل بعده في شهرٍ لم ينتهِ.
+   */
+  currentMonth: string;
   invoiceCount: number;
   notTaxValidCount: number;
   /** فواتير لم يُقرأ تفصيلها الضريبي — مجهولة لا غير صالحة */
@@ -90,9 +96,11 @@ export interface MonthCloseReport {
 const riyals = formatRiyalsDisplay;
 
 /** أين يُصلَح كلُّ بند — مرشَّحاً بالشهر حيث يقبل الترشيح. */
-export function fixHref(id: string, month: string): string {
+export function fixHref(id: string, month: string): string | null {
   switch (id) {
     case "has-invoices": return "/upload";
+    /* الشهرُ الجاري لا يُصلَح، يُنتظَر — والقادمُ رابطُه على بنده (فاتورةٌ تاريخُها بعد اليوم) */
+    case "month-ended": return null;
     case "no-blockers": return "/attention?item=open-blockers";
     case "no-pending-review": return "/documents?status=NEEDS_REVIEW";
     case "tax-unknown": return `/purchases/invoices?tax=UNKNOWN&month=${month}`;
@@ -111,6 +119,21 @@ export function fixHref(id: string, month: string): string {
 export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   const items: CheckItem[] = [];
 
+  /* الشهرُ الذي لم ينتهِ لا يُقفَل — يُحكم في الخادم، والشاشةُ تقرأ الحكم نفسه */
+  if (facts.month >= facts.currentMonth) {
+    const ongoing = facts.month === facts.currentMonth;
+    items.push({
+      id: "month-ended",
+      label: "انتهاء الشهر",
+      state: "BLOCK",
+      detail: ongoing ? `${formatMonth(facts.month)} لم ينتهِ بعد` : `${formatMonth(facts.month)} لم يبدأ بعد`,
+      action: ongoing
+        ? "أقفله بعد آخر يوم فيه، حين تصل فواتيره وكشفه كاملة"
+        : "تاريخ فاتورة فيه بعد اليوم، فراجع تاريخها",
+      href: ongoing ? undefined : `/purchases/invoices?month=${facts.month}`,
+    });
+  }
+
   /*
    * الشهر بلا فواتير: يمنع الإقفال عمداً.
    * الأرجح أنّ الفواتير لم تُرفع بعد لا أنّه لم يُشترَ شيء، وإقفال شهر فارغ
@@ -118,7 +141,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
    */
   items.push({
     id: "has-invoices",
-    label: "فواتير الشهر مرفوعة",
+    label: "فواتير الشهر",
     state: facts.invoiceCount > 0 ? "PASS" : "BLOCK",
     detail:
       facts.invoiceCount > 0
@@ -129,7 +152,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
 
   items.push({
     id: "no-blockers",
-    label: "لا تنبيهات مانعة مفتوحة",
+    label: "التنبيهات المانعة",
     state: facts.openBlockerIssues === 0 ? "PASS" : "BLOCK",
     detail:
       facts.openBlockerIssues === 0
@@ -140,7 +163,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
 
   items.push({
     id: "no-pending-review",
-    label: "لا مستندات معلقة للمراجعة",
+    label: "المستندات المعلّقة للمراجعة",
     state: facts.documentsNeedingReview === 0 ? "PASS" : "BLOCK",
     detail:
       facts.documentsNeedingReview === 0
@@ -157,7 +180,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.unknownTaxCount > 0) {
     items.push({
       id: "tax-unknown",
-      label: "قُرئ التفصيل الضريبي لكل الفواتير",
+      label: "قراءة التفصيل الضريبي",
       state: "WARN",
       detail: `${countNoun(facts.unknownTaxCount, INVOICE)} لم يُقرأ تفصيلها الضريبي`,
       action: "اقرأ محتواها. حالتها غير معروفة لا غير صالحة، فلا تطالب المورّد قبل ذلك",
@@ -172,7 +195,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.invoiceCount > 0) {
     items.push({
       id: "tax-valid",
-      label: "كل الفواتير ضريبية مكتملة",
+      label: "اكتمال الفواتير الضريبية",
       state: facts.notTaxValidCount === 0 ? "PASS" : "WARN",
       detail:
         facts.notTaxValidCount === 0
@@ -186,7 +209,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
 
     items.push({
       id: "paid",
-      label: "مستحقات الشهر مسدّدة",
+      label: "سداد مستحقات الشهر",
       state: facts.unpaidCount === 0 ? "PASS" : "WARN",
       detail:
         facts.unpaidCount === 0
@@ -212,12 +235,14 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     */
     const differing = facts.suppliersWithStatementIssues;
     const parts = [
-      missingStatements > 0 ? `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشف حسابه` : null,
+      missingStatements === 0 ? null
+      : facts.suppliersWithInvoices === 1 ? "لم يصل كشف حساب مورّد الشهر الوحيد"
+      : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشف حسابه`,
       differing > 0 ? `${countNoun(differing, SUPPLIER)} وصل كشف حسابه وفيه فروق مع سجلاتنا` : null,
     ].filter((x): x is string => x !== null);
     items.push({
       id: "statements",
-      label: "كشوف المورّدين وصلت وتطابقت",
+      label: "كشوف المورّدين",
       state: parts.length === 0 ? "PASS" : "WARN",
       detail:
         parts.length === 0
@@ -238,7 +263,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       الشهر. فينجح بجانب «لا أيّام بلا كشف» الساقط، وتناقض القائمةُ نفسها.
       والتغطيةُ يفحصها البندُ الذي يليه.
     */
-    label: "كشف البنك مستورد لهذا الشهر",
+    label: "كشف البنك للشهر",
     /*
       غيابُ الكشف مانع لا تنبيه: أيّام الشهر كلّها فجوة، والفجوة يقين.
       وكان «تنبيهاً» فيُقفَل شهرٌ لم يُقرأ منه ريالٌ بنكيّ.
@@ -258,7 +283,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.bankImportCoversMonth) {
     items.push({
       id: "bank-coverage",
-      label: "لا أيام بلا كشف",
+      label: "تغطية الكشف لأيام الشهر",
       state: facts.bankGapDays === 0 ? "PASS" : "BLOCK",
       detail:
         facts.bankGapDays === 0
@@ -276,7 +301,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     */
     items.push({
       id: "bank-balance",
-      label: "رصيد البنك يتطابق",
+      label: "مطابقة رصيد البنك",
       state:
         facts.bankBalanceStatus === "BALANCED" || facts.bankBalanceStatus === "WITHIN_TOLERANCE"
           ? "PASS"
@@ -299,7 +324,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     if (facts.bankUnexplainedCount > 0) {
       items.push({
         id: "bank-unexplained",
-        label: "لا حركة بنكية بلا تفسير",
+        label: "تفسير حركات البنك",
         state: "WARN",
         detail: `${countNoun(facts.bankUnexplainedCount, TRANSACTION)} بلا تفسير، قيمتها ${riyals(facts.bankUnexplainedMinor)} ريال`,
         action: "افتح قائمة المراجعة وقرّر فيما بقي",
@@ -318,7 +343,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.bankImportCoversMonth && facts.bankSupplierUnpostedCount > 0) {
     items.push({
       id: "bank-supplier-unposted",
-      label: "حوالات المورّدين مسجّلة",
+      label: "تسجيل حوالات المورّدين",
       state: "WARN",
       detail: `${countNoun(facts.bankSupplierUnpostedCount, TRANSACTION)} لمورّدين بقيمة ${riyals(facts.bankSupplierUnpostedMinor)} ريال لم تُسجَّل سداداً، فيظهر ما عليك لهم أكثر من الحقيقة`,
       action: "سجّلها على فواتيرها أو على حساب المورّد من قائمة المراجعة",
@@ -328,7 +353,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.fixedAssetCount > 0) {
     items.push({
       id: "fixed-assets",
-      label: "الأصول الثابتة روجعت",
+      label: "مراجعة الأصول الثابتة",
       state: "WARN",
       detail: `${countNoun(facts.fixedAssetCount, INVOICE)} فوق حد الرسملة`,
       action: "راجعها مع المحاسب، فتسجيلها مصروفاً دفعة واحدة يشوّه ربح الشهر",
@@ -343,7 +368,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.vatFiled !== undefined && periodMonths(quarter)[2] === facts.month) {
     items.push({
       id: "vat-return",
-      label: `إقرار ضريبة ${quarterLabel(quarter)} قُدّم`,
+      label: `تقديم إقرار ضريبة ${quarterLabel(quarter)}`,
       state: facts.vatFiled ? "PASS" : "WARN",
       detail: facts.vatFiled
         ? "سُجّل تقديمه"
@@ -354,7 +379,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   }
 
   for (const i of items) {
-    if (i.state !== "PASS" && !i.href) i.href = fixHref(i.id, facts.month);
+    if (i.state !== "PASS" && !i.href) i.href = fixHref(i.id, facts.month) ?? undefined;
   }
 
   const blockers = items.filter((i) => i.state === "BLOCK");

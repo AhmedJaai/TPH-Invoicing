@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY, FIELD, GAP, ITEM, INVOICE, OPPORTUNITY, QUOTATION, SECOND, TIME, countNoun, nounForm } from "./arabic";
+import { DAY, FIELD, GAP, ITEM, INVOICE, OPPORTUNITY, OTHER_ITEM, QUOTATION, SECOND, TIME, countNoun, doesNotBlock, mustBeResolved, nounForm } from "./arabic";
 
 describe("nounForm", () => {
   it("الواحد والاثنان لهما صيغتاهما", () => {
@@ -98,5 +98,19 @@ describe("SECOND — مدّةُ الانتظار بجانب الزرّ", () => {
     expect(countNoun(2, SECOND)).toBe("ثانيتين");
     expect(countNoun(5, SECOND)).toBe("5 ثوانٍ");
     expect(countNoun(12, SECOND)).toBe("12 ثانية");
+  });
+});
+
+describe("الصفةُ والفعلُ يتبعان العدد", () => {
+  it("«آخر» بالعدد: بند آخر · بندان آخران · ٣ بنود أخرى · ١٢ بنداً آخر", () => {
+    expect(countNoun(1, OTHER_ITEM)).toBe("بند آخر");
+    expect(countNoun(2, OTHER_ITEM)).toBe("بندان آخران");
+    expect(countNoun(3, OTHER_ITEM)).toBe("3 بنود أخرى");
+    expect(countNoun(12, OTHER_ITEM)).toBe("12 بنداً آخر");
+  });
+
+  it("«لا يمنع» و«يجب حلّه» بالعدد", () => {
+    expect([1, 2, 5, 11].map(doesNotBlock)).toEqual(["لا يمنع", "لا يمنعان", "لا تمنع", "لا تمنع"]);
+    expect([1, 2, 4].map(mustBeResolved)).toEqual(["يجب حلّه", "يجب حلّهما", "يجب حلّها"]);
   });
 });

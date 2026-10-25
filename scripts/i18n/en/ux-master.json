@@ -1,0 +1,18 @@
+{
+"لا يمنع": "won't block",
+"لا يمنعان": "won't block",
+"لا تمنع": "won't block",
+"بند آخر": "one more item",
+"بندان آخران": "two more items",
+"بنود أخرى": "more items",
+"بنداً آخر": "more items",
+"يجب حلّه": "must be resolved",
+"يجب حلّهما": "must be resolved",
+"يجب حلّها": "must be resolved",
+"لم يصل كشف حساب مورّد الشهر الوحيد": "The month's only supplier hasn't sent a statement",
+"انتهاء الشهر": "Month has ended",
+"أقفله بعد آخر يوم فيه، حين تصل فواتيره وكشفه كاملة": "Close it after its last day, once its invoices and statement are complete",
+"تاريخ فاتورة فيه بعد اليوم، فراجع تاريخها": "An invoice in it is dated after today; check its date",
+"{0} لم ينتهِ بعد": "{0} hasn't ended yet",
+"{0} لم يبدأ بعد": "{0} hasn't started yet"
+}

@@ -20,7 +20,7 @@ import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { DAY, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
+import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
 import { previousMonth } from "@/lib/filing";
 import { addDays, currentMonthRiyadh, formatDay, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
 import { sinceYesterday } from "@/lib/since-yesterday";
@@ -267,7 +267,7 @@ export default async function HomePage() {
                   href="/attention"
                   className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
                 >
-                  <T s="و{0} أخرى في القائمة{1}" a={[countNoun(attention.length - SHOWN, ITEM), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+                  <T s="و{0} في القائمة{1}" a={[countNoun(attention.length - SHOWN, OTHER_ITEM), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
               )}
               <p className="mt-3 hidden text-[11px] text-muted lg:block">
                 <T s="تنقّل بين البنود بالمفتاحين {0} و{1}، وافتح البند بمفتاح {2}." a={[<Kbd key="0">J</Kbd>, <Kbd key="1">K</Kbd>, <Kbd key="2">Enter</Kbd>]} /></p>
@@ -378,7 +378,7 @@ async function CloseCard({ month }: { month: string }) {
       >
         <span className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold">
-            {p.closed ? "مقفل" : <><T s="{0} من {1} فحوص اجتازت" a={[<span key="0" className="nums">{p.passed}</span>, <span key="1" className="nums">{p.total}</span>]} /></>}
+            {p.closed ? "مقفل" : <T s="اجتاز {0} من {1}" a={[<span key="0" className="nums">{p.passed}</span>, countNoun(p.total, CHECK)]} />}
           </span>
           {p.closed ? (
             <Badge tone="ok" dot>مقفل</Badge>

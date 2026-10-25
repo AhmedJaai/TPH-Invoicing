@@ -155,6 +155,27 @@ export const SUGGESTION: NounForms = {
   zero: "لا اقتراحات",
 };
 
+/** «وبندان آخران في القائمة» — الصفةُ تتبع العدد كما يتبعه المعدود */
+export const OTHER_ITEM: NounForms = {
+  one: "بند آخر",
+  two: "بندان آخران",
+  few: "بنود أخرى",
+  many: "بنداً آخر",
+  zero: "لا بنود أخرى",
+};
+
+/** الفعلُ بعد المعدود: «تنبيه لا يمنع» · «تنبيهان لا يمنعان» · «٥ تنبيهات لا تمنع» */
+export function doesNotBlock(n: number): string {
+  const abs = Math.abs(Math.trunc(n));
+  return abs === 1 ? "لا يمنع" : abs === 2 ? "لا يمنعان" : "لا تمنع";
+}
+
+/** «مانع يجب حلّه» · «مانعان يجب حلّهما» · «٣ موانع يجب حلّها» */
+export function mustBeResolved(n: number): string {
+  const abs = Math.abs(Math.trunc(n));
+  return abs === 1 ? "يجب حلّه" : abs === 2 ? "يجب حلّهما" : "يجب حلّها";
+}
+
 export const CHECK: NounForms = {
   one: "فحص واحد",
   two: "فحصان",

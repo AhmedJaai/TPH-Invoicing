@@ -3,6 +3,7 @@ import { buildMonthClose, monthBalances, type MonthFacts } from "./month-close";
 
 const clean: MonthFacts = {
   month: "2026-08",
+  currentMonth: "2026-10",
   invoiceCount: 43,
   notTaxValidCount: 0,
   unknownTaxCount: 0,
@@ -35,6 +36,23 @@ describe("buildMonthClose", () => {
     expect(r.blockers).toHaveLength(0);
     expect(r.warnings).toHaveLength(0);
     expect(r.items.every((i) => i.state === "PASS")).toBe(true);
+  });
+
+  it("الشهرُ الجاري لا يُقفَل قبل أن ينتهي", () => {
+    const r = buildMonthClose({ ...clean, month: "2026-10" });
+    expect(state(r, "month-ended")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
+    expect(r.blockers[0].detail).toMatch(/لم ينتهِ/);
+  });
+
+  it("الشهرُ القادم لا يُقفَل — تاريخُ فاتورةٍ بعد اليوم لا يفتح إقفاله", () => {
+    const r = buildMonthClose({ ...clean, month: "2026-11" });
+    expect(state(r, "month-ended")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
+  });
+
+  it("الشهرُ المنقضي لا يحمل بندَ الانتهاء", () => {
+    expect(state(buildMonthClose({ ...clean, month: "2026-09" }), "month-ended")).toBeUndefined();
   });
 
   it("الشهر بلا فواتير يمنع إقفاله", () => {
