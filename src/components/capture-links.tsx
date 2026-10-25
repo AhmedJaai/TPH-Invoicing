@@ -6,7 +6,7 @@ import { Copy, Link2, Plus, Share2 } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { timeAgo } from "@/lib/arabic";
 import { buttonClass } from "./ui-tokens";
-import { ConfirmAction, toast } from "./ui-client";
+import { ConfirmAction, ReadySubmit, toast } from "./ui-client";
 
 export interface CaptureLinkItem {
   id: string;
@@ -130,9 +130,9 @@ export function CaptureLinks({ links }: { links: CaptureLinkItem[] }) {
           aria-label="اسم الموظف"
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-10"
         />
-        <button type="submit" disabled={busy || !label.trim()} aria-busy={busy} className={buttonClass("primary", "md")}>
+        <ReadySubmit ready={label.trim() !== ""} busy={busy} missing="اكتب اسم الموظف الذي سيصوّر بالرابط.">
           <Plus className="h-4 w-4" aria-hidden /> أنشئ رابطاً
-        </button>
+        </ReadySubmit>
       </form>
     </div>
   );

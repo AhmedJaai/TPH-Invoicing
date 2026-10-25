@@ -7,7 +7,7 @@ import { Money } from "./money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { ReadySubmit, toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
 
 export interface ExpenseRow {
@@ -195,8 +195,8 @@ export function RecurringExpenses({
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button aria-busy={busy} type="submit" disabled={busy || label.trim().length < 2 || !amount.trim()} className={buttonClass("primary", "sm")}>
-              <T s="{0}أضف" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></button>
+            <ReadySubmit ready={label.trim().length >= 2 && amount.trim() !== ""} busy={busy} size="sm" missing={label.trim().length < 2 ? "اكتب اسم المصروف (حرفان على الأقل)." : "اكتب المبلغ بالريال."}>
+              <T s="{0}أضف" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></ReadySubmit>
             {error && <p role="alert" className="text-xs font-bold text-danger">{error}</p>}
           </div>
         </form>

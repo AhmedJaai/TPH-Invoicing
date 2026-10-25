@@ -4,6 +4,7 @@ import { DateChips } from "./date-chips";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
+import { ReadySubmit } from "./ui-client";
 import { buttonClass } from "./ui";
 import { T } from "@/components/i18n/t";
 
@@ -218,13 +219,9 @@ export function ReceiptForm({
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            aria-busy={busy}
-            type="submit" disabled={busy || quantity.trim() === "" || date === ""}
-            className={buttonClass("primary", "sm")}
-          >
+          <ReadySubmit ready={quantity.trim() !== "" && date !== ""} busy={busy} size="sm" missing={quantity.trim() === "" ? "اكتب الكمية المستلمة." : "اختر يوم الاستلام."}>
             احفظ الكمية
-          </button>
+          </ReadySubmit>
           <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>إلغاء</button>
         </div>
       )}

@@ -8,7 +8,7 @@ import {
   TriangleAlert, Unlock, Wallet, type LucideIcon,
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
-import { BusyStatus, ConfirmAction, toast } from "./ui-client";
+import { BusyStatus, ConfirmAction, ReadySubmit, toast } from "./ui-client";
 import { countNoun, doesNotBlock, mustBeResolved, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { postJson } from "@/lib/http-client";
@@ -274,14 +274,9 @@ export function MonthClose({
                   />
                 </label>
               </div>
-              <button
-                aria-busy={busy === "balancing"}
-                type="submit"
-                disabled={busy !== null || !opening.trim() || !closing.trim()}
-                className={`${buttonClass("primary", "sm")} mt-4`}
-              >
+              <ReadySubmit ready={opening.trim() !== "" && closing.trim() !== ""} busy={busy !== null} size="sm" className="mt-4" missing={!opening.trim() ? "اكتب الرصيد الافتتاحي كما في كشف البنك." : "اكتب الرصيد الختامي كما في كشف البنك."}>
                 احفظ الرصيدين وأعد الفحص
-              </button>
+              </ReadySubmit>
             </form>
           )}
 

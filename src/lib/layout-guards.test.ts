@@ -158,3 +158,33 @@ describe("هدفُ اللمس على الجوّال", () => {
     expect(found).toEqual([]);
   });
 });
+
+/**
+ * ── زرُّ الإرسال لا يُعطَّل صامتاً ──
+ *
+ * `<button type="submit" disabled={busy || !ready}>` يُضغط قبل اكتمال النموذج فلا يحدث
+ * شيءٌ ولا يُعرف لماذا — وجده زاحفُ الأزرار في أربعةَ عشرَ نموذجاً. فالإرسالُ بـ`ReadySubmit`
+ * (`ui-client.tsx`) يقول ما ينقص، و`disabled` لزرّ الإرسال لانشغاله وحده.
+ */
+export function silentSubmits(source: string): string[] {
+  const out: string[] = [];
+  for (const m of source.matchAll(/<button\b[^>]*>/g)) {
+    const tag = m[0];
+    if (!/type="submit"/.test(tag)) continue;
+    const dis = tag.match(/disabled=\{([^}]*)\}/);
+    if (dis && /\|\||&&|!|===|<|>/.test(dis[1].replace(/^\s*busy\s*$/, ""))) out.push(tag.slice(0, 90));
+  }
+  return out;
+}
+
+describe("زرُّ الإرسال يقول ما ينقص", () => {
+  it("يمسك المعطَّلَ بشرطٍ ويترك المعطَّلَ لانشغاله", () => {
+    expect(silentSubmits(`<button type="submit" disabled={busy || !ready}>x</button>`)).toHaveLength(1);
+    expect(silentSubmits(`<button type="submit" disabled={busy}>x</button>`)).toHaveLength(0);
+  });
+
+  it("لا زرَّ إرسالٍ معطَّلٌ بشرطٍ صامت", () => {
+    const found = walk("src").flatMap((f) => silentSubmits(readFileSync(f, "utf8")).map((x) => `${f}: ${x}`));
+    expect(found).toEqual([]);
+  });
+});

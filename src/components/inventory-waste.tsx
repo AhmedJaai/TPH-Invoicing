@@ -7,6 +7,7 @@ import { postJson } from "@/lib/http-client";
 import { Trash2 } from "lucide-react";
 import { buttonClass } from "./ui";
 import { T } from "@/components/i18n/t";
+import { ReadySubmit } from "./ui-client";
 
 /**
  * تسجيلُ هدرٍ — **داخل الجرد، حيث يُتذكَّر**.
@@ -184,14 +185,9 @@ export function InventoryWaste({
           placeholder="ملاحظة (اختيارية)"
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-xs"
         />
-        <button
-          aria-busy={busy}
-          type="submit"
-          disabled={busy || !productId || quantity.trim() === ""}
-          className={buttonClass("primary")}
-        >
+        <ReadySubmit ready={Boolean(productId) && quantity.trim() !== ""} busy={busy} missing={!productId ? "اختر الصنف الذي هُدر." : "اكتب الكمية المهدورة."}>
           سجّل الهدر
-        </button>
+        </ReadySubmit>
       </form>
 
       {message && <p role={failed ? "alert" : "status"} className={`mt-2 text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}

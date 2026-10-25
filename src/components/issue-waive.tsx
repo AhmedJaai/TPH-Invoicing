@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCheck } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { ReadySubmit, toast } from "./ui-client";
 
 /** «تجاوزه مع كتابة السبب» — لا يُرسل إلّا معرّفَ التنبيه وسببَه (`/api/issue-waive`). */
 export function IssueWaive({ issueId }: { issueId: string }) {
@@ -48,9 +48,9 @@ export function IssueWaive({ issueId }: { issueId: string }) {
         autoFocus
         className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-raised px-3 text-xs sm:min-h-8"
       />
-      <button type="submit" disabled={busy || reason.trim().length < 3} aria-busy={busy} className={buttonClass("primary", "sm")}>
+      <ReadySubmit ready={reason.trim().length >= 3} busy={busy} size="sm" missing="اكتب سبب التجاوز (ثلاثة أحرف على الأقل)، فهو يُحفظ مع القرار.">
         {busy ? "يحفظ…" : "تجاوزه"}
-      </button>
+      </ReadySubmit>
       <button type="button" onClick={() => setOpen(false)} disabled={busy} className={buttonClass("quiet", "sm")}>تراجع</button>
       {error && <span role="alert" className="w-full text-xs text-danger">{error}</span>}
     </form>

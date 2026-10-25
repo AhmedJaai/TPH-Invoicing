@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ReceiptText } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { Field, Input, MoneyInput, toast } from "./ui-client";
+import { Field, Input, MoneyInput, ReadySubmit, toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
 
 /**
@@ -118,9 +118,9 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       </Field>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
-        <button type="submit" aria-busy={busy} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
+        <ReadySubmit ready={amount.trim() !== ""} busy={busy} size="sm" missing="اكتب مبلغ الإشعار كما على ورقته.">
           <span>{duplicate ? "سجّل إشعاراً آخر" : "سجّل الإشعار"}</span>
-        </button>
+        </ReadySubmit>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           إلغاء
         </button>

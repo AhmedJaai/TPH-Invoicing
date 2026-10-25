@@ -7,6 +7,7 @@ import { postJson } from "@/lib/http-client";
 import { sameUnitFamily } from "@/lib/inventory/units";
 import { STORED_UNITS, isStoredUnit, storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { PRODUCT, countNoun } from "@/lib/arabic";
+import { ReadySubmit } from "./ui-client";
 import { buttonClass } from "./ui";
 import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purchase-link.service";
 import { T } from "@/components/i18n/t";
@@ -207,14 +208,14 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
               <option value="">—</option>
               {unitChoices.map((u) => <option key={u} value={u}>{storedUnitLabel(u)}</option>)}
             </select>]} /></label>
-          <button
-            type="submit"
-            aria-busy={busy}
-            disabled={busy || !product || !unitOk || contentQuantity.trim() === "" || packSize.trim() === ""}
-            className={buttonClass("primary", "sm")}
+          <ReadySubmit
+            ready={Boolean(product) && unitOk && contentQuantity.trim() !== "" && packSize.trim() !== ""}
+            busy={busy}
+            size="sm"
+            missing={!product ? "اختر صنف المخزون الذي يقابله هذا البند." : packSize.trim() === "" ? "اكتب عدد العبوات في البند." : contentQuantity.trim() === "" ? "اكتب ما في العبوة الواحدة." : "اختر وحدة تناسب الصنف."}
           >
             <span>اربط</span>
-          </button>
+          </ReadySubmit>
           {isLinked && (
             <button type="button" onClick={() => setEditing(false)} disabled={busy} className={buttonClass("quiet", "sm")}>
               إلغاء

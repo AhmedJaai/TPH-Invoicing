@@ -280,6 +280,56 @@ export function ActionButton({
 }
 
 /**
+ * زرُّ إرسال النموذج: قبل اكتماله يُضغط فيقول ما ينقصه — كما `ActionButton` بسببه.
+ *
+ * كانت سبعةُ نماذج تعطّل «احفظ» و«أضف» بـ`disabled` حتى يكتمل ما فيها، فيضغطه
+ * صاحبُ المقهى على الجوّال ولا يحدث شيء ولا يُعرف لماذا (زاحفُ الأزرار، ٢٥ أكتوبر ٢٠٢٦).
+ * فيبقى `aria-disabled` يستقبل الضغطة، ويمنع الإرسال، ويقول `missing` سطراً بجانبه
+ * (منطقةٌ حيّة واحدة — والإشعارُ معه كان يُقرأ مرّتين).
+ */
+export function ReadySubmit({
+  ready,
+  missing,
+  busy = false,
+  children,
+  variant = "primary",
+  size = "md",
+  className = "",
+}: {
+  ready: boolean;
+  /** ما ينقص بجملةٍ تُقرأ: «اكتب اسم الموظف». */
+  missing: string;
+  busy?: boolean;
+  children: React.ReactNode;
+  variant?: ButtonVariant;
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const [said, setSaid] = useState(false);
+  const id = useId();
+  return (
+    <>
+      <button
+        type="submit"
+        disabled={busy}
+        aria-busy={busy}
+        aria-disabled={!ready || undefined}
+        aria-describedby={!ready ? id : undefined}
+        onClick={(e) => {
+          if (ready) return;
+          e.preventDefault();
+          setSaid(true);
+        }}
+        className={`${buttonClass(variant, size)} ${ready ? "" : "cursor-not-allowed opacity-60"} ${className}`}
+      >
+        {children}
+      </button>
+      <span id={id} role={said && !ready ? "status" : undefined} className={said && !ready ? "text-[11px] font-bold text-warn" : "sr-only"}>{ready ? "" : missing}</span>
+    </>
+  );
+}
+
+/**
  * ما يجري الآن، بجانب زرٍّ يأخذ ثوانيَ — مزامنة، إعادةُ قراءة، إقفال، استيراد.
  *
  * الدوّارةُ داخل الزرّ تقول «وصلت الضغطة» ولا تقول ماذا يجري ولا كم بقي، فيُضغط ثانيةً

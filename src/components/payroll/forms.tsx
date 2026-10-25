@@ -18,7 +18,7 @@ import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from 
 import type { PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
 import { buttonClass, fieldClass } from "../ui-tokens";
-import { ConfirmAction, toast } from "../ui-client";
+import { ConfirmAction, ReadySubmit, toast } from "../ui-client";
 
 /* ─────────────── أداةٌ مشتركة ─────────────── */
 
@@ -113,7 +113,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
       <label className={`${label} mt-4`}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><textarea className={`${field} mt-1.5 min-h-16 py-2`} value={v.note} onChange={(e) => set("note", e.target.value)} maxLength={300} /></label>
       <ErrorLine error={error} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="submit" className={buttonClass("primary")} disabled={busy || !ready} aria-busy={busy}>{isNew ? "أضف الموظف" : "احفظ التعديل"}</button>
+        <ReadySubmit ready={ready} busy={busy} missing={v.name.trim().length < 2 ? "اكتب اسم الموظف (حرفان على الأقل)." : "اختر تاريخ مباشرته العمل."}>{isNew ? "أضف الموظف" : "احفظ التعديل"}</ReadySubmit>
         <p className="min-w-0 flex-1 basis-60 text-[11px] leading-relaxed text-muted">رقم المستفيد هو ما يظهر بعد «BEN ID» في وصف الحوالة. به تُقترح حوالاته تلقائياً.</p>
       </div>
     </form>
@@ -133,7 +133,7 @@ export function RateForm({ employeeId, kind, month }: { employeeId: string; kind
     }}>
       <label className={label}>من شهر<input type="month" dir="ltr" className={`${field} mt-1.5`} value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} required /></label>
       <label className={label}>{kind === "MONTHLY" ? "الراتب الشهري (ريال)" : "أجر الساعة (ريال)"}<input className={`${field} nums mt-1.5 w-36 text-end`} dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="3500" required /></label>
-      <button type="submit" className={buttonClass("primary")} disabled={busy || !amount.trim() || !fromMonth} aria-busy={busy}>احفظ</button>
+      <ReadySubmit ready={amount.trim() !== "" && Boolean(fromMonth)} busy={busy} missing={!amount.trim() ? "اكتب الراتب الشهري." : "اختر الشهر الذي يسري منه."}>احفظ</ReadySubmit>
       <div className="basis-full"><ErrorLine error={error} /></div>
     </form>
   );
@@ -165,7 +165,7 @@ export function AdjustmentForm({ employeeId, month, loanMinor }: { employeeId: s
       </div>
       <p className="text-[11px] leading-relaxed text-muted">{ADJUSTMENT_HINT[kind]}{kind === "LOAN_REPAYMENT" && <> · رصيد سلفه الآن {formatRiyalsDisplay(loanMinor)} ريال</>}</p>
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !amount.trim()} aria-busy={busy}><Plus className="h-3.5 w-3.5" aria-hidden />أضف</button>
+      <ReadySubmit ready={amount.trim() !== ""} busy={busy} size="sm" missing="اكتب المبلغ أولاً."><Plus className="h-3.5 w-3.5" aria-hidden />أضف</ReadySubmit>
     </form>
   );
 }
@@ -236,7 +236,7 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
             </span>}
       </div>
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || (byMinutes && !(n > 0))} aria-busy={busy}>سجّل اليوم</button>
+      <ReadySubmit ready={!(byMinutes && !(n > 0))} busy={busy} size="sm" missing="اكتب دقائق التأخير رقماً أكبر من صفر.">سجّل اليوم</ReadySubmit>
     </form>
   );
 }
@@ -289,7 +289,7 @@ export function WeekForm({ employeeId, defaultDay, suggestedHours }: { employeeI
       </div>
       <p className="text-[11px] text-muted">الأسبوع من الأحد إلى السبت، ويُحسب لشهر يوم السبت. بالساعات يُضرب في أجر الساعة.</p>
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || (!hours.trim() && !amount.trim())} aria-busy={busy}>سجّل الأسبوع</button>
+      <ReadySubmit ready={hours.trim() !== "" || amount.trim() !== ""} busy={busy} size="sm" missing="اكتب ساعات الأسبوع أو مبلغه.">سجّل الأسبوع</ReadySubmit>
     </form>
   );
 }
@@ -411,9 +411,9 @@ export function LinkTransferForm({ tx, employees, defaults, owed }: {
       {badAmount && <p className="text-[11px] font-bold text-danger">مبلغ غير مفهوم في أحد السطور.</p>}
       {blanks > 1 && <p className="text-[11px] font-bold text-warn">اكتب مبلغ كل سطر، أو اترك سطراً واحداً فارغاً ليأخذ الباقي.</p>}
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !ready} aria-busy={busy}>
+      <ReadySubmit ready={ready} busy={busy} size="sm" missing={!parts.every((p) => p.employeeId && p.month) ? "اختر الموظف والشهر لكل سطر." : badAmount ? "اكتب مبلغ كل سطر رقماً صحيحاً." : blanks > 1 ? "اترك سطراً واحداً فقط بلا مبلغ ليأخذ الباقي." : over ? "مجموع الأسطر أكبر من مبلغ الحوالة." : "اكتب المبلغ."}>
         <Link2 className="h-3.5 w-3.5" aria-hidden />{parts.length === 1 ? "وزّع" : parts.length === 2 ? "وزّع على جزأين" : `وزّع على ${parts.length} أجزاء`}
-      </button>
+      </ReadySubmit>
     </form>
   );
 }
@@ -506,7 +506,7 @@ export function AttendancePlaceForm({ current }: { current: { lat: string; lng: 
       </div>
       <p className="text-[11px] text-muted">يمكنك لصق الإحداثيات من خرائط جوجل (مثل 21.6136, 39.1567) في الخانة الأولى.</p>
       <ErrorLine error={error} />
-      <button type="submit" className={buttonClass("primary", "sm")} disabled={busy || !ready} aria-busy={busy}>احفظ الموقع</button>
+      <ReadySubmit ready={ready} busy={busy} size="sm" missing="اكتب خط العرض وخط الطول أرقاماً، مثل 21.5433 و39.1728.">احفظ الموقع</ReadySubmit>
     </form>
   );
 }
