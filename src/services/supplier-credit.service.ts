@@ -32,6 +32,7 @@ import {
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { allocate, createPayment, refreshPaymentStatus } from "./payment.service";
 import { echoHeldPaymentIds } from "./payment-echo.service";
+import { duplicateHandHeldIds } from "./hand-duplicate.service";
 import type { db } from "@/db";
 import { recordAudit } from "@/lib/audit";
 import type { Tx } from "./types";
@@ -152,10 +153,15 @@ export async function applySupplierCredit(
     const only = new Set(options.paymentIds);
     credits = credits.filter((c) => only.has(c.paymentId));
   }
-  /* الخصمُ الآليّ يتنحّى عن حوالةٍ هي صدى سدادٍ مقيَّد — وما يقرّره إنسانٌ (`null`) يمضي */
-  if (options.forwardDays !== null) {
-    const held = await echoHeldPaymentIds(tx, supplierId);
-    credits = credits.filter((c) => !held.has(c.paymentId));
+  /*
+    الخصمُ الآليّ يتنحّى عن حوالةٍ هي صدى سدادٍ مقيَّد، وعن سدادٍ بيدٍ يُظنّ مكرّراً
+    (`hand-duplicate.service.ts`) — وإلّا أغلق فاتورةً لم تُدفع بمالٍ لم يخرج. وما يقرّره
+    إنسانٌ (`null`) يمضي.
+  */
+  if (options.forwardDays !== null && credits.length > 0) {
+    const echo = await echoHeldPaymentIds(tx, supplierId);
+    const dup = await duplicateHandHeldIds(tx, supplierId);
+    credits = credits.filter((c) => !echo.has(c.paymentId) && !dup.has(c.paymentId));
   }
   if (credits.length === 0) return { allocations: [], appliedMinor: 0, creditLeftMinor: 0 };
 

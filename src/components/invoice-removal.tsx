@@ -12,7 +12,7 @@ import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
 
-type Choice = { mode: "release"; reallocate: boolean } | { mode: "move"; targetId: string };
+type Choice = { mode: "release"; reallocate: boolean; voidHand?: boolean } | { mode: "move"; targetId: string };
 
 interface Balance { owedMinor: number; creditLeftMinor: number }
 interface RemovalPreviewView {
@@ -22,13 +22,15 @@ interface RemovalPreviewView {
     allocations: { paymentId: string; amountMinor: number; paidOn: string; method: string; bankLinked: boolean }[];
     allocatedMinor: number;
     statementLines: number;
+    handOnly: { paymentId: string; amountMinor: number; method: string; paidOn: string; hasTwin: boolean }[];
     targets: { id: string; number: string; date: string; totalMinor: number; openMinor: number }[];
     refusal: string | null;
   };
   outcome: {
-    movedMinor: number; reappliedMinor: number; leftAsCreditMinor: number;
+    movedMinor: number; reappliedMinor: number; leftAsCreditMinor: number; voidedMinor: number;
     balance: { before: Balance; after: Balance };
   } | null;
+  choice: Choice;
 }
 
 /** «عليك له» أو «لك عنده» — الرصيدُ بجهته لا بإشارة. */
@@ -52,7 +54,11 @@ export function InvoiceRemoval({ invoiceId, initial = null, redirectTo }: {
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(initial !== null);
-  const [choice, setChoice] = useState<Choice>({ mode: "release", reallocate: false });
+  /*
+    الاختيارُ الفعليّ من الخادم مع كلّ معاينة: سدادٌ بيدٍ له توأمٌ مكرّرٌ على الأرجح، فإلغاؤه
+    مقترَحٌ أوّلَ مرّة (`voidHand` غائب) — ويبقى للمالك أن يُزيله.
+  */
+  const [choice, setChoice] = useState<Choice>(initial?.choice ?? { mode: "release", reallocate: false });
   const [preview, setPreview] = useState<RemovalPreviewView | null>(initial);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,6 +74,7 @@ export function InvoiceRemoval({ invoiceId, initial = null, redirectTo }: {
     }
     setError(null);
     setPreview(r.data);
+    setChoice(r.data.choice);
   }, [invoiceId]);
 
   function choose(c: Choice) {
@@ -140,10 +147,19 @@ export function InvoiceRemoval({ invoiceId, initial = null, redirectTo }: {
                     <span className="mt-0.5 block text-[11px] text-muted">
                       {f.allocations.length > 0 ? "ما خُصّص لها يعود رصيداً لك عند المورّد." : "تخرج من المستحق، ويبقى أثرها في السجل."}
                     </span>
+                    {choice.mode === "release" && (f.handOnly?.length ?? 0) > 0 && (
+                      <label className="mt-2 flex items-start gap-2 text-[11px]">
+                        <input type="checkbox" className="mt-0.5" checked={Boolean(choice.voidHand)} onChange={(e) => choose({ ...choice, voidHand: e.target.checked })} />
+                        <span>
+                          <T s="وألغِ سدادها المسجّل بيدك ({0})، فلا يبقى رصيداً لك عند المورّد لم تدفعه." a={[<Money key="0" minor={f.handOnly.reduce((n, h) => n + h.amountMinor, 0)} />]} />
+                          {f.handOnly.some((h) => h.hasTwin) && <span className="block text-warn">للمورّد سداد آخر بالمبلغ نفسه في الأيام نفسها، فهذا السداد مكرّر على الأرجح.</span>}
+                        </span>
+                      </label>
+                    )}
                     {choice.mode === "release" && f.allocations.length > 0 && (
                       <label className="mt-2 flex items-center gap-2 text-[11px]">
-                        <input type="checkbox" checked={choice.reallocate} onChange={(e) => choose({ mode: "release", reallocate: e.target.checked })} />
-                        ووزّعه بالأقدم أولاً على فواتيره المفتوحة
+                        <input type="checkbox" checked={choice.reallocate} onChange={(e) => choose({ ...choice, reallocate: e.target.checked })} />
+                        {choice.voidHand ? "ووزّع ما بقي بالأقدم أولاً على فواتيره المفتوحة" : "ووزّعه بالأقدم أولاً على فواتيره المفتوحة"}
                       </label>
                     )}
                   </span>
@@ -191,6 +207,7 @@ export function InvoiceRemoval({ invoiceId, initial = null, redirectTo }: {
                     <T s="رصيد {0}: قبل {1} · بعد {2}" a={[f.supplier.name, <BalanceLine key="1" b={o.balance.before} />, <strong key="2"><BalanceLine b={o.balance.after} /></strong>]} />
                     {o.movedMinor > 0 && <> <T s=" · ينتقل {0}" a={[<Money key="0" minor={o.movedMinor} />]} /></>}
                     {o.reappliedMinor > 0 && <> <T s=" · يُوزَّع {0}" a={[<Money key="0" minor={o.reappliedMinor} />]} /></>}
+                    {o.voidedMinor > 0 && <> <T s=" · يُلغى سداد مكرّر {0}" a={[<Money key="0" minor={o.voidedMinor} />]} /></>}
                     {o.leftAsCreditMinor > 0 && <> <T s=" · يبقى رصيداً {0}" a={[<Money key="0" minor={o.leftAsCreditMinor} />]} /></>}
                   </p>
                 ) : (

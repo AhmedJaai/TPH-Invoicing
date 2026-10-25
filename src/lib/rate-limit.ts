@@ -124,7 +124,10 @@ export const RULES: Record<string, RateLimitRule> = {
   /* تُستدعى مع كلّ تعديلٍ في بطاقة الرفع — بلا نموذج */
   "analyze-review": { limit: 600, windowSeconds: 3600 },
   "invoice-replace": { limit: 60, windowSeconds: 3600 },
-  "invoice-merge": { limit: 60, windowSeconds: 3600 },
+  /* معاينةٌ ثمّ دمج — نداءان لكلّ نسخة */
+  "invoice-merge": { limit: 120, windowSeconds: 3600 },
+  /* «دفعةٌ قُيّدت مرّتين بيدك»: معاينةٌ ثمّ إلغاءٌ أو إبقاء */
+  "hand-duplicate": { limit: 120, windowSeconds: 3600 },
   /* حذفُ قيد فاتورة ومعاينتُه — معاينةٌ لكلّ اختيار ثمّ تنفيذ */
   "invoice-remove": { limit: 120, windowSeconds: 3600 },
   "issue-waive": { limit: 120, windowSeconds: 3600 },
