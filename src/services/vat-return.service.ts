@@ -24,6 +24,22 @@ import {
   type VatInvoice, type VatPeriod, type VatQuarter, type VatReturn, type VatTx,
 } from "@/lib/vat-return";
 import { todayInRiyadh, monthEndDay } from "@/lib/riyadh-time";
+import { toCanonical } from "@/lib/bank/canonical";
+
+/**
+ * «جهة بلا اسم» ونصُّ البنك الخامّ («احمد … BEN ID:2149830115 تحويل الى الاهل … مرجع…»)
+ * كانا اسمَي الحركة في الإقرار و«ما قرّرته»، و/bank يقرأ المستفيدَ من النصّ نفسه.
+ */
+function readableBeneficiary(r: { description: string | null; beneficiary_raw: string | null; transaction_type: string | null; value_date: Date; amount_minor: number; direction: "DEBIT" | "CREDIT" }): string | null {
+  return toCanonical({
+    valueDate: r.value_date,
+    description: r.description,
+    beneficiaryRaw: r.beneficiary_raw,
+    transactionType: r.transaction_type,
+    amountMinor: Number(r.amount_minor),
+    direction: r.direction,
+  }).beneficiary;
+}
 import type { Conn } from "./types";
 import { vatInsideGross, vatOnNet } from "@/lib/vat";
 
@@ -255,11 +271,15 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     id: string; day: string; direction: "DEBIT" | "CREDIT"; category: string; amount_minor: number;
     label: string | null; choice: boolean | null; covered: boolean; supplier_has_invoices: boolean;
     description: string | null; bounced: boolean; covering: unknown;
+    named: string | null; beneficiary_raw: string | null; transaction_type: string | null; value_date: Date;
   }>(sql`
     select bt.id,
            to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
            bt.direction::text as direction, bt.category::text as category, bt.amount_minor,
            coalesce(s.name_ar, cp.display_name, nullif(bt.beneficiary_raw, ''), nullif(bt.description, ''), bt.transaction_type) as label,
+           /* الاسمُ المعروف وحده — ونصُّ البنك الخامّ يُقرأ مستفيدُه كما في /bank (\`toCanonical\`) */
+           coalesce(s.name_ar, nullif(cp.display_name, 'جهة بلا اسم')) as named,
+           bt.beneficiary_raw, bt.transaction_type, bt.value_date,
            bt.description,
            c.included as choice,
            (bt.supplier_id is not null and exists (
@@ -295,7 +315,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
       supplierHasInvoices: r.supplier_has_invoices && !r.covered,
       label: r.category === "POS_SETTLEMENT" ? posLabel("تسوية الشبكة", r.description, r.direction)
         : category === "POS_VAT" ? posLabel("ضريبة رسوم الشبكة", r.description, r.direction)
-        : r.label ?? "حركة بلا وصف",
+        : r.named ?? readableBeneficiary(r) ?? r.label ?? "حركة بلا وصف",
       categoryLabel: categoryLabel(category),
       included: isIncluded(base),
       vatMinor: txVat(base),
