@@ -4,7 +4,9 @@
 #   npm run backup:install            ← يثبّت أو يحدّث الجدولة
 #   npm run backup:install -- remove  ← يزيلها (لا يمسّ النسخ المحفوظة)
 #
-# تعمل الساعة ١٣:٠٠ بتوقيت الجهاز. وإن كان الجهاز نائماً عملت حين يصحو.
+# تُستدعى رأسَ كلّ ساعة، والنصُّ يخرج بصمتٍ إن اكتملت نسخةُ اليوم — فيومٌ قطعه
+# نومُ الجهاز أو انقطاعُ الشبكة يُستكمل في الساعة التالية لا في الغد.
+# و`caffeinate` يمنع الجهاز من النوم ما دامت النسخة تعمل.
 set -e
 
 LABEL="com.tph.backup"
@@ -31,6 +33,8 @@ cat > "$PLIST" <<EOF
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-is</string>
     <string>$NODE</string>
     <string>$REPO/node_modules/tsx/dist/cli.mjs</string>
     <string>--env-file=.env</string>
@@ -43,7 +47,7 @@ cat > "$PLIST" <<EOF
     <key>BACKUP_ROOT</key><string>$ROOT</string>
   </dict>
   <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+  <dict><key>Minute</key><integer>0</integer></dict>
   <key>StandardOutPath</key><string>$ROOT/launchd.log</string>
   <key>StandardErrorPath</key><string>$ROOT/launchd.log</string>
   <key>ProcessType</key><string>Background</string>
@@ -54,5 +58,5 @@ EOF
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "✓ النسخة الاحتياطيّة مجدولة كلَّ يوم الساعة ١٣:٠٠ — في $ROOT"
+echo "✓ النسخة الاحتياطيّة مجدولة: كلَّ ساعة حتّى تكتمل نسخةُ اليوم — في $ROOT"
 echo "  تشغيلٌ الآن للتجربة:  launchctl kickstart gui/$(id -u)/$LABEL"

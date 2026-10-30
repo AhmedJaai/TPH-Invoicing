@@ -68,3 +68,46 @@ export function needsDownload(
   if (version === null) return prev.path !== path; // بلا بصمة: لا نعيد التنزيل كلّ يوم
   return prev.version !== version;
 }
+
+/* ── التشغيل كلَّ ساعة حتّى يكتمل اليوم ──
+ * الجهاز يصحو على البطّاريّة دقائقَ ثمّ ينام (DarkWake)، فتنقطع النسخة في منتصفها.
+ * فالجدولة كلَّ ساعة، والنصُّ يخرج بصمتٍ إن اكتمل اليومُ قبله. */
+
+export interface LastRun { lastSuccess?: string | null; successDay?: string | null; notifiedDay?: string | null }
+
+/** يُشغَّل إن لم تكتمل نسخةُ اليوم بعد، أو طُلب ذلك صراحةً. */
+export function shouldRun(last: LastRun, today: string, force: boolean): boolean {
+  return force || last.successDay !== today;
+}
+
+/** إشعارٌ واحد في اليوم على الأكثر، ولا يُزعَج إلّا إن مضى على آخر نسخةٍ كاملة يومٌ ونصف. */
+export const ALERT_AFTER_MS = 36 * 60 * 60 * 1000;
+export function shouldNotify(last: LastRun, today: string, now: Date): boolean {
+  if (last.notifiedDay === today) return false;
+  if (!last.lastSuccess) return true;
+  return now.getTime() - new Date(last.lastSuccess).getTime() > ALERT_AFTER_MS;
+}
+
+/** أيّامٌ ناقصة تسبق آخرَ يومٍ كامل — أجزاؤها مكرَّرةٌ في الكامل بعدها، فتُحذف. */
+export function failedDaysToPrune(days: readonly { day: string; ok: boolean }[]): string[] {
+  const lastOk = days.filter((d) => d.ok).map((d) => d.day).sort().at(-1);
+  if (!lastOk) return [];
+  return days.filter((d) => !d.ok && d.day < lastOk).map((d) => d.day).sort();
+}
+
+/**
+ * رسالةُ الخطأ من مخرجات نصٍّ فرعيّ: سطرُ «✕» أو «Error» إن وُجد — لا آخرُ ثلاثة أسطر،
+ * فقد كانت `}  Node.js v20` ولا تقول شيئاً.
+ */
+export function errorSummary(output: string): string {
+  const lines = output.split("\n").map((l) => l.trim()).filter(Boolean);
+  const hit = lines.find((l) => l.startsWith("✕")) ?? lines.find((l) => /\b\w*Error\b[:]/.test(l));
+  if (hit) return hit.replace(/^✕\s*/, "").slice(0, 300);
+  const tail = lines.filter((l) => !/^Node\.js v\d/.test(l) && !/^[{}]$/.test(l)).slice(-2).join(" ");
+  return tail.slice(0, 300) || "توقّف بلا رسالة";
+}
+
+/** أخطاءُ شبكةٍ عابرة — تُعاد المحاولة لها. وغيرُها (سرٌّ خاطئ، مخطّطٌ تغيّر) لا تُعاد. */
+export function isTransient(message: string): boolean {
+  return /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|EPIPE|socket hang up|Connection terminated|timeout|invalid authentication credentials|\b5\d\d\b|rate ?limit/i.test(message);
+}

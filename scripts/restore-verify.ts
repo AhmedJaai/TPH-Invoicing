@@ -105,7 +105,9 @@ async function main() {
       (cat as unknown as Record<string, unknown[]>)[k] = (await dst.query(q)).rows;
     }
     const schemaDiff = (Object.keys(queries) as (keyof Catalog)[])
-      .filter((k) => md5(JSON.stringify(cat[k])) !== manifest.schema[k]);
+      // نسخةٌ أقدم من قسمٍ أُضيف للفهرس (كالامتدادات) لا تحمل بصمته — فلا يُقارَن.
+      .filter((k) => k in manifest.schema && md5(JSON.stringify(cat[k])) !== manifest.schema[k]);
+    const compared = Object.keys(queries).filter((k) => k in manifest.schema).length;
 
     const actual: Record<string, { n: number; h: string }> = {};
     for (const t of cat.tables) {
@@ -122,7 +124,7 @@ async function main() {
     for (const c of cmp.filter((x) => !x.ok)) {
       console.log(`    ✕ ${c.table}: متوقَّع ${c.expected.n} صفّاً، وُجد ${c.actual?.n ?? "لا جدول"}`);
     }
-    console.log(`  المخطّط: ${schemaDiff.length === 0 ? "مطابق في أقسامه السبعة" : `افترق في: ${schemaDiff.join("، ")}`}`);
+    console.log(`  المخطّط: ${schemaDiff.length === 0 ? `مطابق في أقسامه (${compared})` : `افترق في: ${schemaDiff.join("، ")}`}`);
 
     const ok = matched === cmp.length && schemaDiff.length === 0;
     if (ok && attestBy) {

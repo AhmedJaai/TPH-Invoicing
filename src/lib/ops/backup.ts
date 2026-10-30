@@ -63,7 +63,11 @@ export interface CatalogIndex { sch: string; name: string; def: string }
 export interface CatalogFunction { sch: string; name: string; args: string; def: string }
 export interface CatalogTrigger { sch: string; name: string; def: string }
 
+/** امتدادٌ في القاعدة (pg_trgm للبحث، pgcrypto للمعرّفات) — بلاه لا يُبنى فهرسٌ ولا افتراض. */
+export interface CatalogExtension { name: string; sch: string }
+
 export interface Catalog {
+  extensions: CatalogExtension[];
   enums: CatalogEnum[];
   tables: CatalogTable[];
   columns: CatalogColumn[];
@@ -80,6 +84,9 @@ export interface Catalog {
 export function catalogQueries(schemas: readonly string[] = BACKUP_SCHEMAS): Record<keyof Catalog, string> {
   const inList = schemas.map(lit).join(", ");
   return {
+    // والامتدادات للقاعدة كلّها لا لمخطّطٍ بعينه: pg_trgm في public وفهارسُه في جداولنا.
+    extensions: `select e.extname::text name, n.nspname::text sch from pg_extension e
+                 join pg_namespace n on n.oid = e.extnamespace where e.extname <> 'plpgsql' order by 1`,
     enums: `select n.nspname::text sch, t.typname::text name, array_agg(e.enumlabel::text order by e.enumsortorder) labels
             from pg_type t join pg_enum e on e.enumtypid = t.oid join pg_namespace n on n.oid = t.typnamespace
             where n.nspname in (${inList}) group by n.nspname, t.typname order by 1, 2`,
@@ -116,7 +123,16 @@ export const PRE_DATA_PREAMBLE = "set check_function_bodies = off;";
 export function buildSchemaSql(cat: Catalog, schemas: readonly string[] = BACKUP_SCHEMAS): { pre: string; post: string } {
   const pre: string[] = [PRE_DATA_PREAMBLE];
   for (const s of schemas) if (s !== "public") pre.push(`create schema if not exists ${ident(s)};`);
-  pre.push("create extension if not exists pgcrypto with schema public;");
+  /*
+    كانت pgcrypto وحدها مكتوبةً هنا بيدٍ، فلمّا أُضيف pg_trgm للبحث (073) صارت كلُّ نسخةٍ
+    تسقط عند الاستعادة على فهارسه ‹gin_trgm_ops›. فالامتدادات تُقرأ من القاعدة نفسها.
+  */
+  const exts = new Map<string, string>([["pgcrypto", "public"]]);
+  for (const e of cat.extensions) exts.set(e.name, e.sch);
+  for (const [name, sch] of exts) {
+    if (sch !== "public" && !schemas.includes(sch)) pre.push(`create schema if not exists ${ident(sch)};`);
+    pre.push(`create extension if not exists ${ident(name)} with schema ${ident(sch)};`);
+  }
   for (const e of cat.enums) pre.push(`create type ${qualified(e.sch, e.name)} as enum (${e.labels.map(lit).join(", ")});`);
   for (const f of cat.functions) pre.push(f.def.trim() + ";");
   for (const t of cat.tables) {
