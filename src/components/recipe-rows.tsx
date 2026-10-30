@@ -381,11 +381,18 @@ function RecipePanel({
             type="button"
             onClick={() => void submit("save")}
             disabled={!dirty || empty || busy !== null || changeFrom === ""}
+            title={!dirty ? "عدّل الكمية أو المكوّن أعلاه أولاً" : undefined}
             className={buttonClass("secondary", "sm")}
           >
             احفظ التغيير
           </button>
         </label>
+        {/* الزرُّ المعطَّل يقول لماذا — كان أحمد يختار التاريخ أوّلاً فيظنّ أنّه «لا يقبل» */}
+        {!dirty && !empty && (
+          <p className="basis-full text-[11px] text-muted">
+            عدّل الكمية أو المكوّن في الأسطر أعلاه، أو أضف مكوّناً، ثم اختر التاريخ واضغط «احفظ التغيير». الوصفة القديمة تبقى لما قبل ذلك التاريخ.
+          </p>
+        )}
 
         <ConfirmAction
           label="احذف الوصفة"
