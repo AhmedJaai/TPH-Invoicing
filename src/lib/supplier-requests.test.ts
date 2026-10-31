@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, splitSupplierCredit, type UnbackedPayment, buildPriceRiseMessage, describeRequested, invoiceRequestKey, yearlyQuantity } from "./supplier-requests";
+  buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, splitSupplierCredit, type UnbackedPayment, buildPriceRiseMessage, describeRequested, invoiceRequestKey, statementRequestMonth, yearlyQuantity } from "./supplier-requests";
 
 const pay = (o: Partial<UnbackedPayment> & { paymentId: string }): UnbackedPayment => ({
   supplierId: "g", supplierName: "غاناش", supplierSlug: "Ganache",
@@ -103,5 +103,17 @@ describe("سجلّ المطالبة", () => {
     expect(describeRequested(0)).toBe("طُولب اليوم");
     expect(describeRequested(3)).toBe("طُولب قبل 3 أيام");
     expect(describeRequested(9)).toBe("طُولب قبل 9 أيام، وحان وقت التذكير");
+  });
+});
+
+describe("statementRequestMonth — أيُّ كشفٍ يُطلب اليوم", () => {
+  it("في الأسبوع الأوّل لا يُطلب كشفُ الشهر المنقضي بعد", () => {
+    expect(statementRequestMonth("2026-11-01")).toBe("2026-09");
+    expect(statementRequestMonth("2026-11-07")).toBe("2026-09");
+  });
+  it("بعده يُطلب كشفُ الشهر الماضي، وعبر السنة", () => {
+    expect(statementRequestMonth("2026-11-08")).toBe("2026-10");
+    expect(statementRequestMonth("2027-01-03")).toBe("2026-11");
+    expect(statementRequestMonth("2027-01-20")).toBe("2026-12");
   });
 });

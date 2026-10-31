@@ -178,3 +178,19 @@ export function describeRequested(daysAgo: number): string {
   const when = daysAgo <= 0 ? "اليوم" : daysAgo === 1 ? "أمس" : daysAgo === 2 ? "قبل يومين" : daysAgo <= 10 ? `قبل ${daysAgo} أيام` : `قبل ${daysAgo} يوماً`;
   return daysAgo >= REMIND_AFTER_DAYS ? `طُولب ${when}، وحان وقت التذكير` : `طُولب ${when}`;
 }
+
+/** أيّامٌ بعد آخر الشهر قبل أن يُطلب كشفُه — المورّدُ يُصدره في الأسبوع الأوّل عادةً. */
+export const STATEMENT_GRACE_DAYS = 7;
+
+/**
+ * أيُّ شهرٍ يُطلب كشفُه اليوم — قاعدةٌ واحدة لـ«يحتاج قرارك» و«الكشوف» ومساحة الطلب.
+ * كانت ثلاث نسخٍ من «الشهر الماضي»، فيُقال يومَ ١ نوفمبر «لم يصل كشفُ أكتوبر» ولم يكن
+ * يُنتظر بعد. فقبل اليوم الثامن يُسأل عن الشهر الذي قبله.
+ */
+export function statementRequestMonth(today: string): string {
+  const back = Number(today.slice(8, 10)) > STATEMENT_GRACE_DAYS ? 1 : 2;
+  let [y, m] = today.slice(0, 7).split("-").map(Number);
+  m -= back;
+  while (m < 1) { m += 12; y -= 1; }
+  return `${y}-${String(m).padStart(2, "0")}`;
+}

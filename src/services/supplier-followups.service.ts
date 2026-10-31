@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { alertResolutions } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { groupUnbackedBySupplier, invoiceRequestKey, type UnbackedPayment } from "@/lib/supplier-requests";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
 /** ما دون الريال بقيّةُ تقريبٍ لا دفعةٌ بلا فاتورة. */
 export const UNBACKED_FLOOR_MINOR = 100;
@@ -101,6 +102,18 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
         join suppliers s on s.id = i.supplier_id
        /* من أعلن أنّه لا يصدر كشوفاً لا يطلب منه (044) */
        where s.issues_statements
+         /*
+           وكشفٌ يُطلب ممّن تعامل في الشهر أو بقي له عليك شيء — كان يُطلب من كلّ مورّدٍ له فاتورةٌ
+           يوماً ما: زاكوباك آخرُ فاتورةٍ له ٩ سبتمبر، وسُئل عن كشف أكتوبر.
+         */
+         and (
+           exists (select 1 from invoices im where im.supplier_id = s.id and im.period_month = ${month})
+           or exists (
+             select 1 from invoices io
+              where io.supplier_id = s.id
+                and io.total_minor - coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = io.id), 0) > ${SETTLED_TOLERANCE_MINOR}
+           )
+         )
          and not exists (
          select 1 from statements st
           where st.supplier_id = i.supplier_id

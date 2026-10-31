@@ -1,4 +1,5 @@
 import { whatsappHref } from "@/lib/supplier-edit";
+import { statementRequestMonth } from "@/lib/supplier-requests";
 import Link from "next/link";
 import { DocumentPaper } from "./document-paper";
 import { driveFileUrl } from "@/lib/document-labels";
@@ -21,8 +22,7 @@ import { DOCUMENT, PAYMENT_RECORD, countNoun } from "@/lib/arabic";
 import { needsContract } from "@/lib/supplier-policy-rules";
 import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { loadPendingReview } from "@/services/document-review.service";
-import { previousMonth } from "@/lib/filing";
-import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
+import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
 import { T } from "@/components/i18n/t";
 
@@ -376,7 +376,7 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
 
 /** «مورّدون لم يصل كشفهم» — يُطلَب الكشف من هنا. */
 export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?: boolean }) {
-  const month = previousMonth(currentMonthRiyadh());
+  const month = statementRequestMonth(todayInRiyadh());
   const rows = await loadMissingStatementSuppliers(month);
 
   if (rows.length === 0) {

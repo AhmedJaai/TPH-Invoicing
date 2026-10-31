@@ -3,11 +3,11 @@
  * الحساب في attention.ts دالة خالصة؛ وهذه تجلب أرقامها.
  */
 import { sql } from "drizzle-orm";
+import { statementRequestMonth } from "@/lib/supplier-requests";
 import { db } from "@/db";
 import { bankTransactions, suppliers } from "@/db/schema";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
-import { previousMonth } from "./filing";
 import { currentMonthRiyadh, daysSinceRiyadh, formatDay, isoDay } from "./riyadh-time";
 import { findReversals, reversalKey } from "./bank/reversal";
 import { analyzeCoverage } from "./bank/coverage";
@@ -45,7 +45,6 @@ function vatRiskSilencedSql(today: string) {
 }
 
 export async function gatherAttentionFacts(): Promise<AttentionFacts> {
-  const lastMonth = previousMonth(currentMonthRiyadh());
   const today = todayInRiyadh();
   /*
     الوقائعُ مستقلّةٌ بعضُها عن بعض — تُطلَب معاً لا واحدةً بعد أخرى.
@@ -98,7 +97,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         where i.tax_status='UNKNOWN' order by i.total_minor desc limit 10
       `),
     loadOverdueBalances(db, 60),
-    loadMissingStatementSuppliers(lastMonth),
+    loadMissingStatementSuppliers(statementRequestMonth(today)),
     db.execute<Row>(sql`
         select suppliers.name_ar,
                (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor

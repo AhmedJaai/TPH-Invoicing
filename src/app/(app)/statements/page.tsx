@@ -1,4 +1,5 @@
 import { whatsappHref } from "@/lib/supplier-edit";
+import { statementRequestMonth } from "@/lib/supplier-requests";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, eq, sql } from "drizzle-orm";
@@ -11,8 +12,7 @@ import { PageShell } from "@/components/page-shell";
 import { StatementQuickCheck, StatementReconcile } from "@/components/statement-reconcile";
 import { Callout, Monogram, NoAccess, buttonClass } from "@/components/ui";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
-import { previousMonth } from "@/lib/filing";
-import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
 import { lineHasSameDayInvoice } from "@/services/statement-reconcile.service";
@@ -47,7 +47,7 @@ export default async function StatementsPage({
   }
 
   /* الشهر نفسه الذي يعدّ به التنبيه: المنقضي بتوقيت الرياض */
-  const missingMonth = previousMonth(currentMonthRiyadh());
+  const missingMonth = statementRequestMonth(todayInRiyadh());
 
   const [rows, missing, supplierRows, [monthInvoices]] = await Promise.all([
     db.execute<{
