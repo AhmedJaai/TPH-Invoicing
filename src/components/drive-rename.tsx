@@ -1,5 +1,6 @@
 "use client";
 
+import { NETWORK_ERROR } from "@/lib/http-client";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -44,11 +45,12 @@ export function DriveRename() {
 
   /** يقرأ النصّ قبل أن يدّعي أنّه JSON — فصفحةُ الخطأ لا تنفجر رمزاً. */
   const post = useCallback(async (body: unknown) => {
+    /* انقطاعُ الشبكة يُقال بالعربيّة — كان «Failed to fetch» من المتصفّح كما هو */
     const res = await fetch("/api/drive-rename", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }).catch(() => { throw new Error(NETWORK_ERROR); });
     const text = await res.text();
     let json: (Preview & { error?: string; message?: string }) | null = null;
     try { json = JSON.parse(text) as Preview & { error?: string; message?: string }; }

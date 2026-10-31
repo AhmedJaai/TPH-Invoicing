@@ -1,5 +1,6 @@
 "use client";
 
+import { NETWORK_ERROR } from "@/lib/http-client";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -135,11 +136,12 @@ export function DriveSync() {
         فيقف صاحب العمل أمام نصٍّ لا يدلّه على شيء.
       */
       const post = async (body: unknown) => {
+        /* انقطاعُ الشبكة يُقال بالعربيّة — كان «Failed to fetch» من المتصفّح كما هو */
         const res = await fetch("/api/drive-sync", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(body),
-        });
+        }).catch(() => { throw new Error(NETWORK_ERROR); });
         const text = await res.text();
         let json: (Result & { error?: string }) | null = null;
         try { json = JSON.parse(text) as Result & { error?: string }; } catch { /* ليس JSON */ }
