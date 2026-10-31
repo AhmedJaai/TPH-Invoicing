@@ -228,7 +228,8 @@ export async function loadSoldTotals(periodStart: string, periodEnd: string, con
       /* جوابُ الكاشير عند الردّ — طلبُ المرتجَع نفسُه في مرآة فودكس (FDX ومرجعُه) */
       left join foodics_orders fo on sl.is_refund and fo.reference::text = substring(s.external_id from 5) and s.external_id like 'FDX:%'
      where s.business_date >= ${periodStart} and s.business_date <= ${periodEnd} and not sl.is_modifier
-     group by 1, 2, pp.external_id, pp.product_id, sl.is_refund, 7, (sl.is_void or s.is_void), sl.is_complimentary
+     /* جوابُ الكاشير بتعبيره لا برقم عموده — ترتيبٌ يتغيّر في السطور أعلاه كان يجمع بغيره صامتاً */
+     group by 1, 2, pp.external_id, pp.product_id, sl.is_refund, (case when sl.is_refund then fo.wasted_lines > 0 end), (sl.is_void or s.is_void), sl.is_complimentary
   `);
   return rows.rows.map((r) => {
     const wasted = r.ingredients_wasted === null || r.ingredients_wasted === undefined ? null : Boolean(r.ingredients_wasted);
