@@ -32,7 +32,7 @@ import {
 } from "@/lib/payroll/saudi-rules";
 import { pgErrorCode } from "./guard";
 import { assertMonthsOpen } from "./month-guard";
-import type { Conn } from "./types";
+import type { Conn, Tx } from "./types";
 
 export class PayrollRefused extends Error {
   constructor(message: string) {
@@ -649,10 +649,10 @@ export async function linkTransfer(input: LinkPart & { bankTransactionId: string
  * تحويلُ المالك لنفسه ١١٬٤٥٣ يصير ستّة رواتب بضغطة، ولا يبقى نصفُ توزيعٍ إن رُفض جزء.
  * المجموعُ لا يتجاوز ما بقي من الحوالة (هنا ثمّ في مؤثِّر القاعدة)، وكلُّ جزءٍ يمرّ بحرّاسه.
  */
-export async function splitTransfer(bankTransactionId: string, parts: readonly LinkPart[], actorId: string): Promise<number[]> {
+export async function splitTransfer(bankTransactionId: string, parts: readonly LinkPart[], actorId: string, conn?: Tx): Promise<number[]> {
   if (parts.length === 0) throw new PayrollRefused("أضف سطراً واحداً على الأقل.");
   if (parts.filter((p) => p.amountMinor === null).length > 1) throw new PayrollRefused("اكتب مبلغ كل سطر، وسطراً واحداً على الأكثر يأخذ الباقي.");
-  return db.transaction(async (t) => {
+  const run = async (t: Tx): Promise<number[]> => {
     const tx = (await t.execute<{ amount_minor: number; direction: string; category: string; month: string; linked: string; description: string | null; beneficiary: string | null }>(sql`
       select bt.amount_minor, bt.direction::text as direction, bt.category::text as category,
              bt.description, bt.beneficiary_raw as beneficiary,
@@ -687,7 +687,8 @@ export async function splitTransfer(bankTransactionId: string, parts: readonly L
       await recordAudit({ actorId, action: "PAYROLL_LINKED", entityType: "payroll_link", entityId: row.id, before: null, after: { ...p, bankTransactionId, amountMinor: amounts[i] } }, t);
     }
     return amounts;
-  });
+  };
+  return conn ? run(conn) : db.transaction(run);
 }
 
 /**
@@ -713,8 +714,8 @@ export async function linkSuggested(txIds: readonly string[], since: string, act
   return { linked, skipped };
 }
 
-export async function unlinkTransfer(id: string, actorId: string): Promise<boolean> {
-  return db.transaction(async (t) => {
+export async function unlinkTransfer(id: string, actorId: string, conn?: Tx): Promise<boolean> {
+  const run = async (t: Tx): Promise<boolean> => {
     const [link] = await t.select().from(payrollLinks).where(and(eq(payrollLinks.id, id), isNull(payrollLinks.voidedAt))).limit(1);
     if (!link) return false;
     if (link.purpose === "LOAN") {
@@ -726,7 +727,8 @@ export async function unlinkTransfer(id: string, actorId: string): Promise<boole
     await t.update(payrollLinks).set({ voidedAt: new Date(), voidedById: actorId }).where(eq(payrollLinks.id, id));
     await recordAudit({ actorId, action: "PAYROLL_UNLINKED", entityType: "payroll_link", entityId: id, before: link, after: null }, t);
     return true;
-  });
+  };
+  return conn ? run(conn) : db.transaction(run);
 }
 
 /** أوّلُ يومٍ تُعرض منه الحوالاتُ المفتوحة: أوّلُ الشهر الذي قبل المعروض. */
