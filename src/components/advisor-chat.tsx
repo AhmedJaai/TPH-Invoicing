@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, CircleDashed, FileSearch, MessageSquarePlus, RotateCcw, Send, Sparkles, Target, Trash2, X } from "lucide-react";
+import { countNoun, DAY } from "@/lib/arabic";
 import { postJson, request } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { ReadySubmit, toast } from "./ui-client";
@@ -184,7 +185,10 @@ export function AdvisorWorkspace({
                 ) : m.status === "FAILED" ? (
                   <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-xs leading-relaxed text-danger">
                     <span>{m.error ?? "تعذّر إكمال الجواب."}</span>
-                    <button type="button" className={buttonClass("secondary", "sm")} onClick={() => void retry(m.id)}><RotateCcw className="h-3.5 w-3.5" aria-hidden />أعد المحاولة</button>
+                    {/* آخرُ جوابٍ وحده يُعاد — ما بعده سؤالٌ أحدث يُسأل من جديد */}
+                    {m.id === messages.at(-1)?.id
+                      ? <button type="button" className={buttonClass("secondary", "sm")} onClick={() => void retry(m.id)}><RotateCcw className="h-3.5 w-3.5" aria-hidden />أعد المحاولة</button>
+                      : <span className="text-muted">اسأله من جديد في آخر المحادثة إن احتجته</span>}
                   </div>
                 ) : (
                   <>
@@ -244,7 +248,7 @@ export function AdvisorWorkspace({
         <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-1.5 text-sm font-bold"><Target className="h-4 w-4 text-accent" aria-hidden />الخطة</h2>
-            <span className="text-[11px] text-muted">{open.length === 0 ? "لا بنود مفتوحة" : `${open.length} مفتوح`}</span>
+            <span className="text-[11px] text-muted">{open.length === 0 ? "لا بنود مفتوحة" : `مفتوح: ${open.length}`}</span>
           </div>
           {plan.length === 0 ? (
             <p className="mt-2 text-xs leading-relaxed text-muted">حين تتفق مع المستشار على خطوة، يكتبها هنا بأفقها ومؤشرها ويسألك عنها لاحقاً.</p>
@@ -253,7 +257,7 @@ export function AdvisorWorkspace({
               {[...open, ...closed].map((p) => (
                 <li key={p.id} className={`rounded-xl border border-line-soft p-3 ${p.status !== "OPEN" ? "opacity-60" : ""}`}>
                   <p className={`text-[13px] font-bold leading-relaxed ${p.status === "DONE" ? "line-through" : ""}`}>{p.title}</p>
-                  <p className="mt-0.5 text-[11px] text-muted">{p.horizonDays} يوماً{p.metric ? ` · يُقاس بـ${p.metric}` : ""}</p>
+                  <p className="mt-0.5 text-[11px] text-muted">{countNoun(p.horizonDays, DAY)}{p.metric ? ` · يُقاس بـ${p.metric}` : ""}</p>
                   {p.detail && <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{p.detail}</p>}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {p.status === "OPEN" ? (

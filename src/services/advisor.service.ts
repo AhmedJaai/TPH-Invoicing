@@ -6,7 +6,7 @@
  * جولاتٍ معدودة — ثمّ يجيب. وكلُّ حقيقةٍ رآها تُجمَع، فيُوسَم كلُّ رقمٍ في جوابه: من
  * دفاترك أو عامّ (`verify.ts`). والفشلُ لا يترك نصفَ دور: رسالتُه تُمحى ويقال السبب.
  */
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { advisorMessages, advisorPlanItems, advisorThreads } from "@/db/schema";
 import { callDeepseek, type DeepseekMessage } from "@/lib/ai/deepseek";
@@ -151,7 +151,7 @@ export async function loadAnswerStatus(id: string): Promise<PendingView | null> 
     id: m.id,
     status: stale ? "FAILED" : m.status,
     steps: m.steps ?? [],
-    error: stale ? "انقطع العمل على هذا الجواب قبل أن يكتمل. أعد إرسال سؤالك." : m.error,
+    error: stale ? "انقطع العمل على هذا الجواب قبل أن يكتمل. أعد المحاولة." : m.error,
   };
 }
 
@@ -217,12 +217,25 @@ export async function runAdvisorJob(input: TurnInput & { threadId: string; pendi
   }
 }
 
-/** «أعد المحاولة»: الجوابُ الذي تعذّر يعود «يعمل» على السؤال نفسه. */
-export async function retryAnswer(pendingId: string): Promise<{ threadId: string } | null> {
-  const rows = await db.update(advisorMessages).set({ status: "PENDING", error: null, steps: [], createdAt: new Date() })
-    .where(and(eq(advisorMessages.id, pendingId), eq(advisorMessages.status, "FAILED")))
-    .returning({ threadId: advisorMessages.threadId });
-  return rows[0] ?? null;
+/**
+ * «أعد المحاولة»: الجوابُ الذي تعذّر — أو انقطع وهو «يعمل» — يعود «يعمل» على السؤال نفسه.
+ * وآخرُ رسالةٍ في المحادثة وحدها: كان يُعاد جوابٌ قديم فيُكتب بعد سؤالٍ أحدث ويُجيب عنه.
+ * والمنقطعُ يبقى «يعمل» في القاعدة (لا يعرف أنّه قُتل)، فكان الزرُّ يُرفض بـ«لم يتعذّر».
+ */
+export async function retryAnswer(pendingId: string): Promise<{ threadId: string } | "not-last" | null> {
+  return db.transaction(async (t) => {
+    const [m] = await t.select({ threadId: advisorMessages.threadId, status: advisorMessages.status, createdAt: advisorMessages.createdAt })
+      .from(advisorMessages).where(and(eq(advisorMessages.id, pendingId), eq(advisorMessages.role, "assistant"))).limit(1).for("update");
+    if (!m) return null;
+    const stale = m.status === "PENDING" && Date.now() - m.createdAt.getTime() > STALE_PENDING_MS;
+    if (m.status !== "FAILED" && !stale) return null;
+    const [newer] = await t.select({ id: advisorMessages.id }).from(advisorMessages)
+      .where(and(eq(advisorMessages.threadId, m.threadId), gt(advisorMessages.createdAt, m.createdAt))).limit(1);
+    if (newer) return "not-last" as const;
+    await t.update(advisorMessages).set({ status: "PENDING", error: null, steps: [], createdAt: new Date() })
+      .where(eq(advisorMessages.id, pendingId));
+    return { threadId: m.threadId };
+  });
 }
 
 class AdvisorFailed extends Error {}

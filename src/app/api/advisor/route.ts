@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
     if ("retry" in body) {
       const again = await retryAnswer(body.retry);
+      if (again === "not-last") return NextResponse.json({ error: "بعد هذا الجواب سؤالٌ أحدث. اسأل سؤالك من جديد في آخر المحادثة" }, { status: 409 });
       if (!again) return NextResponse.json({ error: "هذا الجواب لم يتعذّر، أو لم يعد موجوداً. حدّث الصفحة" }, { status: 409 });
       after(() => withDeadline(JOB_BUDGET_MS, () => runAdvisorJob({
         threadId: again.threadId, pendingId: body.retry, message: "", user: { id: user.id, role: user.role }, canSeePayroll,

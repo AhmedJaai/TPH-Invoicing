@@ -101,19 +101,19 @@ export interface CafePerformance {
 export async function loadPerformance(opts: { canSeePayroll: boolean }): Promise<CafePerformance> {
   const today = todayInRiyadh();
   const yesterday = addDays(today, -1);
-  const [series, last30, previous30, since, outlook, balances] = await Promise.all([
+  const returnsFrom = addDays(today, -90);
+  const [series, last30, previous30, since, outlook, balances, returns] = await Promise.all([
     loadPnlSeries(),
     loadServiceSpeed(addDays(today, -30), yesterday),
     loadServiceSpeed(addDays(today, -60), addDays(today, -31)),
     loadSpeedSince(),
     loadCashOutlook({ canSeePayroll: opts.canSeePayroll }),
     loadBalanceTotals(),
+    loadReturnsWitness(returnsFrom, yesterday),
   ]);
   const months = series.map(kpiOf).sort((a, b) => a.month.localeCompare(b.month));
   const thisMonth = currentMonthRiyadh();
   const finished = months.filter((m) => m.month < thisMonth && m.revenueMinor !== null);
-  const returnsFrom = addDays(today, -90);
-  const returns = await loadReturnsWitness(returnsFrom, yesterday);
   return {
     months,
     latest: finished.at(-1) ?? null,

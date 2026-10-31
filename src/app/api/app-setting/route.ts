@@ -24,15 +24,17 @@ const Body = z.discriminatedUnion("setting", [
 ]);
 
 export async function POST(request: Request) {
-  let user;
   try {
-    user = await guard("app-setting", "bank:edit");
+    return await save(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
 
+async function save(request: Request) {
+  const user = await guard("app-setting", "bank:edit");
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
   const body = read.body;

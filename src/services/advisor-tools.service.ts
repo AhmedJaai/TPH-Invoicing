@@ -7,7 +7,7 @@
  * ارتفاع الأسعار — أرقامه مضلّلة») ولا هوامشَ أصنافٍ تقوم عليها. والكتابةُ الوحيدة بندٌ في
  * خطّته — نصٌّ لا مال.
  */
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { advisorPlanItems, suppliers } from "@/db/schema";
@@ -187,13 +187,13 @@ const TOOLS = [
       const w = await loadServiceSpeed(addDays(today, -days), addDays(today, -1));
       const s = w.speed;
       const f = new FactList();
-      f.count(`طلبات قيس زمن تحضيرها في آخر ${days} يوماً`, s.measured);
+      f.count(`طلبات قيس زمن تحضيرها في آخر ${countNoun(days, DAY)}`, s.measured);
       f.count(`طلبات مقفلة في الفترة نفسها`, w.closedOrders);
       /*
         طلبٌ لم يُقرأ وقتُه بعد (`wasted_lines` فارغٌ معه — قُرئ قبل ٠٩٣) نقصٌ في القراءة لا في المقهى.
         حكم المستشارُ مرّةً على «طلبين» أنّ الشاشة «غير مفعّلة» والشاشةُ على ٩٤٪ من الطلبات.
       */
-      if (w.unread > 0) f.note("أوقات لم تُقرأ بعد", `${w.unread} طلباً من ${w.closedOrders} لم يُقرأ وقت شاشته من فودكس بعد (تعبئةٌ لم تُشغَّل). هذا نقصٌ في قراءة النظام لا في المقهى: لا تقل إنّ الشاشة غير مستعملة ولا تحكم على السرعة من الباقي`);
+      if (w.unread > 0) f.note("أوقات لم تُقرأ بعد", `${countNoun(w.unread, ORDER)} من ${w.closedOrders} لم يُقرأ وقت شاشته من فودكس بعد (تعبئةٌ لم تُشغَّل). هذا نقصٌ في قراءة النظام لا في المقهى: لا تقل إنّ الشاشة غير مستعملة ولا تحكم على السرعة من الباقي`);
       else if (s.measured < 100) f.note("حجم العيّنة", "صغيرة: لا يُحكم منها على سرعة الخدمة");
       f.count(`زمن التحضير بالثواني — الوسيط`, s.medianSec);
       f.count(`زمن التحضير بالثواني — العُشر الأبطأ يتجاوز`, s.p90Sec);
@@ -260,7 +260,8 @@ const TOOLS = [
       const f = new FactList();
       const m = formatMonth(month);
       f.count(`${m} — عدد الموظّفين في المسيّر`, p.rows.length);
-      f.sar(`${m} — مجموع المستحقّ للموظّفين`, p.rows.every((r) => r.slip.dueMinor !== null) ? p.rows.reduce((s, r) => s + (r.slip.dueMinor ?? 0), 0) : null);
+      /* مسيّرٌ فارغ لا يقول «مجموعه صفر» — لم يُدخَل فيه أحدٌ بعد */
+      f.sar(`${m} — مجموع المستحقّ للموظّفين`, p.rows.length > 0 && p.rows.every((r) => r.slip.dueMinor !== null) ? p.rows.reduce((s, r) => s + (r.slip.dueMinor ?? 0), 0) : null);
       for (const r of p.rows) {
         f.sar(`${m} — مستحقّ ${r.employee.name} (${r.employee.kind === "PART_TIME" ? "جزئيّ" : "شهريّ"})`, r.slip.dueMinor);
         f.sar(`${m} — حُوّل لـ${r.employee.name}`, r.slip.paidMinor);
@@ -323,6 +324,14 @@ const TOOLS = [
       metric: z.string().trim().max(200).optional(),
     }),
     run: async (a, ctx) => {
+      /* إعادةُ المحاولة تعيد الجولات من أوّلها — فالبندُ المفتوح بالعنوان نفسه لا يُكتب مرّتين */
+      const [same] = await db.select({ id: advisorPlanItems.id }).from(advisorPlanItems)
+        .where(and(eq(advisorPlanItems.status, "OPEN"), eq(advisorPlanItems.title, a.title))).limit(1);
+      if (same) {
+        const f = new FactList();
+        f.note("في الخطّة من قبل", `${a.title} — ${same.id}`);
+        return { facts: f.facts, label: "يراجع الخطّة" };
+      }
       const [row] = await db.insert(advisorPlanItems).values({
         title: a.title, detail: a.detail ?? null, horizonDays: a.horizon_days, metric: a.metric ?? null,
         threadId: ctx.threadId, createdById: ctx.userId,
@@ -371,7 +380,7 @@ export async function runAdvisorTool(name: string, rawArgs: string, ctx: ToolCon
   } catch (e) {
     console.error(`[advisor] ${name}:`, (e as Error).message);
     f.note("تعذّرت القراءة", "لم تُقرأ هذه البيانات الآن — قل ذلك ولا تخمّن رقمها");
-    return { facts: f.facts, label: spec.name };
+    return { facts: f.facts, label: "تعذّرت قراءة مصدر" };
   }
 }
 
