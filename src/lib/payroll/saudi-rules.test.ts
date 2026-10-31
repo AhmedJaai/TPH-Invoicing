@@ -95,6 +95,13 @@ describe("مخالفات الشهر من الحضور", () => {
     ]);
     expect(r.capped.chargedMinor).toBe(13_000);
   });
+  it("تأخيرُ ٢٧ أكتوبر يُحسم من راتب نوفمبر لا أكتوبر — صُرف أكتوبر يومَ ٢٧ (قرار أحمد)", () => {
+    const history = [late("a", "2026-10-26", 12), late("b", "2026-10-27", 12)];
+    const oct = monthViolations({ month: "2026-10", monthlyMinor: SALARY, graceMinutes: 5, daysOff: "", history, manual: [] });
+    const nov = monthViolations({ month: "2026-11", monthlyMinor: SALARY, graceMinutes: 5, daysOff: "", history, manual: [] });
+    expect(oct.items.map((v) => v.day)).toEqual(["2026-10-26"]);
+    expect(nov.items.map((v) => v.day)).toEqual(["2026-10-27"]);
+  });
   it("غياب أكثر من عشرة أيام متصلة: المادة ٨٠ لا جزاء مالي", () => {
     const days = Array.from({ length: 11 }, (_, i) => absent(`a${i}`, `2026-10-${String(i + 1).padStart(2, "0")}`));
     const r = monthViolations({ month: "2026-10", monthlyMinor: SALARY, graceMinutes: 0, daysOff: "", history: days, manual: [] });

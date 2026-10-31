@@ -19,6 +19,7 @@ import { ADJUSTMENT_LABEL, endOfService, formatMinutes, PURPOSE_LABEL, rateFor, 
 import { WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { OBLIGATION_KIND_LABEL, isObligationKind } from "@/lib/obligations";
 import {
   loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadOpenTransfers, loadPayrollMonth, transfersSince,
@@ -61,7 +62,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     loadEmployeeLinks(id),
     loadEmployeeDocuments(id),
     loadOpenTransfers(transfersSince(month)),
-    loadCheckins(`${month}-01`, monthEndDay(month)),
+    /* تسجيلاتُ فترة الخصم — هي ما يُحسب منه تأخيرُ الشهر */
+    loadCheckins(deductionPeriod(month).from, deductionPeriod(month).to),
     loadEmployeeHistory(id, workMonths.slice(0, 24)),
   ]);
   const row = sheet.rows.find((r) => r.employee.id === id);
@@ -175,6 +177,13 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               {employee.kind === "MONTHLY" ? (
                 <Card>
                   <h2 className="mb-3 text-sm font-bold">تأخير، انصراف مبكر، غياب، إجازة</h2>
+                  {/* بعد يوم الصرف: ما يُسجَّل اليوم لا يظهر في هذا الشهر — يُقال قبل أن يُبحث عنه */}
+                  {deductionMonthOf(defaultDay) !== month && (
+                    <p className="mb-3 rounded-lg bg-sunken/60 px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
+                      صُرف راتب {formatMonth(month)} يوم {PAYDAY}، فما تسجّله من {formatDay(addDays(deductionPeriod(month).to, 1))} يُحسم من راتب {formatMonth(deductionMonthOf(defaultDay))}.{" "}
+                      <Link href={`/payroll/employee/${id}?month=${deductionMonthOf(defaultDay)}`} className="font-bold text-accent hover:underline">افتح {formatMonth(deductionMonthOf(defaultDay))}</Link>
+                    </p>
+                  )}
                   <DayForm employeeId={id} salaryMinor={rate} shiftMinutes={employee.shiftMinutes} graceMinutes={employee.lateGraceMinutes} defaultDay={defaultDay} />
                 </Card>
               ) : (
@@ -190,7 +199,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       )}
 
       {row && (row.adjustments.length > 0 || row.attendance.length > 0 || row.weeks.length > 0) && (
-        <Section title="بنود الشهر" icon={CalendarClock} count={row.adjustments.length + row.attendance.length + row.weeks.length}>
+        <Section title="بنود الشهر" icon={CalendarClock} count={row.adjustments.length + row.attendance.length + row.weeks.length} hint={`الحضور والمخالفات من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}، فالراتب يُصرف يوم ${PAYDAY} وما بعده يُحسم من الشهر القادم.`}>
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {row.adjustments.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">

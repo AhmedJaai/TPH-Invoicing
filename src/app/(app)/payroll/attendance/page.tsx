@@ -11,7 +11,8 @@ import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/form
 import { Badge, Callout, Card, DataTable, EmptyState, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { activeIn } from "@/lib/payroll/calc";
 import { isWorkday, riyadhClock, trusted, VERDICT_LABEL, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
-import { addDays, formatDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
+import { deductionMonthOf, deductionPeriod } from "@/lib/payroll/period";
 import {
   loadAttendanceSettings, loadCheckins, loadEmployees, loadPayrollMonth, loadUnreviewedCheckins, type CheckinView, type EmployeeView,
 } from "@/services/payroll.service";
@@ -42,7 +43,9 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const q = await searchParams;
   const today = todayInRiyadh();
   const day = q.day && DAY_RE.test(q.day) && q.day <= today ? q.day : today;
-  const month = day.slice(0, 7);
+  /* اليومُ يُقرأ من مسيّر الراتب الذي يُحسم منه: ما وقع من ٢٧ فصاعداً لراتب الشهر القادم (`period.ts`) */
+  const month = deductionMonthOf(day);
+  const period = deductionPeriod(month);
 
   const [list, settings, checkins, unreviewed, sheet] = await Promise.all([
     loadEmployees(),
@@ -51,7 +54,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     loadUnreviewedCheckins(),
     loadPayrollMonth(month),
   ]);
-  const working = list.filter((e) => activeIn(e, month) && e.hiredOn <= day && (!e.leftOn || e.leftOn >= day));
+  /* من يعمل يومَها بشهر اليوم نفسه — لا بشهر الخصم: من خرج ٣١ أكتوبر يعمل يومَ ٢٨ منه */
+  const working = list.filter((e) => activeIn(e, day.slice(0, 7)) && e.hiredOn <= day && (!e.leftOn || e.leftOn >= day));
   const names = new Map(list.map((e) => [e.id, e.name]));
   const board: BoardRow[] = working.map((employee) => {
     const mine = checkins.filter((c) => c.employeeId === employee.id && c.review !== "REJECTED");
@@ -160,7 +164,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       </Section>
 
       {monthRows.length > 0 && (
-        <Section title="الشهر حتى الآن" icon={CalendarDays} hint="ما يتراكم على كل موظف ويُخصم في المسيّر.">
+        <Section title={`فترة خصم راتب ${formatMonth(month)} حتى الآن`} icon={CalendarDays} hint={`ما وقع من ${formatDay(period.from)} إلى ${formatDay(period.to)} ويُحسم من راتب ${formatMonth(month)} يوم ${formatDay(addDays(period.to, 1))}.`}>
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {monthRows.map((r) => (
               <li key={r.employee.id}>

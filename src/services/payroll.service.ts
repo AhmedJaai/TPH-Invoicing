@@ -9,6 +9,7 @@
  * وليس كلُّ ما حوّله المالكُ لنفسه شخصيّاً (بعضُه رواتب دفعها منه). والحوالةُ الواحدة تُقسَم.
  * والمبلغُ يُحسب في الخادم من الحوالة، والقاعدةُ ترفض ما يتجاوزها (084).
  */
+import { deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -147,7 +148,7 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
   const first = sorted[0], last = sorted[sorted.length - 1];
   const lastDay = monthEndDay(last);
   /* التكرارُ يُعدّ من ١٨٠ يوماً قبل المخالفة — فيُقرأ ما قبل أوّل شهرٍ بقدرها وفوقه سلسلةٌ أطول */
-  const historyFrom = addDays(`${first}-01`, -(REPEAT_WINDOW_DAYS * 2));
+  const historyFrom = addDays(deductionPeriod(first).from, -(REPEAT_WINDOW_DAYS * 2));
   const firstWeek = weekStartOf(`${first}-01`);
   const monthList = sql.join(sorted.map((m) => sql`${m}`), sql`, `);
   const [list, adjAll, attAll, weeksAll, linksAll, loans, manualAll] = await Promise.all([
@@ -161,13 +162,14 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
   ]);
   const manualIds = new Set(manualAll.map((v) => v.id));
   return months.map((month) => {
-    const monthEnd = monthEndDay(month);
+    /* الحضورُ والمخالفاتُ بفترة الخصم لا بالشهر: من ٢٧ السابق إلى ٢٦ منه (`period.ts`) */
+    const period = deductionPeriod(month);
     const adj = adjAll.filter((a) => a.month === month);
     const links = linksAll.filter((l) => l.month === month);
-    const att = attAll.filter((a) => a.day >= `${month}-01` && a.day <= monthEnd);
-    /* التاريخُ حتى آخر الشهر وحده — مخالفةٌ بعده لا تُشدّد جزاءَ ما قبلها */
-    const history = attAll.filter((a) => a.day <= monthEnd);
-    const manualHistory = manualAll.filter((v) => v.day <= monthEnd);
+    const att = attAll.filter((a) => a.day >= period.from && a.day <= period.to);
+    /* التاريخُ حتى آخر الفترة وحده — مخالفةٌ بعدها لا تُشدّد جزاءَ ما قبلها */
+    const history = attAll.filter((a) => a.day <= period.to);
+    const manualHistory = manualAll.filter((v) => v.day <= period.to);
     const rows: PayrollRow[] = [];
     for (const employee of list) {
       const mine = <T extends { employeeId: string }>(xs: readonly T[]) => xs.filter((x) => x.employeeId === employee.id);
@@ -993,8 +995,8 @@ export async function loadPayrollAttentionFacts(today: string, conn: Conn = db):
       loadEmployees(conn),
     ]);
     const salary = open.filter((o) => !o.viaOwner);
-    /* من يوم ٢٥ يُسأل عن رواتب الشهر الجاري، وقبله عن الماضي */
-    const owedMonth = Number(today.slice(8, 10)) >= 25 ? month : addDays(`${month}-01`, -1).slice(0, 7);
+    /* من يوم الصرف (٢٧) يُسأل عن رواتب الشهر الجاري، وقبله عن الماضي */
+    const owedMonth = Number(today.slice(8, 10)) >= PAYDAY ? month : addDays(`${month}-01`, -1).slice(0, 7);
     let owed: PayrollAttentionFacts["owed"] = null;
     if (list.some((e) => activeIn(e, owedMonth))) {
       const sheet = await loadPayrollMonth(owedMonth, conn);

@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import { deductionPeriod } from "@/lib/payroll/period";
+import { DAY, MINUTE, countNoun } from "@/lib/arabic";
 import { ArrowRight } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -33,8 +35,8 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
     [row.employee.kind === "PART_TIME" ? "أجر الأسابيع" : s.days && s.days.worked < s.days.of ? `الراتب (${s.days.worked} من ${s.days.of} يوماً)` : "الراتب الشهري", money(s.baseMinor)],
     ...row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `+ ${money(a.amountMinor)}`]),
     ...row.adjustments.filter((a) => a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `− ${money(a.amountMinor)}`]),
-    ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`أجر دقائق التأخير والانصراف (${s.lateMinutes + s.earlyMinutes} دقيقة)`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
-    ...(s.absentDays > 0 ? [[`أجر أيام الغياب (${s.absentDays} يوم)`, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
+    ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`أجر دقائق التأخير والانصراف (${countNoun(s.lateMinutes + s.earlyMinutes, MINUTE)})`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
+    ...(s.absentDays > 0 ? [[`أجر أيام الغياب (${countNoun(s.absentDays, DAY)})`, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
     ...row.violations.filter((v) => !v.waived).map((v): [string, string] => [
       `${v.detail} ${formatDay(v.day)} — البند ${v.code} من لائحة تنظيم العمل، المرة ${ORDINAL[Math.min(v.occurrence, 4) - 1]}: ${penaltyLabel(v.penalty)}`,
       v.amountMinor === null ? "—" : v.amountMinor === 0 ? "إنذار" : `− ${money(v.amountMinor)}`,
@@ -54,6 +56,8 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
           <div>
             <p className="text-xs text-muted">مؤسسة ذا بوبليك هاوس</p>
             <h2 className="text-lg font-bold">قسيمة راتب {formatMonth(month)}</h2>
+            {/* الحضورُ والمخالفات بفترة الخصم (`period.ts`) — يُقرأ في القسيمة لا يُستنتج */}
+            <p className="mt-0.5 text-[11px] text-muted">الحضور والمخالفات من {formatDay(deductionPeriod(month).from)} إلى {formatDay(deductionPeriod(month).to)}</p>
           </div>
           <BrandMark className="h-10 w-auto text-accent" />
         </header>

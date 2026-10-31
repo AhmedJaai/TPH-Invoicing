@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { redirect } from "next/navigation";
 import { ArrowLeftRight, Download, Info, Link2, ReceiptText, UserPlus, Users } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -145,7 +146,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     <PageShell
       user={user}
       title="مسيّر الرواتب"
-      intro="كم يستحق كل موظف هذا الشهر بعد الخصومات والسلف، وكم حوّلت له، وكم بقي."
+      intro={`كم يستحق كل موظف عن ${formatMonth(month)} بعد الخصومات والسلف، وكم حوّلت له، وكم بقي. الراتب يُصرف يوم ${PAYDAY}، والخصومات عمّا وقع من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}
       actions={
         <>
           <a href={`/api/payroll/export?month=${month}`} download className={buttonClass("quiet", "sm")}><Download className="h-3.5 w-3.5" aria-hidden />تنزيل المسيّر</a>

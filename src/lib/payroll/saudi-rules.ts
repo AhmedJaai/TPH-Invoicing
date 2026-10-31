@@ -17,6 +17,7 @@
  * والجدولُ حدٌّ أعلى: لصاحب العمل أن يعفو (`waived`)، فلا يُحسم الجزاءُ ولا يُعدّ في التكرار.
  * نقيّ: المالُ هللاتٌ صحيحة.
  */
+import { inDeductionPeriod } from "./period";
 import type { AttendanceKind } from "@/db/schema";
 import { isoDay } from "@/lib/riyadh-time";
 import { isWorkday } from "./attendance";
@@ -275,7 +276,7 @@ export function countsAsLate(minutes: number, graceMinutes: number): boolean {
 
 /**
  * مخالفاتُ الشهر وجزاؤها: من سجلّ الحضور (تأخير · انصراف · غياب) ومن المسجَّل بيده، والتاريخُ
- * كلُّه (١٨٠ يوماً قبل الشهر على الأقلّ) لعدّ المرّات. يُرجع ما وقع في الشهر وحده بعد الحدود.
+ * كلُّه (١٨٠ يوماً قبل الشهر على الأقلّ) لعدّ المرّات. يُرجع ما وقع في فترة خصم الشهر وحدها بعد الحدود.
  */
 export function monthViolations(input: {
   month: string;
@@ -299,10 +300,11 @@ export function monthViolations(input: {
   const article80: { start: string; days: number }[] = [];
   for (const spell of absenceSpells(absences, (d) => isWorkday(d, input.daysOff))) {
     const code = absenceCode(spell.days);
-    if (code === "ART80") { if (spell.start.slice(0, 7) === input.month) article80.push({ start: spell.start, days: spell.days }); continue; }
+    if (code === "ART80") { if (inDeductionPeriod(spell.start, input.month)) article80.push({ start: spell.start, days: spell.days }); continue; }
     events.push({ id: spell.id, code, day: spell.start, waived: waivedById.get(spell.id) ?? false, detail: spell.days === 1 ? "غاب يوماً" : spell.days === 2 ? "غاب يومين متتاليين" : `غاب ${spell.days} أيام متتالية` });
   }
   for (const m of input.manual) events.push({ id: m.id, code: m.code, day: m.day, waived: m.waived, detail: m.note ?? RULES[m.code]?.label ?? m.code });
-  const items = assess(events, daily).filter((v) => v.day.slice(0, 7) === input.month);
+  /* ما وقع في فترة خصم الشهر (٢٧ السابق → ٢٦ منه) — `period.ts` */
+  const items = assess(events, daily).filter((v) => inDeductionPeriod(v.day, input.month));
   return { items, capped: capPenalties(items, daily), article80 };
 }

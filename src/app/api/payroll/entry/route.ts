@@ -9,6 +9,8 @@ import { isAdjustmentKind, parseHours } from "@/lib/payroll/calc";
 import { isViolationCode } from "@/lib/payroll/saudi-rules";
 import { Amount, Day, Id, Month, Note, positiveMinor } from "@/lib/payroll/request";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { formatMonth } from "@/lib/riyadh-time";
+import { deductionMonthOf } from "@/lib/payroll/period";
 import { failWith, guard } from "@/services/guard";
 import {
   addAdjustment, addViolation, clearAttendance, clearWeek, PayrollRefused, setAttendance, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
@@ -48,11 +50,11 @@ export async function POST(request: Request) {
       }
       case "day": {
         await setAttendance({ employeeId: b.employeeId, day: b.day, kind: b.kind, minutes: b.minutes ?? null, note: b.note, disrupted: b.disrupted }, user.id);
-        return NextResponse.json({ ok: true, message: "سُجّل اليوم، ويتراكم على الشهر" });
+        return NextResponse.json({ ok: true, message: `سُجّل اليوم، ويُحسم من راتب ${formatMonth(deductionMonthOf(b.day))}` });
       }
       case "violation": {
         await addViolation({ employeeId: b.employeeId, day: b.day, code: b.code, note: b.note }, user.id);
-        return NextResponse.json({ ok: true, message: "سُجّلت المخالفة، وحُسب جزاؤها من جدول اللائحة" });
+        return NextResponse.json({ ok: true, message: `سُجّلت المخالفة، وحُسب جزاؤها من جدول اللائحة ويُحسم من راتب ${formatMonth(deductionMonthOf(b.day))}` });
       }
       case "violation-void": {
         const done = await voidViolation(b.id, user.id);
