@@ -12,6 +12,16 @@ const store = new AsyncLocalStorage<{ label: string }>();
 
 /** اسمُ الفاعل الآليّ في سجلّ التدقيق. */
 export const CRON_ACTOR_LABEL = "system:cron";
+/**
+ * الاستدراكُ الخلفيّ من القشرة (`components/auto-process.tsx`): يجري بجلسة من فتح
+ * الصفحة، لكنّه لم يضغط شيئاً — فيُوسَم كالمجدول. والضغطُ بيدٍ يبقى باسم صاحبه.
+ */
+export const BACKGROUND_ACTOR_LABEL = "system:background";
+
+/** يجري العملَ باسم النظام إن كان خلفيّاً، وإلّا كما هو. */
+export function runAsSystemIf<T>(background: boolean, fn: () => Promise<T>): Promise<T> {
+  return background ? runAsSystem(BACKGROUND_ACTOR_LABEL, fn) : fn();
+}
 
 export function runAsSystem<T>(label: string, fn: () => Promise<T>): Promise<T> {
   return store.run({ label }, fn);

@@ -23,6 +23,7 @@ import {
 } from "@/lib/supplier-intel";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
+import { auditActorName } from "@/lib/audit-actor";
 
 const RIYADH_DAY = (col: SQL) => sql`(${col} at time zone 'Asia/Riyadh')::date::text`;
 
@@ -173,10 +174,12 @@ export async function loadSupplierIntel(
     db.execute<{
       id: string; at: string; kind: string; title: string; amount: string | number | null;
       meta: string | null; ref_id: string | null; cancelled: boolean | null;
+      actor_id: string | null; after: unknown;
     }>(sql`
       (select i.id, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD"T"HH24:MI') as at,
               'INVOICE' as kind, i.invoice_number as title, i.total_minor::bigint as amount,
-              null::text as meta, i.id as ref_id, null::boolean as cancelled
+              null::text as meta, i.id as ref_id, null::boolean as cancelled,
+              null::text as actor_id, null::jsonb as after
          from invoices i where i.supplier_id = ${supplierId}
         order by i.invoice_date desc limit ${eventLimit})
       union all
@@ -184,19 +187,19 @@ export async function loadSupplierIntel(
               'PAYMENT', p.method::text, (p.amount_minor - p.fee_minor)::bigint,
               p.status::text,
               (select bt.id from bank_transactions bt where bt.matched_payment_id = p.id limit 1),
-              p.status in ('REVERSED','VOID')
+              p.status in ('REVERSED','VOID'), null, null
          from payments p where p.supplier_id = ${supplierId}
         order by p.paid_at desc limit ${eventLimit})
       union all
       (select st.id, to_char(st.created_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD"T"HH24:MI'),
               'STATEMENT',
               ${RIYADH_DAY(sql`st.period_start`)} || '|' || ${RIYADH_DAY(sql`st.period_end`)},
-              st.closing_balance_minor::bigint, null, null, null
+              st.closing_balance_minor::bigint, null, null, null, null, null
          from statements st where st.supplier_id = ${supplierId}
         order by st.created_at desc limit ${eventLimit})
       union all
       (select al.id, to_char(al.at at time zone 'Asia/Riyadh', 'YYYY-MM-DD"T"HH24:MI'),
-              'AUDIT', al.action, null, u.name, al.entity_type, null
+              'AUDIT', al.action, null, u.name, al.entity_type, null, al.actor_id, al.after
          from audit_logs al
          left join users u on u.id = al.actor_id
         where (al.entity_type = 'supplier' and al.entity_id = ${supplierId})
@@ -244,7 +247,8 @@ export async function loadSupplierIntel(
         kind,
         title: r.title,
         amountMinor: amount,
-        meta: r.meta,
+        /* فاعلُ القيد: «النظام» لما فعله النظام باسم المالك — `lib/audit-actor.ts` */
+        meta: kind === "AUDIT" ? auditActorName({ actorId: r.actor_id, after: r.after, actorName: r.meta }) : r.meta,
         href:
           kind === "INVOICE" ? invoiceHref(r.id)
           : kind === "PAYMENT" && r.ref_id ? txHref(r.ref_id)

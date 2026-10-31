@@ -7,6 +7,7 @@
  * وما لم يحمله لا يُخترَع له.
  */
 import { actionLabel } from "./audit-labels";
+import { auditActorName, isSystemAudit } from "./audit-actor";
 import { invoiceHref } from "./invoice-profile";
 import { txHref } from "./inspector";
 
@@ -83,12 +84,11 @@ function field(after: unknown, keys: readonly string[]): unknown {
 export function describeMover(row: AuditRow, viewerId: string): Mover {
   const amount = field(row.after, AMOUNT_KEYS);
   const detail = field(row.after, DETAIL_KEYS);
-  const reason = field(row.after, ["السبب", "نوع"]);
-  /* الاستدراكُ يكتب باسم من فُتحت الصفحةُ عنده — فيُعرَف الآليُّ من سببه لا من فاعله */
-  const automatic = row.actorId === null || (typeof reason === "string" && /آلي|الأرشفة الآليّة|القراءة المحفوظة/.test(reason));
+  /* الاستدراكُ يكتب باسم من فُتحت الصفحةُ عنده — فيُعرَف الآليُّ بوسمه وعلاماته لا بفاعله */
+  const automatic = isSystemAudit(row);
   return {
     label: actionLabel(row.action),
-    who: automatic ? "النظام" : row.actorId === viewerId ? "أنت" : row.actorName ?? "مستخدم آخر",
+    who: auditActorName(row, viewerId),
     automatic,
     detail: Array.isArray(detail)
       ? detail.filter((d): d is string => typeof d === "string").slice(0, 4).join("، ") || null

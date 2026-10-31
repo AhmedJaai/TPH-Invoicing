@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, desc, eq, inArray, not, sql, type SQL } from "drizzle-orm";
 import {
-  Boxes, FileText, Landmark, Sparkles, Store, UserRound, Users, Wallet, CircleDot, type LucideIcon,
+  Bot, Boxes, FileText, Landmark, Sparkles, Store, UserRound, Users, Wallet, CircleDot, type LucideIcon,
 } from "lucide-react";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { isRecordId } from "@/lib/figure-history";
@@ -17,6 +17,7 @@ import { ENTITY_LABEL, actionLabel, labelValue } from "@/lib/audit-labels";
 import { AUDIT_KIND_LABEL, KIND_PATTERN, LEARNED_ACTIONS, auditKind, isAuditKind, type AuditKind } from "@/lib/audit-kinds";
 import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
+import { auditActorName, isSystemAudit } from "@/lib/audit-actor";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +132,7 @@ export default async function AuditTrailPage({
       before: auditLogs.before,
       after: auditLogs.after,
       at: auditLogs.at,
+      actorId: auditLogs.actorId,
       actorName: users.name,
       actorEmail: users.email,
     })
@@ -166,7 +168,7 @@ export default async function AuditTrailPage({
         <LinkTabs
           label="النوع"
           items={[
-            { href: tab(null), label: "كل ما نفّذه المستخدمون", active: kind === null },
+            { href: tab(null), label: "كل ما نُفّذ", active: kind === null },
             ...(["money", "documents", "bank", "suppliers", "inventory", "learned"] as const).map((k) => ({
               href: tab(k),
               label: AUDIT_KIND_LABEL[k],
@@ -207,8 +209,10 @@ export default async function AuditTrailPage({
                             <p className="nums text-[11px] text-muted"><bdi>{WHEN_TIME.format(r.at)}</bdi></p>
                           </div>
                           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                            <UserRound className="h-3 w-3" strokeWidth={2} aria-hidden />
-                            {r.actorName ?? r.actorEmail ?? "النظام"} · {entityLink(r.entityType, r.entityId)}
+                            {isSystemAudit(r)
+                              ? <Bot className="h-3 w-3" strokeWidth={2} aria-hidden />
+                              : <UserRound className="h-3 w-3" strokeWidth={2} aria-hidden />}
+                            {auditActorName({ ...r, actorName: r.actorName ?? r.actorEmail })} · {entityLink(r.entityType, r.entityId)}
                           </p>
                           {hasDetail && (
                             <details className="group mt-2">

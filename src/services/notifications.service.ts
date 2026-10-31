@@ -12,6 +12,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { ACTION_LABEL } from "@/lib/audit-labels";
+import { SYSTEM_ACTOR_NAME, isSystemAudit } from "@/lib/audit-actor";
 import { DAY, DOCUMENT, SUPPLIER, countNoun } from "@/lib/arabic";
 import { can, type Role } from "@/lib/permissions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
@@ -30,6 +31,8 @@ export interface Notice {
   href: string;
   tone: NoticeTone;
   kind: "DOCUMENTS" | "REVIEW" | "STALLED" | "OVERDUE" | "DRIVE" | "ACTIVITY";
+  /** فعلٌ في السجلّ قام به النظام لا إنسان — يُرسَم بأيقونته. */
+  bySystem?: boolean;
 }
 
 export interface Digest {
@@ -59,6 +62,11 @@ const DECISION_ACTIONS = [
 ];
 
 const WINDOW_DAYS = 14;
+
+type ActivityRow = {
+  id: string; action: string; entity_type: string; at: string;
+  actor_id: string | null; after: unknown; actor: string | null;
+};
 
 function actionLabel(action: string): string {
   return Object.hasOwn(ACTION_LABEL, action) ? String(Reflect.get(ACTION_LABEL, action)) : action;
@@ -94,8 +102,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
         from documents
     `),
     audit
-      ? db.execute<{ id: string; action: string; entity_type: string; at: string; actor: string | null }>(sql`
-          select a.id, a.action, a.entity_type, a.at, u.name as actor
+      ? db.execute<ActivityRow>(sql`
+          select a.id, a.action, a.entity_type, a.at, a.actor_id, a.after, u.name as actor
             from audit_logs a
             left join users u on u.id = a.actor_id
            where a.at > now() - make_interval(days => ${WINDOW_DAYS})
@@ -103,7 +111,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
            order by a.at desc
            limit 25
         `)
-      : Promise.resolve({ rows: [] as { id: string; action: string; entity_type: string; at: string; actor: string | null }[] }),
+      : Promise.resolve({ rows: [] as ActivityRow[] }),
     db.execute<{ arrived: number; archived: number; payments: number; decisions: number }>(sql`
       select
         (select count(*)::int from documents where created_at > now() - interval '24 hours') as arrived,
@@ -198,14 +206,16 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
 
   for (const a of activity.rows) {
     if (QUIET_ACTIONS.has(a.action)) continue;
+    const bySystem = isSystemAudit({ actorId: a.actor_id, after: a.after });
     notices.push({
       id: `audit:${a.id}`,
       at: new Date(a.at).toISOString(),
       kind: "ACTIVITY",
       tone: "ok",
       title: actionLabel(a.action),
-      body: a.actor ? `بواسطة ${a.actor}` : "آلياً",
+      body: `بواسطة ${bySystem ? SYSTEM_ACTOR_NAME : a.actor ?? "مستخدم آخر"}`,
       href: "/settings/audit",
+      bySystem,
     });
   }
 
