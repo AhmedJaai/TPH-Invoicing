@@ -83,6 +83,7 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           إلغاء
         </button>
+        {!target && !busy && <span className="text-[11px] text-muted">اختر الصنف أولاً</span>}
       </div>
       {error && <p role="alert" className="mt-1.5 text-xs text-danger">{error}</p>}
     </div>

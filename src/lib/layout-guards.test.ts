@@ -215,3 +215,38 @@ describe("حاويةُ الأفعال تلتفّ داخل أمّها", () => {
     expect(found).toEqual([]);
   });
 });
+
+/**
+ * ── النسخُ الممنوع يُسمَع ──
+ *
+ * `navigator.clipboard.writeText` يُرفض حين يمنع المتصفّحُ الحافظة. ورابطُ الحضور الجديد
+ * «يظهر الآن مرة واحدة فقط»: نسخُه كان `.then(نجاح)` بلا رفض، فإن مُنع لم يُقَل شيء
+ * وظنّ المالكُ أنّه نسخه، وضاع الرابط. فكلُّ نسخٍ في `try` أو له ردٌّ على الرفض.
+ */
+export function silentCopies(source: string): string[] {
+  const out: string[] = [];
+  for (const m of source.matchAll(/clipboard\.writeText\(/g)) {
+    const before = source.slice(Math.max(0, m.index - 400), m.index);
+    const after = source.slice(m.index, m.index + 400);
+    /* داخل `try {` لم تُغلق: ما فُتح بعده من أقواسٍ أكثرُ ممّا أُغلق */
+    const at = before.lastIndexOf("try {");
+    const tail = at < 0 ? "" : before.slice(at);
+    const inTry = at >= 0 && (tail.match(/\{/g)?.length ?? 0) > (tail.match(/\}/g)?.length ?? 0);
+    const guarded = inTry || /\.catch\(/.test(after) || /\.then\(\s*\([^)]*\)\s*=>[\s\S]*?,\s*\([^)]*\)\s*=>/.test(after);
+    if (!guarded) out.push(after.slice(0, 80).replace(/\s+/g, " "));
+  }
+  return out;
+}
+
+describe("النسخُ إلى الحافظة يقول إن مُنع", () => {
+  it("يمسك `.then` بلا رفض ويترك `try` و`.then(ok, fail)`", () => {
+    expect(silentCopies(`void navigator.clipboard.writeText(u).then(() => ok());`)).toHaveLength(1);
+    expect(silentCopies(`try {\n await navigator.clipboard.writeText(u);\n ok(); } catch {}`)).toHaveLength(0);
+    expect(silentCopies(`navigator.clipboard.writeText(u).then(\n () => ok(),\n () => fail());`)).toHaveLength(0);
+  });
+
+  it("لا نسخَ صامتٌ عند المنع", () => {
+    const found = walk("src").flatMap((f) => silentCopies(readFileSync(f, "utf8")).map((x) => `${f}: ${x}`));
+    expect(found).toEqual([]);
+  });
+});

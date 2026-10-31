@@ -448,7 +448,13 @@ export function CheckinLinkPanel({ employeeId, name, phone, hasLink }: { employe
           <p className="text-xs font-bold">الرابط الجديد — يظهر الآن مرة واحدة فقط</p>
           <p className="nums mt-1 break-all text-[11px] text-ink-soft" dir="ltr">{url}</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass("secondary", "sm")} onClick={() => { void navigator.clipboard.writeText(url).then(() => toast({ tone: "ok", title: "نُسخ الرابط" })); }}><Copy className="h-3.5 w-3.5" aria-hidden />انسخ</button>
+            <button type="button" className={buttonClass("secondary", "sm")} onClick={() => {
+              /* الرابطُ يظهر مرّةً واحدة: النسخُ الممنوع يُسمَع ولا يُظَنّ تمّ */
+              navigator.clipboard.writeText(url).then(
+                () => toast({ tone: "ok", title: "نُسخ الرابط" }),
+                () => toast({ tone: "warn", title: "تعذّر النسخ", body: "المتصفح منع النسخ. حدّد الرابط فوقه وانسخه بنفسك قبل أن تغادر الصفحة." }),
+              );
+            }}><Copy className="h-3.5 w-3.5" aria-hidden />انسخ</button>
             {wa && <a className={buttonClass("secondary", "sm")} href={wa} target="_blank" rel="noreferrer"><MessageCircle className="h-3.5 w-3.5" aria-hidden />أرسله واتساب</a>}
           </div>
         </div>

@@ -11,6 +11,7 @@
  * مسارين (الواجهة ونصُّ تهيئة)، والاتّفاقُ البرمجيّ وحده لا يُعوَّل
  * عليه — درسٌ مكتوبٌ في `CLAUDE.md` عن ثلاث طبقاتٍ لمنع التكرار.
  */
+import { RECIPE, countNoun } from "@/lib/arabic";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { products, recipeIngredients, recipeVersions, recipes } from "@/db/schema";
@@ -716,7 +717,7 @@ export async function deleteRecipe(
 export class ItemInUseError extends Error {
   constructor(public readonly recipes: readonly string[]) {
     super(
-      `هذا الصنف مكوّن في ${recipes.length} وصفات سارية (${recipes.slice(0, 5).join("، ")}`
+      `هذا الصنف مكوّنٌ في ${countNoun(recipes.length, RECIPE)} ${recipes.length === 2 ? "ساريتين" : "سارية"} (${recipes.slice(0, 5).join("، ")}`
       + `${recipes.length > 5 ? "…" : ""}). احذفه من هذه الوصفات أولاً، ثم أخرجه من المخزون.`,
     );
     this.name = "ItemInUseError";

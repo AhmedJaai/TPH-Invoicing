@@ -259,6 +259,12 @@ export function InvoiceFix({
               إلغاء
             </button>
             {message && <span role={failed ? "alert" : "status"} className={`text-xs font-bold ${failed ? "text-danger" : "text-ok"}`}>{message}</span>}
+            {/* المعطَّلُ يقول لماذا في سطرٍ يُرى — `title` لا يظهر على الجوّال */}
+            {!message && !busy && (unreadable || !dirty) && (
+              <span className={`text-[11px] ${unreadable ? "font-bold text-warn" : "text-muted"}`}>
+                {unreadable ? "صحّح المبلغ غير المفهوم أولاً" : "غيّر حقلاً ليُحفظ التصحيح"}
+              </span>
+            )}
           </div>
         </div>
         </Reveal>

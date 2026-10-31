@@ -24,6 +24,7 @@ import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { activeSameFile } from "@/services/document-profile.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -96,6 +97,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "الإعادة تحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     }
     const restored = await db.transaction(async (t) => {
+      /* نسخةٌ قائمةٌ من الملفّ نفسه: الإعادةُ تكرارٌ ترفضه القاعدة — يُقال بدل ٥٠٠ */
+      const same = await activeSameFile(documentId, t);
+      if (same) return { same };
       const rows = await t.update(documents).set({ status: "NEEDS_REVIEW" })
         .where(and(eq(documents.id, documentId), eq(documents.status, "REJECTED")))
         .returning({ id: documents.id, fileName: documents.fileName });
@@ -112,6 +116,9 @@ export async function POST(request: Request) {
     });
     if (!restored) {
       return NextResponse.json({ error: "المستند ليس مرفوضاً، فربما أُعيد من نافذة أخرى" }, { status: 409 });
+    }
+    if ("same" in restored) {
+      return NextResponse.json({ error: `لا يُعاد: الملفّ نفسُه قائمٌ باسم «${restored.same.fileName}»، وهذا نسخةٌ مكرّرة منه`, sameFileId: restored.same.id }, { status: 409 });
     }
     return NextResponse.json({ ok: true, message: "أُعيد المستند إلى المراجعة، وسيُسجَّل ويُعتمد تلقائياً إن توفرت شروطه" });
   }

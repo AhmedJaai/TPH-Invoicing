@@ -13,7 +13,7 @@
  * **والشرحُ من الدوالّ التي قرّرت** (`autoArchive` · `canonicalName` ·
  * `missingFromReading`) لا نصٌّ يُكتب ثانيةً — فلا يفترق القرارُ عن تفسيره.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, documents, invoices, statements, suppliers, users } from "@/db/schema";
 import { autoArchive, sumLineTotals, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
@@ -84,6 +84,8 @@ export interface DocumentProfile {
   /** فاتورةٌ مقيَّدةٌ لمورّده برقمه المقروء — فالمستندُ نسخةٌ منها يُرفض لا يُقيَّد. */
   /** `totalMinor` المقيَّدة و`readTotalMinor` ما قُرئ هنا — الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ مصحَّحة لا نسخة */
   twin: { id: string; number: string; how: InvoiceTwin["kind"]; totalMinor: number | null; readTotalMinor: number | null } | null;
+  /** للمرفوض وحده: نسخةٌ قائمةٌ من الملفّ نفسه — فلا يُعاد، ويُفتح ما قام مقامه. */
+  sameFile: { id: string; fileName: string } | null;
   /** ما يمنع القيد بعينه — `missingFromReading`، وفارغٌ لما قُيِّد. */
   missing: string[];
   verdict: AutoArchiveVerdict;
@@ -95,6 +97,22 @@ export interface DocumentProfile {
 }
 
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]);
+
+/**
+ * نسخةٌ قائمةٌ (غيرُ مرفوضة) من الملفّ نفسه ببصمته — فالمرفوضُ نسخةٌ مكرّرة لا تُعاد إلى
+ * المراجعة: القاعدةُ ترفض بصمتين قائمتين (`documents_sha_uniq`)، وكانت الإعادةُ تسقط بـ٥٠٠.
+ * يسأله زرُّ «أعده إلى المراجعة» قبل أن يظهر، والخادمُ قبل أن يكتب.
+ */
+export async function activeSameFile(documentId: string, reader: Pick<typeof db, "select"> = db): Promise<{ id: string; fileName: string } | null> {
+  const [me] = await reader.select({ sha: documents.sha256 }).from(documents).where(eq(documents.id, documentId)).limit(1);
+  if (!me?.sha) return null;
+  const [other] = await reader
+    .select({ id: documents.id, fileName: documents.fileName })
+    .from(documents)
+    .where(and(eq(documents.sha256, me.sha), ne(documents.id, documentId), ne(documents.status, "REJECTED")))
+    .limit(1);
+  return other ?? null;
+}
 
 export async function loadDocumentProfile(id: string): Promise<DocumentProfile | null> {
   const [row] = await db
@@ -284,6 +302,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
       fromName: fromNameUsed,
     },
     twin: twinRow,
+    sameFile: row.status === "REJECTED" ? await activeSameFile(row.id) : null,
     missing,
     verdict,
     evidence,

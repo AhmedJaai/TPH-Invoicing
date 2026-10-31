@@ -260,7 +260,15 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
               <ReplaceInvoice documentId={p.id} number={corrected.number} before={formatRiyalsDisplay(corrected.totalMinor!)} after={formatRiyalsDisplay(corrected.readTotalMinor!)} />
             )}
             {p.status === "REJECTED" ? (
-              <RestoreDocument documentId={p.id} />
+              p.sameFile ? (
+                /* نسخةٌ مكرّرة من ملفٍّ قائم: لا إعادة — يُفتح القائم */
+                <span className="inline-flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+                  <T s="نسخةٌ مكرّرة من ملفٍّ قائم، فلا تُعاد إلى المراجعة." />
+                  <LinkButton href={`/documents/file/${p.sameFile.id}`} size="sm" icon={FileText}>افتح الملفّ القائم</LinkButton>
+                </span>
+              ) : (
+                <RestoreDocument documentId={p.id} />
+              )
             ) : (
               !p.invoice && <RejectDocument documentId={p.id} />
             )}

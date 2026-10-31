@@ -131,6 +131,14 @@ export const PRODUCT: NounForms = {
   zero: "لا أصناف",
 };
 
+export const RECIPE: NounForms = {
+  one: "وصفة واحدة",
+  two: "وصفتين",
+  few: "وصفات",
+  many: "وصفة",
+  zero: "لا وصفات",
+};
+
 export const SUPPLIER: NounForms = {
   one: "مورّد واحد",
   two: "مورّدان",
