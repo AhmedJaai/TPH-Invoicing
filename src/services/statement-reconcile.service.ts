@@ -442,3 +442,37 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
       .map((o) => ({ invoiceId: o.invoiceId, invoiceNumber: o.invoiceNumber, day: day(o.invoiceDate), amountMinor: o.totalMinor })),
   };
 }
+
+export interface StatementMissingLine {
+  supplierId: string;
+  supplierName: string;
+  slug: string;
+  ref: string | null;
+  day: string;
+  amountMinor: number;
+  /** مرجعُه لا يُقرأ — قد تكون عندنا برقمٍ آخر، فيُقال بحذر. */
+  unclear: boolean;
+}
+
+/**
+ * فواتيرُ في آخر كشفٍ لكلّ مورّد ليست في دفترنا — سطراً سطراً، بالنواة نفسها التي تعرضها
+ * صفحةُ المورّد (`latestStatementDiscrepancies`).
+ *
+ * كان «يحتاج قرارك» يقارن الرصيدَ الختاميّ وحده: كشفُ لوريفا (١–٢٦ أكتوبر ٢٠٢٦) بلا رصيدٍ
+ * مقروء فلم يُسأل عنه، وفيه فاتورةٌ ليست للمقهى (SI-0106 · ٤٩٧٫٩٨) لا تُرى إلّا بفتح صفحة
+ * المورّد (أحمد: «لازم أدخل وأضغط عليه عشان تبان»). فالسطرُ نفسُه يبلغ التنبيهَ وقائمةَ المورّدين.
+ */
+export async function latestStatementMissing(conn: Conn = db): Promise<StatementMissingLine[]> {
+  const suppliersWithStatements = (await conn.execute<{ id: string; name_ar: string; slug: string }>(sql`
+    select distinct s.id, s.name_ar, s.slug
+      from statements st join suppliers s on s.id = st.supplier_id
+     where st.period_end is not null and exists (select 1 from statement_lines sl where sl.statement_id = st.id)`)).rows;
+  const out: StatementMissingLine[] = [];
+  for (const s of suppliersWithStatements) {
+    const d = await latestStatementDiscrepancies(s.id, conn);
+    for (const m of d?.missing ?? []) {
+      out.push({ supplierId: s.id, supplierName: s.name_ar, slug: s.slug, ref: m.ref, day: m.day, amountMinor: m.amountMinor, unclear: m.unclear });
+    }
+  }
+  return out.sort((a, b) => b.amountMinor - a.amountMinor);
+}

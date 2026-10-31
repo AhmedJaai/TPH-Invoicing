@@ -178,6 +178,8 @@ export interface AttentionFacts {
 
   /** مورّدون يخالف آخرُ كشفٍ منهم دفترَنا (`latestStatementGaps`) — ما يطالبوننا به غيرُ ما ندين به */
   statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number; key?: string }[];
+  /** فواتيرُ في آخر كشف المورّد ليست عندنا — ولو لم يُقرأ رصيدُه الختاميّ. */
+  statementMissing?: { supplierName: string; slug: string; ref: string | null; day: string; amountMinor: number; unclear: boolean; key?: string }[];
 
   /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
   misplacedFiles?: { label: string; sub: string; href: string }[];
@@ -1278,6 +1280,43 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         amountMinor: Math.abs(g.gapMinor),
         href: `/statements?supplier=${encodeURIComponent(g.slug)}`,
         signalKey: g.key,
+      })),
+    });
+  }
+
+  /*
+    سطرُ الكشف لا رصيدُه: فاتورةٌ في كشف المورّد ليست عندنا — قد تكون مطالبةً ليست للمقهى.
+    كشفُ لوريفا بلا رصيدٍ مقروء فلم يبلغ البندَ السابق، وفيه SI-0106 ليست لنا. وما قاله البندُ
+    السابق عن مورّدٍ لا يُكرَّر هنا.
+  */
+  const gapSlugs = new Set(gaps.map((g) => g.slug));
+  const missingLines = (f.statementMissing ?? []).filter((m) => !gapSlugs.has(m.slug));
+  if (missingLines.length > 0) {
+    const total = missingLines.reduce((s, m) => s + m.amountMinor, 0);
+    const suppliersCount = new Set(missingLines.map((m) => m.slug)).size;
+    const one = missingLines[0];
+    out.push({
+      id: "statement-invoice-missing",
+      area: "SUPPLIERS",
+      severity: "HIGH",
+      title: missingLines.length === 1
+        ? `كشف ${one.supplierName} فيه فاتورة ليست عندك: ${one.ref ?? "بلا مرجع"} بـ${formatRiyalsDisplay(one.amountMinor)}`
+        : suppliersCount === 1
+          ? `كشف ${one.supplierName} فيه ${countNoun(missingLines.length, INVOICE)} ليست عندك`
+          : `${countNoun(suppliersCount, SUPPLIER)} في كشوفهم فواتير ليست عندك`,
+      detail: "المورّد يحسبها عليك في كشفه، ولا فاتورة بها في سجلاتك. إمّا أنّ ورقتها لم تصلك، أو أنّها ليست للمقهى أصلاً.",
+      action: "افتح الكشف: إن كانت لك فاطلب ورقتها أو سجّلها من الكشف، وإن لم تكن لك فاطلب من المورّد حذفها من كشفه قبل أن تسدّد رصيده.",
+      actionLabel: "افتح الكشف",
+      href: suppliersCount === 1 ? `/suppliers/${encodeURIComponent(one.slug)}?tab=statements` : "/statements",
+      count: missingLines.length,
+      amountMinor: total,
+      impact: { kind: "UNATTRIBUTED", amountMinor: total },
+      evidence: missingLines.slice(0, 10).map((m) => ({
+        label: `${m.supplierName} · ${m.ref ?? "بلا مرجع"}`,
+        sub: `في كشفه يوم ${formatDay(m.day)}${m.unclear ? " · مرجعه غير واضح، فقد تكون عندك برقم آخر" : ""}`,
+        amountMinor: m.amountMinor,
+        href: `/suppliers/${encodeURIComponent(m.slug)}?tab=statements`,
+        signalKey: m.key,
       })),
     });
   }

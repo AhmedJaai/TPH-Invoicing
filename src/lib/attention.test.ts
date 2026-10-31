@@ -522,6 +522,23 @@ describe("كشف المورّد يخالف دفترنا", () => {
   it("وبلا فرق لا بند", () => {
     expect(ids({ statementGaps: [] })).not.toContain("statement-ledger-gap");
   });
+
+  it("لوريفا: كشفٌ بلا رصيدٍ مقروء فيه فاتورةٌ ليست عندنا — بندٌ يسمّيها ويفتح كشوفه", () => {
+    const [item] = buildAttention({ ...quiet, statementMissing: [{ supplierName: "لوريفا كيك", slug: "Loreva", ref: "SI-0106", day: "2026-10-10", amountMinor: 497_98, unclear: false }] });
+    expect(item.id).toBe("statement-invoice-missing");
+    expect(item.title).toContain("SI-0106");
+    expect(item.amountMinor).toBe(497_98);
+    expect(item.href).toBe("/suppliers/Loreva?tab=statements");
+  });
+
+  it("ومورّدٌ قال البندُ السابق فرقَه لا يُكرَّر", () => {
+    const got = ids({
+      statementGaps: [{ supplierName: "غاناش", slug: "Ganache", day: "2026-08-31", theirsMinor: 5432_60, oursMinor: 4784_00, gapMinor: -648_60 }],
+      statementMissing: [{ supplierName: "غاناش", slug: "Ganache", ref: "X1", day: "2026-08-20", amountMinor: 648_60, unclear: false }],
+    });
+    expect(got).toContain("statement-ledger-gap");
+    expect(got).not.toContain("statement-invoice-missing");
+  });
 });
 
 describe("موعد إقرار الضريبة", () => {

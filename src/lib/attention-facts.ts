@@ -21,11 +21,11 @@ import { loadOverdueBalances } from "@/services/supplier-balance.service";
 import { DAY, TIME, countNoun } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { latestStatementGaps } from "@/services/statement-reconcile.service";
+import { latestStatementGaps, latestStatementMissing } from "@/services/statement-reconcile.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey, vatRiskKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, vatRiskKey } from "./signal-decisions";
 import { MAX_PLAUSIBLE_PRICE_MULTIPLE } from "./items";
 import { todayInRiyadh } from "./riyadh-time";
 import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
@@ -297,7 +297,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
    */
   /* «علمتُ» على صنفٍ يُخرجه من البند حتى يرتفع سعرُه ثانيةً (`priceRiseKey`) */
   const silenced = silencedKeys((await db.execute<{ key: string; decision: string }>(sql`
-    select key, decision from alert_resolutions where key like 'price-rise:%' or key like 'statement-gap:%'`)).rows, todayInRiyadh());
+    select key, decision from alert_resolutions where key like 'price-rise:%' or key like 'statement-gap:%' or key like 'statement-missing:%'`)).rows, todayInRiyadh());
   const rises = q6.rows
     .filter((r) => !silenced.has(priceRiseKey(String(r.supplier_id), String(r.normalized_description), Number(r.now_price))))
     .slice(0, 10);
@@ -548,6 +548,9 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     heldBankRows: Number(counts?.held_rows ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
+    statementMissing: (await latestStatementMissing())
+      .map((m) => ({ ...m, key: statementMissingKey(m.slug, m.ref, m.day, m.amountMinor) }))
+      .filter((m) => !silenced.has(m.key)),
     statementGaps: (await latestStatementGaps())
       .map((g) => ({ ...g, key: statementGapKey(g.slug, g.day, g.theirsMinor, g.oursMinor) }))
       .filter((g) => !silenced.has(g.key)),

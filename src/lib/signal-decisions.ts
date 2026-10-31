@@ -28,6 +28,7 @@ export const SIGNAL_PREFIXES = [
   "repeat-delivery",
   "price-rise",
   "statement-gap",
+  "statement-missing",
   "vat-risk",
   "payroll-tx",
 ] as const;
@@ -52,6 +53,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "repeat-delivery": "توريد يبدو مسجّلاً مرتين",
   "price-rise": "ارتفاع سعر صنف عند مورّده",
   "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
+  "statement-missing": "فاتورة في كشف المورّد ليست عندنا",
   "vat-risk": "ضريبة فاتورة لا تُخصم",
   "payroll-tx": "حوالة راتب ليست لموظف",
 };
@@ -63,6 +65,11 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
 */
 export function priceRiseKey(supplierId: string, normalizedDescription: string, nowPriceMinor: number): string {
   return `price-rise:${supplierId}:${shortHash(normalizedDescription)}:${nowPriceMinor}`;
+}
+
+/** فاتورةٌ في كشفه ليست عندنا — بمرجعها ويومها ومبلغها: إن تغيّر شيءٌ منها عاد السؤال. */
+export function statementMissingKey(slug: string, ref: string | null, day: string, amountMinor: number): string {
+  return `statement-missing:${encodeURIComponent(slug).slice(0, 80)}:${encodeURIComponent(ref ?? "-").slice(0, 60)}:${day}:${amountMinor}`;
 }
 
 export function statementGapKey(slug: string, day: string, theirsMinor: number, oursMinor: number): string {

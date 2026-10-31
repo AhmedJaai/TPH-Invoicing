@@ -18,6 +18,8 @@ import { SUPPLIER, countNoun, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic"
 import { buildInvoiceRequest, groupUnbackedBySupplier, invoiceRequestKey } from "@/lib/supplier-requests";
 import { loadInvoiceRequestMarks, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { RequestInvoiceLink } from "@/components/request-invoice-link";
+import { latestStatementMissing } from "@/services/statement-reconcile.service";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { loadBalanceTotals, loadOpenInvoiceAges, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadSupplierDirectory } from "@/services/supplier-intel.service";
 import { loadDuplicateHints } from "@/services/supplier-merge.service";
@@ -73,7 +75,7 @@ export default async function SuppliersPage({
   const wanted = VIEWS.find((v) => v === params.view) ?? "all";
 
   const canMerge = can(user.role, "supplier:merge");
-  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory, dupHints] = await Promise.all([
+  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory, dupHints, statementMissing] = await Promise.all([
     loadBalanceTotals(),
     showAmounts ? loadOverdueBalances() : Promise.resolve([]),
     loadOpenInvoiceAges(),
@@ -81,6 +83,8 @@ export default async function SuppliersPage({
     showAmounts ? listOpenFindings() : Promise.resolve([]),
     loadSupplierDirectory(),
     canMerge ? loadDuplicateHints() : Promise.resolve([]),
+    /* فاتورةٌ في كشفه ليست عندنا تُرى بجانب اسمه — لا بفتح صفحته (أحمد، لوريفا SI-0106) */
+    showAmounts ? latestStatementMissing() : Promise.resolve([]),
   ]);
 
   if (directory.length === 0) {
@@ -97,6 +101,11 @@ export default async function SuppliersPage({
   }
 
   const balanceOf = new Map(balances.map((b) => [b.supplierId, b]));
+  const missingBy = new Map<string, { count: number; amountMinor: number }>();
+  for (const m of statementMissing) {
+    const x = missingBy.get(m.supplierId) ?? { count: 0, amountMinor: 0 };
+    missingBy.set(m.supplierId, { count: x.count + 1, amountMinor: x.amountMinor + m.amountMinor });
+  }
   const unbackedGroups = groupUnbackedBySupplier(unbackedPayments);
   const unbackedTotal = unbackedPayments.reduce((s, p) => s + p.unbackedMinor, 0);
 
@@ -114,6 +123,7 @@ export default async function SuppliersPage({
         idle: m.invoiceCount === 0 && m.paymentCount === 0,
         contract: needsContract(m),
         paper: needsPaperUpload(m),
+        statementMissing: missingBy.get(m.id) ?? null,
       };
     })
     /*
@@ -195,6 +205,11 @@ export default async function SuppliersPage({
                   : r.invoiceCount > 0 ? "فواتيره مسدّدة" : "دفعات بلا فواتير"}
               {r.contract && <Badge tone="warn">يحتاج عقد توريد</Badge>}
               {r.paper && <Badge>فواتيره ورقية</Badge>}
+              {r.statementMissing && (
+                <Link href={`/suppliers/${r.slug}?tab=statements`} className="relative">
+                  <Badge tone="danger" dot>{r.statementMissing.count === 1 ? "في كشفه فاتورة ليست عندك" : `في كشفه ${countNoun(r.statementMissing.count, INVOICE)} ليست عندك`} · {formatRiyalsDisplay(r.statementMissing.amountMinor)}</Badge>
+                </Link>
+              )}
             </span>
           </span>
         </span>
