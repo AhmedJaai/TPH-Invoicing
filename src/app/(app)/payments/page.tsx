@@ -51,11 +51,22 @@ export default async function PaymentsPage({
   const { month: raw } = await searchParams;
   const current = currentMonthRiyadh();
   const defaultMonth = previousMonth(current);
-  const month = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : defaultMonth;
+  const chosen = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : null;
 
   const balances = await loadSupplierBalances();
   const creditBy = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
-  const run = await loadPaymentRun(month, { creditBySupplier: creditBy });
+  /*
+    بلا اختيار: الشهرُ الماضي — فإن لم يبقَ فيه شيءٌ (سُدّد كلُّه) فالجاري حتى اليوم.
+    كانت تفتح في ٣١ أكتوبر «لا مستحقات في سبتمبر» ودفعةُ أكتوبر (١٠٬٠٨٤) تستحقّ غداً
+    — صفحةٌ فارغةٌ تطلب من صاحبها أن يبحث عن الشهر الذي فيه العمل.
+  */
+  const isEmptyRun = (r: Awaited<ReturnType<typeof loadPaymentRun>>) => r.ready.length === 0 && r.held.length === 0 && r.coveredByCredit.length === 0;
+  let month = chosen ?? defaultMonth;
+  let run = await loadPaymentRun(month, { creditBySupplier: creditBy });
+  if (chosen === null && isEmptyRun(run)) {
+    const next = await loadPaymentRun(current, { creditBySupplier: creditBy });
+    if (!isEmptyRun(next)) { month = current; run = next; }
+  }
   /* المحجوزون كذلك: رقمُ واتساب كلٍّ منهم من ملفّه، لا شاشةُ اختيار جهة */
   const supplierIds = [...new Set([...run.ready.map((r) => r.supplierId), ...run.held.map((h) => h.invoice.supplierId)])];
   const [accounts, slugs] = await Promise.all([
@@ -120,7 +131,8 @@ export default async function PaymentsPage({
         <LinkTabs
           label="الشهر"
           items={months.map((m) => ({
-            href: m === defaultMonth ? "/payments" : `/payments?month=${m}`,
+            /* كلُّ لسانٍ بشهره صراحةً: «/payments» وحدها قد تفتح الجاري إن فرغ الماضي */
+            href: `/payments?month=${m}`,
             label: m === current ? `${formatMonth(m)} (حتى اليوم)` : formatMonth(m),
             active: m === month,
           }))}

@@ -104,6 +104,19 @@ export function detectPriceChange(history: readonly PricePoint[]): PriceChange |
   };
 }
 
+/**
+ * تغيّرٌ يُصدَّق: السعرُ الجديد لا يتجاوز ثلاثةَ أضعاف السابق ولا ينزل تحت ثلثه.
+ *
+ * ما وراء ذلك وحدةٌ مختلفة في الغالب لا سعرٌ تغيّر — كرتونٌ قُرئ حبّةً أو العكس: كانت
+ * «الأصناف والأسعار» تقول «أعلى زيادة 1397٪»، و«يحتاج قرارك» يُسقط ما فوق ثلاثة أضعاف
+ * بحدٍّ مكتوبٍ في استعلامه. فالحدُّ واحدٌ هنا يقرؤه الاثنان.
+ */
+export const MAX_PLAUSIBLE_PRICE_MULTIPLE = 3;
+
+export function plausiblePriceChange(c: Pick<PriceChange, "previousMinor" | "currentMinor">): boolean {
+  return c.previousMinor > 0 && c.currentMinor <= c.previousMinor * MAX_PLAUSIBLE_PRICE_MULTIPLE && c.currentMinor * MAX_PLAUSIBLE_PRICE_MULTIPLE >= c.previousMinor;
+}
+
 /** الأثر السنوي المقدَّر لتغيّر السعر، بناءً على الكمية المشتراة فعلاً. */
 export function annualImpactMinor(change: PriceChange, quantityPerYear: number): number {
   return Math.round(change.deltaMinor * quantityPerYear);

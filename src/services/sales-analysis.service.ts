@@ -11,6 +11,7 @@
  * وصفٌ لما وقع: لا اسمَ عميلٍ، ولا حكمَ على أحد.
  */
 import { sql } from "drizzle-orm";
+import { businessHourOrder } from "@/lib/finance/performance";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -196,7 +197,8 @@ export async function loadSalesAnalysis(month: string, conn: Conn = db): Promise
     month, revenue: mine, previous: revenue.get(prev) ?? null,
     previousToDatePaidMinor: prevToDate ? Number(prevToDate.rows[0]?.paid ?? 0) : null,
     days: days.rows.map((r) => ({ day: r.day, paidMinor: Number(r.paid), orders: r.orders })),
-    hours: [...hourAcc].map(([hour, v]) => ({ hour, ...v })).sort((a, b) => a.hour - b.hour),
+    /* بترتيب يوم العمل (يفتح السابعة ويغلق الثالثة فجراً) — منتصفُ الليل آخرُ اليوم لا أوّلُه */
+    hours: [...hourAcc].map(([hour, v]) => ({ hour, ...v })).sort((a, b) => businessHourOrder(a.hour) - businessHourOrder(b.hour)),
     weekdays: [...dayAcc].map(([weekday, v]) => ({ weekday, ...v })).sort((a, b) => a.weekday - b.weekday),
     methods: methods.rows.map((r) => ({ name: r.name, type: r.type, amountMinor: Number(r.amount), payments: r.n })),
     types: types.rows.map((r) => ({ type: r.type, label: ORDER_TYPE_LABEL[r.type] ?? `نوع ${r.type}`, paidMinor: Number(r.paid), orders: r.orders })),

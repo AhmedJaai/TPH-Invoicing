@@ -6,7 +6,7 @@ import { ChevronDown, Link2, Sparkles } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { sameUnitFamily } from "@/lib/inventory/units";
 import { STORED_UNITS, isStoredUnit, storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
-import { PRODUCT, countNoun } from "@/lib/arabic";
+import { ITEM, PRODUCT, countNoun } from "@/lib/arabic";
 import { ReadySubmit } from "./ui-client";
 import { buttonClass } from "./ui";
 import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purchase-link.service";
@@ -146,7 +146,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           <span className="text-muted"> · {row.supplierName}</span>
         </p>
         <p className="text-[11px] text-muted">
-          <T s="الكمية {0} · {1}{2}" a={[<span key="0" className="nums">{row.qtyText}</span>, row.lines === 1 ? "بند واحد" : <Fragment key="1"><T s="{0} بنود" a={[<span key="0" className="nums">{row.lines}</span>]} /></Fragment>, row.invoiceNumbers.length > 0 && <Fragment key="2"> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></Fragment>]} /></p>
+          <T s="الكمية {0} · {1}{2}" a={[<span key="0" className="nums">{row.qtyText}</span>, countNoun(row.lines, ITEM), row.invoiceNumbers.length > 0 && <Fragment key="2"> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></Fragment>]} /></p>
       </div>
 
       {isLinked ? (

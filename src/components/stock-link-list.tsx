@@ -1,5 +1,6 @@
 "use client";
 
+import { LINE, countNoun } from "@/lib/arabic";
 import { useState } from "react";
 import { Scale } from "lucide-react";
 import { LinkRow } from "./inventory-purchase-links";
@@ -33,7 +34,7 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
               <span className="text-muted">مشترياتك منه حتى الآن</span>
               {r.evidence && (
                 <Badge tone="accent">
-                  <T s="{0}فودكس: «{1}» في {2} {3} بالمبلغ نفسه" a={[<Scale key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />, r.evidence.productName, r.evidence.matches, r.evidence.matches === 1 ? "سطر" : "سطراً"]} /></Badge>
+                  <T s="{0}فودكس: «{1}» في {2} بالمبلغ نفسه" a={[<Scale key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />, r.evidence.productName, countNoun(r.evidence.matches, LINE)]} /></Badge>
               )}
               {r.notStock && <Badge tone="muted">ليس مخزوناً</Badge>}
             </div>

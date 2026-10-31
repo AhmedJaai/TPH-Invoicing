@@ -6,7 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { ApproveReady, StockLinkList } from "@/components/stock-link-list";
 import { Callout, KeyFigure, LinkButton, LinkTabs, NoAccess, Section } from "@/components/ui";
-import { PRODUCT, countNoun } from "@/lib/arabic";
+import { ITEM, PRODUCT, countNoun } from "@/lib/arabic";
 import { formatShare } from "@/lib/finance/format";
 import { storedUnitLabel } from "@/lib/unit-conversion";
 import { coverageAfterReady, isReady, loadStockLinks, notStockKey, READY_MIN_MATCHES } from "@/services/stock-link.service";
@@ -77,7 +77,7 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
       </div>
 
       <Callout tone="info" icon={Info} className="mt-4" title="ما معنى «جاهز»؟">
-        <T s="هو بند في فاتورتنا يقابله بند في فودكس للمورّد نفسه في الأيام نفسها {0}، وقد حدّد من أدخله صنف المخزون وكميته. فإذا تأكد الصنف والكمية في الوحدة {1} فأكثر، صار البند جاهزاً. تعتمده أنت بضغطة واحدة، ولا يُربط شيء تلقائياً." a={[<strong key="0" className="text-ink">وبالمبلغ نفسه</strong>, READY_MIN_MATCHES === 2 ? "بندان" : `${READY_MIN_MATCHES} بنود`]} /></Callout>
+        <T s="هو بند في فاتورتنا يقابله بند في فودكس للمورّد نفسه في الأيام نفسها {0}، وقد حدّد من أدخله صنف المخزون وكميته. فإذا تأكد الصنف والكمية في الوحدة {1} فأكثر، صار البند جاهزاً. تعتمده أنت بضغطة واحدة، ولا يُربط شيء تلقائياً." a={[<strong key="0" className="text-ink">وبالمبلغ نفسه</strong>, countNoun(READY_MIN_MATCHES, ITEM)]} /></Callout>
 
       <div className="mt-5">
         <LinkTabs
@@ -92,7 +92,7 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
       </div>
 
       <Section title={view === "ready" ? "جاهز للاعتماد" : view === "linked" ? "المربوط" : view === "out" ? "ليس مخزوناً" : "بلا ربط"} count={list.length}
-        hint={list.length > SHOWN ? `أعلى ${SHOWN} بنود قيمةً. اربطها لتظهر البقية.` : "مرتبة حسب قيمة المشتريات."}>
+        hint={list.length > SHOWN ? `أعلى ${countNoun(SHOWN, ITEM)} قيمةً. اربطها لتظهر البقية.` : "مرتبة حسب قيمة المشتريات."}>
         {list.length === 0 ? (
           <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد بنود في هذه القائمة.</p>
         ) : (

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SupplierQrLine } from "@/components/supplier-qr";
 import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
+import { plausiblePriceChange } from "@/lib/items";
 import { notFound, redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import {
@@ -832,7 +833,13 @@ export async function SupplierView({
                           key: "move",
                           header: "آخر تغيّر",
                           cell: (p: (typeof intel.prices)[number]) =>
-                            p.lastMove ? (
+                            /* ثلاثةُ أضعافٍ فأكثر وحدةٌ مختلفة في الغالب (حليبٌ بالكرتون ثمّ بالقارورة: «انخفاض 93٪») — يُقال ولا يُعدّ تغيّراً */
+                            p.lastMove && !plausiblePriceChange({ previousMinor: p.lastMove.previousMinor, currentMinor: p.lastMinor }) ? (
+                              <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px]">
+                                <Badge tone="warn">وحدة مختلفة على الأرجح</Badge>
+                                <span className="text-muted"><T s="كان {0} — راجع البند في فاتورته" a={[<Money key="0" minor={p.lastMove.previousMinor} />]} /></span>
+                              </span>
+                            ) : p.lastMove ? (
                               <span className="inline-flex flex-wrap items-center gap-1.5">
                                 <Delta pct={p.lastMove.pct} favourable={p.lastMove.pct === null ? null : p.lastMove.pct <= 0} />
                                 <span className="text-[11px] text-muted"><T s="من {0}" a={[<Money key="0" minor={p.lastMove.previousMinor} />]} /></span>

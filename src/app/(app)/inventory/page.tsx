@@ -7,7 +7,7 @@ import { branches, inventoryCounts } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { Card, LinkButton, NoAccess, Section } from "@/components/ui";
+import { Callout, Card, LinkButton, NoAccess, Section } from "@/components/ui";
 import { Money } from "@/components/money";
 import { NewCount, StartCount } from "@/components/inventory-actions";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
@@ -19,7 +19,7 @@ import { loadWorkspaceInputs } from "@/services/inventory-workspace.service";
 import { loadInventorySetup, setupProgress } from "@/services/inventory-overview.service";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
-import { lastCompleteWeek } from "@/lib/inventory/week";
+import { lastCompleteWeek, nextWeek } from "@/lib/inventory/week";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -139,12 +139,20 @@ export default async function InventoryPage({
   const week = lastCompleteWeek();
   const progress = setupProgress(setup);
   const canCount = can(user.role, "inventory:count");
+  /*
+    آخرُ أسبوعٍ اكتمل قد يكون جُرد وأُقفل: كانت الصفحةُ تقول «جاهز لجرد أسبوع ١٨–٢٤» وجردُه
+    المقفل في القائمة تحتها بنقصه — تعرض عملاً منجزاً كأنّه ينتظر. فالمقفلُ يُقال، والتالي بموعده.
+  */
+  const doneWeek = recentAll.find((c) => c.status === "FINALISED" && c.periodStart === week.start) ?? null;
+  const upcoming = nextWeek(week);
 
   const intro = !progress.done.catalog
     ? "الجرد يقارن ما وُجد على الرف بما كان يُفترض أن يُصرف، لذلك يحتاج إلى ثلاث خطوات بالترتيب، أولها الكتالوج."
     : !progress.done.sales
       ? "الكتالوج جاهز. ارفع ملف مبيعات الأسبوع ليعرف النظام ما كان يُفترض أن يُصرف."
-      : `جاهز لجرد أسبوع ${formatWeek(week.start, week.end)}، وهو آخر أسبوع مكتمل.`;
+      : doneWeek
+        ? `جرد أسبوع ${formatWeek(week.start, week.end)} أُقفل. وأسبوع ${formatWeek(upcoming.start, upcoming.end)} يكتمل بعد تقفيلة السبت، فيُجرد من الأحد.`
+        : `جاهز لجرد أسبوع ${formatWeek(week.start, week.end)}، وهو آخر أسبوع مكتمل.`;
 
   return (
     <PageShell
@@ -185,6 +193,11 @@ export default async function InventoryPage({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         {/* ── ابدأ جرد الأسبوع ── */}
         <div id="start" className="min-w-0 scroll-mt-24">
+          {doneWeek && (
+            <Callout tone="ok" className="mb-4" title={`جرد أسبوع ${formatWeek(week.start, week.end)} مقفل`}>
+              <T s="لا جرد ينتظر الآن. افتح {0}، أو اختر أسبوعاً أقدم أدناه لتعيد جرده." a={[<Link key="0" href={`/inventory/counts/${doneWeek.id}`} className="font-bold text-accent hover:underline">الجرد المقفل</Link>]} />
+            </Callout>
+          )}
           {canCount ? (
             <StartCount
               defaultStart={week.start}

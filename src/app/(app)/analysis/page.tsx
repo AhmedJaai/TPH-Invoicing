@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import { Figure } from "@/components/supplier-intel";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
+import { MAX_PLAUSIBLE_PRICE_MULTIPLE, plausiblePriceChange } from "@/lib/items";
 import { formatDay, MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 import { whatsappHref } from "@/lib/supplier-edit";
 import { buildPriceRiseMessage, yearlyQuantity } from "@/lib/supplier-requests";
@@ -133,8 +134,10 @@ export default async function ItemsAndPricesPage({
 
   /* ما تحرّك 3٪ فأكثر — دون ذلك تقريبٌ لا حركة */
   const priceMoves = items
-    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03)
+    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03 && plausiblePriceChange(i.priceChange))
     .sort((a, b) => Math.abs(b.priceChange!.deltaRatio!) - Math.abs(a.priceChange!.deltaRatio!));
+  /* ما تغيّر بأكثر من ثلاثة أضعاف وحدةٌ مختلفة في الغالب — يُقال ولا يُعدّ ارتفاعاً */
+  const unitSuspects = items.filter((i) => i.priceChange && i.priceChange.previousMinor > 0 && !plausiblePriceChange(i.priceChange));
   const rises = priceMoves.filter((i) => i.priceChange!.direction === "up");
   const falls = priceMoves.filter((i) => i.priceChange!.direction === "down");
   const maxRise = Math.max(0, ...rises.map((i) => pctOf(i) ?? 0));
@@ -210,11 +213,19 @@ export default async function ItemsAndPricesPage({
         <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على جزء من الفواتير فقط">
           <T s="أرقام هذه الصفحة مبنية على {0}، والباقي غير محسوب." a={[lineCoverage.detail]} /></Callout>
       )}
-      {/* ما لا يُحسَب يُقال ولا يُعرَض صفراً — والمبيعات غير موصولة */}
+      {unitSuspects.length > 0 && (
+        <Callout tone="warn" icon={Info} className="mt-4" title={`تغيّرٌ بأكثر من ${MAX_PLAUSIBLE_PRICE_MULTIPLE} أضعاف في السعر: ${countNoun(unitSuspects.length, PRODUCT)}، ولا يُعدّ ارتفاعاً`}>
+          <T s="الأرجح أن الوحدة اختلفت بين الفاتورتين (كرتون قُرئ حبة أو العكس)، لا أن السعر تغيّر. صحّح البند في فاتورته إن كان خطأً: {0}." a={[unitSuspects.slice(0, 6).map((i, n) => {
+            const slug = i.supplierId ? slugOf.get(i.supplierId) : undefined;
+            return <span key={i.key}>{n > 0 && "، "}{slug ? <Link href={`/suppliers/${slug}?tab=prices#detail`} className="font-bold text-accent hover:underline">{i.displayName}</Link> : i.displayName}</span>;
+          })]} />
+        </Callout>
+      )}
+      {/* هامشُ كلّ صنفٍ وتكلفةُ المبيعات تُحسب من فودكس والجرد في «المالية» — كان هنا «غير متاح، المبيعات غير موصولة» وفودكس موصولٌ منذ مايو */}
       <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
         <span>
-          <T s="{0} هامش الربح وتكلفة المبيعات وربحية كل صنف. تحتاج هذه الأرقام إلى ربط مصدر للمبيعات، ولن نعرضها بأرقام تقديرية." a={[<span key="0" className="font-bold text-ink-soft">غير متاح بعد:</span>]} /></span>
+          <T s="هذه الصفحة لأسعار الشراء وحدها. هامش كل صنف في {0}، وتكلفة المبيعات في {1}." a={[<Link key="0" href="/finance/sales#margins" className="font-bold text-accent hover:underline">المبيعات</Link>, <Link key="1" href="/finance" className="font-bold text-accent hover:underline">الربح</Link>]} /></span>
       </p>
 
       <div className="mt-8">

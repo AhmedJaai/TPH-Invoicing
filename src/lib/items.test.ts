@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { annualImpactMinor, detectPriceChange, normalizeItem, priceKey, similarItems } from "./items";
+import { annualImpactMinor, detectPriceChange, normalizeItem, plausiblePriceChange, priceKey, similarItems } from "./items";
 
 const at = (iso: string, price: number) => ({ date: new Date(`${iso}T00:00:00Z`), unitPriceMinor: price });
 
@@ -118,5 +118,15 @@ describe("أقرب أصناف المورّد — للاقتراح لا للدم�
   });
   it("والأرقام المختلفة صنفان لا يقترح أحدهما للآخر", () => {
     expect(similarItems(n("كيس 1 كيلو"), [n("كيس 2 كيلو")])).toEqual([]);
+  });
+});
+
+describe("التغيّرُ الذي يُصدَّق", () => {
+  it("ثلاثةُ أضعافٍ حدٌّ: 1397٪ وحدةٌ مختلفة لا سعر، وما دونها يُصدَّق", () => {
+    expect(plausiblePriceChange({ previousMinor: 1_00, currentMinor: 14_97 })).toBe(false);
+    expect(plausiblePriceChange({ previousMinor: 30_00, currentMinor: 9_00 })).toBe(false);
+    expect(plausiblePriceChange({ previousMinor: 10_00, currentMinor: 12_50 })).toBe(true);
+    expect(plausiblePriceChange({ previousMinor: 10_00, currentMinor: 30_00 })).toBe(true);
+    expect(plausiblePriceChange({ previousMinor: 0, currentMinor: 5_00 })).toBe(false);
   });
 });

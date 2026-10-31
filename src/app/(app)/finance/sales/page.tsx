@@ -177,7 +177,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-3">
         <Mover title="ما ارتفع" icon={TrendingUp} items={risers} empty="لم يرتفع أي صنف عن الشهر السابق." />
         <Mover title="ما انخفض" icon={TrendingDown} items={fallers} empty="لم ينخفض أي صنف عن الشهر السابق." />
-        <Section title="أضعف الهوامش" icon={Coffee} hint="من بين الأصناف التي بيع منها بثلاثمئة ريال فأكثر.">
+        <Section id="margins" title="أضعف الهوامش" icon={Coffee} hint="من بين الأصناف التي بيع منها بثلاثمئة ريال فأكثر.">
           {weak.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا يوجد صنف له وصفة وتكلفة بعد.</p> : (
             <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
               {weak.map((i) => (

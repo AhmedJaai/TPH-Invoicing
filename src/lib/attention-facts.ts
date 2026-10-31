@@ -26,6 +26,7 @@ import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
 import { priceRiseKey, silencedKeys, statementGapKey, vatRiskKey } from "./signal-decisions";
+import { MAX_PLAUSIBLE_PRICE_MULTIPLE } from "./items";
 import { todayInRiyadh } from "./riyadh-time";
 import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
 
@@ -152,7 +153,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           بـ١٢٫٥٠ ثمّ صينيةً بـ١٧٥ قيل «ارتفع ١٣٠٠٪ ويكلّفك ٩٧٥ في السنة» (لوريفا، سبتمبر ٢٠٢٦).
         */
         where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
-          and p.now_price <= 3 * p.then_price
+          and p.now_price <= ${MAX_PLAUSIBLE_PRICE_MULTIPLE} * p.then_price
         order by annual_minor desc, (p.now_price - p.then_price) desc limit 40
       `),
     db.execute<{ start: string | null; end: string | null }>(sql`
