@@ -8,10 +8,11 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import type { Conn } from "./types";
 import { alertResolutions } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { groupUnbackedBySupplier, invoiceRequestKey, type UnbackedPayment } from "@/lib/supplier-requests";
-import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
+import { loadBalanceTotals } from "./supplier-balance.service";
 
 /** ما دون الريال بقيّةُ تقريبٍ لا دفعةٌ بلا فاتورة. */
 export const UNBACKED_FLOOR_MINOR = 100;
@@ -93,9 +94,11 @@ export interface MissingStatementSupplier {
 }
 
 /** مورّدون لهم فواتير عندنا ولا كشف منهم ينتهي في الشهر المطلوب. */
-export async function loadMissingStatementSuppliers(month: string): Promise<MissingStatementSupplier[]> {
+export async function loadMissingStatementSuppliers(month: string, conn: Conn = db): Promise<MissingStatementSupplier[]> {
+  /* «بقي له عليك» من مصدره الواحد (`supplier-balance.service.ts`) — بعد رصيدك عنده */
+  const owing = (await loadBalanceTotals(conn)).rows.filter((r) => r.owedMinor > 0).map((r) => r.supplierId);
   const rows = (
-    await db.execute<{ id: string; name_ar: string; slug: string; invoices: number; last_invoice: string | null; phone: string | null }>(sql`
+    await conn.execute<{ id: string; name_ar: string; slug: string; invoices: number; last_invoice: string | null; phone: string | null }>(sql`
       select s.id, s.name_ar, s.slug, s.phone_e164 as phone, count(i.id)::int as invoices,
              to_char(max(i.invoice_date), 'YYYY-MM-DD') as last_invoice
         from invoices i
@@ -108,11 +111,7 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
          */
          and (
            exists (select 1 from invoices im where im.supplier_id = s.id and im.period_month = ${month})
-           or exists (
-             select 1 from invoices io
-              where io.supplier_id = s.id
-                and io.total_minor - coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = io.id), 0) > ${SETTLED_TOLERANCE_MINOR}
-           )
+           ${owing.length > 0 ? sql`or s.id in (${sql.join(owing.map((id) => sql`${id}`), sql`, `)})` : sql``}
          )
          and not exists (
          select 1 from statements st
