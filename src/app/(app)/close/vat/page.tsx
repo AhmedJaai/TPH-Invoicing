@@ -12,6 +12,7 @@ import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkButton, Lin
 import { VatBulk, VatCashField, VatFilePanel, VatTxToggle, VatVoidFiling } from "@/components/vat-choice";
 import { SalesWitnessPanel, SalesWitnessSkeleton } from "@/components/sales-witness";
 import { loadFoodicsCashByMonth } from "@/services/sales-witness.service";
+import { loadCashCustody } from "@/services/app-settings.service";
 import { SectionBoundary } from "@/components/ui-client";
 import { WhyNumber } from "@/components/why-number";
 import { FiledQuartersSection } from "@/components/vat-compare";
@@ -70,7 +71,8 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
 
   const { result: r, filing } = view;
   /* نقدُ فودكس الذي لم يُكتب — يُقال قبل التقديم وبعده، لا «للمقارنة» في آخر الصفحة وحدها */
-  const cashGaps = untypedFoodicsCash(view.cash, await loadFoodicsCashByMonth(view.cash.map((c) => c.month)));
+  const [foodicsCashBy, custody] = await Promise.all([loadFoodicsCashByMonth(view.cash.map((c) => c.month)), loadCashCustody()]);
+  const cashGaps = untypedFoodicsCash(view.cash, foodicsCashBy);
   const cashGapVat = cashGaps.reduce((sum, g) => sum + g.vatMinor, 0);
   const cashGapText = cashGaps.map((g) => `${formatMonth(g.month)} ${riyalsText(g.foodicsCashMinor)}`).join(" · ");
   /* الإقرارُ ربعيّ: موعدُ الشهر موعدُ ربعه، لا آخرُ الشهر التالي له */
@@ -368,6 +370,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                     label={formatMonth(c.month)}
                     initial={c.grossMinor === null ? "" : formatRiyals(c.grossMinor)}
                     locked={locked}
+                    foodicsCash={custody.value === "OWNER_HOLDS" && (foodicsCashBy.get(c.month) ?? 0) > 0 ? formatRiyals(foodicsCashBy.get(c.month)!) : undefined}
                   />
                 ))}
               </div>

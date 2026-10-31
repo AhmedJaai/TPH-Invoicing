@@ -1,5 +1,6 @@
 "use client";
 
+import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 /**
  * يضمّ حركةَ بنكٍ إلى إقرار الضريبة أو يُخرجها — مربّعٌ في صفّها، وزرٌّ لمجموعة.
  *
@@ -141,12 +142,17 @@ async function act(body: Record<string, unknown>, failTitle: string): Promise<bo
  * مبيعاتُ النقد التي لم تُودَع لشهر — تُكتب شاملةَ الضريبة، والخادمُ يحوّلها هللاتٍ ويحسب.
  * الفارغُ «لم يُكتب» لا صفر.
  */
-export function VatCashField({ month, label, initial, locked }: {
+export function VatCashField({ month, label, initial, locked, foodicsCash }: {
   month: string;
   label: string;
   /** ما كُتب من قبل بالريال نصّاً — فارغٌ لم يُكتب. */
   initial: string;
   locked?: string;
+  /**
+   * نقدُ فودكس للشهر بالريال نصّاً — يُعرض حين قال المالك إنّ النقد عنده لم يُودَع، فيُكتب في
+   * الخانة بضغطةٍ ويحفظه هو. فودكس لا يكتب في الإقرار: الاقتراحُ يملأ الحقل، والحفظُ بيده.
+   */
+  foodicsCash?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
@@ -167,6 +173,11 @@ export function VatCashField({ month, label, initial, locked }: {
           className={FIELD}
         />
         {locked && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{locked}</span>}
+        {!locked && foodicsCash && value.trim() !== foodicsCash && (
+          <button type="button" onClick={() => setValue(foodicsCash)} className="mt-1 block text-start text-[11px] font-bold text-accent hover:underline">
+            اكتب نقد فودكس لهذا الشهر: {formatRiyalsDisplay(parseRiyals(foodicsCash) ?? 0)}
+          </button>
+        )}
       </label>
       <ActionButton
         size="sm"

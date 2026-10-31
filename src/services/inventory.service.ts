@@ -151,6 +151,7 @@ export async function loadSoldLines(
            sl.quantity,
            sl.line_total_minor,
            sl.is_refund,
+           (case when sl.is_refund then fo.wasted_lines > 0 end) as ingredients_wasted,
            (sl.is_void or s.is_void) as is_void,
            sl.is_complimentary,
            coalesce((
@@ -172,6 +173,8 @@ export async function loadSoldLines(
       from sale_lines sl
       join sales s on s.id = sl.sale_id
       left join pos_products pp on pp.id = sl.pos_product_id
+      /* جوابُ الكاشير عند الردّ — طلبُ المرتجَع نفسُه في مرآة فودكس (FDX ومرجعُه) */
+      left join foodics_orders fo on sl.is_refund and fo.reference::text = substring(s.external_id from 5) and s.external_id like 'FDX:%'
      where s.business_date >= ${periodStart}
        and s.business_date <= ${periodEnd}
        and not sl.is_modifier
@@ -190,6 +193,7 @@ export async function loadSoldLines(
     quantityMilli: soldMilli(r.quantity),
     lineTotalMinor: Number(r.line_total_minor),
     isRefund: Boolean(r.is_refund),
+    ingredientsWasted: r.ingredients_wasted === null || r.ingredients_wasted === undefined ? null : Boolean(r.ingredients_wasted),
     isVoid: Boolean(r.is_void),
     isComplimentary: Boolean(r.is_complimentary),
     modifierExternalIds: Array.isArray(r.modifier_ids)
@@ -213,6 +217,7 @@ export async function loadSoldTotals(periodStart: string, periodEnd: string, con
            pp.external_id            as pos_external_id,
            pp.product_id             as menu_product_id,
            sl.is_refund,
+           (case when sl.is_refund then fo.wasted_lines > 0 end) as ingredients_wasted,
            (sl.is_void or s.is_void) as is_void,
            sl.is_complimentary,
            sum(sl.quantity)::text    as quantity,
@@ -220,11 +225,14 @@ export async function loadSoldTotals(periodStart: string, periodEnd: string, con
       from sale_lines sl
       join sales s on s.id = sl.sale_id
       left join pos_products pp on pp.id = sl.pos_product_id
+      /* جوابُ الكاشير عند الردّ — طلبُ المرتجَع نفسُه في مرآة فودكس (FDX ومرجعُه) */
+      left join foodics_orders fo on sl.is_refund and fo.reference::text = substring(s.external_id from 5) and s.external_id like 'FDX:%'
      where s.business_date >= ${periodStart} and s.business_date <= ${periodEnd} and not sl.is_modifier
-     group by 1, 2, pp.external_id, pp.product_id, sl.is_refund, (sl.is_void or s.is_void), sl.is_complimentary
+     group by 1, 2, pp.external_id, pp.product_id, sl.is_refund, 7, (sl.is_void or s.is_void), sl.is_complimentary
   `);
   return rows.rows.map((r) => {
-    const id = `${String(r.business_date)}|${String(r.key)}|${r.is_refund ? "R" : ""}${r.is_void ? "V" : ""}${r.is_complimentary ? "C" : ""}`;
+    const wasted = r.ingredients_wasted === null || r.ingredients_wasted === undefined ? null : Boolean(r.ingredients_wasted);
+    const id = `${String(r.business_date)}|${String(r.key)}|${r.is_refund ? "R" : ""}${wasted === true ? "W" : wasted === false ? "K" : ""}${r.is_void ? "V" : ""}${r.is_complimentary ? "C" : ""}`;
     return {
       saleId: id, lineId: id,
       businessDate: String(r.business_date),
@@ -234,6 +242,7 @@ export async function loadSoldTotals(periodStart: string, periodEnd: string, con
       quantityMilli: soldMilli(r.quantity),
       lineTotalMinor: Number(r.line_total_minor),
       isRefund: Boolean(r.is_refund),
+      ingredientsWasted: wasted,
       isVoid: Boolean(r.is_void),
       isComplimentary: Boolean(r.is_complimentary),
       modifierExternalIds: [],

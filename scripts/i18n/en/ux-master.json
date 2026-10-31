@@ -117,5 +117,14 @@
 "ربما لم تُستعمل شاشة التحضير في هذه الأيام، أو لم تُقرأ مزامنة فودكس الأخيرة بعد.": "The kitchen screen may not have been used these days, or the latest Foodics sync hasn't been read yet.",
 "أبعد من المعتاد بكثير — تحقّق": "Far beyond usual — verify",
 "أوقات التحضير لم تُقرأ من فودكس بعد.": "Preparation times haven't been read from Foodics yet.",
-"{0} من {1} لم يُقرأ وقتها من فودكس بعد، فالأرقام عن جزء من الطلبات.": "{0} of {1} haven't had their times read from Foodics yet, so these figures cover only part of the orders."
+"{0} من {1} لم يُقرأ وقتها من فودكس بعد، فالأرقام عن جزء من الطلبات.": "{0} of {1} haven't had their times read from Foodics yet, so these figures cover only part of the orders.",
+"مرتجع هُدرت مكوّناته": "Returned with ingredients wasted",
+"لم يُسجَّل هدرٌ باليد في الجرد — المجموعُ كلُّه من المرتجع الذي قال الكاشير إنّ مكوّناته هُدرت.": "No waste was recorded by hand in counts — the whole total is from returns the cashier marked as wasted.",
+"المرتجع الذي قال الكاشير عند ردّه إنّ مكوّناته هُدرت يُحسب مستهلكاً وهدراً معاً (المشروبات: {0}، من فودكس لا من سجلٍّ يدوي). وما قال إنها لم تُهدر يعود إلى الرف.": "A return the cashier marked as ingredients-wasted counts as both consumed and wasted (drinks: {0}, from Foodics, not a manual record). Returns marked not wasted go back to the shelf.",
+"من المرتجع الذي هُدرت مكوّناته": "from returns with wasted ingredients",
+"أين هذا النقد؟": "Where is this cash?",
+"عندي نقداً ولم يُصرف": "I hold it in cash, unspent",
+"يُصرف منه على المقهى": "It's spent on the café",
+"نقد عندك لم يُودَع": "Cash you hold, not deposited",
+"النقد عندك ولم يُصرف": "The cash is with you, unspent"
 }

@@ -24,6 +24,7 @@ import { loadCashOutlook } from "./cash-outlook.service";
 import { loadBalanceTotals, loadOverdueBalances } from "./supplier-balance.service";
 import { loadPayrollMonth } from "./payroll.service";
 import { loadFinancePosition } from "./finance-position.service";
+import { loadCashCustody } from "./app-settings.service";
 import { listCounts } from "./inventory.service";
 import { loadWasteBoard } from "./waste-board.service";
 import { loadPnlSeries } from "./profit.service";
@@ -220,8 +221,12 @@ const TOOLS = [
       for (const p of o.prepaid) f.sar(`دفعة مقدّمة قادمة (تقدير بمبلغ السابقة) — ${p.label}: تغطي حتى ${formatMonth(p.coveredThrough)} والتالية في ${formatMonth(p.dueMonth)}`, p.estimateMinor);
       f.sar(`المستحقّ للمورّدين (${countNoun(b.totals.owedSuppliers, SUPPLIER)})`, b.totals.owedMinor);
       /* نقدُ الصندوق لا يدخل البنك — وما دُفع منه لا يظهر تكلفة: أرجحُ ما يغيب عن الدفاتر */
-      const position = await loadFinancePosition();
-      f.sar(`نقد قبضه فودكس منذ البداية ولم يدخل البنك (لا تُعرف وجهته: قد يكون دفع منه رواتب أو مشتريات لا تظهر تكلفةً)`, position.cash.totalMinor);
+      const [position, custody] = await Promise.all([loadFinancePosition(), loadCashCustody()]);
+      f.sar(custody.value === "OWNER_HOLDS"
+        ? "نقد قبضه فودكس منذ البداية ولم يدخل البنك — عند المالك نقداً ولم يُصرف (قاله المالك): ليس تكلفة غائبة، وضريبته مستحقّة"
+        : custody.value === "SPENT"
+          ? "نقد قبضه فودكس منذ البداية ولم يدخل البنك — يُصرف منه على المقهى (قاله المالك): ما صُرف ولم يُدخَل في «ما لا يظهر في الكشف» تكلفةٌ غائبة"
+          : "نقد قبضه فودكس منذ البداية ولم يدخل البنك (لم يقل المالك أين هو: محفوظٌ أم يُصرف منه)", position.cash.totalMinor);
       for (const x of overdue.slice(0, 8)) f.sar(`متأخّر أكثر من ستين يوماً — ${x.nameAr} (أقدم فاتورة عمرها ${countNoun(x.oldestDays, DAY)})`, x.owedMinor);
       return { facts: f.facts, label: "يراجع النقد والالتزامات" };
     },
@@ -279,7 +284,7 @@ const TOOLS = [
       }
       f.sar(`الهدر المسجّل بتكلفته منذ ${waste.since}`, waste.knownCostMinor);
       f.count("سجلّات هدر يدويّة في الجرد", waste.recordCount);
-      f.count("مشروبات مرتجعة بعد التحضير (من أسطر البيع)", Math.round(waste.returnedAfterPrep.unitsMilli / 1000));
+      f.count("مشروبات مرتجعة قال الكاشير إنّ مكوّناتها هُدرت (آخر ثمانية أسابيع)", Math.round(waste.returnedAfterPrep.unitsMilli / 1000));
       f.count("طلبات مرتجع في آخر تسعين يوماً (فودكس)", returns.returnOrders);
       f.count("منها ما قال الكاشير إنّ مكوّناتها هُدرت", returns.answered > 0 ? returns.wastedOrders : null);
       return { facts: f.facts, label: "يراجع الجرد والهدر" };

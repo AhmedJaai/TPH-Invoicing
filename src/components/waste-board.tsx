@@ -44,12 +44,12 @@ export async function WasteBoardSection() {
             <p className="mt-2 text-2xl font-semibold tracking-tight"><Money minor={b.knownCostMinor} currency /></p>
             <p className="mt-1 text-[11px] text-muted">
               {b.recordCount === 0
-                ? "لم يُسجَّل هدرٌ باليد في الجرد — المجموعُ كلُّه من المرتجع بعد التحضير."
+                ? "لم يُسجَّل هدرٌ باليد في الجرد — المجموعُ كلُّه من المرتجع الذي قال الكاشير إنّ مكوّناته هُدرت."
                 : <T s="سُجّل فيها هدر {0}{1}" a={[countNoun(b.recordCount, TIME), recordsUnknown > 0 && <span key="1" className="font-bold text-warn"> <T s=" · منها {0} تكلفتها غير معروفة، وهي خارج المجموع" a={[countNoun(recordsUnknown, TIME)]} /></span>]} />}
               {b.returnedAfterPrep.unknownCount > 0 && <span className="font-bold text-warn"> <T s=" · ومن مكوّنات المرتجع {0} بلا سعرٍ معروف، خارج المجموع" a={[countNoun(b.returnedAfterPrep.unknownCount, PRODUCT)]} /></span>}</p>
             {b.returnedAfterPrep.lines > 0 && (
               <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                <T s="المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً (المشروباتُ المرتجعة بعد التحضير: {0}، من أسطر البيع لا من سجلٍّ يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
+                <T s="المرتجع الذي قال الكاشير عند ردّه إنّ مكوّناته هُدرت يُحسب مستهلكاً وهدراً معاً (المشروبات: {0}، من فودكس لا من سجلٍّ يدوي). وما قال إنها لم تُهدر يعود إلى الرف." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
             )}
             <div className="mt-4">
               <BarList
@@ -77,7 +77,7 @@ export async function WasteBoardSection() {
                     key: p.productId,
                     label: p.productName,
                     minor: p.costMinor,
-                    sub: p.count === 0 ? "من المرتجع بعد التحضير" : p.returned ? `${countNoun(p.count, TIME)} · ومن المرتجع` : countNoun(p.count, TIME),
+                    sub: p.count === 0 ? "من المرتجع الذي هُدرت مكوّناته" : p.returned ? `${countNoun(p.count, TIME)} · ومن المرتجع` : countNoun(p.count, TIME),
                     href: `/inventory/items/${p.productId}`,
                   }))}
                 />

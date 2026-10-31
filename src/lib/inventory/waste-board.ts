@@ -33,7 +33,7 @@ export type BoardReason = WasteReason | "RETURNED_AFTER_PREP";
 
 export const BOARD_REASON_LABEL: Record<BoardReason, string> = {
   ...WASTE_REASON_LABEL,
-  RETURNED_AFTER_PREP: "مرتجع بعد التحضير",
+  RETURNED_AFTER_PREP: "مرتجع هُدرت مكوّناته",
 };
 
 /** مكوّنُ مرتجعٍ بعد التحضير — بلا سبب، فسببُه واحد. */

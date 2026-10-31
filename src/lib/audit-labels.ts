@@ -134,6 +134,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   DOCUMENT_EXPIRY_SAVED: "حفظ وثيقة بتاريخ انتهائها",
   DOCUMENT_EXPIRY_CLOSED: "أرشفة وثيقة أو إعادتها",
   PAYMENT_CASH_FLOOR_SET: "ضبط حدّ الرصيد الأدنى",
+  CASH_CUSTODY_SET: "أين نقد الصندوق",
   BANK_HELD_ROW_RESOLVED: "قرار في سطر كشف غير واضح",
   BANK_ACCOUNT_UPDATED: "تعديل بيانات حساب بنكيّ",
   BANK_RULE_DELETED: "حذف قاعدة تصنيف",

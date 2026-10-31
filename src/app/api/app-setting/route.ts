@@ -9,15 +9,19 @@ import { NextResponse } from "next/server";
 import { readJson } from "@/lib/request-body";
 import { guard, respondTo } from "@/services/guard";
 import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
-import { saveCashFloor } from "@/services/app-settings.service";
+import { saveCashCustody, saveCashFloor } from "@/services/app-settings.service";
 
 export const runtime = "nodejs";
 
-const Body = z.object({
-  setting: z.literal("cash-floor"),
-  /** بالريالات نصّاً — وفارغٌ أو غائبٌ يرفع الحدّ */
-  amount: z.string().max(30).optional(),
-});
+const Body = z.discriminatedUnion("setting", [
+  z.object({
+    setting: z.literal("cash-floor"),
+    /** بالريالات نصّاً — وفارغٌ أو غائبٌ يرفع الحدّ */
+    amount: z.string().max(30).optional(),
+  }),
+  /* أين نقدُ الصندوق — جوابُ المالك؛ و`null` «لم يُقَل» */
+  z.object({ setting: z.literal("cash-custody"), value: z.enum(["OWNER_HOLDS", "SPENT"]).nullable() }),
+]);
 
 export async function POST(request: Request) {
   let user;
@@ -31,7 +35,12 @@ export async function POST(request: Request) {
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
-  const raw = read.body.amount?.trim() ?? "";
+  const body = read.body;
+  if (body.setting === "cash-custody") {
+    await saveCashCustody(body.value, user.id);
+    return NextResponse.json({ ok: true, message: body.value === "OWNER_HOLDS" ? "حُفظ: النقد عندك ولم يُصرف" : body.value === "SPENT" ? "حُفظ: يُصرف من النقد على المقهى" : "أُزيل الجواب" });
+  }
+  const raw = body.amount?.trim() ?? "";
 
   if (raw === "") {
     await saveCashFloor(null, user.id);

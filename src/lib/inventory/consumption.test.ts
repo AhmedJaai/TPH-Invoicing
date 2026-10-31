@@ -164,6 +164,30 @@ describe("الملغى والمرتجع والمجانيّ — ثلاثة لا �
     expect(r.returnedAfterPrep.lines).toBe(0);
   });
 
+  describe("جوابُ الكاشير هو الحَكَم (أحمد، ٣١ أكتوبر ٢٠٢٦)", () => {
+    it("قال «لم تُهدر»: يعود إلى الرفّ ولو كانت وصفتُه محضَّرة — لا هدرَ يُعَدّ", () => {
+      const r = computeConsumption([sold({ quantityMilli: 10 * 1000 }), sold({ quantityMilli: 2 * 1000, isRefund: true, ingredientsWasted: false })], versions);
+      const coffee = r.byIngredient.get(COFFEE)!;
+      /* ثمانيةٌ استُهلكت × ١٨ جراماً — المرتجعان أُلغيا قبل التحضير وعادت مكوّناتُهما */
+      expect(canonicalToQuantity(coffee.canonicalMilli, "G")).toBe(144);
+      expect(coffee.fromReturnedWasteMilli).toBe(0);
+      expect(r.returnedAfterPrep.lines).toBe(0);
+    });
+
+    it("قال «هُدرت»: هدرٌ ولو كانت وصفتُه بالحبّة", () => {
+      const WATER = "p-water";
+      const shelf = indexRecipeVersions([version({ ingredients: [{ productId: WATER, quantityMilli: 1000, unit: "PIECE", prepLossBp: null }] })]);
+      const r = computeConsumption([sold({ quantityMilli: 2 * 1000, isRefund: true, ingredientsWasted: true })], shelf);
+      expect(r.byIngredient.get(WATER)!.fromReturnedWasteMilli).toBe(2000);
+      expect(r.returnedAfterPrep.lines).toBe(1);
+    });
+
+    it("وبلا جوابٍ تُحكَم الوصفةُ كما كانت", () => {
+      const r = computeConsumption([sold({ quantityMilli: 2 * 1000, isRefund: true, ingredientsWasted: null })], versions);
+      expect(r.returnedAfterPrep.lines).toBe(1);
+    });
+  });
+
   it("وصنفٌ بلا وصفة يبقى خارج الحساب مرتجَعاً أو مباعاً — لا يُخترَع له هدر", () => {
     const r = computeConsumption([sold({ menuProductId: AMERICANO, isRefund: true })], versions);
     expect(r.excluded[0].reason).toBe("NO_RECIPE");

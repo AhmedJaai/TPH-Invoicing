@@ -109,6 +109,7 @@ export type AuditAction =
   | "DOCUMENT_EXPIRY_CLOSED"
   /* حدُّ الرصيد الأدنى الذي يُنبَّه تحته «النقد القادم» */
   | "PAYMENT_CASH_FLOOR_SET"
+  | "CASH_CUSTODY_SET"
   /* ── الجرد وتسوية المخزون ── */
   | "SALES_IMPORTED"
   /* مورّدُ فودكس رُبط بمورّدنا أو فُكّ — قرارُ إنسانٍ تقوم عليه مقارنةُ المشتريات */

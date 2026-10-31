@@ -9,12 +9,14 @@ import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { BarList, Callout, DataTable, KeyFigure, LinkButton, NoAccess, Section, type Column } from "@/components/ui";
 import { DAY, SUPPLIER, countNoun } from "@/lib/arabic";
-import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { daysSinceRiyadh, formatDay, formatMonth, isoDay } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
 import { loadFinancePosition, TILL_SMALL_MINOR, type TillRow } from "@/services/finance-position.service";
 import { loadFinanceAttentionFacts, tillSignalKey } from "@/services/finance-attention.service";
 import { SignalControls } from "@/components/signal-controls";
 import { T } from "@/components/i18n/t";
+import { CashCustodyChoice } from "@/components/cash-custody";
+import { loadCashCustody } from "@/services/app-settings.service";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,8 @@ export default async function FinancePositionPage() {
   if (!can(user.role, "amounts:view")) {
     return <PageShell user={user} title="الوضع الآن"><NoAccess what="الوضع المالي" /></PageShell>;
   }
-  const [pos, attention, start] = await Promise.all([loadFinancePosition(), loadFinanceAttentionFacts(), loadStartState()]);
+  const [pos, attention, start, custody] = await Promise.all([loadFinancePosition(), loadFinanceAttentionFacts(), loadStartState(), loadCashCustody()]);
+  const holds = custody.value === "OWNER_HOLDS";
   const unknown = <span className="text-xl text-muted">غير معروف</span>;
   const flagged = attention.tillGaps;
   const canSilence = can(user.role, "bank:edit");
@@ -88,10 +91,12 @@ export default async function FinancePositionPage() {
         />
         <KeyFigure
           icon={Banknote}
-          label="نقد سجّله فودكس ولم يدخل البنك"
+          label={holds ? "نقد عندك لم يُودَع" : "نقد سجّله فودكس ولم يدخل البنك"}
           /* بلا مبيعاتٍ من فودكس لا يُعرف النقد — لا «0.00 منذ البداية» */
           value={pos.cash.firstDay ? <Money minor={pos.cash.totalMinor} currency /> : unknown}
-          sub={pos.cash.firstDay ? <><T s="منذ {0}. لا توجد في الكشف إيداعات نقدية، والبيانات لا تبيّن كم بقي منه." a={[<bdi key="0">{formatDay(pos.cash.firstDay)}</bdi>]} /></> : "لم تصل مبيعات من فودكس بعد."}
+          sub={!pos.cash.firstDay ? "لم تصل مبيعات من فودكس بعد." : holds
+            ? <><T s="منذ {0}، ما قبضه فودكس نقداً. قلت إنه عندك ولم يُصرف ({1})، وضريبته مستحقة لأنه مبيعات." a={[<bdi key="0">{formatDay(pos.cash.firstDay)}</bdi>, <bdi key="1">{formatDay(isoDay(custody.setOn!))}</bdi>]} /></>
+            : <><T s="منذ {0}. لا توجد في الكشف إيداعات نقدية، والبيانات لا تبيّن كم بقي منه." a={[<bdi key="0">{formatDay(pos.cash.firstDay)}</bdi>]} /></>}
           href="#cash"
         />
       </div>
@@ -133,8 +138,12 @@ export default async function FinancePositionPage() {
       </div>
 
       <Section id="cash" title="النقد والصندوق" icon={Banknote} hint="كل نقد المقهى خارج البنك: ما سجّله فودكس نقداً، وما عُدّ في الدرج عند الإقفال.">
-        <Callout tone="info" icon={Info} title="ما نعرفه وما لا نعرفه">
-          <T s="يعرف فودكس كم دخل نقداً وكم عُدّ في الدرج عند كل إقفال، لكن البيانات لا تبيّن أين ذهب النقد بعد الإقفال: هل صُرف على المقهى أم سُحب. فإن كنت تدفع منه رواتب أو مشتريات فأدخلها في «ما لا يظهر في الكشف» لتدخل في قائمة الدخل.{0}{1}" a={[last && <Fragment key="0"> <T s=" آخر عدّ: {0}، وفي الدرج {1} والمتوقع {2}." a={[<bdi key="0">{formatDay(last.day)}</bdi>, <strong key="1"><MaybeMoney minor={last.countedMinor} /></strong>, <MaybeMoney key="2" minor={last.expectedMinor} />]} /></Fragment>, <div key="1" className="mt-3"><LinkButton href="/finance/inputs" size="sm">ما لا يظهر في الكشف</LinkButton></div>]} /></Callout>
+        <Callout tone="info" icon={Info} title={holds ? "النقد عندك ولم يُصرف" : "ما نعرفه وما لا نعرفه"}>
+          <T s={holds
+            ? "يعرف فودكس كم دخل نقداً وكم عُدّ في الدرج عند كل إقفال، وقلت إنه عندك نقداً ولم يُصرف على المقهى. فهو ليس تكلفة غائبة عن قائمة الدخل، لكن ضريبته مستحقة: اكتبه في «نقد لم يُودَع» في الإقرار. وإن صرفت منه شيئاً فأدخله في «ما لا يظهر في الكشف».{0}{1}"
+            : "يعرف فودكس كم دخل نقداً وكم عُدّ في الدرج عند كل إقفال، لكن البيانات لا تبيّن أين ذهب النقد بعد الإقفال: هل صُرف على المقهى أم سُحب. فإن كنت تدفع منه رواتب أو مشتريات فأدخلها في «ما لا يظهر في الكشف» لتدخل في قائمة الدخل.{0}{1}"} a={[last && <Fragment key="0"> <T s=" آخر عدّ: {0}، وفي الدرج {1} والمتوقع {2}." a={[<bdi key="0">{formatDay(last.day)}</bdi>, <strong key="1"><MaybeMoney minor={last.countedMinor} /></strong>, <MaybeMoney key="2" minor={last.expectedMinor} />]} /></Fragment>, <div key="1" className="mt-3"><LinkButton href="/finance/inputs" size="sm">ما لا يظهر في الكشف</LinkButton></div>]} />
+          {can(user.role, "bank:edit") && <CashCustodyChoice value={custody.value} />}
+        </Callout>
 
         {flagged.length > 0 && (
           <ul className="mt-4 space-y-2" aria-label="صناديق تحتاج مراجعتك">
