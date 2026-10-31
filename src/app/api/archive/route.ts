@@ -370,6 +370,12 @@ async function archive(request: Request, staged: (url: string) => void): Promise
 
     // ── القاعدة ──
     const driveMd5 = md5Of(data);
+    const corrections = diffCorrections(serverRaw ?? {}, {
+      invoiceNumber: body.invoiceNumber ?? "",
+      invoiceDate: body.invoiceDate ?? "",
+      totalAmount: body.total ?? "",
+      vatAmount: body.vat ?? "",
+    });
     let ownerPaid: { amountMinor: number; fromTransfers: boolean } | null = null;
     const documentId = await db.transaction(async (tx) => {
       const docId = await createDocument(tx, {
@@ -535,6 +541,26 @@ async function archive(request: Request, staged: (url: string) => void): Promise
         ? { codes: review.overridden.map((b) => b.code), actorId: user.id, reason: "أقرّ صاحب العمل عند الأرشفة أن الفاتورة له رغم المانع" }
         : undefined);
 
+      /* أثرُ الأرشفة في المعاملة نفسها — كان بعدها، فإن سقط بقي مستندٌ بلا سطرِ من رفعه */
+      await recordAudit({
+        actorId: user.id,
+        action: "DOCUMENT_ARCHIVED",
+        entityType: "document",
+        entityId: docId,
+        before: serverRaw,
+        after: {
+          fileName: uploaded.fileName,
+          driveFileId: uploaded.fileId,
+          folderName: body.folderName,
+          periodMonth,
+          /* الشهر المصحَّح يُسجَّل بطرفيه — لا يُبتلَع */
+          ...(monthCorrected ? { الشهر_صُحّح: monthCorrected } : {}),
+          الحالة_الضريبية: review.taxStatus,
+          خصم_المدخلات: review.inputVatStatus,
+          manualCorrections: corrections,
+        },
+      }, tx);
+
       return docId;
     }).catch(async (e: unknown) => {
       /*
@@ -555,32 +581,6 @@ async function archive(request: Request, staged: (url: string) => void): Promise
         reason: e instanceof MonthClosedError ? e.message : code ? `رفضت قاعدة البيانات التسجيل (${code})` : "تعذّر التسجيل",
       }).catch(() => undefined);
       throw e;
-    });
-
-    const corrections = diffCorrections(serverRaw ?? {}, {
-      invoiceNumber: body.invoiceNumber ?? "",
-      invoiceDate: body.invoiceDate ?? "",
-      totalAmount: body.total ?? "",
-      vatAmount: body.vat ?? "",
-    });
-
-    await recordAudit({
-      actorId: user.id,
-      action: "DOCUMENT_ARCHIVED",
-      entityType: "document",
-      entityId: documentId,
-      before: serverRaw,
-      after: {
-        fileName: uploaded.fileName,
-        driveFileId: uploaded.fileId,
-        folderName: body.folderName,
-        periodMonth,
-        /* الشهر المصحَّح يُسجَّل بطرفيه — لا يُبتلَع */
-        ...(monthCorrected ? { الشهر_صُحّح: monthCorrected } : {}),
-        الحالة_الضريبية: review.taxStatus,
-        خصم_المدخلات: review.inputVatStatus,
-        manualCorrections: corrections,
-      },
     });
 
     return NextResponse.json({

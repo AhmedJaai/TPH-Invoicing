@@ -14,14 +14,18 @@ export const runtime = "nodejs";
 const Body = z.object({ paused: z.boolean() }).strict();
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("auto-process", "document:upload");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("auto-process", "document:upload");
   /* العملُ الآليّ يقيّد مبالغَ ويعتمدها — فضابطُه لمن يراها، كالاعتماد نفسه */
   if (!can(user.role, "amounts:view")) {
     return NextResponse.json({ error: "إيقاف العمل الآلي يحتاج صلاحية عرض المبالغ" }, { status: 403 });

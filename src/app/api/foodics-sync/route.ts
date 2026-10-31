@@ -25,15 +25,19 @@ const BUDGET_MS = 40_000;
 const Body = z.object({ background: z.boolean().optional() }).strict();
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف يُقال بنصّه لا ٥٠٠ */
   try {
-    /* تكتب مبيعاتٍ يُحسَب منها الجرد — صلاحيةُ رفع ملفّ المبيعات نفسُها */
-    user = await guard("foodics-sync", "inventory:count");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+    /* تكتب مبيعاتٍ يُحسَب منها الجرد — صلاحيةُ رفع ملفّ المبيعات نفسُها */
+  const user = await guard("foodics-sync", "inventory:count");
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
 

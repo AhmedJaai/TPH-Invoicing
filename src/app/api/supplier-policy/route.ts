@@ -35,14 +35,18 @@ const Body = z.object({
 type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("supplier-policy", "supplier:edit");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("supplier-policy", "supplier:edit");
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;

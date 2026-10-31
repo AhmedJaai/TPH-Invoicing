@@ -51,14 +51,18 @@ function streamOf(data: Buffer): ReadableStream<Uint8Array> {
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status, headers: { "cache-control": "no-store" } });
 
 export async function GET(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("document-file", "document:view");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("document-file", "document:view");
 
   const id = new URL(request.url).searchParams.get("id") ?? "";
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return fail("معرّف المستند غير صالح", 400);

@@ -22,7 +22,7 @@ import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
 import { WARNING, countNoun } from "@/lib/arabic";
-import { monthEndDay } from "@/lib/riyadh-time";
+import { formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { describeError, logEvent } from "@/lib/log";
 import { freezePnl } from "@/services/profit.service";
 import { sealMonth } from "@/services/month-seal.service";
@@ -44,14 +44,17 @@ const Body = z.object({
 type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
-  let user;
   try {
-    user = await guard("month-close", "month:close");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("month-close", "month:close");
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
@@ -157,7 +160,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "هذا الشهر ليس مقفلاً، فربما فُتح من نافذة أخرى. حدّث الصفحة." }, { status: 409 });
     }
 
-    return NextResponse.json({ ok: true, report, status: "OPEN", message: `أُعيد فتح ${body.month}` });
+    return NextResponse.json({ ok: true, report, status: "OPEN", message: `أُعيد فتح ${formatMonth(body.month)}` });
   }
 
   // ── الإقفال ──
@@ -253,6 +256,6 @@ export async function POST(request: Request) {
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
+    message: `أُقفل ${formatMonth(body.month)}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
   });
 }

@@ -18,14 +18,18 @@ import { loadPaymentRun } from "@/services/payment-run.service";
 export const runtime = "nodejs";
 
 export async function GET() {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("push-brief", "amounts:view");
+    return await handle();
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle() {
+  const user = await guard("push-brief", "amounts:view");
   const canPay = can(user.role, "payment:approve");
   const [pending, start, run] = await Promise.all([
     workCount(user.role),

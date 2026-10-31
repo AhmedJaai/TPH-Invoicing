@@ -33,7 +33,13 @@ const StagedBody = z.object({
 
 export async function POST(request: Request) {
   /* النداء لا يعيش أطول من المسار — يقف بمهلةٍ معلَنة قبل أن يُقتَل */
-  return withDeadline(55_000, () => handle(request));
+  try {
+    return await withDeadline(55_000, () => handle(request));
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 }
 
 async function handle(request: Request) {

@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { advisorMessages, advisorPlanItems, advisorThreads } from "@/db/schema";
 import { callDeepseek, type DeepseekMessage } from "@/lib/ai/deepseek";
 import { isDeepseekConfigured } from "@/lib/ai/models";
-import { advisorSystemPrompt } from "@/lib/advisor/persona";
+import { ADVISOR_PROMPT_VERSION, advisorSystemPrompt } from "@/lib/advisor/persona";
 import { verifiedNumbers } from "@/lib/advisor/verify";
 import type { Fact } from "@/lib/finance/reading";
 import { formatDay, formatMonth, isoDay, todayInRiyadh } from "@/lib/riyadh-time";
@@ -205,7 +205,9 @@ export async function runAdvisorJob(input: TurnInput & { threadId: string; pendi
     }
     if (!answer.trim()) throw new AdvisorFailed("لم يكتب المستشار جواباً");
     await db.update(advisorMessages).set({
-      content: answer.slice(0, 40_000), verified: verifiedNumbers(answer, facts), tools: used, model, status: "DONE", steps: [...steps], error: null,
+      content: answer.slice(0, 40_000), verified: verifiedNumbers(answer, facts), tools: used,
+      /* بنسخة التعليمات: جوابٌ يُراجَع بعد شهر يُعرف بأيّ «مستشار» كُتب */
+      model: `${model} · ${ADVISOR_PROMPT_VERSION}`, status: "DONE", steps: [...steps], error: null,
     }).where(eq(advisorMessages.id, input.pendingId));
     await db.update(advisorThreads).set({ updatedAt: new Date() }).where(eq(advisorThreads.id, input.threadId));
   } catch (e) {

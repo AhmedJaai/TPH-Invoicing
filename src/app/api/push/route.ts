@@ -26,14 +26,18 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("push", "amounts:view");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("push", "amounts:view");
 
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "تعذّرت قراءة طلب الإشعار. حدّث الصفحة وأعد المحاولة." }, { status: 400 });

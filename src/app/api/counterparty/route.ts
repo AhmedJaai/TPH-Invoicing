@@ -240,13 +240,19 @@ export async function POST(request: Request) {
                 matchOutcome: null,
                 matchScore: null,
               }
-            : {}),
+            /*
+              والعكس: ما تُجوهل لأنّه «رسمٌ» أو «تحويلٌ داخليّ» ثمّ قيل إنّه سدادُ مورّد يعود
+              إلى الطابور. كان يبقى «متجاهَلاً» فلا يُطابَق بفاتورةٍ أبداً.
+            */
+            : !notAPayment && b.ignored && !b.posted
+              ? { matchStatus: "UNMATCHED" as const, matchDisposition: null, matchOutcome: null, matchScore: null }
+              : {}),
           lifecycle: deriveLifecycle({
             classified: true,
             hasCandidate: Boolean(body.supplierId),
             decided: true,
             posted: b.posted,
-            ignored: notAPayment || b.ignored,
+            ignored: notAPayment,
           }),
         })
         .where(inArray(bankTransactions.id, b.ids));

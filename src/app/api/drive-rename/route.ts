@@ -45,15 +45,19 @@ type Body = z.infer<typeof Body>;
 
 /** يجمع ما يُبنى به الاسم من الجداول التي تحمله. */
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف يُقال بنصّه لا ٥٠٠ */
   try {
-    /* الأرشيف يُكتَب فيه — فالصلاحية صلاحيةُ رفعٍ لا قراءة */
-    user = await guard("drive-rename", "document:upload");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+    /* الأرشيف يُكتَب فيه — فالصلاحية صلاحيةُ رفعٍ لا قراءة */
+  const user = await guard("drive-rename", "document:upload");
 
   const read = await readJson(request, Body, { emptyOk: true });
   if (!read.ok) return read.response;

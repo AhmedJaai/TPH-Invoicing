@@ -16,14 +16,18 @@ export const runtime = "nodejs";
 const Body = z.object({ supplierId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "المعرّف غير صالح") });
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("supplier-request", "supplier:edit");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("supplier-request", "supplier:edit");
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;

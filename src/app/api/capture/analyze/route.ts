@@ -21,7 +21,13 @@ export const maxDuration = 60;
 const Body = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) });
 
 export async function POST(request: Request) {
-  return withDeadline(55_000, () => handle(request));
+  try {
+    return await withDeadline(55_000, () => handle(request));
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 }
 
 async function handle(request: Request) {

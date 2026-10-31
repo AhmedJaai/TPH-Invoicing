@@ -43,14 +43,18 @@ type Body = z.infer<typeof Body>;
 const UNDECIDED = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
 
 export async function POST(request: Request) {
-  let user;
+  /* كلُّ باب — لا الرفضُ وحده: شهرٌ مقفل في خصم رصيد المورّد عند الاعتماد كان يُردّ ٥٠٠ */
   try {
-    user = await guard("document-status", "document:upload");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("document-status", "document:upload");
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
@@ -241,86 +245,90 @@ export async function POST(request: Request) {
     | { kind: "NO_TWIN"; number: string }
     | { kind: "DONE"; fileName: string; removed: number };
 
-  let outcome: Outcome;
-  try {
-    outcome = await db.transaction(async (t): Promise<Outcome> => {
-      const [doc] = await t
-        .select({ id: documents.id, fileName: documents.fileName, status: documents.status })
-        .from(documents)
-        .where(eq(documents.id, documentId))
-        .for("update")
-        .limit(1);
-      /*
-        والمؤرشَفُ يُلغى كذلك — «هذي الفاتورة ألغيت» (أحمد): فاتورةٌ ألغاها
-        المورّد تبقى مستحقّةً في القيد وتُعدّ متأخّرة. ويُلغيها من يرى المبالغ
-        وحده، وبالشروط نفسها: لا سدادَ عليها، ولا سطرَ كشفٍ طوبق بها، ولا شهرَ
-        مقفل. ولا يُمَسّ ملفُّها في الدرايف (القيد الأوّل).
-      */
-      const rejectable: readonly string[] = can(user.role, "amounts:view") ? [...UNDECIDED, "ARCHIVED"] : UNDECIDED;
-      if (!doc || !rejectable.includes(doc.status)) return { kind: "NOT_PENDING" };
+  const outcome = await db.transaction(async (t): Promise<Outcome> => {
+    const [doc] = await t
+      .select({ id: documents.id, fileName: documents.fileName, status: documents.status })
+      .from(documents)
+      .where(eq(documents.id, documentId))
+      .for("update")
+      .limit(1);
+    /*
+      والمؤرشَفُ يُلغى كذلك — «هذي الفاتورة ألغيت» (أحمد): فاتورةٌ ألغاها
+      المورّد تبقى مستحقّةً في القيد وتُعدّ متأخّرة. ويُلغيها من يرى المبالغ
+      وحده، وبالشروط نفسها: لا سدادَ عليها، ولا سطرَ كشفٍ طوبق بها، ولا شهرَ
+      مقفل. ولا يُمَسّ ملفُّها في الدرايف (القيد الأوّل).
+    */
+    const rejectable: readonly string[] = can(user.role, "amounts:view") ? [...UNDECIDED, "ARCHIVED"] : UNDECIDED;
+    if (!doc || !rejectable.includes(doc.status)) return { kind: "NOT_PENDING" };
 
-      const linked = await t
-        .select({
-          id: invoices.id,
-          number: invoices.invoiceNumber,
-          supplierId: invoices.supplierId,
-          totalMinor: invoices.totalMinor,
-          periodMonth: invoices.periodMonth,
-          invoiceDate: invoices.invoiceDate,
-          allocatedMinor: sql<number>`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)::bigint`,
-          matchedLines: sql<number>`(select count(*) from statement_lines sl where sl.matched_invoice_id = ${invoices}.id)::int`,
-        })
-        .from(invoices)
-        .where(eq(invoices.documentId, doc.id));
+    const linked = await t
+      .select({
+        id: invoices.id,
+        number: invoices.invoiceNumber,
+        supplierId: invoices.supplierId,
+        totalMinor: invoices.totalMinor,
+        periodMonth: invoices.periodMonth,
+        invoiceDate: invoices.invoiceDate,
+        allocatedMinor: sql<number>`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)::bigint`,
+        matchedLines: sql<number>`(select count(*) from statement_lines sl where sl.matched_invoice_id = ${invoices}.id)::int`,
+      })
+      .from(invoices)
+      .where(eq(invoices.documentId, doc.id));
 
-      if (linked.length > 0 && !can(user.role, "amounts:view")) return { kind: "FORBIDDEN" };
-      const paid = linked.find((l) => Number(l.allocatedMinor) > 0);
-      if (paid) return { kind: "PAID", number: paid.number, allocatedMinor: Number(paid.allocatedMinor) };
-      const matched = linked.find((l) => Number(l.matchedLines) > 0);
-      if (matched) return { kind: "MATCHED", number: matched.number };
+    if (linked.length > 0 && !can(user.role, "amounts:view")) return { kind: "FORBIDDEN" };
+    const paid = linked.find((l) => Number(l.allocatedMinor) > 0);
+    if (paid) return { kind: "PAID", number: paid.number, allocatedMinor: Number(paid.allocatedMinor) };
+    const matched = linked.find((l) => Number(l.matchedLines) > 0);
+    if (matched) return { kind: "MATCHED", number: matched.number };
 
-      /*
-        «مكرّرة» دعوى تُفحص: لوريفا SI-0034 (٢٥٣) رُفضت «مكررة» ولا فاتورةَ أخرى بها ولا
-        ملفّ — وكانت من حوالة أغسطس، فبدت الحوالةُ أكبر من فواتيرها وذهب باقيها إلى سبتمبر.
-        فلا يُقبل السببُ إلّا وأصلُه قائم: الرقمُ نفسه بأيّ صيغة، أو اليومُ والمبلغ، أو البصمة.
-      */
-      if (/مكرر|مكرّر|duplicate/i.test(reason) && linked.length > 0) {
-        for (const l of linked) {
-          const key = l.number.toLowerCase().replace(/[^a-z0-9]/g, "");
-          const [twin] = (await t.execute<{ id: string }>(sql`
-            select i.id from invoices i
-             where i.id <> ${l.id} and i.supplier_id is not distinct from ${l.supplierId}
-               and (regexp_replace(lower(i.invoice_number), '[^a-z0-9]', '', 'g') = ${key}
-                    or (i.invoice_date = ${l.invoiceDate} and i.total_minor = ${l.totalMinor}))
-            union all
-            select d2.id from documents d2 join documents d on d.id = ${doc.id}
-             where d2.id <> d.id and d.sha256 is not null and d2.sha256 = d.sha256
-            limit 1`)).rows;
-          if (!twin) return { kind: "NO_TWIN", number: l.number };
-        }
+    /*
+      «مكرّرة» دعوى تُفحص: لوريفا SI-0034 (٢٥٣) رُفضت «مكررة» ولا فاتورةَ أخرى بها ولا
+      ملفّ — وكانت من حوالة أغسطس، فبدت الحوالةُ أكبر من فواتيرها وذهب باقيها إلى سبتمبر.
+      فلا يُقبل السببُ إلّا وأصلُه قائم: الرقمُ نفسه بأيّ صيغة، أو اليومُ والمبلغ، أو البصمة.
+    */
+    if (/مكرر|مكرّر|duplicate/i.test(reason) && linked.length > 0) {
+      for (const l of linked) {
+        const key = l.number.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const [twin] = (await t.execute<{ id: string }>(sql`
+          select i.id from invoices i
+           where i.id <> ${l.id} and i.supplier_id is not distinct from ${l.supplierId}
+             and (regexp_replace(lower(i.invoice_number), '[^a-z0-9]', '', 'g') = ${key}
+                  or (i.invoice_date = ${l.invoiceDate} and i.total_minor = ${l.totalMinor}))
+          union all
+          select d2.id from documents d2 join documents d on d.id = ${doc.id}
+           where d2.id <> d.id and d.sha256 is not null and d2.sha256 = d.sha256
+          limit 1`)).rows;
+        if (!twin) return { kind: "NO_TWIN", number: l.number };
       }
+    }
 
-      await assertMonthsOpen(t, linked.map((l) => l.periodMonth));
+    await assertMonthsOpen(t, linked.map((l) => l.periodMonth));
 
-      const rows = await t
-        .update(documents)
-        .set({ status: "REJECTED" })
-        .where(and(eq(documents.id, doc.id), inArray(documents.status, [...rejectable] as ("PENDING" | "EXTRACTED" | "NEEDS_REVIEW" | "ARCHIVED")[])))
-        .returning({ id: documents.id, fileName: documents.fileName });
-      if (rows.length === 0) return { kind: "NOT_PENDING" };
+    const rows = await t
+      .update(documents)
+      .set({ status: "REJECTED" })
+      .where(and(eq(documents.id, doc.id), inArray(documents.status, [...rejectable] as ("PENDING" | "EXTRACTED" | "NEEDS_REVIEW" | "ARCHIVED")[])))
+      .returning({ id: documents.id, fileName: documents.fileName });
+    if (rows.length === 0) return { kind: "NOT_PENDING" };
 
-      if (linked.length > 0) {
-        await t.delete(invoices).where(eq(invoices.documentId, doc.id));
-      }
-      await t.delete(statements).where(eq(statements.documentId, doc.id));
+    /* الكشفُ يسقط معه كذلك — فيُكتب في الأثر قبل حذفه كما تُكتب الفاتورة */
+    const droppedStatements = await t
+      .select({ id: statements.id, supplierId: statements.supplierId, periodEnd: statements.periodEnd, closingMinor: statements.closingBalanceMinor })
+      .from(statements)
+      .where(eq(statements.documentId, doc.id));
+    if (linked.length > 0) {
+      await t.delete(invoices).where(eq(invoices.documentId, doc.id));
+    }
+    await t.delete(statements).where(eq(statements.documentId, doc.id));
 
-      await recordAudit({
-        actorId: user.id,
-        action: "DOCUMENT_REJECTED",
-        entityType: "document",
-        entityId: rows[0].id,
-        before: linked.length > 0
-          ? {
+    await recordAudit({
+      actorId: user.id,
+      action: "DOCUMENT_REJECTED",
+      entityType: "document",
+      entityId: rows[0].id,
+      before: linked.length + droppedStatements.length > 0
+        ? {
+            ...(linked.length > 0 ? {
               "فواتير أسقطت معه": linked.map((l) => ({
                 المعرّف: l.id,
                 الرقم: l.number,
@@ -329,17 +337,18 @@ export async function POST(request: Request) {
                 التاريخ: l.invoiceDate,
                 الشهر: l.periodMonth,
               })),
-            }
-          : undefined,
-        after: { الملف: rows[0].fileName, السبب: reason },
-      }, t);
-      return { kind: "DONE", fileName: rows[0].fileName, removed: linked.length };
-    });
-  } catch (e) {
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    throw e;
-  }
+            } : {}),
+            ...(droppedStatements.length > 0 ? {
+              "كشوف أسقطت معه": droppedStatements.map((x) => ({
+                المعرّف: x.id, المورّد: x.supplierId, نهايته: x.periodEnd, الرصيد_الختامي: x.closingMinor,
+              })),
+            } : {}),
+          }
+        : undefined,
+      after: { الملف: rows[0].fileName, السبب: reason },
+    }, t);
+    return { kind: "DONE", fileName: rows[0].fileName, removed: linked.length };
+  });
 
   switch (outcome.kind) {
     case "NOT_PENDING":

@@ -41,14 +41,18 @@ const Body = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  let user;
+  /* الطلبُ كلُّه لا الحارسُ وحده: خطأُ عملٍ معروف (شهرٌ مقفل، قيدٌ في القاعدة) يُقال بنصّه لا ٥٠٠ */
   try {
-    user = await guard("document-reread", "document:upload");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("document-reread", "document:upload");
 
   /*
     إعادةُ القراءة قراءةٌ لمبالغ الفاتورة وكتابةٌ لها — فلا تُفتح لمن لا يراها.

@@ -40,5 +40,11 @@ async function handle(request: Request) {
 
 /* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */
 export async function POST(request: Request) {
-  return withDeadline(55_000, () => handle(request));
+  try {
+    return await withDeadline(55_000, () => handle(request));
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 }

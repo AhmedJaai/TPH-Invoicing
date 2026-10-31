@@ -199,3 +199,29 @@ describe("لا نصّ ثانويّاً مبهّتاً دون حدّ التباي
     expect(FADED_TEXT.test('className="text-muted"')).toBe(false);
   });
 });
+
+/*
+  ── الحارسُ وحده في `try` ثمّ الطلبُ كلُّه بلا مترجم ──
+
+  سبعةٌ وعشرون مساراً كانت تلفّ `guard()` بـ`try` وتترك ما بعده: فالشهرُ المقفل أو قيدُ
+  القاعدة أو التوأمُ يخرج ٥٠٠ بلا نصّ، وكلٌّ منها خطأُ عملٍ له جملتُه في `respondTo`.
+  فمسارٌ يكتب `let user;` قبل الحارس يحتاج مترجماً ثانياً على الأقلّ لما بعده.
+*/
+const GUARD_ONLY_TRY = /let user;\n\s+try \{\n(?:\s+\/\*.*\*\/\n)?\s+user = await guard\(/;
+
+describe("لا مسار يترجم أخطاء حارسه وحده", () => {
+  it("كلُّ مسارٍ بـ`let user; try { guard }` يترجم ما بعده كذلك", () => {
+    const hits = SRC.filter((f) => f.startsWith(path.join("src", "app", "api")) && f.endsWith("route.ts"))
+      .filter((f) => {
+        const s = readFileSync(f, "utf8");
+        const mappers = (s.match(/respondTo\(e\)|answer\(|failWith\(/g) ?? []).length;
+        return GUARD_ONLY_TRY.test(s) && mappers <= 1;
+      });
+    expect(hits).toEqual([]);
+  });
+
+  it("والحارس يمسك الشكل الخاطئ", () => {
+    expect(GUARD_ONLY_TRY.test("  let user;\n  try {\n    user = await guard(\"x\", \"y\");")).toBe(true);
+    expect(GUARD_ONLY_TRY.test("  const user = await guard(\"x\", \"y\");")).toBe(false);
+  });
+});
