@@ -10,7 +10,7 @@ import { readJson } from "@/lib/request-body";
 import { productCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { guard, respondTo, failWith } from "@/services/guard";
-import { linkToProduct, unlink } from "@/services/product.service";
+import { linkToProduct, unlinkMany } from "@/services/product.service";
 import { recordAudit } from "@/lib/audit";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 
@@ -46,15 +46,9 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "unlink") {
-    for (const id of ids) await unlink(id);
-    await recordAudit({
-      actorId: user.id,
-      action: "PRODUCT_UNLINKED",
-      entityType: "supplier_product",
-      entityId: ids[0],
-      after: { عدد: ids.length },
-    });
-    return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(ids.length, PRODUCT)}` });
+    const n = await unlinkMany(ids, user.id);
+    if (n === 0) return NextResponse.json({ error: "لم يكن شيء من المختار مربوطاً، فربما فُكّ من نافذة أخرى. حدّث الصفحة." }, { status: 409 });
+    return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(n, PRODUCT)}` });
   }
 
   try {

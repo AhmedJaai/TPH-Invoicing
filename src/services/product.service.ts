@@ -5,7 +5,8 @@
  * أمّا ربط أصناف مورّدين مختلفين بصنف معياري واحد فلا يقع آلياً أبداً:
  * درس «العنب» أنّ الاسم الواحد قد يخفي شيئين. يُقترح، ويؤكّده إنسان.
  */
-import { and, eq, sql, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/db";
 import { invoiceLines, products, supplierProducts } from "@/db/schema";
 import { suggestCategory, type ProductCategory } from "@/lib/products";
@@ -202,12 +203,25 @@ export async function linkToProduct(input: LinkInput): Promise<LinkResult> {
   return { productId, productName, linked, createdProduct };
 }
 
-/** يفكّ الربط ويعيد الصنف اقتراحاً غير مؤكَّد. */
-export async function unlink(supplierProductId: string): Promise<void> {
-  await db
-    .update(supplierProducts)
-    .set({ productId: null, confirmedById: null, confirmedAt: null })
-    .where(eq(supplierProducts.id, supplierProductId));
+/**
+ * يفكّ ربط المختار ويعيده اقتراحاً غير مؤكَّد — تحديثٌ واحد (كلُّه أو لا شيء)، ويُرجع عددَ
+ * ما فُكّ فعلاً: كان يُفكّ صنفاً صنفاً ويقول «فُكّ ربط عشرة» وإن لم يوجد منها شيء.
+ */
+export async function unlinkMany(supplierProductIds: readonly string[], actorId: string): Promise<number> {
+  return db.transaction(async (t) => {
+    const rows = await t
+      .update(supplierProducts)
+      .set({ productId: null, confirmedById: null, confirmedAt: null })
+      .where(and(inArray(supplierProducts.id, [...supplierProductIds]), isNotNull(supplierProducts.productId)))
+      .returning({ id: supplierProducts.id });
+    if (rows.length > 0) {
+      await recordAudit({
+        actorId, action: "PRODUCT_UNLINKED", entityType: "supplier_product", entityId: rows[0].id,
+        after: { عدد: rows.length, الأصناف: rows.map((r) => r.id) },
+      }, t);
+    }
+    return rows.length;
+  });
 }
 
 /** أصناف معيارية قائمة — للاختيار منها. */

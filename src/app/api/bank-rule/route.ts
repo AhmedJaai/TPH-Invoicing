@@ -64,18 +64,24 @@ async function handle(request: Request) {
   */
   if (body.action === "delete") {
     if (typeof body.id !== "string" || !body.id) return NextResponse.json({ error: "حدّد القاعدة" }, { status: 400 });
-    const [gone] = await db
-      .delete(bankRules)
-      .where(eq(bankRules.id, body.id))
-      .returning({ id: bankRules.id, pattern: bankRules.pattern, category: bankRules.category });
-    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة، فربما حُذفت من نافذة أخرى" }, { status: 404 });
-    await recordAudit({
-      actorId: user.id,
-      action: "BANK_RULE_DELETED",
-      entityType: "bank_rule",
-      entityId: gone.id,
-      before: { النمط: gone.pattern, التصنيف: CATEGORY_LABEL[gone.category as TxCategory] ?? gone.category },
+    const id = body.id;
+    /* الحذفُ وأثرُه معاً: قاعدةٌ تُمحى بلا سطرٍ يقول ما كانت لا تُستعاد */
+    const gone = await db.transaction(async (t) => {
+      const [g] = await t
+        .delete(bankRules)
+        .where(eq(bankRules.id, id))
+        .returning({ id: bankRules.id, pattern: bankRules.pattern, category: bankRules.category });
+      if (!g) return null;
+      await recordAudit({
+        actorId: user.id,
+        action: "BANK_RULE_DELETED",
+        entityType: "bank_rule",
+        entityId: g.id,
+        before: { النمط: g.pattern, التصنيف: CATEGORY_LABEL[g.category as TxCategory] ?? g.category },
+      }, t);
+      return g;
     });
+    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة، فربما حُذفت من نافذة أخرى" }, { status: 404 });
     return NextResponse.json({ ok: true, message: `حُذفت قاعدة «${gone.pattern}»، ولن تُطبَّق على الكشوف القادمة` });
   }
 

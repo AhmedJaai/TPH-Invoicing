@@ -64,38 +64,43 @@ async function handle(request: Request) {
   if (body.action === "delete") {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
     // لا يُحذف بل يُعطَّل — فيبقى ما بُني عليه من مقارنات سابقة مفهوماً
-    await db
-      .update(recurringExpenses)
-      .set({ isActive: false })
-      .where(eq(recurringExpenses.id, body.id));
-
-    await recordAudit({
-      actorId: user.id,
-      action: "EXPENSE_REMOVED",
-      entityType: "recurring_expense",
-      entityId: body.id,
-      after: { الحالة: "معطّل" },
+    /* والأثرُ في معاملة التعطيل؛ ومعرّفٌ لا مصروفَ له لا يُقال عنه «عُطّل» */
+    const id = body.id;
+    const row = await db.transaction(async (t) => {
+      const [r] = await t.update(recurringExpenses).set({ isActive: false })
+        .where(eq(recurringExpenses.id, id)).returning({ label: recurringExpenses.label });
+      if (!r) return null;
+      await recordAudit({
+        actorId: user.id,
+        action: "EXPENSE_REMOVED",
+        entityType: "recurring_expense",
+        entityId: id,
+        after: { البند: r.label, الحالة: "معطّل" },
+      }, t);
+      return r;
     });
-    return NextResponse.json({ ok: true, message: "عُطّل المصروف ولم يُحذف" });
+    if (!row) return NextResponse.json({ error: "المصروف غير موجود. حدّث الصفحة." }, { status: 404 });
+    return NextResponse.json({ ok: true, message: `عُطّل «${row.label}» ولم يُحذف` });
   }
 
   /* المعطَّل يُعاد — نقرةٌ خاطئة على «عطّله» لم يكن لها رجوع */
   if (body.action === "activate") {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
-    const [row] = await db
-      .update(recurringExpenses)
-      .set({ isActive: true })
-      .where(eq(recurringExpenses.id, body.id))
-      .returning({ label: recurringExpenses.label });
-    if (!row) return NextResponse.json({ error: "المصروف غير موجود" }, { status: 404 });
-
-    await recordAudit({
-      actorId: user.id,
-      action: "EXPENSE_REACTIVATED",
-      entityType: "recurring_expense",
-      entityId: body.id,
-      after: { البند: row.label, الحالة: "مفعّل" },
+    const id = body.id;
+    const row = await db.transaction(async (t) => {
+      const [r] = await t.update(recurringExpenses).set({ isActive: true })
+        .where(eq(recurringExpenses.id, id)).returning({ label: recurringExpenses.label });
+      if (!r) return null;
+      await recordAudit({
+        actorId: user.id,
+        action: "EXPENSE_REACTIVATED",
+        entityType: "recurring_expense",
+        entityId: id,
+        after: { البند: r.label, الحالة: "مفعّل" },
+      }, t);
+      return r;
     });
+    if (!row) return NextResponse.json({ error: "المصروف غير موجود. حدّث الصفحة." }, { status: 404 });
     return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المصروفات المتوقعة` });
   }
 
@@ -122,25 +127,29 @@ async function handle(request: Request) {
     startsOn = body.startsOn;
   }
 
-  const [row] = await db
-    .insert(recurringExpenses)
-    .values({
-      label,
-      category: body.category,
-      amountMinor,
-      cadence,
-      startsOn,
-      note: body.note?.trim() || null,
-      createdById: user.id,
-    })
-    .returning({ id: recurringExpenses.id });
-
-  await recordAudit({
-    actorId: user.id,
-    action: "EXPENSE_ADDED",
-    entityType: "recurring_expense",
-    entityId: row.id,
-    after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category, أوّل_استحقاق: startsOn },
+  /* البابُ بعد التحقّق — يُثبَّت لأنّ التضييق لا يعبر إلى داخل المعاملة */
+  const category = body.category;
+  const row = await db.transaction(async (t) => {
+    const [inserted] = await t
+      .insert(recurringExpenses)
+      .values({
+        label,
+        category,
+        amountMinor,
+        cadence,
+        startsOn,
+        note: body.note?.trim() || null,
+        createdById: user.id,
+      })
+      .returning({ id: recurringExpenses.id });
+    await recordAudit({
+      actorId: user.id,
+      action: "EXPENSE_ADDED",
+      entityType: "recurring_expense",
+      entityId: inserted.id,
+      after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: category, أوّل_استحقاق: startsOn },
+    }, t);
+    return inserted;
   });
 
   return NextResponse.json({ ok: true, id: row.id, message: `أُضيف «${label}»` });
