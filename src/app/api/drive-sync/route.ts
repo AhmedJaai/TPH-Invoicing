@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { readJson } from "@/lib/request-body";
 import { guard, respondTo } from "@/services/guard";
 import { withDeadline } from "@/lib/ai/deadline";
+import { runAsSystemIf } from "@/lib/actor-context";
 import { DriveSyncBody, runDriveSync } from "@/services/drive-sync.service";
 import { BROWSER_SYNC_EVERY_MS, scheduledRanRecently } from "@/services/cron.service";
 
@@ -34,7 +35,7 @@ async function handle(request: Request) {
   if (body.background === true && await scheduledRanRecently("drive", BROWSER_SYNC_EVERY_MS)) {
     return NextResponse.json({ ok: true, scheduled: true, summary: { created: 0, truncated: false }, backlog: { done: [] } });
   }
-  return runDriveSync(user, body);
+  return runAsSystemIf(body.background === true, () => runDriveSync(user, body));
 }
 
 /* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */

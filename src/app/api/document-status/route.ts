@@ -16,6 +16,7 @@ import { guard, respondTo } from "@/services/guard";
 import { runBacklogSweep } from "@/services/backlog-sweep.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { recordAudit } from "@/lib/audit";
+import { runAsSystemIf } from "@/lib/actor-context";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { renameArchived } from "@/services/drive-rename.service";
 import { refreshTokenFor } from "@/services/drive.service";
@@ -62,7 +63,8 @@ export async function POST(request: Request) {
   */
   if (body.action === "confirm-eligible") {
     /* التنفيذُ في `backlog-sweep.service.ts` — يمرّ به التشغيلُ المجدول أيضاً */
-    const out = await runBacklogSweep(user, { background: body.background === true });
+    const background = body.background === true;
+    const out = await runAsSystemIf(background, () => runBacklogSweep(user, { background }));
     if (out.kind === "forbidden") return NextResponse.json({ error: out.error }, { status: 403 });
     if (out.kind === "skipped") {
       return NextResponse.json({

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { foodicsConfigured } from "@/lib/foodics/client";
 import { guard, respondTo } from "@/services/guard";
+import { runAsSystemIf } from "@/lib/actor-context";
 import { runLeasedFoodicsSync } from "@/services/foodics-sync.service";
 import { BROWSER_SYNC_EVERY_MS, scheduledRanRecently } from "@/services/cron.service";
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, configured: true, scheduled: true });
   }
 
-  const leased = await runLeasedFoodicsSync({ actorId: user.id, budgetMs: BUDGET_MS });
+  const leased = await runAsSystemIf(read.body.background === true, () => runLeasedFoodicsSync({ actorId: user.id, budgetMs: BUDGET_MS }));
   if (leased.busy) {
     const error = "مزامنة أخرى مع فودكس تجري الآن من جهاز أو تبويب آخر. انتظر دقيقة ثم أعد المحاولة.";
     return read.body.background

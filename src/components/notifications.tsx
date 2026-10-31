@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck, CircleAlert, CircleCheck, CloudOff, FileText, Info, RefreshCw, TriangleAlert } from "lucide-react";
+import { Bell, Bot, CheckCheck, CircleAlert, CircleCheck, CloudOff, FileText, Info, RefreshCw, TriangleAlert } from "lucide-react";
 import { request, postJson } from "@/lib/http-client";
 import { timeAgo } from "@/lib/arabic";
 import type { NoticeFeed, Notice } from "@/services/notifications.service";
@@ -196,7 +196,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
 }
 
 function NoticeRow({ n, unread }: { n: Notice; unread: boolean }) {
-  const Icon = n.tone === "info" && n.kind !== "DOCUMENTS" ? Info : ICON[n.kind];
+  const Icon = n.bySystem ? Bot : n.tone === "info" && n.kind !== "DOCUMENTS" ? Info : ICON[n.kind];
   return (
     <li>
       <Link href={n.href} className="flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-hover">
