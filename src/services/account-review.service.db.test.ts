@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
-import { bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
+import { auditLogs, bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
 import { allocate, createPayment, findManualTwin } from "./payment.service";
 import { EchoMergeRefused, HandLinkRefused, reserveForHandPayments, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
 import { applySupplierCredit, drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
 import { isOwnersPayment } from "./payment-echo.service";
+import { UndoError, undoDrawn } from "./mark-paid-undo.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
 
@@ -93,6 +94,36 @@ describe("«سجّل أنّها سدّدت» يأخذ حوالة الكشف غي
       expect(await allocationsOf(tx, bank)).toEqual([]);
       const [b] = await tx.select({ status: payments.status }).from(payments).where(eq(payments.id, bank));
       expect(b.status).not.toBe("VOID");
+    }));
+
+  it("التراجع من الإشعار يفكّ ما نسبه إقرارُ المستخدم نفسه وحده، بمبلغه، ومرّةً واحدة", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 900_00, "2026-09-15");
+      const bank = await bankPayment(tx, s, 900_00, "2026-09-14");
+      /* تخصيصٌ قديم من الحوالة على الفاتورة نفسها — لا يمسّه التراجع */
+      await allocate(tx, bank, [{ invoiceId: inv, amountMinor: 300_00 }]);
+      const me = await someone(tx);
+      const other = await someone(tx);
+
+      /* زوجٌ لم يسجّله إقرار: يُرفض ولا يُفكّ شيء */
+      expect(await caught(undoDrawn(tx, [{ paymentId: bank, invoiceId: inv }], me))).toBeInstanceOf(UndoError);
+
+      const out = await drawBankCredit(tx, { supplierId: s, invoiceId: inv, remainingMinor: 600_00, paidOn: "2026-09-20" });
+      expect(out.drawn[0].amountMinor).toBe(600_00);
+      await tx.insert(auditLogs).values({
+        actorId: me, action: "INVOICES_MARKED_PAID", entityType: "invoice", entityId: s,
+        after: { نُسب_من_حوالات_الكشف: out.drawn.map((d) => ({ الحوالة: d.paymentId, الفاتورة: d.invoiceId, يومها: d.paidOn, بالهللات: d.amountMinor })) },
+      });
+
+      /* مستخدمٌ آخر لا يفكّ إقرارَ غيره */
+      expect(await caught(undoDrawn(tx, [{ paymentId: bank, invoiceId: inv }], other))).toBeInstanceOf(UndoError);
+
+      expect(await undoDrawn(tx, [{ paymentId: bank, invoiceId: inv }], me)).toBe(600_00);
+      expect(await allocationsOf(tx, bank)).toEqual([{ invoiceId: inv, amountMinor: 300_00 }]);
+      /* الضغطةُ الثانية لا تفكّ القديم */
+      expect(await caught(undoDrawn(tx, [{ paymentId: bank, invoiceId: inv }], me))).toBeInstanceOf(UndoError);
+      expect(await allocationsOf(tx, bank)).toEqual([{ invoiceId: inv, amountMinor: 300_00 }]);
     }));
 
   it("حوالة أبعد من النافذة، أو دفعة بلا حركة بنك، لا تؤخذ", () =>

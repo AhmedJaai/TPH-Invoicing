@@ -308,7 +308,8 @@ async function handle(request: Request) {
           مصدر_السداد: "إقرار المالك لا مطابقة بنكية",
           يوم_السداد: paidOn,
           أُقرّ_أنّه_سدادٌ_آخر: body.acknowledgeTwin === true,
-          نُسب_من_حوالات_الكشف: drawn.map((d) => ({ الحوالة: d.paymentId, يومها: d.paidOn, بالهللات: d.amountMinor })),
+          /* بفاتورته: التراجعُ من الإشعار يفكّ ما سُجّل هنا وحده وبمبلغه */
+          نُسب_من_حوالات_الكشف: drawn.map((d) => ({ الحوالة: d.paymentId, الفاتورة: d.invoiceId, يومها: d.paidOn, بالهللات: d.amountMinor })),
         },
       }, tx);
     });

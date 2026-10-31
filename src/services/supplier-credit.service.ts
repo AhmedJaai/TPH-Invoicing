@@ -447,23 +447,33 @@ export async function drawBankCredit(
   return { drawn, restMinor: Math.max(0, rest) };
 }
 
-/** التراجعُ عمّا نسبه `drawBankCredit` — فكٌّ لا إلغاء: الحوالةُ حقيقيّةٌ وتبقى. */
+/**
+ * التراجعُ عمّا نسبه `drawBankCredit` — فكٌّ لا إلغاء: الحوالةُ حقيقيّةٌ وتبقى.
+ * يُفكّ **ما نُسب وحده** (`amountMinor`): كان يُحذف صفُّ التخصيص كلُّه، فإن كان للحوالة
+ * على الفاتورة نفسها تخصيصٌ قبل الإقرار ذهب معه.
+ */
 export async function undrawBankCredit(
   tx: Tx,
-  pairs: readonly { paymentId: string; invoiceId: string }[],
+  pairs: readonly { paymentId: string; invoiceId: string; amountMinor: number }[],
 ): Promise<number> {
   let freed = 0;
   for (const p of pairs) {
-    const removed = await tx
-      .delete(paymentAllocations)
+    if (p.amountMinor <= 0) continue;
+    const [row] = await tx
+      .select({ id: paymentAllocations.id, amountMinor: paymentAllocations.amountMinor })
+      .from(paymentAllocations)
       .where(and(
         eq(paymentAllocations.paymentId, p.paymentId),
         eq(paymentAllocations.invoiceId, p.invoiceId),
         sql`exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${p.paymentId})`,
       ))
-      .returning({ amountMinor: paymentAllocations.amountMinor });
-    for (const r of removed) freed += r.amountMinor;
-    if (removed.length > 0) await refreshPaymentStatus(tx, p.paymentId);
+      .for("update");
+    if (!row) continue;
+    const take = Math.min(row.amountMinor, p.amountMinor);
+    if (take === row.amountMinor) await tx.delete(paymentAllocations).where(eq(paymentAllocations.id, row.id));
+    else await tx.update(paymentAllocations).set({ amountMinor: row.amountMinor - take }).where(eq(paymentAllocations.id, row.id));
+    freed += take;
+    await refreshPaymentStatus(tx, p.paymentId);
   }
   return freed;
 }

@@ -96,25 +96,55 @@ export async function undoMarkedPaid(
  * التراجعُ عمّا نسبه الإقرارُ من حوالاتٍ في الكشف (`drawBankCredit`): يُفكّ
  * التخصيص فتعود الحوالةُ رصيداً والفاتورةُ مفتوحة. فكٌّ لا إلغاء، ولا يقع
  * في شهرٍ مقفل.
+ *
+ * والزوجُ من المتصفّح سؤالٌ لا أمر: يُفكّ ما سجّله **إقرارُ هذا المستخدم نفسِه** في
+ * التدقيق خلال نافذة التراجع، بمبلغه هناك، ومرّةً واحدة. كان يُفكّ أيَّ تخصيصِ حوالةٍ
+ * بمعرّفين يُرسَلان — بابٌ لفكّ مطابقاتٍ تاريخيّة من زرّ إشعار.
  */
 export async function undoDrawn(
   t: Tx,
   pairs: readonly { paymentId: string; invoiceId: string }[],
   userId: string,
 ): Promise<number> {
+  const unique = [...new Map(pairs.map((p) => [`${p.paymentId}|${p.invoiceId}`, p])).values()];
+  const resolved: { paymentId: string; invoiceId: string; amountMinor: number }[] = [];
+  for (const p of unique) {
+    /* القفلُ على صفّ التخصيص أوّلاً: ضغطتان معاً — الثانيةُ ترى أثرَ الأولى فتُردّ */
+    await t.execute(sql`select 1 from payment_allocations where payment_id = ${p.paymentId} and invoice_id = ${p.invoiceId} for update`);
+    /* ما نسبه إقرارُه بعد آخر فكٍّ للزوج نفسه — فالفكُّ لا يقع مرّتين، والإقرارُ الجديد بعده يُفكّ */
+    const [found] = (await t.execute<{ drawn: string | number | null }>(sql`
+      select sum((e->>'بالهللات')::bigint) as drawn
+        from audit_logs a, jsonb_array_elements(coalesce(a.after->'نُسب_من_حوالات_الكشف', '[]'::jsonb)) e
+       where a.action = 'INVOICES_MARKED_PAID' and a.actor_id = ${userId}
+         and a.at > now() - make_interval(mins => ${UNDO_WINDOW_MINUTES})
+         and e->>'الحوالة' = ${p.paymentId} and e->>'الفاتورة' = ${p.invoiceId}
+         and a.at > coalesce((
+           select max(u.at) from audit_logs u
+            where u.action = 'BANK_CREDIT_UNDRAWN'
+              and u.after->'الأزواج' @> jsonb_build_array(jsonb_build_object('paymentId', ${p.paymentId}::text, 'invoiceId', ${p.invoiceId}::text))
+         ), '-infinity'::timestamptz)
+    `)).rows;
+    const drawn = Number(found?.drawn ?? 0);
+    if (drawn <= 0) throw new UndoError("فُكّ هذا من قبل، أو انتهى وقت التراجع من الإشعار. حدّث الصفحة، وافكك الحوالة من صفحة الفاتورة إن لزم.", 409);
+    resolved.push({ ...p, amountMinor: drawn });
+  }
   const months = await t
     .select({ month: invoices.periodMonth })
     .from(invoices)
-    .where(inArray(invoices.id, pairs.map((p) => p.invoiceId)));
+    .where(inArray(invoices.id, unique.map((p) => p.invoiceId)));
   await assertMonthsOpen(t, months.map((m) => m.month));
-  const freed = await undrawBankCredit(t, pairs);
+  const freed = await undrawBankCredit(t, resolved);
   if (freed > 0) {
     await recordAudit({
       actorId: userId,
       action: "BANK_CREDIT_UNDRAWN",
       entityType: "payment",
-      entityId: pairs[0].paymentId,
-      after: { السبب: "تراجع عن إقرار سداد — فكّت الحوالة عن الفاتورة وبقيت", "فكّ بالهللات": freed, الأزواج: pairs },
+      entityId: unique[0].paymentId,
+      after: {
+        السبب: "تراجع عن إقرار سداد — فكّت الحوالة عن الفاتورة وبقيت",
+        "فكّ بالهللات": freed,
+        الأزواج: unique.map((p) => ({ paymentId: p.paymentId, invoiceId: p.invoiceId })),
+      },
     }, t);
   }
   return freed;
