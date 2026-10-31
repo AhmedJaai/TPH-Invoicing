@@ -10,7 +10,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Callout, EmptyState, KeyFigure, LinkButton, NoAccess } from "@/components/ui";
 import { SUPPLIER, countNoun } from "@/lib/arabic";
-import { formatDay } from "@/lib/riyadh-time";
+import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadCashOutlook } from "@/services/cash-outlook.service";
 import { loadStartState } from "@/services/start.service";
 import { CashTimeline } from "@/components/cash-timeline";
@@ -31,8 +31,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   if (!user) redirect("/login?from=/cash");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} width="wide" title="السيولة القادمة">
-        <NoAccess what="السيولة القادمة" />
+      <PageShell user={user} width="wide" title="النقد القادم">
+        <NoAccess what="النقد القادم" />
       </PageShell>
     );
   }
@@ -57,7 +57,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
     <PageShell
       user={user}
       width="wide"
-      title="السيولة القادمة"
+      title="النقد القادم"
       intro="المبالغ المعروفة التي ستخرج من الحساب في الأسابيع القادمة: دفعات المورّدين والرواتب والمصروفات المتكررة وضريبة القيمة المضافة، مقارنةً بآخر رصيد معروف."
       actions={
         <LinkButton href="/settings#recurring" icon={Plus} variant="secondary">
@@ -164,6 +164,16 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
             <span key={v.periodKey} className="block">
               <T s="{0}: {1} {2} · تُسدَّد قبل {3}. {4}" a={[v.label, <Money key="1" minor={v.amountMinor ?? 0} />, v.accruing ? "حتى اليوم، وتزيد مع كل يوم بيع" : "", <bdi key="3">{formatDay(v.deadline)}</bdi>, canVat && <Link key="4" href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">احسبها</Link>]} /></span>
           ))]} /></Callout>
+      )}
+      {o.prepaid.length > 0 && (
+        <Callout tone="accent" icon={CalendarClock} className="mt-3" title="خصّص مبلغاً للدفعة المقدّمة القادمة">
+          {o.prepaid.map((p) => (
+            <span key={p.label} className="block">
+              <T s="{0}: تغطي حتى {1}، والدفعة التالية نحو {2} في {3} (تقدير بمبلغ السابقة)." a={[p.label, formatMonth(p.coveredThrough), <Money key="2" minor={p.estimateMinor} />, formatMonth(p.dueMonth)]} />
+            </span>
+          ))}
+          <span className="mt-1 block text-[11px] text-muted">موعدها بعد الفترة التي يغطيها الجدول، فلا تُطرح من «يتبقى بعدها»، لكنها من أكبر ما سيخرج من الحساب.</span>
+        </Callout>
       )}
       {o.vatUnknown.length > 0 && (
         <Callout tone="warn" icon={Percent} className="mt-3" title="ضريبة قادمة مبلغها غير معروف">

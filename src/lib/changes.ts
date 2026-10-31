@@ -190,7 +190,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
       currentCount: f.documentsLast7,
       previousCount: f.documentsPrev7,
       favourable: null,
-      detail: `${countNoun(f.documentsLast7, DOCUMENT)} هذا الأسبوع · ${f.documentsPrev7} الذي قبله`,
+      /* الرقمُ الكبير فوقه عددُ هذا الأسبوع — فالتفصيلُ يقول ما لا يقوله: الأسبوعُ الذي قبله */
+      detail: `و${countNoun(f.documentsPrev7, DOCUMENT)} في الأسبوع الذي قبله`,
       href: "/documents",
     });
   }

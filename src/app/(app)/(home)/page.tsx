@@ -5,6 +5,7 @@ import { buildBrief } from "@/lib/morning-brief";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
   ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
 } from "lucide-react";
@@ -194,7 +195,8 @@ export default async function HomePage() {
                 : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNoun(oldestDays, DAY)}` : ""}`
             }
           >
-            {totals.creditLeftMinor > 0 && (
+            {/* دون ريالٍ تقريبٌ لا رصيد يُقال في الصفحة الأولى — يبقى في قائمة المورّدين بهللاته */}
+            {totals.creditLeftMinor >= TOTAL_ROUNDING_TOLERANCE_MINOR && (
               <p className="text-xs text-ink-soft"><T s="ولك عندهم رصيد {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></p>
             )}
             {!start.knowsNothing && <SinceYesterdayLine s={owedSince} kind="money" />}
@@ -372,24 +374,37 @@ function ChangesSkeleton() {
   );
 }
 
-async function CloseCard({ month }: { month: string }) {
-  const p = await loadCloseProgress(month);
-  const blockers = p.report.blockers.length;
-  const next = p.report.blockers[0] ?? p.report.warnings[0];
+/**
+ * بطاقةُ الإقفال: الشهرُ الذي ينتظر الإقفال — فإن أُقفل السابقُ فالجاري واستعدادُه الآن.
+ * كانت تقول «إقفال سبتمبر · مقفل · مقفل» في آخر يومٍ من أكتوبر: خبرٌ قديم مكرّر، والسؤالُ
+ * الحيّ «ما الذي ينقص أكتوبر قبل أن يُقفل غداً؟».
+ */
+async function CloseCard({ month: runMonth }: { month: string }) {
+  const previous = await loadCloseProgress(runMonth);
+  const current = currentMonthRiyadh();
+  const ahead = previous.closed && runMonth < current;
+  const p = ahead ? await loadCloseProgress(current) : previous;
+  const month = p.month;
+  /* «انتهاء الشهر» عائقُ الجاري بطبيعته لا عملٌ ينتظر — يُقال موعداً لا عائقاً */
+  const blockingNow = p.report.blockers.filter((b) => b.id !== "month-ended");
+  const blockers = blockingNow.length;
+  const next = blockingNow[0] ?? p.report.warnings[0];
   return (
-    <Section title={`إقفال ${formatMonth(month)}`} icon={CalendarCheck} className="mt-0!">
+    <Section title={`إقفال ${formatMonth(month)}`} icon={CalendarCheck} className="mt-0!" hint={ahead ? `${formatMonth(runMonth)} مقفل. وهذا ما يحتاجه ${formatMonth(month)} قبل إقفاله بعد آخر يوم فيه.` : undefined}>
       <Link
         href="/close"
         className="block rounded-xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow] hover:border-accent-line hover:shadow-lifted sm:p-5"
       >
         <span className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold">
-            {p.closed ? "مقفل" : <T s="اجتاز {0} من {1}" a={[<span key="0" className="nums">{p.passed}</span>, countNoun(p.total, CHECK)]} />}
+            {p.closed ? "أُقفل الشهر ولا يُكتب فيه شيء" : <T s="اجتاز {0} من {1}" a={[<span key="0" className="nums">{p.passed}</span>, countNoun(p.total, CHECK)]} />}
           </span>
           {p.closed ? (
             <Badge tone="ok" dot>مقفل</Badge>
           ) : blockers > 0 ? (
             <Badge tone="danger" dot>{blockers === 1 ? "عائق واحد" : blockers === 2 ? "عائقان" : `${blockers} عوائق`}</Badge>
+          ) : month === current ? (
+            <Badge tone="accent" dot>يُقفل بعد آخر يوم</Badge>
           ) : (
             <Badge tone="accent" dot>جاهز للإقفال</Badge>
           )}

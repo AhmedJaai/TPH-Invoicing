@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import { redirect } from "next/navigation";
 import { Banknote, CalendarClock, HandCoins, Info, Landmark, Receipt } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -72,7 +73,7 @@ export default async function FinancePositionPage() {
           label="المستحق للمورّدين"
           tone={overdueMinor > 0 ? "warn" : undefined}
           value={start.has.documents ? <Money minor={totals.owedMinor} currency /> : unknown}
-          sub={!start.has.documents ? "لم تُرفع فاتورة بعد، فلا يعرف النظام لمن تدين." : totals.owedSuppliers === 0 ? "كل فاتورة مسجّلة يغطيها ما دفعته." : <><T s="لـ{0}{1}{2}." a={[countNoun(totals.owedSuppliers, SUPPLIER), overdueMinor > 0 && <Fragment key="1"><T s="، منها {0} تجاوزت ستين يوماً" a={[<strong key="0" className="text-ink"><Money minor={overdueMinor} /></strong>]} /></Fragment>, totals.creditLeftMinor > 0 && <Fragment key="2"><T s=". ولك رصيد عند بعض المورّدين {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></Fragment>]} /></>}
+          sub={!start.has.documents ? "لم تُرفع فاتورة بعد، فلا يعرف النظام لمن تدين." : totals.owedSuppliers === 0 ? "كل فاتورة مسجّلة يغطيها ما دفعته." : <><T s="لـ{0}{1}{2}." a={[countNoun(totals.owedSuppliers, SUPPLIER), overdueMinor > 0 && <Fragment key="1"><T s="، منها {0} تجاوزت ستين يوماً" a={[<strong key="0" className="text-ink"><Money minor={overdueMinor} /></strong>]} /></Fragment>, totals.creditLeftMinor >= TOTAL_ROUNDING_TOLERANCE_MINOR && <Fragment key="2"><T s=". ولك رصيد عند بعض المورّدين {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></Fragment>]} /></>}
           href="/suppliers"
         />
         <KeyFigure

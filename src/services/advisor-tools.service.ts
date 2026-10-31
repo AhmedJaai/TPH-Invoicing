@@ -211,6 +211,7 @@ const TOOLS = [
       f.sar("مجموع ما يُدفع حتى آخر الشهر القادم", o.totalMinor);
       if (o.shortfallAt) f.note("يقصر الرصيد عن الجدول", `في ${o.shortfallAt}`);
       for (const v of [...o.vatIncluded, ...o.vatAhead]) f.sar(`ضريبة القيمة المضافة — ${v.label}`, v.amountMinor);
+      for (const p of o.prepaid) f.sar(`دفعة مقدّمة قادمة (تقدير بمبلغ السابقة) — ${p.label}: تغطي حتى ${formatMonth(p.coveredThrough)} والتالية في ${formatMonth(p.dueMonth)}`, p.estimateMinor);
       f.sar(`المستحقّ للمورّدين (${countNoun(b.totals.owedSuppliers, SUPPLIER)})`, b.totals.owedMinor);
       for (const x of overdue.slice(0, 8)) f.sar(`متأخّر أكثر من ستين يوماً — ${x.nameAr} (أقدم فاتورة عمرها ${countNoun(x.oldestDays, DAY)})`, x.owedMinor);
       return { facts: f.facts, label: "يراجع النقد والالتزامات" };

@@ -498,3 +498,36 @@ export function parseStoredMinor(value: string | null | undefined): number | nul
   const n = Number(value);
   return Number.isSafeInteger(n) && n > 0 && n <= MAX_AMOUNT_MINOR ? n : null;
 }
+
+/**
+ * دفعةٌ مقدَّمة تنتهي مدّتُها — الإيجارُ يُدفع كلَّ ستّة أشهر، فلا يراه جدولُ الأسابيع ولا
+ * المتكرّرُ الشهريّ، وهو أكبرُ ما يخرج من الحساب. ما وُزِّع على أشهره (`SPREAD`) ومدّتُه لم
+ * تنتهِ بعد يُقال: تغطّي حتى كذا، والتالية في الشهر بعدها **بمبلغ السابقة تقديراً** —
+ * يُجنَّب له ولا يُطرح من الرصيد (كالضريبة التي بعد الأفق).
+ */
+export interface PrepaidRenewal {
+  label: string;
+  category: string;
+  /** آخرُ شهرٍ تغطّيه الدفعةُ القائمة. */
+  coveredThrough: string;
+  /** الشهرُ المتوقَّعُ للدفعة التالية. */
+  dueMonth: string;
+  /** بمبلغ السابقة — تقديرٌ يُقال إنّه تقدير. */
+  estimateMinor: number;
+}
+
+export function prepaidRenewals(
+  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string }[],
+  thisMonth: string,
+): PrepaidRenewal[] {
+  /* الأحدثُ لكلّ باب — دفعةُ أغسطس تحلّ محلّ دفعة فبراير */
+  const latest = new Map<string, (typeof declarations)[number]>();
+  for (const d of declarations) {
+    if (d.kind !== "SPREAD" || d.toMonth < thisMonth || d.amountMinor <= 0) continue;
+    const prev = latest.get(d.category);
+    if (!prev || d.toMonth > prev.toMonth) latest.set(d.category, d);
+  }
+  return [...latest.values()].map((d) => ({
+    label: d.label, category: d.category, coveredThrough: d.toMonth, dueMonth: addMonths(d.toMonth, 1), estimateMinor: d.amountMinor,
+  })).sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
+}

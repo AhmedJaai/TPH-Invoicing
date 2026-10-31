@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addMonths } from "./filing";
-import { buildCashOutlook, dueThisWeek, withoutPayrollDuplicates, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { buildCashOutlook, dueThisWeek, withoutPayrollDuplicates, floorBreach, occursIn, parseStoredMinor, prepaidRenewals, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",
@@ -336,5 +336,20 @@ describe("الرواتب لا تُطرح مرّتين", () => {
   });
   it("وبلا مسيّر يبقى «الراتب» المتكرّر", () => {
     expect(withoutPayrollDuplicates([rec("sal", "SALARY")], []).map((r) => r.id)).toEqual(["sal"]);
+  });
+});
+
+describe("الدفعةُ المقدَّمة التالية", () => {
+  it("إيجارُ ستّة أشهر حتى يناير ← التالية في فبراير بمبلغها، والملغاةُ والمنتهيةُ لا تُذكر", () => {
+    const r = prepaidRenewals([
+      { kind: "SPREAD", category: "RENT", label: "إيجار — دفعة أغسطس", amountMinor: 47_500_00, fromMonth: "2026-08", toMonth: "2027-01" },
+      { kind: "SPREAD", category: "RENT", label: "إيجار — دفعة فبراير", amountMinor: 47_500_00, fromMonth: "2026-02", toMonth: "2026-07" },
+      { kind: "OFF_BOOK", category: "RENT", label: "حصّة", amountMinor: 9_715_00, fromMonth: "2026-05", toMonth: "2026-05" },
+    ], "2026-10");
+    expect(r).toEqual([{ label: "إيجار — دفعة أغسطس", category: "RENT", coveredThrough: "2027-01", dueMonth: "2027-02", estimateMinor: 47_500_00 }]);
+  });
+
+  it("ديسمبر يعبر إلى يناير السنة التالية", () => {
+    expect(prepaidRenewals([{ kind: "SPREAD", category: "RENT", label: "x", amountMinor: 100, fromMonth: "2026-07", toMonth: "2026-12" }], "2026-10")[0].dueMonth).toBe("2027-01");
   });
 });

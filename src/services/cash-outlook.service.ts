@@ -7,7 +7,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses, recurringExpenses } from "@/db/schema";
 import {
-  asCadence, buildCashOutlook, withoutPayrollDuplicates, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue,
+  asCadence, buildCashOutlook, withoutPayrollDuplicates, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue, prepaidRenewals, type PrepaidRenewal,
 } from "@/lib/cash-outlook";
 import { addMonths } from "@/lib/filing";
 import { payrollTotals, suggestedPayMonth } from "@/lib/payroll/calc";
@@ -22,6 +22,7 @@ import { loadSupplierBalances } from "./supplier-balance.service";
 import { filingDeadline, periodKey, previousQuarter, quarterLabel, quarterOfMonth, type VatQuarter } from "@/lib/vat-return";
 import { loadVatReturn } from "./vat-return.service";
 import { loadCashFloor } from "./app-settings.service";
+import { loadDeclarations } from "./profit.service";
 import { buildCommitments, type Commitments } from "@/lib/commitments";
 import { OBLIGATION_KIND_LABEL } from "@/lib/obligations";
 import { loadObligations } from "./obligation.service";
@@ -132,7 +133,7 @@ export interface OutlookInputs {
  * `withVat: false` يعرض الإسقاطَ كما كان قبل أن تدخله الضريبة — زرٌّ في الصفحة،
  * كي يرى صاحبُها الرقمين ويعرف من أين الفرق.
  */
-export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?: boolean } = {}): Promise<CashOutlook & { runMonth: string; thisMonth: string; vatOff: VatDue[]; floorMinor: number | null; breach: FloorBreach | null; inputs: OutlookInputs }> {
+export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?: boolean } = {}): Promise<CashOutlook & { runMonth: string; thisMonth: string; vatOff: VatDue[]; floorMinor: number | null; breach: FloorBreach | null; inputs: OutlookInputs; prepaid: PrepaidRenewal[] }> {
   const withVat = opts.withVat ?? true;
   const thisMonth = currentMonthRiyadh();
   const runMonth = previousMonth(thisMonth);
@@ -141,7 +142,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
     الدفعتان من استعلامٍ واحد: صفوفُ الشهر الجاري تحوي صفوفَ ما قبله، والبناءُ
     يعيد فحصَ الشهر — فلا رحلتان إلى القاعدة بعد انتهاء ما فوقهما.
   */
-  const [balances, recurring, cash, paid, payable, overrides, vat, floorMinor, payroll] = await Promise.all([
+  const [balances, recurring, cash, paid, payable, overrides, vat, floorMinor, payroll, declarations] = await Promise.all([
     loadSupplierBalances(),
     loadRecurringInputs(),
     loadCashPosition(),
@@ -154,6 +155,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
     loadVatDues(),
     loadCashFloor(),
     loadPayrollDues([runMonth, thisMonth, addMonths(thisMonth, 1)]),
+    loadDeclarations(),
   ]);
   const credit = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
   const overdue = buildPaymentRun(payable, runMonth, { includeOlderUnpaid: true, creditBySupplier: credit, overrides });
@@ -183,6 +185,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
   /* ما أُخرج بطلب صاحبه يُسمّى — فلا يُظنّ أنّ الضريبةَ صفر */
   return {
     ...outlook, runMonth, thisMonth, vatOff: withVat ? [] : vat, floorMinor, breach: floorBreach(outlook.buckets, floorMinor),
+    prepaid: prepaidRenewals(declarations, thisMonth),
     inputs: { overdueRun: dues(overdue), nextRun: dues(next), recurring, paidThisMonth, vat, payroll, payrollHref: opts.canSeePayroll ?? false },
   };
 }

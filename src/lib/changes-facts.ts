@@ -4,7 +4,7 @@ import { db } from "@/db";
 import type { ChangeFacts } from "./changes";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
 import { loadBalanceTotals } from "@/services/supplier-balance.service";
-import { todayInRiyadh } from "./riyadh-time";
+import { daysInMonth, todayInRiyadh } from "./riyadh-time";
 import type { Conn } from "@/services/types";
 
 interface Row extends Record<string, unknown> {
@@ -179,6 +179,10 @@ export async function loadMonthPurchases(q: Conn, today: string): Promise<MonthP
     thisMinor: Number(r?.purchases_this ?? 0),
     prevMinor: Number(r?.purchases_prev ?? 0),
     /* يوم الشهر بتوقيت الرياض — كما في بطاقة المشتريات، فلا يقول أحدهما ١٣ والآخر ١٤ */
-    daysElapsed: thisMonth === month ? dayOfMonth : null,
+    /*
+      يومٌ بلغ طولَ الشهر السابق يقارنه كاملاً: في ٣١ أكتوبر كان يُقال «عن أول 31 يوماً
+      من سبتمبر» وسبتمبر ثلاثون — والقصُّ عند ٣١ يأخذه كلَّه أصلاً.
+    */
+    daysElapsed: thisMonth === month && !(r?.prev_month && dayOfMonth >= daysInMonth(r.prev_month)) ? dayOfMonth : null,
   };
 }
