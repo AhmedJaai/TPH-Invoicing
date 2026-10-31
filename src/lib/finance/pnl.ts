@@ -204,7 +204,7 @@ export function buildPnl(input: PnlInput): Pnl {
   if (other) {
     lines.push({ id: "revenue-foodics", label: "مبيعات فودكس: ما دفعه الزبائن دون الضريبة", amountMinor: foodicsNetMinor, kind: "item", note: input.revenue === null ? "لا مبيعات مقروءة" : undefined });
     lines.push({
-      id: "revenue-other", label: `مبيعات خارج فودكس: ${other.count} حوالة واردة صنّفتها بيعاً، بمبلغها كما وصل`, amountMinor: other.grossMinor, kind: "item",
+      id: "revenue-other", label: `مبيعات خارج فودكس: حوالات واردة صنّفتها بيعاً (${other.count})، بمبلغها كما وصل`, amountMinor: other.grossMinor, kind: "item",
       note: "إن كانت فيها ضريبة فهي داخل هذا المبلغ ولم تُطرح. اسأل محاسبك عن معاملتها في الإقرار",
     });
     lines.push({ id: "revenue", label: "الإيراد", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "مبيعات فودكس غير مقروءة" : undefined });
@@ -317,7 +317,7 @@ export function buildPnl(input: PnlInput): Pnl {
   const viaStaffMinor = input.excluded.filter((x) => x.kind === "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);
   if (viaStaffMinor > 0) lines.push({ id: "excluded-purchases", label: "مبالغ أعطيتها موظفين ليسددوا فواتير مورّدين، محسوبة في المشتريات لا في المصروفات", amountMinor: viaStaffMinor, kind: "memo" });
   if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروبات الموظفين بتكلفتها، وهي داخلة في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
-  if (c.returnedMinor != null && c.returnedMinor > 0) lines.push({ id: "returned-after-prep", label: "مشروبات حُضّرت ثم أُرجعت بتكلفتها: داخلة في تكلفة المبيعات وتُعدّ هدراً", amountMinor: c.returnedMinor, kind: "memo" });
+  if (c.returnedMinor != null && c.returnedMinor > 0) lines.push({ id: "returned-after-prep", label: "مشروبات أُرجعت وقال الكاشير إن مكوّناتها هُدرت، بتكلفتها: داخلة في تكلفة المبيعات وتُعدّ هدراً", amountMinor: c.returnedMinor, kind: "memo" });
 
   return {
     month,

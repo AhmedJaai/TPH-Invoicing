@@ -127,5 +127,7 @@
 "يُصرف منه على المقهى": "It's spent on the café",
 "نقد عندك لم يُودَع": "Cash you hold, not deposited",
 "النقد عندك ولم يُصرف": "The cash is with you, unspent",
-"يُخرج بعد حذفه من وصفاته": "Can be removed once it's out of its recipes"
+"يُخرج بعد حذفه من وصفاته": "Can be removed once it's out of its recipes",
+"{0} {1}{2}. هي ما أُرجع وقال الكاشير عند ردّه إن مكوّناته هُدرت، فتُحسب مستهلكة وهدراً معاً ولا تُنقص الاستهلاك المتوقع. وما قال إنه لم يُهدر يعود إلى الرف فيُنقصه.": "{0} {1}{2}. These were returned and the cashier said their ingredients were wasted, so they count as both used and waste and don't reduce expected usage. What the cashier said wasn't wasted goes back to the shelf and does reduce it.",
+"مرتجع هُدرت مكوّناته:": "Returned, ingredients wasted:"
 }

@@ -76,7 +76,7 @@ export interface ReturnsWitness {
   answered: number;
 }
 
-/** جوابُ الكاشير عن المرتجَع — شاهدٌ على «مرتجع بعد التحضير» الذي نحسبه بالوصفة. */
+/** جوابُ الكاشير عن المرتجَع — وهو الحَكَم في هدره منذ ٣١ أكتوبر ٢٠٢٦ (`consumption.ts`). */
 export async function loadReturnsWitness(from: string, to: string, conn: Conn = db): Promise<ReturnsWitness> {
   const r = await conn.execute<{ n: number; wasted: number; answered: number }>(sql`
     select count(*)::int as n,
