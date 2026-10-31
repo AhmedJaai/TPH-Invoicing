@@ -98,8 +98,9 @@ describe("العدّ في الذاكرة", () => {
   });
 
   it("الذاكرة للقراءة الرخيصة وحدها — ما يكلّف نموذجاً أو يكتب مالاً يبقى في القاعدة", () => {
-    expect([...MEMORY_COUNTED_ROUTES].sort()).toEqual(["notifications", "search"]);
-    for (const route of ["analyze", "archive", "bank-import", "payment-run", "mark-paid", "month-close"]) {
+    /* حالُ جواب المستشار قراءةٌ رخيصة تُسأل كلَّ ثوانٍ — والسؤالُ نفسُه («advisor») في القاعدة */
+    expect([...MEMORY_COUNTED_ROUTES].sort()).toEqual(["advisor-status", "notifications", "search"]);
+    for (const route of ["analyze", "archive", "bank-import", "payment-run", "mark-paid", "month-close", "advisor"]) {
       expect(MEMORY_COUNTED_ROUTES.has(route)).toBe(false);
     }
   });

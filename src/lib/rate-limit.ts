@@ -159,6 +159,8 @@ export const RULES: Record<string, RateLimitRule> = {
   */
   advisor: { limit: 40, windowSeconds: 3600 },
   "advisor-plan": { limit: 200, windowSeconds: 3600 },
+  /* من ينتظر جواباً يسأل عن حاله كلَّ ثلاث ثوانٍ — دقيقتان بعشرين سؤالاً، وعشراتُ الأجوبة في الساعة */
+  "advisor-status": { limit: 2000, windowSeconds: 3600 },
   "ai-findings": { limit: 300, windowSeconds: 3600 },
   /*
     دِلاءٌ صريحة لما كان يقع في الافتراضيّ: الإقرار الجماعيّ كان يشارك
@@ -185,7 +187,7 @@ export const RULES: Record<string, RateLimitRule> = {
  * وهو كافٍ لما لا نموذجَ فيه ولا كتابة — يوقف الحلقةَ العالقة ولا يحرس مالاً.
  * وكلُّ ما سواهما يبقى في القاعدة.
  */
-export const MEMORY_COUNTED_ROUTES: ReadonlySet<string> = new Set(["notifications", "search"]);
+export const MEMORY_COUNTED_ROUTES: ReadonlySet<string> = new Set(["notifications", "search", "advisor-status"]);
 
 /** بلا حدّ: لا يُعدّ أصلاً — عدُّ ما لا يُرفَض كتابةٌ بلا نفع. */
 export function isUnlimited(rule: RateLimitRule): boolean {

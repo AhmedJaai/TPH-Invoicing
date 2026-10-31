@@ -2649,6 +2649,10 @@ export const advisorMessages = pgTable("advisor_messages", {
   verified: jsonb("verified").$type<Record<string, string>>(),
   tools: jsonb("tools").$type<{ name: string; label: string }[]>(),
   model: text("model"),
+  /** الجوابُ عملٌ في الخلفية (٠٩٥): «يعمل» حتى يُكتب، ولو أُغلقت الصفحة. */
+  status: text("status").$type<"PENDING" | "DONE" | "FAILED">().notNull().default("DONE"),
+  steps: jsonb("steps").$type<string[]>(),
+  error: text("error"),
   createdAt: now(),
 }, (t) => [index("advisor_messages_thread_idx").on(t.threadId, t.createdAt)]);
 

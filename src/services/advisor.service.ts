@@ -30,6 +30,9 @@ export interface AdvisorMessageView {
   content: string;
   verified: Record<string, string>;
   tools: { name: string; label: string }[];
+  status: "PENDING" | "DONE" | "FAILED";
+  steps: string[];
+  error: string | null;
   createdAt: Date;
 }
 export interface PlanItemView {
@@ -44,7 +47,14 @@ export async function listThreads(limit = 30): Promise<ThreadSummary[]> {
 
 export async function loadThreadMessages(threadId: string): Promise<AdvisorMessageView[]> {
   const rows = await db.select().from(advisorMessages).where(eq(advisorMessages.threadId, threadId)).orderBy(asc(advisorMessages.createdAt));
-  return rows.map((r) => ({ id: r.id, role: r.role, content: r.content, verified: r.verified ?? {}, tools: r.tools ?? [], createdAt: r.createdAt }));
+  return rows.map((r) => {
+    const stale = r.status === "PENDING" && Date.now() - r.createdAt.getTime() > STALE_PENDING_MS;
+    return {
+      id: r.id, role: r.role, content: r.content, verified: r.verified ?? {}, tools: r.tools ?? [],
+      status: stale ? "FAILED" as const : r.status, steps: r.steps ?? [],
+      error: stale ? "انقطع العمل على هذا الجواب قبل أن يكتمل. أعد المحاولة." : r.error, createdAt: r.createdAt,
+    };
+  });
 }
 
 export async function listPlan(): Promise<PlanItemView[]> {
@@ -77,11 +87,8 @@ async function briefing(): Promise<{ text: string; facts: Fact[] }> {
   };
 }
 
-export type TurnEvent =
-  | { type: "thread"; id: string; title: string }
-  | { type: "step"; label: string }
-  | { type: "done"; message: AdvisorMessageView }
-  | { type: "error"; error: string };
+/** جوابٌ «يعمل» أقدمُ من هذا انقطع (قُتل المسار أو سقط الخادم) — يُقال تعذّر لا يُنتظر أبداً. */
+export const STALE_PENDING_MS = 6 * 60_000;
 
 export interface TurnInput {
   threadId: string | null;
@@ -90,49 +97,91 @@ export interface TurnInput {
   canSeePayroll: boolean;
 }
 
-/** دورٌ واحد — يُبلغ خطواته وهو يعمل، ويحفظ السؤالَ وجوابَه معاً أو لا شيء. */
-export async function runAdvisorTurn(input: TurnInput, emit: (e: TurnEvent) => void): Promise<void> {
-  if (!isDeepseekConfigured()) {
-    emit({ type: "error", error: "المستشار يحتاج مفتاح DeepSeek، وهو غير مضبوط في هذه البيئة." });
-    return;
-  }
+export type StartOutcome =
+  | { ok: true; threadId: string; title: string; userMessageId: string; pendingId: string }
+  | { ok: false; status: number; error: string };
+
+/**
+ * يبدأ الدور: يكتب السؤالَ وجواباً «يعمل» ويعود فوراً — والعملُ نفسُه في `runAdvisorJob`
+ * خارج الطلب (`after`)، فلا يقطعه خروجُ صاحب المقهى من الصفحة.
+ * ودورٌ واحدٌ في المحادثة في كلّ لحظة: سؤالان معاً يتجاوب فيهما جوابان على تاريخٍ ناقص.
+ */
+export async function startAdvisorTurn(input: TurnInput): Promise<StartOutcome> {
+  if (!isDeepseekConfigured()) return { ok: false, status: 503, error: "المستشار يحتاج مفتاح DeepSeek، وهو غير مضبوط في هذه البيئة." };
   const text = input.message.trim();
   let threadId = input.threadId;
-  let created = false;
+  let title = "";
   if (threadId) {
-    const [t] = await db.select({ id: advisorThreads.id }).from(advisorThreads).where(eq(advisorThreads.id, threadId)).limit(1);
-    if (!t) { emit({ type: "error", error: "هذه المحادثة لم تعد موجودة. ابدأ محادثة جديدة." }); return; }
+    const [t] = await db.select({ id: advisorThreads.id, title: advisorThreads.title }).from(advisorThreads).where(eq(advisorThreads.id, threadId)).limit(1);
+    if (!t) return { ok: false, status: 404, error: "هذه المحادثة لم تعد موجودة. ابدأ محادثة جديدة." };
+    title = t.title;
+    const [busy] = await db.select({ id: advisorMessages.id, createdAt: advisorMessages.createdAt }).from(advisorMessages)
+      .where(and(eq(advisorMessages.threadId, threadId), eq(advisorMessages.status, "PENDING"))).limit(1);
+    if (busy && Date.now() - busy.createdAt.getTime() < STALE_PENDING_MS) {
+      return { ok: false, status: 409, error: "المستشار ما زال يعمل على سؤالك السابق في هذه المحادثة. انتظر جوابه أو ابدأ محادثة جديدة." };
+    }
   } else {
-    const title = text.length > 70 ? `${text.slice(0, 68)}…` : text;
+    title = text.length > 70 ? `${text.slice(0, 68)}…` : text;
     const [t] = await db.insert(advisorThreads).values({ title, createdById: input.user.id }).returning({ id: advisorThreads.id });
     threadId = t.id;
-    created = true;
-    emit({ type: "thread", id: threadId, title });
   }
-  const [userRow] = await db.insert(advisorMessages).values({ threadId, role: "user", content: text }).returning({ id: advisorMessages.id });
+  const rows = await db.transaction(async (t) => {
+    const [u] = await t.insert(advisorMessages).values({ threadId: threadId!, role: "user", content: text }).returning({ id: advisorMessages.id });
+    const [a] = await t.insert(advisorMessages).values({ threadId: threadId!, role: "assistant", content: "", status: "PENDING", steps: [] }).returning({ id: advisorMessages.id });
+    await t.update(advisorThreads).set({ updatedAt: new Date() }).where(eq(advisorThreads.id, threadId!));
+    return { userId: u.id, pendingId: a.id };
+  });
+  return { ok: true, threadId, title, userMessageId: rows.userId, pendingId: rows.pendingId };
+}
 
-  const undo = async () => {
-    await db.delete(advisorMessages).where(and(eq(advisorMessages.id, userRow.id), eq(advisorMessages.threadId, threadId!)));
-    if (created) await db.delete(advisorThreads).where(eq(advisorThreads.id, threadId!));
+export interface PendingView {
+  id: string;
+  status: "PENDING" | "DONE" | "FAILED";
+  steps: string[];
+  error: string | null;
+}
+
+/** حالُ جوابٍ ينتظر — و«يعمل» أقدمُ من حدّه يُقال انقطع. */
+export async function loadAnswerStatus(id: string): Promise<PendingView | null> {
+  const [m] = await db.select({ id: advisorMessages.id, status: advisorMessages.status, steps: advisorMessages.steps, error: advisorMessages.error, createdAt: advisorMessages.createdAt })
+    .from(advisorMessages).where(and(eq(advisorMessages.id, id), eq(advisorMessages.role, "assistant"))).limit(1);
+  if (!m) return null;
+  const stale = m.status === "PENDING" && Date.now() - m.createdAt.getTime() > STALE_PENDING_MS;
+  return {
+    id: m.id,
+    status: stale ? "FAILED" : m.status,
+    steps: m.steps ?? [],
+    error: stale ? "انقطع العمل على هذا الجواب قبل أن يكتمل. أعد إرسال سؤالك." : m.error,
   };
+}
 
+/** العملُ نفسُه — خارج الطلب. يكتب خطواته في صفّ الجواب، ثمّ الجوابَ أو سببَ تعذّره. */
+export async function runAdvisorJob(input: TurnInput & { threadId: string; pendingId: string }): Promise<void> {
+  const steps: string[] = [];
+  const step = async (label: string) => {
+    if (steps.at(-1) === label) return;
+    steps.push(label);
+    await db.update(advisorMessages).set({ steps: [...steps] }).where(eq(advisorMessages.id, input.pendingId)).catch(() => {});
+  };
   try {
-    emit({ type: "step", label: "يقرأ إحاطة المقهى" });
-    const ctx: ToolContext = { userId: input.user.id, role: input.user.role, canSeePayroll: input.canSeePayroll, threadId };
-    const [brief, history] = await Promise.all([briefing(), loadThreadMessages(threadId)]);
+    await step("يقرأ إحاطة المقهى");
+    const ctx: ToolContext = { userId: input.user.id, role: input.user.role, canSeePayroll: input.canSeePayroll, threadId: input.threadId };
+    const [brief, history] = await Promise.all([briefing(), loadThreadMessages(input.threadId)]);
     const facts: Fact[] = [...brief.facts];
     const used: { name: string; label: string }[] = [];
+    /* التاريخُ ما تمّ وحده: الجوابُ الذي ينتظر أو تعذّر لا يُعطى للنموذج */
+    const done = history.filter((m) => m.id !== input.pendingId && (m.role === "user" || m.status === "DONE"));
     const messages: DeepseekMessage[] = [
       { role: "system", content: advisorSystemPrompt({ today: todayInRiyadh(), lastFinishedMonth: formatMonth(lastFinishedMonth()), canSeePayroll: input.canSeePayroll }) },
       { role: "system", content: brief.text },
-      ...history.slice(-HISTORY).map((m) => ({ role: m.role, content: m.content }) as DeepseekMessage),
+      ...done.slice(-HISTORY).map((m) => ({ role: m.role, content: m.content }) as DeepseekMessage),
     ];
     const tools = advisorToolsFor(ctx);
 
     let answer = "";
     let model = "";
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-      emit({ type: "step", label: round === 0 ? "يفكّر في سؤالك" : "يربط ما وجده" });
+      await step(round === 0 ? "يفكّر في سؤالك" : "يربط ما وجده");
       const last = round === MAX_TOOL_ROUNDS;
       const r = await callDeepseek({
         task: "REASONING",
@@ -146,31 +195,34 @@ export async function runAdvisorTurn(input: TurnInput, emit: (e: TurnEvent) => v
       model = r.model;
       if (r.toolCalls.length === 0) { answer = r.text; break; }
       messages.push({ role: "assistant", content: r.text, toolCalls: r.toolCalls, reasoning: r.reasoning });
-      const results = await Promise.all(r.toolCalls.map(async (c) => {
-        const out = await runAdvisorTool(c.name, c.arguments, ctx);
-        emit({ type: "step", label: out.label });
-        return { c, out };
-      }));
+      const results = await Promise.all(r.toolCalls.map(async (c) => ({ c, out: await runAdvisorTool(c.name, c.arguments, ctx) })));
       for (const { c, out } of results) {
+        await step(out.label);
         facts.push(...out.facts);
         used.push({ name: c.name, label: out.label });
         messages.push({ role: "tool", toolCallId: c.id, content: renderFacts(out.facts) || "- لا شيء" });
       }
     }
     if (!answer.trim()) throw new AdvisorFailed("لم يكتب المستشار جواباً");
-
-    const verified = verifiedNumbers(answer, facts);
-    const [row] = await db.insert(advisorMessages).values({
-      threadId, role: "assistant", content: answer.slice(0, 40_000), verified, tools: used, model,
-    }).returning({ id: advisorMessages.id, createdAt: advisorMessages.createdAt });
-    await db.update(advisorThreads).set({ updatedAt: new Date() }).where(eq(advisorThreads.id, threadId));
-    emit({ type: "done", message: { id: row.id, role: "assistant", content: answer, verified, tools: used, createdAt: row.createdAt } });
+    await db.update(advisorMessages).set({
+      content: answer.slice(0, 40_000), verified: verifiedNumbers(answer, facts), tools: used, model, status: "DONE", steps: [...steps], error: null,
+    }).where(eq(advisorMessages.id, input.pendingId));
+    await db.update(advisorThreads).set({ updatedAt: new Date() }).where(eq(advisorThreads.id, input.threadId));
   } catch (e) {
-    await undo().catch(() => {});
     const reason = e instanceof AdvisorFailed ? e.message : "تعذّر إكمال الجواب";
     if (!(e instanceof AdvisorFailed)) console.error("[advisor]", (e as Error).message);
-    emit({ type: "error", error: `${reason}. لم يُحفظ سؤالك، فأعد إرساله.` });
+    /* السؤالُ يبقى في المحادثة، والجوابُ «تعذّر» بسببه — يُعاد بضغطة لا يُكتب من جديد */
+    await db.update(advisorMessages).set({ status: "FAILED", error: `${reason}.`.slice(0, 500), steps: [...steps] })
+      .where(eq(advisorMessages.id, input.pendingId)).catch(() => {});
   }
+}
+
+/** «أعد المحاولة»: الجوابُ الذي تعذّر يعود «يعمل» على السؤال نفسه. */
+export async function retryAnswer(pendingId: string): Promise<{ threadId: string } | null> {
+  const rows = await db.update(advisorMessages).set({ status: "PENDING", error: null, steps: [], createdAt: new Date() })
+    .where(and(eq(advisorMessages.id, pendingId), eq(advisorMessages.status, "FAILED")))
+    .returning({ threadId: advisorMessages.threadId });
+  return rows[0] ?? null;
 }
 
 class AdvisorFailed extends Error {}

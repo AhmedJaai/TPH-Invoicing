@@ -30,9 +30,10 @@ export default async function AdvisorPage({ searchParams }: { searchParams: Prom
   return (
     <PageShell user={user} width="wide" title="المستشار" intro="مديرك المالي ومستشار النمو: يعرف المقهى من دفاترك، ويجيب ويدرس ويخطط معك، ويتابع ما اتفقتما عليه.">
       <AdvisorWorkspace
-        key={threadId ?? "new"}
+        /* يُعاد بالمحادثة وحال رسائلها: حين يتمّ جوابٌ في الخلفية يُقرأ من الخادم كما هو */
+        key={`${threadId ?? "new"}:${messages.length}:${messages.map((m) => m.status[0]).join("")}`}
         threadId={threadId}
-        messages={messages.map((m) => ({ id: m.id, role: m.role, content: m.content, verified: m.verified, tools: m.tools }))}
+        messages={messages.map((m) => ({ id: m.id, role: m.role, content: m.content, verified: m.verified, tools: m.tools, status: m.status, steps: m.steps, error: m.error }))}
         threads={threads.map((t) => ({ id: t.id, title: t.title, updatedLabel: timeAgo(t.updatedAt) }))}
         plan={plan.map((p) => ({ id: p.id, title: p.title, detail: p.detail, horizonDays: p.horizonDays, metric: p.metric, status: p.status }))}
         starters={ADVISOR_STARTERS}

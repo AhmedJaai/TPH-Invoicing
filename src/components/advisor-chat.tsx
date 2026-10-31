@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, CircleDashed, FileSearch, MessageSquarePlus, RotateCcw, Send, Sparkles, Target, Trash2, X } from "lucide-react";
-import { messageForStatus, NETWORK_ERROR, postJson } from "@/lib/http-client";
+import { postJson, request } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { ReadySubmit, toast } from "./ui-client";
 import { AdvisorText } from "./advisor-text";
@@ -15,15 +15,12 @@ export interface ChatMessage {
   content: string;
   verified: Record<string, string>;
   tools: { name: string; label: string }[];
+  status: "PENDING" | "DONE" | "FAILED";
+  steps: string[];
+  error: string | null;
 }
 export interface ThreadItem { id: string; title: string; updatedLabel: string }
 export interface PlanItem { id: string; title: string; detail: string | null; horizonDays: number; metric: string | null; status: "OPEN" | "DONE" | "DROPPED" }
-
-type Event =
-  | { type: "thread"; id: string; title: string }
-  | { type: "step"; label: string }
-  | { type: "done"; message: ChatMessage }
-  | { type: "error"; error: string };
 
 /**
  * مساحةُ المستشار: المحادثةُ في الوسط، ومحادثاتُه السابقة وخطّتُه بجانبها.
@@ -50,71 +47,62 @@ export function AdvisorWorkspace({
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  /* معرّفٌ محلّيّ للسؤال المتفائل — عدّادٌ لا ساعة (الرسمُ نقيّ) */
-  const seq = useRef(0);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages.length, steps.length]);
+  const lastSteps = messages.at(-1)?.steps.length ?? 0;
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages.length, lastSteps]);
 
+  /*
+    السؤالُ يُكتب ويعود الخادمُ فوراً، والجوابُ عملٌ في الخلفية: يُسأل عن حاله كلَّ ثلاث ثوانٍ.
+    والخروجُ من الصفحة لا يقطعه — كان يقطع البثَّ فيتوقّف المستشار ويُمحى السؤال.
+  */
   async function send(text: string) {
     const question = text.trim();
     if (!question || busy) return;
     setBusy(true);
     setError(null);
-    setSteps([]);
-    setInput("");
-    const optimistic: ChatMessage = { id: `local-${++seq.current}`, role: "user", content: question, verified: {}, tools: [] };
-    setMessages((m) => [...m, optimistic]);
-    let current = threadId;
-    let failed: string | null = null;
-    try {
-      const res = await fetch("/api/advisor", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId: current, message: question }) });
-      if (!res.ok || !res.body) {
-        const raw = await res.text().catch(() => "");
-        let msg: string | null = null;
-        try { const j = JSON.parse(raw) as { error?: unknown }; msg = typeof j.error === "string" ? j.error : null; } catch { /* ليس JSON */ }
-        failed = msg ?? messageForStatus(res.status);
-      } else {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let finished = false;
-        while (!finished) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            let e: Event;
-            try { e = JSON.parse(line) as Event; } catch { continue; }
-            if (e.type === "thread") current = e.id;
-            if (e.type === "step") setSteps((s) => (s.at(-1) === e.label ? s : [...s, e.label]));
-            if (e.type === "done") { setMessages((m) => [...m, e.message]); finished = true; }
-            if (e.type === "error") { failed = e.error; finished = true; }
-          }
-        }
-        if (!finished && !failed) failed = "انقطع الجواب قبل أن يكتمل. أعد إرسال سؤالك.";
-      }
-    } catch {
-      failed = NETWORK_ERROR;
-    }
+    const r = await postJson<{ threadId: string; userMessageId: string; pendingId: string }>("/api/advisor", { threadId, message: question });
     setBusy(false);
-    setSteps([]);
-    if (failed) {
-      /* السؤالُ لم يُحفَظ: يعود إلى الحقل ولا يبقى في المحادثة كأنّه سُئل */
-      setMessages((m) => m.filter((x) => x.id !== optimistic.id));
-      setInput(question);
-      setError(failed);
-      return;
+    if (!r.ok) { setError(r.error); return; }
+    setInput("");
+    setMessages((m) => [
+      ...m,
+      { id: r.data.userMessageId, role: "user", content: question, verified: {}, tools: [], status: "DONE", steps: [], error: null },
+      { id: r.data.pendingId, role: "assistant", content: "", verified: {}, tools: [], status: "PENDING", steps: [], error: null },
+    ]);
+    if (r.data.threadId !== threadId) {
+      setThreadId(r.data.threadId);
+      /* الرابطُ بالمحادثة — فمن خرج ورجع وجدها، والمكوّنُ يُعاد بمفتاحها ويكمل السؤال عن حالها */
+      router.replace(`/finance/advisor?t=${r.data.threadId}`, { scroll: false });
     }
-    setThreadId(current);
-    if (current && current !== initialThreadId) router.replace(`/finance/advisor?t=${current}`, { scroll: false });
-    else router.refresh();
   }
+
+  async function retry(id: string) {
+    const r = await postJson("/api/advisor", { retry: id });
+    if (!r.ok) { toast({ tone: "danger", title: "تعذّرت إعادة المحاولة", body: r.error }); return; }
+    setMessages((m) => m.map((x) => (x.id === id ? { ...x, status: "PENDING", steps: [], error: null } : x)));
+  }
+
+  /* ما ينتظر يُسأل عن حاله؛ وحين يتمّ أو يتعذّر تُقرأ المحادثةُ من الخادم بجوابها */
+  const pendingIds = messages.filter((m) => m.status === "PENDING").map((m) => m.id).join(",");
+  useEffect(() => {
+    if (!pendingIds) return;
+    let stopped = false;
+    const tick = async () => {
+      for (const id of pendingIds.split(",")) {
+        const r = await request<{ status: ChatMessage["status"]; steps: string[]; error: string | null }>(`/api/advisor?id=${encodeURIComponent(id)}`);
+        if (stopped || !r.ok) continue;
+        const { status, steps, error: failure } = r.data;
+        if (status === "PENDING") setMessages((m) => m.map((x) => (x.id === id ? { ...x, steps } : x)));
+        else if (status === "FAILED") setMessages((m) => m.map((x) => (x.id === id ? { ...x, status, steps, error: failure } : x)));
+        else router.refresh();
+      }
+    };
+    const timer = setInterval(() => void tick(), 3000);
+    void tick();
+    return () => { stopped = true; clearInterval(timer); };
+  }, [pendingIds, router]);
 
   async function planStatus(id: string, status: PlanItem["status"]) {
     const r = await postJson<{ message?: string }>("/api/advisor/manage", { kind: "plan", id, status });
@@ -173,25 +161,32 @@ export function AdvisorWorkspace({
                     </details>
                   )}
                 </div>
-                <AdvisorText content={m.content} verified={m.verified} />
+                {m.status === "PENDING" ? (
+                  <div role="status" aria-live="polite" className="rounded-xl border border-line-soft bg-sunken/40 p-4">
+                    <p className="flex items-center gap-2 text-sm font-bold text-ink"><CircleDashed className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />يعمل على سؤالك</p>
+                    {m.steps.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-muted">
+                        {m.steps.map((st, i) => (
+                          <li key={`${st}-${i}`} className="flex items-center gap-1.5">
+                            {i === m.steps.length - 1 ? <FileSearch className="h-3.5 w-3.5 text-accent" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5 text-ok" aria-hidden />}
+                            {st}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="mt-2 text-[11px] leading-relaxed text-muted">قد يأخذ دقيقة أو اثنتين. يمكنك الخروج من الصفحة، فالمستشار يكمل عمله وتجد الجواب هنا حين ترجع.</p>
+                  </div>
+                ) : m.status === "FAILED" ? (
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-xs leading-relaxed text-danger">
+                    <span>{m.error ?? "تعذّر إكمال الجواب."}</span>
+                    <button type="button" className={buttonClass("secondary", "sm")} onClick={() => void retry(m.id)}><RotateCcw className="h-3.5 w-3.5" aria-hidden />أعد المحاولة</button>
+                  </div>
+                ) : (
+                  <AdvisorText content={m.content} verified={m.verified} />
+                )}
               </article>
             )
           ))}
-
-          {busy && (
-            <div role="status" aria-live="polite" className="rounded-xl border border-line-soft bg-sunken/40 p-4">
-              <p className="flex items-center gap-2 text-sm font-bold text-ink"><CircleDashed className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />المستشار يعمل على سؤالك</p>
-              <ul className="mt-2 space-y-1 text-xs text-muted">
-                {steps.map((s, i) => (
-                  <li key={`${s}-${i}`} className="flex items-center gap-1.5">
-                    {i === steps.length - 1 ? <FileSearch className="h-3.5 w-3.5 text-accent" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5 text-ok" aria-hidden />}
-                    {s}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-[11px] text-muted">قد يأخذ دقيقة أو اثنتين حين يراجع أكثر من مصدر.</p>
-            </div>
-          )}
           <div ref={endRef} />
         </div>
 
@@ -216,9 +211,9 @@ export function AdvisorWorkspace({
               maxLength={4000}
               placeholder="اسأل عن قرار، أو اطلب دراسة أو خطة…"
               className="min-h-12 flex-1 resize-y rounded-xl border border-line-input bg-raised px-3 py-2.5 text-[15px] leading-7 focus:border-accent focus:outline-none"
-              disabled={busy}
+              disabled={busy || pendingIds !== ""}
             />
-            <ReadySubmit ready={input.trim().length > 0} missing="اكتب سؤالك أولاً" busy={busy} size="lg">
+            <ReadySubmit ready={input.trim().length > 0 && pendingIds === ""} missing={pendingIds ? "انتظر جواب سؤالك الحالي" : "اكتب سؤالك أولاً"} busy={busy} size="lg">
               <Send className="h-4 w-4" aria-hidden /><span className="sr-only sm:not-sr-only">أرسل</span>
             </ReadySubmit>
           </div>

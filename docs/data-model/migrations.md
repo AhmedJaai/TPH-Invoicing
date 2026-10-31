@@ -142,6 +142,7 @@
 | `092_push_subscriptions.sql` | `push_subscriptions` — جهازُ كلّ مستخدمٍ اشترك في إشعار الصباح؛ خاملٌ حتى تُضبط مفاتيح VAPID |
 | `093_foodics_kitchen_times.sql` | `foodics_orders.kitchen_received_at` · `kitchen_done_at` (وقتا شاشة التحضير) · `wasted_lines` (أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت) — مرآةٌ لا مال، والفارغ «لم يُقرأ» |
 | `094_advisor.sql` | `advisor_threads` · `advisor_messages` · `advisor_plan_items` — محادثاتُ المستشار وخطّتُه؛ نصٌّ لا مال، والأرقامُ تُحسَب من الدفاتر لحظةَ السؤال |
+| `095_advisor_jobs.sql` | `advisor_messages.status` (`PENDING`·`DONE`·`FAILED`) · `steps` · `error` — الجوابُ يُكمَل في الخلفية ولو أُغلقت الصفحة |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
