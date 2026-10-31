@@ -197,7 +197,7 @@ export default async function FoodicsBankPage() {
         id="months"
         title="البطاقات شهراً بشهر"
         icon={Landmark}
-        hint="مجموع دفعات الشهر عند الطرفين. الشهر الحالي ناقص حتى يكتمل كشفه."
+        hint="دفعات البنك بحسب يوم البيع الذي تحمله (دفعة كل يوم تحمل مبيعات اليوم الذي قبله)، وما يقابلها من بطاقات فودكس. يقارب مجموع بطاقات الشهر في «المبيعات»، والفرق بينهما بيع ما بعد منتصف الليل وأيام لم يغطها الكشف بعد."
       >
         <DataTable<CardMonth>
           rows={t.card.months}
@@ -208,9 +208,30 @@ export default async function FoodicsBankPage() {
               key: "month",
               header: "الشهر",
               primary: true,
-              cell: (m) => <span className="font-bold">{formatMonth(m.month)}{m.month >= thisMonth && <span className="ms-2"><Badge>غير مكتمل</Badge></span>}</span>,
+              cell: (m) => (
+                <span className="block">
+                  <span className="font-bold">{formatMonth(m.month)}</span>
+                  {m.month >= thisMonth && <span className="ms-2"><Badge>غير مكتمل</Badge></span>}
+                  {/* الصفُّ عن أيّام دفعاته — يُقال صراحةً كي لا يُقرأ مجموعَ الشهر */}
+                  <span className="mt-0.5 block text-[11px] font-normal text-muted">
+                    <T s="مبيعات {0} إلى {1}" a={[<bdi key="0">{formatDay(m.firstDay)}</bdi>, <bdi key="1">{formatDay(m.lastDay)}</bdi>]} />
+                  </span>
+                </span>
+              ),
             },
-            { key: "foodics", header: "سجّله فودكس بطاقة", numeric: true, cell: (m) => <Money minor={m.foodicsMinor} /> },
+            {
+              key: "foodics", header: "سجّله فودكس بطاقة", numeric: true,
+              cell: (m) => (
+                <span className="block">
+                  <Money minor={m.foodicsMinor} />
+                  {t.cardByBusinessMonth[m.month] !== undefined && (
+                    <span className="block text-[10px] font-normal text-muted">
+                      <T s="والشهر كاملاً في المبيعات {0}" a={[<Money key="0" minor={t.cardByBusinessMonth[m.month]} />]} />
+                    </span>
+                  )}
+                </span>
+              ),
+            },
             { key: "bank", header: "دخل البنك", numeric: true, cell: (m) => <Money minor={m.bankMinor} /> },
             { key: "gap", header: "الفرق", cell: (m) => <GapWords gapMinor={m.gapMinor} agrees={!m.notable} /> },
             { key: "batches", header: "الدفعات", numeric: true, secondary: true, cell: (m) => <span className="nums nums-count">{m.comparedBatches}</span> },

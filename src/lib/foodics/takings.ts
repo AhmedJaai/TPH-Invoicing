@@ -88,6 +88,9 @@ export interface CardBatchRow {
 
 export interface CardMonth {
   month: string;
+  /** أوّلُ يومِ بيعٍ وآخرُه في دفعاتٍ حُكم فيها — الصفُّ عن هذه الأيّام لا عن الشهر كلّه. */
+  firstDay: string;
+  lastDay: string;
   /** دفعاتٌ حُكم فيها — عليها وحدها يُحسَب الفرق. */
   comparedBatches: number;
   /** وكم منها ثبت إلى الهللة. */
@@ -189,9 +192,17 @@ export function compareCardTakings(
   const byMonth = new Map<string, CardMonth>();
   for (const r of rows) {
     if (r.verdict === "RECENT") continue;
-    const month = r.day.slice(0, 7);
-    const m = byMonth.get(month) ?? { month, comparedBatches: 0, exactBatches: 0, foodicsMinor: 0, bankMinor: 0, gapMinor: 0, notable: false };
+    /*
+      الدفعةُ المؤرّخةُ بيومٍ تحمل مبيعاتِ اليوم الذي قبله (دفعةُ ١ أغسطس: من ٣١ يوليو ٠٠:٠٨ إلى
+      ١ أغسطس ٠٠:٠٨). فالشهرُ بيوم البيع لا بيوم الدفعة — كان يُنسب آخرُ يومٍ من كلّ شهرٍ إلى الذي
+      بعده، فقال أغسطس ١٥٤٬٠٠١ و«المبيعات» ١٤٧٬٤٧٢ (أحمد: «الأرقام غلط»).
+    */
+    const saleDay = addDays(r.day, -1);
+    const month = saleDay.slice(0, 7);
+    const m = byMonth.get(month) ?? { month, firstDay: saleDay, lastDay: saleDay, comparedBatches: 0, exactBatches: 0, foodicsMinor: 0, bankMinor: 0, gapMinor: 0, notable: false };
     byMonth.set(month, m);
+    if (saleDay < m.firstDay) m.firstDay = saleDay;
+    if (saleDay > m.lastDay) m.lastDay = saleDay;
     m.comparedBatches++;
     if (r.verdict === "AGREES") m.exactBatches++;
     m.foodicsMinor += r.foodicsMinor;

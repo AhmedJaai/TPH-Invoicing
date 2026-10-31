@@ -46,6 +46,9 @@ describe("بطاقاتُ فودكس أمام دفعات البنك", () => {
     expect(by.get("2026-06-14")).toMatchObject({ gapMinor: 40_000, verdict: "BANK_SHORT" });
     expect(by.get("2026-06-15")?.verdict).toBe("AGREES");
     expect(r.months[0]).toMatchObject({ month: "2026-06", comparedBatches: 3, exactBatches: 2, gapMinor: 40_000, notable: true });
+    /* الصفُّ يقول أيّامَ دفعاته — لا يُقرأ مجموعَ الشهر كلّه (أحمد: «الأرقام غلط») */
+    /* ودفعةُ اليوم تحمل مبيعاتِ أمس: الشهرُ والأيّامُ بيوم البيع */
+    expect(r.months[0]).toMatchObject({ firstDay: "2026-06-12", lastDay: "2026-06-14" });
   });
 
   it("وصل البنكَ أكثر ممّا سجّله فودكس بطاقةً ← يُقال باتّجاهه", () => {

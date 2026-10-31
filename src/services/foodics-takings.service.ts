@@ -27,6 +27,8 @@ export async function loadFoodicsSilenced(prefix: "foodics-card" | "foodics-purc
 }
 
 export interface FoodicsTakings {
+  /** بطاقاتُ فودكس للشهر كاملاً بيوم البيع — الرقمُ نفسُه في «المبيعات»، لتُفهم مقارنةُ الدفعات بجانبه. */
+  cardByBusinessMonth: Record<string, number>;
   /** أيعرف فودكس شيئاً؟ — قبل أن يُعرَض رقم. */
   hasOrders: boolean;
   firstDay: string | null;
@@ -78,9 +80,10 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
         from foodics_order_payments p join foodics_orders o on o.id = p.order_id
        where ${SETTLED}
     `),
-    db.execute<{ month: string; cash: string; house: string; other: string }>(sql`
+    db.execute<{ month: string; cash: string; card: string; house: string; other: string }>(sql`
       select substr(p.business_date, 1, 7) as month,
              coalesce(sum(p.amount_minor) filter (where p.method_type = ${PAYMENT_TYPE.CASH}), 0)::bigint as cash,
+             coalesce(sum(p.amount_minor) filter (where p.method_type = ${PAYMENT_TYPE.CARD}), 0)::bigint as card,
              coalesce(sum(p.amount_minor) filter (where p.method_type = ${PAYMENT_TYPE.HOUSE_ACCOUNT}), 0)::bigint as house,
              coalesce(sum(p.amount_minor) filter (where p.method_type not in (${PAYMENT_TYPE.CASH}, ${PAYMENT_TYPE.CARD}, ${PAYMENT_TYPE.HOUSE_ACCOUNT})), 0)::bigint as other
         from foodics_order_payments p join foodics_orders o on o.id = p.order_id
@@ -117,6 +120,7 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
   }));
 
   return {
+    cardByBusinessMonth: Object.fromEntries(monthly.rows.map((r) => [r.month, Number(r.card)])),
     hasOrders: Number(span.rows[0]?.n ?? 0) > 0,
     firstDay, lastDay,
     lastBankDay: compared.lastBankDay,
