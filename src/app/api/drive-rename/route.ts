@@ -16,6 +16,7 @@
  *      يُعيد تسمية إلّا ما أرسل المتصفّح معرّفَه، ثمّ **يُعيد اشتقاق
  *      الاسم بنفسه** ولا يأخذه من المتصفّح.
  */
+import { FILE, countNoun } from "@/lib/arabic";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { can } from "@/lib/permissions";
@@ -199,7 +200,7 @@ async function handle(request: Request) {
       ? `سُمّي ${done.length} · وتعذّرت تسمية ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
       : done.length === 0
         ? "لا شيء يحتاج إلى إعادة تسمية، فأسماء الملفات موحّدة"
-        : `سُمّي ${done.length} ملفاً من جديد`
+        : `سُمّي من جديد ${countNoun(done.length, FILE)}`
           + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length}، اضغط مرة أخرى` : ""),
   });
 }

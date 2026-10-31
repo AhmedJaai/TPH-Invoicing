@@ -24,7 +24,7 @@ import {
   unmetRecurring,
   type Expense,
 } from "@/lib/expenses";
-import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
+import { countNoun, ITEM } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import {
@@ -92,7 +92,7 @@ export default async function ExpensesPage({
           title="لا توجد مصروفات مسجّلة بعد."
           hint={
             pendingAll.count > 0
-              ? `في كشف البنك ${countNoun(pendingAll.count, TRANSACTION)} مصروفات لم تُسجَّل بعد. سجّلها بضغطة واحدة، ثم أضف ما دفعته نقداً.`
+              ? `في كشف البنك حركاتُ مصروف لم تُسجَّل بعد: ${pendingAll.count}. سجّلها بضغطة واحدة، ثم أضف ما دفعته نقداً.`
               : "تُسجَّل المصروفات من كشف البنك بعد تصنيف حركاته، أو يدوياً إذا دُفعت نقداً. استورد كشف البنك أولاً إن لم تفعل."
           }
           action={
@@ -231,7 +231,7 @@ export default async function ExpensesPage({
             <Notice
               tone="warn"
               icon={TriangleAlert}
-              title={`في الكشف ${countNoun(pending.count, TRANSACTION)} مصروفات لم تُسجَّل بعد`}
+              title={`في الكشف حركاتُ مصروف لم تُسجَّل بعد: ${pending.count}`}
               action={canEdit ? <DeriveExpenses month={month} variant="primary" label="سجّلها الآن" /> : undefined}
             >
               <T s="لذلك فالمصروف الفعلي في {0} أقل من الحقيقي بـ{1} ريال. ولا يُحسب هنا سداد المورّدين ولا ما يدل وصفه على شراء بضاعة." a={[formatMonth(month), <Money key="1" minor={pending.amountMinor} />]} /></Notice>

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { thmanyahDisplay, thmanyahSans } from "./fonts";
 import "./globals.css";
 import { cookies } from "next/headers";
-import { ThemePrimer } from "@/components/view-controls";
+import { ThemePrimer } from "@/components/theme-primer";
 import { EnglishRuntime } from "@/components/i18n/english-runtime";
 import { asLocale, DICTIONARY_URL, LOCALE_COOKIE } from "@/lib/i18n/locale";
 

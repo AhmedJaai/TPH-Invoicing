@@ -676,11 +676,11 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
     }
     if (counts.revised > 0) {
       messages.push(
-        `${counts.revised} سطراً كان مسجّلاً وتغيّرت بياناته في المصدر، فحُدّث ولم يُرفض. التفاصيل أدناه.`,
+        `أسطرٌ كانت مسجّلة وتغيّرت بياناتها في المصدر، فحُدّثت ولم تُرفض: ${counts.revised}. التفاصيل أدناه.`,
       );
     }
     if (counts.duplicates > 0) {
-      messages.push(`${counts.duplicates} سطراً مسجّل من قبل بلا تغيير، فلم يُسجَّل مرة ثانية.`);
+      messages.push(`أسطرٌ مسجّلة من قبل بلا تغيير، فلم تُسجَّل مرة ثانية: ${counts.duplicates}.`);
     }
 
     await tx

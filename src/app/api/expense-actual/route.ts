@@ -11,7 +11,8 @@ import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { NextResponse } from "next/server";
-import { failWith, guard, respondTo } from "@/services/guard";
+import { failWith, guard } from "@/services/guard";
+import { EXPENSE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { parseRiyals } from "@/lib/money";
 import {
   deleteExpense,
@@ -37,14 +38,15 @@ const Body = z.object({
 type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
-  let user;
   try {
-    user = await guard("expense-actual", "expense:edit");
+    return await handle(request);
   } catch (e) {
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    throw e;
+    return failWith(e, "expense-actual");
   }
+}
+
+async function handle(request: Request) {
+  const user = await guard("expense-actual", "expense:edit");
 
   const read = await readJson(request, Body);
   if (!read.ok) return read.response;
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
     const r = await deriveExpensesFromBank(user.id, month);
     /* ما تُرك في شهرٍ مقفل يُقال — لا يُحسب «لا جديد» وهو جديدٌ لم يُقيَّد */
     const closedNote = r.skippedClosedMonth > 0
-      ? ` وترك ${r.skippedClosedMonth} في شهر مقفل، تسجّل إن أعدت فتحه.`
+      ? ` وتُرك ${countNoun(r.skippedClosedMonth, TRANSACTION)} في شهر مقفل، تُسجَّل إن أعدت فتحه.`
       : "";
     return NextResponse.json({
       ok: true,
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
       message:
         (r.created === 0
           ? "لا جديد، فكل حركة مصنّفة في شهر مفتوح سُجّلت من قبل."
-          : `سُجّل ${r.created} مصروفاً، منها ${r.linkedToRecurring} مربوطة بمصروف متوقع.`) + closedNote,
+          : `سُجّل ${countNoun(r.created, EXPENSE)}${r.linkedToRecurring > 0 ? `، منها ${r.linkedToRecurring} مربوطة بمصروف متوقع` : ""}.`) + closedNote,
     });
   }
 

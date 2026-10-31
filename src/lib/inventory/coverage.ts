@@ -12,6 +12,7 @@
  * لا نسبةً مئويّةً وحدها: «٩٦٪ من الوصفات مكتملة» لا تقول إنّ الأربعة
  * الباقية هي أكثرُ الأصناف مبيعاً.
  */
+import { DAY, countNoun } from "@/lib/arabic";
 import { EXCLUSION_LABEL, type ConsumptionResult, type ExclusionReason } from "./consumption";
 import { PURCHASE_GAP_LABEL, type PurchaseGapReason, type PurchaseSummary } from "./purchases";
 import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
@@ -337,7 +338,7 @@ export function describeCoverage(c: CoverageReport): string {
     bits.push(`دخل في الحساب ${Math.round(c.sales.unitsCoveredBp / 100)}٪ من الوحدات المباعة`);
   }
   if (c.sales.missingDays.length > 0) {
-    bits.push(`و${c.sales.missingDays.length} يوماً بلا مبيعات مستوردة`);
+    bits.push(`و${countNoun(c.sales.missingDays.length, DAY)} بلا مبيعات مستوردة`);
   }
   if (c.purchases.excludedLines > 0) {
     bits.push(`و${c.purchases.excludedLines} سطر شراء كميته غير معروفة`);

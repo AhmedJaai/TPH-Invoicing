@@ -108,7 +108,7 @@ describe("computeCoverage", () => {
     expect(c.readiness).toBe("PARTIAL");
     expect(c.sales.missingDays).toEqual(["2026-09-04"]);
     expect(c.sales.daysWithSales).toBe(6);
-    expect(describeCoverage(c)).toContain("يوماً بلا مبيعات");
+    expect(describeCoverage(c)).toContain("ويوم واحد بلا مبيعات");
   });
 
   it("ملفّان متداخلان ويوم خارج الفترة: اليوم يعدّ مرّةً، والخارج لا يعدّ", () => {

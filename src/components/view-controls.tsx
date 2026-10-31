@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AMOUNTS_KEY, THEME_KEY } from "@/lib/view-prefs";
 
 /**
  * ضبطُ العرض: الظلامُ، وإخفاءُ الأرقام.
@@ -19,8 +20,6 @@ import { useEffect } from "react";
  * في القشرة)، وهذا المكوّن يقرأ ما كُتب ويبدّله.
  */
 
-const THEME_KEY = "tph.theme";
-const AMOUNTS_KEY = "tph.amounts";
 
 type Theme = "light" | "dark" | "system";
 
@@ -128,23 +127,6 @@ export function ViewControls() {
       </button>
     </div>
   );
-}
-
-/**
- * يكتب التفضيل على `<html>` قبل أوّل رسم.
- *
- * يُركَّب في `<head>` بـ`dangerouslySetInnerHTML` لأنّ هذا هو السبيل
- * الوحيد لتشغيل نصٍّ قبل أن يُرسَم الجسم — والنصّ من عندنا لا من مدخلٍ
- * خارجيّ، ولا يقرأ إلّا مفتاحين من تخزين هذا الجهاز.
- */
-export function ThemePrimer() {
-  const js = `(function(){try{
-    var t=localStorage.getItem(${JSON.stringify(THEME_KEY)});
-    if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);
-    if(localStorage.getItem(${JSON.stringify(AMOUNTS_KEY)})==="hidden")
-      document.documentElement.setAttribute("data-amounts","hidden");
-  }catch(e){}})();`;
-  return <script dangerouslySetInnerHTML={{ __html: js }} />;
 }
 
 /* ── الأيقونات: مرسومةٌ هنا كي لا تُضاف حزمةُ أيقونات لأربعة رموز ── */

@@ -12,6 +12,7 @@
  * و`runBacklogSweep` — فإن تداخل تشغيلان ردّ العقدُ القائمُ الثاني `busy` فلا يعمل.
  * والأثرُ صفٌّ في `job_state` (`cron:<job>`) تقرؤه حالُ الدرايف وفودكس، وتتنحّى به القشرة.
  */
+import { FILE, countNoun } from "@/lib/arabic";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -217,7 +218,7 @@ export async function driveCronJob(deps: DriveCronDeps): Promise<CronOutcome> {
   const finished = !r.truncated && !r.busy;
   if (deep && finished) await deps.markDeep();
 
-  const parts = [created > 0 ? `سُجّل ${created} ملفاً جديداً من الدرايف` : "لا ملف جديد في الدرايف"];
+  const parts = [created > 0 ? `سُجّل من الدرايف جديداً: ${countNoun(created, FILE)}` : "لا ملف جديد في الدرايف"];
   if (!finished) parts.push("وبقيت أشهر تُفحص في التشغيل القادم");
   if (deps.now() - startedAt < SWEEP_START_MS) {
     const s = await deps.sweep();
@@ -286,7 +287,7 @@ export interface DailyCronDeps {
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
   if (!written) return `لقطة يوم ${day} مكتوبة من قبل، ولم تتغيّر`;
   const cash = figures.cashMinor === null ? "النقد غير معروف" : `النقد ${formatRiyalsDisplay(figures.cashMinor)}`;
-  return `كُتبت لقطة يوم ${day}: عليك ${formatRiyalsDisplay(figures.owedMinor)} · ${figures.attentionCount} بنداً يحتاج قرارك · ${cash}`;
+  return `كُتبت لقطة يوم ${day}: عليك ${formatRiyalsDisplay(figures.owedMinor)} · يحتاج قرارك: ${figures.attentionCount} · ${cash}`;
 }
 
 function sealLine(s: SealCheckSummary): string {

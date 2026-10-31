@@ -189,7 +189,7 @@ export function describeReconciliation(r: AccountReconciliation): string {
   if (r.balance.status === "UNKNOWN") {
     return `${r.explainedCount} من ${countNoun(r.totalCount, TRANSACTION)} مفسَّرة، ولا يمكن فحص المعادلة: ${r.balance.reason}`;
   }
-  if (r.reconciled) return `الحساب مطابق: ${r.totalCount} حركة، والمعادلة صحيحة`;
+  if (r.reconciled) return `الحساب مطابق: ${countNoun(r.totalCount, TRANSACTION)}، والمعادلة صحيحة`;
   if (r.balance.status === "UNEXPLAINED") return r.balance.reason;
   return `${countNoun(r.unexplainedCount, TRANSACTION)} غير مفسَّرة، قيمتها ${riyals(r.unexplainedMinor)}`;
 }

@@ -868,7 +868,7 @@ export async function loadScope(
 /** معرّفٌ ليس صنفاً في هذا الجرد — يُلغي العمليّةَ كلَّها. */
 export class ScopeItemNotInCountError extends Error {
   constructor(readonly productIds: readonly string[]) {
-    super(`${productIds.length} صنفاً ليست في هذا الجرد، فلم يُحفظ شيء من النطاق. حدّث الصفحة.`);
+    super(`أصنافٌ ليست في هذا الجرد: ${productIds.length}. فلم يُحفظ شيء من النطاق. حدّث الصفحة.`);
     this.name = "ScopeItemNotInCountError";
   }
 }
