@@ -4,7 +4,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
 import { AdvisorWorkspace } from "@/components/advisor-chat";
-import { ADVISOR_STARTERS } from "@/lib/advisor/persona";
+import { ADVISOR_FOLLOWUPS, ADVISOR_STARTERS } from "@/lib/advisor/persona";
 import { timeAgo } from "@/lib/arabic";
 import { listPlan, listThreads, loadThreadMessages } from "@/services/advisor.service";
 
@@ -33,10 +33,11 @@ export default async function AdvisorPage({ searchParams }: { searchParams: Prom
         /* يُعاد بالمحادثة وحال رسائلها: حين يتمّ جوابٌ في الخلفية يُقرأ من الخادم كما هو */
         key={`${threadId ?? "new"}:${messages.length}:${messages.map((m) => m.status[0]).join("")}`}
         threadId={threadId}
-        messages={messages.map((m) => ({ id: m.id, role: m.role, content: m.content, verified: m.verified, tools: m.tools, status: m.status, steps: m.steps, error: m.error }))}
+        messages={messages.map((m) => ({ id: m.id, role: m.role, content: m.content, verified: m.verified, tools: m.tools, status: m.status, steps: m.steps, error: m.error, when: m.role === "assistant" && m.status === "DONE" ? timeAgo(m.createdAt) : undefined }))}
         threads={threads.map((t) => ({ id: t.id, title: t.title, updatedLabel: timeAgo(t.updatedAt) }))}
         plan={plan.map((p) => ({ id: p.id, title: p.title, detail: p.detail, horizonDays: p.horizonDays, metric: p.metric, status: p.status }))}
         starters={ADVISOR_STARTERS}
+        followups={ADVISOR_FOLLOWUPS}
       />
     </PageShell>
   );

@@ -18,6 +18,8 @@ export interface ChatMessage {
   status: "PENDING" | "DONE" | "FAILED";
   steps: string[];
   error: string | null;
+  /** «قبل ساعة» — متى كُتب، فيُعرف أهو جوابُ اليوم أم قديم. */
+  when?: string;
 }
 export interface ThreadItem { id: string; title: string; updatedLabel: string }
 export interface PlanItem { id: string; title: string; detail: string | null; horizonDays: number; metric: string | null; status: "OPEN" | "DONE" | "DROPPED" }
@@ -35,12 +37,14 @@ export function AdvisorWorkspace({
   threads,
   plan,
   starters,
+  followups,
 }: {
   threadId: string | null;
   messages: ChatMessage[];
   threads: ThreadItem[];
   plan: PlanItem[];
   starters: readonly string[];
+  followups: readonly string[];
 }) {
   const router = useRouter();
   const [threadId, setThreadId] = useState(initialThreadId);
@@ -152,6 +156,7 @@ export function AdvisorWorkspace({
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-accent-soft text-accent"><Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /></span>
                   المستشار
+                  {m.when && <span className="font-normal">· {m.when}</span>}
                   {m.tools.length > 0 && (
                     <details className="font-normal">
                       <summary className="cursor-pointer select-none hover:text-ink">راجع {m.tools.length === 1 ? "مصدراً واحداً" : `${m.tools.length} مصادر`} قبل أن يجيب</summary>
@@ -182,7 +187,19 @@ export function AdvisorWorkspace({
                     <button type="button" className={buttonClass("secondary", "sm")} onClick={() => void retry(m.id)}><RotateCcw className="h-3.5 w-3.5" aria-hidden />أعد المحاولة</button>
                   </div>
                 ) : (
-                  <AdvisorText content={m.content} verified={m.verified} />
+                  <>
+                    <AdvisorText content={m.content} verified={m.verified} />
+                    {/* متابعةٌ بضغطة تحت آخر جواب — لا كتابةَ لما يُسأل كلَّ مرّة */}
+                    {m.id === messages.at(-1)?.id && !busy && (
+                      <div className="mt-4 flex flex-wrap gap-2" aria-label="متابعة سريعة">
+                        {followups.map((f) => (
+                          <button key={f} type="button" onClick={() => void send(f)} className="min-h-11 rounded-full border border-line bg-sunken/40 px-3 text-xs text-ink-soft transition-colors hover:border-accent-line hover:bg-accent-soft/40 sm:min-h-9">
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </article>
             )

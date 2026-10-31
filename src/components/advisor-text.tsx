@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { splitNumbers } from "@/lib/advisor/numbers";
+import { groupThousands, splitNumbers } from "@/lib/advisor/numbers";
 
 /** حقيقةٌ مرجعيّة عامّة (`monthsOverviewFacts`) — تُوسَم «مرجعاً» لا «من دفاترك». */
 const REFERENCE_PREFIX = "مرجع عامّ لا من الدفاتر";
@@ -25,15 +25,15 @@ function Inline({ text, verified }: { text: string; verified: Record<string, str
           const label = p.key ? verified[p.key] ?? verified[p.key.slice(p.key.indexOf(":") + 1)] : undefined;
           if (label && label.startsWith(REFERENCE_PREFIX)) {
             const what = label.slice(REFERENCE_PREFIX.length).replace(/^\s*—\s*/, "");
-            return <span key={j} className="nums underline decoration-accent decoration-dashed decoration-2 underline-offset-4" data-tip={`مرجع عام للصناعة، لا من دفاترك: ${what}`} title={`مرجع عام للصناعة، لا من دفاترك: ${what}`}>{p.text}</span>;
+            return <span key={j} className="nums underline decoration-accent decoration-dashed decoration-2 underline-offset-4" data-tip={`مرجع عام للصناعة، لا من دفاترك: ${what}`} title={`مرجع عام للصناعة، لا من دفاترك: ${what}`}>{groupThousands(p.text)}</span>;
           }
           if (label) {
-            return <span key={j} className="nums font-bold text-ink underline decoration-ok decoration-2 underline-offset-4" data-tip={`من دفاترك: ${label}`} title={`من دفاترك: ${label}`}>{p.text}</span>;
+            return <span key={j} className="nums font-bold text-ink underline decoration-ok decoration-2 underline-offset-4" data-tip={`من دفاترك: ${label}`} title={`من دفاترك: ${label}`}>{groupThousands(p.text)}</span>;
           }
           if (p.key) {
-            return <span key={j} className="nums underline decoration-line-input decoration-dotted decoration-2 underline-offset-4" data-tip="رقم عام أو تقدير، لم يُحسب من دفاترك" title="رقم عام أو تقدير، لم يُحسب من دفاترك">{p.text}</span>;
+            return <span key={j} className="nums underline decoration-line-input decoration-dotted decoration-2 underline-offset-4" data-tip="رقم عام أو تقدير، لم يُحسب من دفاترك" title="رقم عام أو تقدير، لم يُحسب من دفاترك">{groupThousands(p.text)}</span>;
           }
-          return <span key={j} className="nums">{p.text}</span>;
+          return <span key={j} className="nums">{groupThousands(p.text)}</span>;
         });
         return bold ? <strong key={i} className="font-bold text-ink">{pieces}</strong> : <Fragment key={i}>{pieces}</Fragment>;
       })}

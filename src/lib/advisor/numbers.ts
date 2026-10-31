@@ -64,3 +64,14 @@ export function splitNumbers(text: string): InlinePiece[] {
   if (last < text.length) out.push({ kind: "text", text: text.slice(last) });
   return out;
 }
+
+/**
+ * «142192» ← «142,192»: النموذجُ يكتب القيمَ كما أُعطيها بلا فواصل، فتُقرأ بصعوبة. ما كُتب بفاصلٍ
+ * أو كسرٍ يبقى، والسنةُ (2020–2040) تبقى، والأرقامُ العربيّة الهنديّة تبقى كما كُتبت.
+ */
+export function groupThousands(text: string): string {
+  if (!/^\d{4,}$/.test(text)) return text;
+  const n = Number(text);
+  if (n >= 2020 && n <= 2040) return text;
+  return text.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}

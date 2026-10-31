@@ -153,7 +153,9 @@ export default async function PerformancePage() {
 
       <Section title="سرعة الخدمة" icon={Timer} hint={`من شاشة التحضير في فودكس: من وصول الطلب إلى الشاشة حتى إنهائه، آخر ثلاثين يوماً.${perf.speed.since ? ` تُعرف الأوقات منذ ${formatDay(perf.speed.since)}.` : ""}`}>
         {s30.medianSec === null ? (
-          perf.speed.since
+          perf.speed.last30.unread > 0
+            ? <EmptyState compact icon={Timer} title="أوقات التحضير لم تُقرأ من فودكس بعد." hint="الطلبات التي قُرئت قبل إضافة هذه الأوقات تحتاج تعبئة واحدة، وما يصل بعدها يُقرأ مع كل مزامنة. النقص في القراءة لا في المقهى." />
+            : perf.speed.since
             ? <EmptyState compact icon={Timer} title="لا طلبات بأوقات تحضير في آخر ثلاثين يوماً." hint="ربما لم تُستعمل شاشة التحضير في هذه الأيام، أو لم تُقرأ مزامنة فودكس الأخيرة بعد." />
             : <EmptyState compact icon={Timer} title="لا أوقات تحضير مقروءة بعد." hint="تُقرأ مع مزامنة فودكس القادمة، وتظهر هنا حين تكتمل أيام كافية." />
         ) : (
@@ -167,6 +169,7 @@ export default async function PerformancePage() {
                 <T s="تجاوز عشر دقائق: {0} من {1}." a={[<span key="0" className="nums font-bold text-ink">{formatShare(s30.slowBp)}</span>, countNoun(s30.measured, ORDER)]} />
                 {sPrev.medianSec !== null && <Fragment> <T s="وفي الثلاثين يوماً قبلها كان الوسيط {0}." a={[formatDuration(sPrev.medianSec)]} /></Fragment>}
                 {s30.forgotten > 0 && <Fragment> <T s="و{0} بقيت على الشاشة أكثر من ساعة، فهي منسية على الأرجح ولا تدخل الحساب." a={[countNoun(s30.forgotten, ORDER)]} /></Fragment>}
+                {perf.speed.last30.unread > 0 && <span className="mt-1 block font-bold text-warn"><T s="{0} من {1} لم يُقرأ وقتها من فودكس بعد، فالأرقام عن جزء من الطلبات." a={[countNoun(perf.speed.last30.unread, ORDER), countNoun(perf.speed.last30.closedOrders, ORDER)]} /></span>}
               </p>
             </Card>
             <Card>

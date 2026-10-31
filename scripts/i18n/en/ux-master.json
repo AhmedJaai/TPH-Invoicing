@@ -115,5 +115,7 @@
 "اختر الصنف أولاً": "Choose the item first",
 "لا طلبات بأوقات تحضير في آخر ثلاثين يوماً.": "No orders with preparation times in the last thirty days.",
 "ربما لم تُستعمل شاشة التحضير في هذه الأيام، أو لم تُقرأ مزامنة فودكس الأخيرة بعد.": "The kitchen screen may not have been used these days, or the latest Foodics sync hasn't been read yet.",
-"أبعد من المعتاد بكثير — تحقّق": "Far beyond usual — verify"
+"أبعد من المعتاد بكثير — تحقّق": "Far beyond usual — verify",
+"أوقات التحضير لم تُقرأ من فودكس بعد.": "Preparation times haven't been read from Foodics yet.",
+"{0} من {1} لم يُقرأ وقتها من فودكس بعد، فالأرقام عن جزء من الطلبات.": "{0} of {1} haven't had their times read from Foodics yet, so these figures cover only part of the orders."
 }

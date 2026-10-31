@@ -41,6 +41,10 @@ export interface SpeedWindow {
   from: string;
   to: string;
   speed: ServiceSpeed;
+  /** طلباتُ النافذة المقفلة كلُّها — فيُعرف كم منها قُرئ وقتُه. */
+  closedOrders: number;
+  /** طلباتٌ لم يُقرأ وقتا شاشتها بعد (`null` في المرآة) — نقصٌ في القراءة لا في المقهى. */
+  unread: number;
 }
 
 /** سرعةُ التحضير في نافذة أيّام — من وقتَي الشاشة، بساعة الرياض. */
@@ -51,7 +55,10 @@ export async function loadServiceSpeed(from: string, to: string, conn: Conn = db
       from foodics_orders
      where status = 4 and kitchen_received_at is not null and kitchen_done_at is not null
        and business_date >= ${from} and business_date <= ${to}`);
-  return { from, to, speed: serviceSpeed(rows.rows) };
+  const [c] = (await conn.execute<{ closed: number; unread: number }>(sql`
+    select count(*)::int as closed, count(*) filter (where kitchen_done_at is null and wasted_lines is null)::int as unread
+      from foodics_orders where status = 4 and business_date >= ${from} and business_date <= ${to}`)).rows;
+  return { from, to, speed: serviceSpeed(rows.rows), closedOrders: c?.closed ?? 0, unread: c?.unread ?? 0 };
 }
 
 /** أوّلُ يومٍ عُرفت فيه أوقاتُ الشاشة — قبله لا يُقال «بطيء» ولا «سريع». */

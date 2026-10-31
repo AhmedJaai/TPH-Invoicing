@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { verifiedNumbers } from "./verify";
-import { splitNumbers } from "./numbers";
+import { groupThousands, splitNumbers } from "./numbers";
 import type { Fact } from "@/lib/finance/reading";
 
 const facts: Fact[] = [
@@ -35,5 +35,15 @@ describe("أرقامُ المستشار", () => {
     const small: Fact[] = [{ id: "F1", label: "رسوم الشبكة", kind: "PCT", value: 0.7 }];
     expect(verifiedNumbers("رسوم 1٪", small)).toEqual({});
     expect(verifiedNumbers("نحو 21٪", pctFact)).toEqual({ "pct:21": "تكلفة المبيعات" });
+  });
+});
+
+describe("الأرقامُ الكبيرة تُقرأ", () => {
+  it("142192 ← 142,192، والسنةُ والمفصولُ والكسرُ كما هي", () => {
+    expect(groupThousands("142192")).toBe("142,192");
+    expect(groupThousands("4546")).toBe("4,546");
+    expect(groupThousands("2026")).toBe("2026");
+    expect(groupThousands("1,250")).toBe("1,250");
+    expect(groupThousands("25.1")).toBe("25.1");
   });
 });
