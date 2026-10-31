@@ -47,5 +47,12 @@
 "لم تصل مبيعات من فودكس بعد.": "No sales have arrived from Foodics yet.",
 "لم تُرفع فاتورة بعد، فلا يعرف النظام لمن تدين.": "No invoice uploaded yet, so the system doesn’t know whom you owe.",
 "كل فاتورة مسجّلة يغطيها ما دفعته.": "Every recorded invoice is covered by what you paid.",
-"لم تصل فواتير ولا كشف بنك بعد.": "No invoices or bank statement yet."
+"لم تصل فواتير ولا كشف بنك بعد.": "No invoices or bank statement yet.",
+"لم يُسجَّل هدرٌ باليد في الجرد — المجموعُ كلُّه من المرتجع بعد التحضير.": "No waste was recorded by hand in counts — the whole total comes from drinks returned after preparation.",
+" · ومن مكوّنات المرتجع {0} بلا سعرٍ معروف، خارج المجموع": " · and {0} of the returned ingredients have no known price, left out of the total",
+"من المرتجع بعد التحضير": "from returns after preparation",
+" · ومن المرتجع": " · plus returns",
+"المشروبات: ": "Drinks: ",
+" · مكوّناتٌ بلا تكلفة: ": " · ingredients without cost: ",
+"المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً (المشروباتُ المرتجعة بعد التحضير: {0}، من أسطر البيع لا من سجلٍّ يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً.": "A drink made and then returned counts as both consumed and wasted (drinks returned after preparation: {0}, from sales lines, not a manual record). Packaged items that go back on the shelf are not waste."
 }

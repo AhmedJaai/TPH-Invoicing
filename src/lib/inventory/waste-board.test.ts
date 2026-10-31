@@ -41,7 +41,7 @@ describe("لوحة الهدر", () => {
 
   it("أكثر الأصناف هدراً ثلاثة بالكلفة المعروفة — وما جهلت كلفته لا يتصدّر بصفر", () => {
     const b = buildWasteBoard([e({}), e({}), e({ productId: "beans", productName: "بنّ", unit: "KG" })], rates);
-    expect(b.topProducts).toEqual([{ productId: "milk", productName: "حليب", count: 2, costMinor: 24_00 }]);
+    expect(b.topProducts).toEqual([{ productId: "milk", productName: "حليب", count: 2, costMinor: 24_00, returned: false }]);
   });
 
   it("«انتهت صلاحيّته» مرّتين لصنف إشارة، ومرّة ليست إشارة", () => {
@@ -64,5 +64,7 @@ describe("لوحة الهدر", () => {
     expect(b.byReason.map((r) => [r.reason, r.count])).toEqual([["RETURNED_AFTER_PREP", 2]]);
     expect(b.returnedAfterPrep.lines).toBe(2);
     expect(b.recordCount).toBe(0);
+    /* المكوّنُ من المرتجع لا يُعَدّ «مرّةً» يدويّة */
+    expect(b.topProducts.map((p) => [p.count, p.returned])).toEqual([[0, true]]);
   });
 });

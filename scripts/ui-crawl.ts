@@ -5,6 +5,9 @@
  *   BASE=http://localhost:3100 npm run ui:crawl
  *   npm run ui:crawl -- --quick           (الحاسوبُ الفاتح وحده)
  *   CRAWL_ROLE=ACCOUNTANT npm run ui:crawl  (خادمٌ بـ`AUTH_BYPASS_ROLE` نفسه)
+ *   CRAWL_PAGES=pages.txt CRAWL_VARIANT=mobile-dark npm run ui:crawl
+ *       (بلا اكتشاف: يزور المساراتِ المسرودةَ سطراً سطراً بوجهٍ واحد — لتوزيع
+ *        الأوجه على عمليّاتٍ متوازية بعد زحفٍ كتب صفحاتِه)
  *
  * يبدأ من كلّ مسارٍ في نموذج التنقّل ولوحة الأوامر، ثمّ يتبع كلَّ رابطٍ
  * داخليٍّ يجده في الصفحات (بعرضٍ واحد)، ثمّ يزور كلَّ ما وجده بأربعة
@@ -20,7 +23,7 @@
  * ولا يضغط زرّاً ولا يرسل نموذجاً — يقرأ فقط، فيصلح لقاعدة المعاينة وحدها.
  * ويخرج بـ١ إن وجد شيئاً، ويكتب التقرير في `.scratch/crawl-report.json`.
  */
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chromium, type Page } from "playwright-core";
 import { entryHref, visibleAccountLinks, visibleAreas, visibleChildren } from "@/lib/nav";
 import { commandsFor } from "@/lib/commands";
@@ -29,6 +32,8 @@ import type { Role } from "@/lib/permissions";
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const QUICK = process.argv.includes("--quick");
 const MAX_PAGES = Number(process.env.CRAWL_MAX ?? 120);
+const PAGES_FILE = process.env.CRAWL_PAGES;
+const ONLY_VARIANT = process.env.CRAWL_VARIANT;
 const ROLE: Role = process.env.CRAWL_ROLE === "ACCOUNTANT" || process.env.CRAWL_ROLE === "PURCHASING" ? process.env.CRAWL_ROLE : "OWNER";
 
 /** مساراتٌ لا يُزحَف إليها: التنزيلاتُ والواجهاتُ والخروج. */
@@ -146,7 +151,17 @@ async function inspect(page: Page, route: string, variant: Variant, collectLinks
   page.on("response", onResponse);
 
   try {
-    const res = await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 90_000 });
+    /*
+      لا `networkidle`: الصفحةُ تجلب مسبقاً كلَّ رابطٍ ظاهر وتعيد جلبَه بعد دقيقة، وعلى
+      خادمٍ محلّيٍّ بمجمّع عشرة اتصالات يصطفّ ثلاثون جلباً مسبقاً فلا تهدأ الشبكةُ أبداً
+      (`/inventory/history` «تعذّر الفتح» وهي سليمة). يُنتظَر المحتوى نفسُه: يكتمل
+      المستند، ثمّ لا هيكلَ تحميل ولا «يحمّل…» في المحتوى.
+    */
+    const res = await page.goto(BASE + route, { waitUntil: "load", timeout: 90_000 });
+    await page.waitForFunction(() => {
+      const main = document.querySelector("main#main") as HTMLElement | null;
+      return Boolean(main) && !main!.querySelector("[aria-busy=true]") && !/يحمّل…/.test(main!.innerText);
+    }, null, { timeout: 60_000 }).catch(() => add("المحتوى لم يكتمل في ٦٠ ثانية (هيكلُ تحميلٍ أو «يحمّل…» باقٍ)"));
     const status = res?.status() ?? 0;
     if (status >= 400 || status === 0) add(`HTTP ${status}`);
     await page.waitForTimeout(250);
@@ -189,7 +204,8 @@ async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   const findings: Finding[] = [];
 
-  /* ── الاكتشاف: الحاسوبُ الفاتح يتبع الروابط ── */
+  /* ── الاكتشاف: الحاسوبُ الفاتح يتبع الروابط — أو قائمةٌ جاهزة بوجهٍ واحد ── */
+  if (PAGES_FILE) return listed(browser, PAGES_FILE);
   const [first, ...rest] = VARIANTS;
   const ctx = await browser.newContext({ viewport: { width: first.width, height: first.height }, colorScheme: first.scheme, locale: "ar-SA" });
   const page = await ctx.newPage();
@@ -237,11 +253,30 @@ async function main() {
     }
   }
   await browser.close();
+  report([...seen], findings, `${seen.size} صفحة${QUICK ? "" : ` × ${VARIANTS.length} أوجه`}`, ROLE === "OWNER" ? "" : `-${ROLE}`);
+}
 
+/** قائمةٌ جاهزة (مسارٌ في كلّ سطر — يقبل سطرَ السجلّ «✓ وجه /مسار») بوجهٍ واحد. */
+async function listed(browser: Awaited<ReturnType<typeof chromium.launch>>, file: string) {
+  const v = VARIANTS.find((x) => x.name === ONLY_VARIANT);
+  if (!v) throw new Error(`CRAWL_VARIANT واحدٌ من: ${VARIANTS.map((x) => x.name).join(" · ")}`);
+  const routes = [...new Set(readFileSync(file, "utf8").split("\n").map((l) => l.trim().split(/\s+/).pop() ?? "").filter((r) => r.startsWith("/")))];
+  const c = await browser.newContext({ viewport: { width: v.width, height: v.height }, colorScheme: v.scheme, isMobile: v.mobile, hasTouch: v.mobile, locale: "ar-SA" });
+  const p = await c.newPage();
+  const findings: Finding[] = [];
+  for (const route of routes) {
+    const r = await inspect(p, route, v, false);
+    findings.push(...r.findings);
+    process.stdout.write(`${r.findings.length ? "✕" : "✓"} ${v.name} ${route}\n`);
+  }
+  await browser.close();
+  report(routes, findings, `${routes.length} صفحة بوجه ${v.name}`, `-${v.name}`);
+}
+
+function report(pages: string[], findings: Finding[], what: string, suffix: string) {
   mkdirSync(".scratch", { recursive: true });
-  writeFileSync(ROLE === "OWNER" ? ".scratch/crawl-report.json" : `.scratch/crawl-report-${ROLE}.json`, JSON.stringify({ base: BASE, pages: [...seen], findings }, null, 2));
-
-  console.log(`\nزُحف إلى ${seen.size} صفحة${QUICK ? "" : ` × ${VARIANTS.length} أوجه`}. ما وُجد: ${findings.length}.`);
+  writeFileSync(`.scratch/crawl-report${suffix}.json`, JSON.stringify({ base: BASE, pages, findings }, null, 2));
+  console.log(`\nزُحف إلى ${what}. ما وُجد: ${findings.length}.`);
   const grouped = new Map<string, string[]>();
   for (const f of findings) grouped.set(f.problem, [...(grouped.get(f.problem) ?? []), `${f.route} (${f.variant})${f.from ? ` ← ${f.from}` : ""}`]);
   for (const [problem, where] of grouped) console.log(`\n✕ ${problem}\n   ${where.slice(0, 6).join("\n   ")}${where.length > 6 ? `\n   … و${where.length - 6} غيرها` : ""}`);

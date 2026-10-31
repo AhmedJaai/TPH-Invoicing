@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { Money } from "./money";
 import { BarList, Callout, Card, EmptyState, Section } from "./ui";
-import { TIME, countNoun } from "@/lib/arabic";
+import { PRODUCT, TIME, countNoun } from "@/lib/arabic";
 import { BOARD_REASON_LABEL } from "@/lib/inventory/waste-board";
 import { milliToDecimal } from "@/lib/inventory/units";
 import { formatDay } from "@/lib/riyadh-time";
@@ -21,6 +21,8 @@ function trimUnits(milli: number): string {
 
 export async function WasteBoardSection() {
   const b = await loadWasteBoard();
+  /* المجهولُ من سجلّات اليد وحدها — مكوّناتُ المرتجع تُعَدّ مكوّناتٍ لا «مرّات» */
+  const recordsUnknown = b.unknownCount - b.returnedAfterPrep.unknownCount;
   return (
     <Section
       id="waste"
@@ -41,10 +43,13 @@ export async function WasteBoardSection() {
             <p className="text-xs font-bold text-muted">تكلفة الهدر المسجّل بحسب السبب</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight"><Money minor={b.knownCostMinor} currency /></p>
             <p className="mt-1 text-[11px] text-muted">
-              <T s="سُجّل فيها هدر {0}{1}" a={[countNoun(b.recordCount, TIME), b.unknownCount > 0 && <span key="1" className="font-bold text-warn"> <T s=" · منها {0} تكلفتها غير معروفة، وهي خارج المجموع" a={[countNoun(b.unknownCount, TIME)]} /></span>]} /></p>
+              {b.recordCount === 0
+                ? "لم يُسجَّل هدرٌ باليد في الجرد — المجموعُ كلُّه من المرتجع بعد التحضير."
+                : <T s="سُجّل فيها هدر {0}{1}" a={[countNoun(b.recordCount, TIME), recordsUnknown > 0 && <span key="1" className="font-bold text-warn"> <T s=" · منها {0} تكلفتها غير معروفة، وهي خارج المجموع" a={[countNoun(recordsUnknown, TIME)]} /></span>]} />}
+              {b.returnedAfterPrep.unknownCount > 0 && <span className="font-bold text-warn"> <T s=" · ومن مكوّنات المرتجع {0} بلا سعرٍ معروف، خارج المجموع" a={[countNoun(b.returnedAfterPrep.unknownCount, PRODUCT)]} /></span>}</p>
             {b.returnedAfterPrep.lines > 0 && (
               <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                <T s="المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً ({0} مرتجعاً بعد التحضير، من أسطر البيع لا من سجل يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
+                <T s="المشروب الذي حُضّر ثم أُرجع يُحسب مستهلكاً وهدراً معاً (المشروباتُ المرتجعة بعد التحضير: {0}، من أسطر البيع لا من سجلٍّ يدوي). والجاهز الذي يعود إلى الرف لا يُحسب هدراً." a={[<span key="0" className="nums">{trimUnits(b.returnedAfterPrep.unitsMilli)}</span>]} /></p>
             )}
             <div className="mt-4">
               <BarList
@@ -53,7 +58,10 @@ export async function WasteBoardSection() {
                   key: r.reason,
                   label: BOARD_REASON_LABEL[r.reason],
                   minor: r.costMinor,
-                  sub: r.unknownCount > 0 ? `${countNoun(r.count, TIME)} · ${r.unknownCount} بلا تكلفة` : countNoun(r.count, TIME),
+                  /* المرتجعُ يُعَدّ بمشروباته كما في الفقرة فوقه — لا بأسطر البيع («79 مرّة» بجانب «109») */
+                  sub: r.reason === "RETURNED_AFTER_PREP"
+                    ? `المشروبات: ${trimUnits(b.returnedAfterPrep.unitsMilli)}${r.unknownCount > 0 ? ` · مكوّناتٌ بلا تكلفة: ${r.unknownCount}` : ""}`
+                    : r.unknownCount > 0 ? `${countNoun(r.count, TIME)} · ${r.unknownCount} بلا تكلفة` : countNoun(r.count, TIME),
                 }))}
               />
             </div>
@@ -69,7 +77,7 @@ export async function WasteBoardSection() {
                     key: p.productId,
                     label: p.productName,
                     minor: p.costMinor,
-                    sub: countNoun(p.count, TIME),
+                    sub: p.count === 0 ? "من المرتجع بعد التحضير" : p.returned ? `${countNoun(p.count, TIME)} · ومن المرتجع` : countNoun(p.count, TIME),
                     href: `/inventory/items/${p.productId}`,
                   }))}
                 />

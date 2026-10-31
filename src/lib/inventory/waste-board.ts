@@ -63,7 +63,8 @@ export interface WasteBoard {
   byReason: { reason: BoardReason; count: number; costMinor: number; unknownCount: number }[];
   /** المرتجعُ بعد التحضير: كم مشروباً (بالمِلّي) — يُعَدّ بعدد المشروبات لا المكوّنات. */
   returnedAfterPrep: { lines: number; unitsMilli: number; costMinor: number; unknownCount: number };
-  topProducts: { productId: string; productName: string; count: number; costMinor: number }[];
+  /** `count` سجلّاتُ اليد وحدها؛ و`returned` أنّ بعضَ كلفته من مكوّنات المرتجع — لا تُعَدّ «مرّات». */
+  topProducts: { productId: string; productName: string; count: number; costMinor: number; returned: boolean }[];
   /** أصنافٌ «انتهت صلاحيّتُها» أكثر من مرّة في النافذة. */
   repeatedExpiry: { productId: string; productName: string; count: number }[];
 }
@@ -83,7 +84,7 @@ export function buildWasteBoard(
   returned: { lines: number; unitsMilli: number; ingredients: readonly ReturnedIngredient[] } = { lines: 0, unitsMilli: 0, ingredients: [] },
 ): WasteBoard {
   const reasons = new Map<BoardReason, { count: number; costMinor: number; unknownCount: number }>();
-  const products = new Map<string, { productName: string; count: number; costMinor: number }>();
+  const products = new Map<string, { productName: string; count: number; costMinor: number; returned: boolean }>();
   const expiry = new Map<string, { productName: string; count: number }>();
   let known = 0;
   let unknown = 0;
@@ -96,7 +97,7 @@ export function buildWasteBoard(
     reasons.set(e.reason, r);
 
     if (cost !== null) {
-      const p = products.get(e.productId) ?? { productName: e.productName, count: 0, costMinor: 0 };
+      const p = products.get(e.productId) ?? { productName: e.productName, count: 0, costMinor: 0, returned: false };
       p.count++;
       p.costMinor += cost;
       products.set(e.productId, p);
@@ -116,8 +117,9 @@ export function buildWasteBoard(
     if (cost === null) { retUnknown++; continue; }
     retCost += cost;
     known += cost;
-    const p = products.get(i.productId) ?? { productName: i.productName, count: 0, costMinor: 0 };
-    p.count++;
+    /* المكوّنُ مجموعُ مرتجعاتٍ كثيرة — ليس «مرّةً واحدة» */
+    const p = products.get(i.productId) ?? { productName: i.productName, count: 0, costMinor: 0, returned: false };
+    p.returned = true;
     p.costMinor += cost;
     products.set(i.productId, p);
   }
