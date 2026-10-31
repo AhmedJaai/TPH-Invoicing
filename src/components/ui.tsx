@@ -449,7 +449,8 @@ export function BarList({
   items,
   tone = "accent",
 }: {
-  items: readonly { key: string; label: React.ReactNode; minor: number; href?: string; sub?: string }[];
+  /** `minor` طولُ الشريط؛ و`display` يُعرض بدل المبلغ لما ليس مالاً (زمنٌ، عدد). */
+  items: readonly { key: string; label: React.ReactNode; minor: number; display?: React.ReactNode; href?: string; sub?: string }[];
   tone?: Tone;
 }) {
   const max = Math.max(1, ...items.map((i) => i.minor));
@@ -463,7 +464,7 @@ export function BarList({
               {i.label}
               {i.sub && <span className="ms-2 text-[11px] text-muted">{i.sub}</span>}
             </span>
-            <span className="relative z-10 shrink-0 text-[13px] font-bold"><Money minor={i.minor} /></span>
+            <span className="relative z-10 shrink-0 text-[13px] font-bold">{i.display ?? <Money minor={i.minor} />}</span>
             <span aria-hidden className={`absolute inset-y-1 start-0 rounded-md opacity-[0.14] ${TONE_DOT[tone]}`} style={{ width: `${pct}%` }} />
           </>
         );

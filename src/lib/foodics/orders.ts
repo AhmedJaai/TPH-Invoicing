@@ -281,6 +281,9 @@ export interface OrderMirror {
   originalReference: number | null;
   openedAt: Date | null;
   closedAt: Date | null;
+  kitchenReceivedAt: Date | null;
+  kitchenDoneAt: Date | null;
+  wastedLines: number;
   sourceUpdatedAt: Date;
 }
 
@@ -339,6 +342,9 @@ export function mirrorOrder(order: FoodicsOrder): { order: OrderMirror; payments
       originalReference: order.original_order?.reference ?? null,
       openedAt: parseFoodicsMoment(order.opened_at),
       closedAt: parseFoodicsMoment(order.closed_at),
+      kitchenReceivedAt: parseFoodicsMoment(order.meta?.foodics?.kitchen_received_at ?? null),
+      kitchenDoneAt: parseFoodicsMoment(order.meta?.foodics?.kitchen_done_at ?? null),
+      wastedLines: (order.products ?? []).filter((p) => p.is_ingredients_wasted === 1 || p.is_ingredients_wasted === true).length,
       sourceUpdatedAt: updated,
     },
     payments,

@@ -48,6 +48,9 @@ export interface DeepseekUsage {
 export interface DeepseekSuccess {
   ok: true;
   text: string;
+  /** ما طلبه من أدوات — فارغٌ لجوابٍ نهائيّ. */
+  toolCalls: DeepseekToolCall[];
+  reasoning: string;
   model: string;
   task: AiTask;
   durationMs: number;
@@ -82,9 +85,29 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
 
+export interface DeepseekToolCall {
+  id: string;
+  name: string;
+  /** نصُّ JSON كما كتبه النموذج — يُفحَص بـzod عند المستدعي. */
+  arguments: string;
+}
+
 export interface DeepseekMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string | ContentPart[];
+  /** للمساعد: أدواتٌ طلبها في هذه الخطوة — تُعاد كما هي في المحادثة. */
+  toolCalls?: DeepseekToolCall[];
+  /** تفكيرُه في خطوة الأداة — المزوّدُ يطلبه معها في وضع التفكير. */
+  reasoning?: string;
+  /** للأداة: أيّ طلبٍ تجيب. */
+  toolCallId?: string;
+}
+
+/** أداةٌ يناديها النموذج — بلا مخطّطٍ صارم (المزوّد لا يقبله)، فالمعاملاتُ تُفحَص بعد. */
+export interface DeepseekTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
 }
 
 export interface DeepseekCall {
@@ -105,6 +128,10 @@ export interface DeepseekCall {
    * `thinkingFor`.
    */
   thinking?: boolean;
+  /** أدواتٌ يطلبها النموذج بدل الجواب — الجوابُ حينها `toolCalls` ونصٌّ قد يكون فارغاً. */
+  tools?: DeepseekTool[];
+  /** الافتراضيّ صفر (قراءةٌ لا إبداع)؛ والمشورةُ تحتمل أكثر. */
+  temperature?: number;
 }
 
 /**
@@ -149,7 +176,14 @@ function retryBaseMs(): number {
 const wait = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
 interface RawResponse {
-  choices?: { message?: { content?: string }; finish_reason?: string }[];
+  choices?: {
+    message?: {
+      content?: string | null;
+      reasoning_content?: string | null;
+      tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[];
+    };
+    finish_reason?: string;
+  }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -199,15 +233,23 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
 
   const body = JSON.stringify({
     model,
-    temperature: 0,
+    temperature: call.temperature ?? 0,
     max_tokens: call.maxTokens,
     ...(call.json ? { response_format: { type: "json_object" } } : {}),
     ...(thinking ? {} : { thinking: { type: "disabled" } }),
+    ...(call.tools && call.tools.length > 0
+      ? { tools: call.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) }
+      : {}),
     messages: call.messages.map((m) => ({
-      ...m,
+      role: m.role,
       content: typeof m.content === "string"
         ? redactor.redact(m.content)
         : m.content.map((part) => (part.type === "text" ? { ...part, text: redactor.redact(part.text) } : part)),
+      ...(m.toolCalls && m.toolCalls.length > 0
+        ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } })) }
+        : {}),
+      ...(m.reasoning ? { reasoning_content: m.reasoning } : {}),
+      ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
     })),
   });
 
@@ -338,6 +380,8 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
 
     const choice = payload.choices?.[0];
     const text = choice?.message?.content?.trim() ?? "";
+    const toolCalls: DeepseekToolCall[] = (choice?.message?.tool_calls ?? []).flatMap((c) =>
+      c.id && c.function?.name ? [{ id: c.id, name: c.function.name, arguments: redactor.restore(c.function.arguments ?? "{}") }] : []);
 
     /*
       الانقطاع عند السقف ليس نجاحاً ناقصاً — هو فشل.
@@ -353,7 +397,7 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
         model, task: call.task, durationMs: Date.now() - started, attempts: attempt,
       };
     }
-    if (!text) {
+    if (!text && toolCalls.length === 0) {
       return {
         ok: false, kind: "INVALID_RESPONSE", reason: "لم يُرجع المزوّد محتوى",
         model, task: call.task, durationMs: Date.now() - started, attempts: attempt,
@@ -378,6 +422,8 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     return {
       ok: true,
       text: redactor.restore(text),
+      toolCalls,
+      reasoning: choice?.message?.reasoning_content ?? "",
       model,
       task: call.task,
       durationMs: Date.now() - started,

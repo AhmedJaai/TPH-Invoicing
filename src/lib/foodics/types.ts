@@ -43,6 +43,8 @@ const OrderProduct = z.object({
   discount_amount: amount,
   total_cost: amount,
   status: z.number(),
+  /** جوابُ الكاشير عند الردّ: أهُدرت المكوّنات؟ — ‏٠/١ (وقد يصل منطقيّاً). */
+  is_ingredients_wasted: z.union([z.number(), z.boolean()]).nullable().optional(),
   taxes: z.array(Tax).optional(),
   options: z.array(Option).optional(),
   product: z.object({
@@ -78,6 +80,13 @@ export const FoodicsOrder = z.object({
   updated_at: z.string(),
   branch: z.object({ name: z.string().nullable().optional(), reference: z.string().nullable().optional() }).nullable().optional(),
   original_order: z.object({ reference: z.number().nullable().optional() }).nullable().optional(),
+  /** أوقاتُ شاشة التحضير — في `meta.foodics` لا في رأس الطلب. */
+  meta: z.object({
+    foodics: z.object({
+      kitchen_received_at: z.string().nullable().optional(),
+      kitchen_done_at: z.string().nullable().optional(),
+    }).passthrough().nullable().optional(),
+  }).passthrough().nullable().optional(),
   products: z.array(OrderProduct).optional(),
   payments: z.array(Payment).optional(),
   combos: z.array(z.unknown()).optional(),

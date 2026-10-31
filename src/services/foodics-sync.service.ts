@@ -96,6 +96,8 @@ async function writeOrders(orders: readonly FoodicsOrder[], actorId: string | nu
           totalMinor: sql`excluded.total_minor`, discountMinor: sql`excluded.discount_minor`,
           vatMinor: sql`excluded.vat_minor`, originalReference: sql`excluded.original_reference`,
           openedAt: sql`excluded.opened_at`, closedAt: sql`excluded.closed_at`,
+          kitchenReceivedAt: sql`excluded.kitchen_received_at`, kitchenDoneAt: sql`excluded.kitchen_done_at`,
+          wastedLines: sql`excluded.wasted_lines`,
           sourceUpdatedAt: sql`excluded.source_updated_at`, syncedAt: sql`now()`,
         },
       });

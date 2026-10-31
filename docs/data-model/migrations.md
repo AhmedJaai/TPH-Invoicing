@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٩٤
+## الجداول — ٩٧
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -20,6 +20,7 @@
 `finance_declarations` `finance_snapshots` `finance_readings`
 `capture_links` `captures`
 `employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
+`advisor_threads` `advisor_messages` `advisor_plan_items`
 
 التعريف في `src/db/schema.ts`.
 
@@ -139,6 +140,8 @@
 | `090_other_sales_category.sql` | `tx_category`: قيمةٌ جديدة `OTHER_SALES` — «مبيعات خارج فودكس» للوارد وحده |
 | `091_supplier_merge.sql` | `suppliers.merged_into_id` · `merged_at` · `merged_by_id`، و`supplier_merges` — ما نُقل وما حُذف وما نُسخ في كلّ دمج، للتراجع |
 | `092_push_subscriptions.sql` | `push_subscriptions` — جهازُ كلّ مستخدمٍ اشترك في إشعار الصباح؛ خاملٌ حتى تُضبط مفاتيح VAPID |
+| `093_foodics_kitchen_times.sql` | `foodics_orders.kitchen_received_at` · `kitchen_done_at` (وقتا شاشة التحضير) · `wasted_lines` (أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت) — مرآةٌ لا مال، والفارغ «لم يُقرأ» |
+| `094_advisor.sql` | `advisor_threads` · `advisor_messages` · `advisor_plan_items` — محادثاتُ المستشار وخطّتُه؛ نصٌّ لا مال، والأرقامُ تُحسَب من الدفاتر لحظةَ السؤال |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

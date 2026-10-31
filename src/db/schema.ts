@@ -2244,6 +2244,11 @@ export const foodicsOrders = pgTable("foodics_orders", {
   originalReference: integer("original_reference"),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
+  /** متى وصل شاشةَ التحضير ومتى أُنهي (`meta.foodics`، ٠٩٣) — `null` لم يُقرأ أو لا شاشة. */
+  kitchenReceivedAt: timestamp("kitchen_received_at", { withTimezone: true }),
+  kitchenDoneAt: timestamp("kitchen_done_at", { withTimezone: true }),
+  /** أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت (`is_ingredients_wasted`) — `null` قبل أن يُقرأ. */
+  wastedLines: integer("wasted_lines"),
   sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }).notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -2623,3 +2628,40 @@ export const attendanceCheckins = pgTable("attendance_checkins", {
   reviewedById: text("reviewed_by_id").references(() => users.id),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
 });
+
+/* ──────────────────── المستشار (094) ──────────────────── */
+
+/** محادثةٌ مع المستشار — تُحفَظ ليتذكّر ما قيل. */
+export const advisorThreads = pgTable("advisor_threads", {
+  id: id(),
+  title: text("title").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("advisor_threads_updated_idx").on(t.updatedAt)]);
+
+export const advisorMessages = pgTable("advisor_messages", {
+  id: id(),
+  threadId: text("thread_id").notNull().references(() => advisorThreads.id, { onDelete: "cascade" }),
+  role: text("role").$type<"user" | "assistant">().notNull(),
+  content: text("content").notNull(),
+  /** أرقامُ الجواب التي طابقت حقيقةً حسبها الخادم — للعرض وحده. */
+  verified: jsonb("verified").$type<Record<string, string>>(),
+  tools: jsonb("tools").$type<{ name: string; label: string }[]>(),
+  model: text("model"),
+  createdAt: now(),
+}, (t) => [index("advisor_messages_thread_idx").on(t.threadId, t.createdAt)]);
+
+/** بندٌ في خطّة المستشار — بأفقه ومؤشّره؛ والرقمُ يُقرأ من الدفاتر حين يُسأل. */
+export const advisorPlanItems = pgTable("advisor_plan_items", {
+  id: id(),
+  title: text("title").notNull(),
+  detail: text("detail"),
+  horizonDays: integer("horizon_days").notNull(),
+  metric: text("metric"),
+  status: text("status").$type<"OPEN" | "DONE" | "DROPPED">().notNull().default("OPEN"),
+  threadId: text("thread_id").references(() => advisorThreads.id, { onDelete: "set null" }),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("advisor_plan_status_idx").on(t.status, t.createdAt)]);

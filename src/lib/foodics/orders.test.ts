@@ -137,4 +137,15 @@ describe("مرآةُ الطلب", () => {
   it("إجماليٌّ لم يُقرأ ← لا مرآة، لا صفر", () => {
     expect(mirrorOrder(order({ total_price: null }))).toBeNull();
   });
+  it("أوقاتُ شاشة التحضير من `meta.foodics`، وغيابُها فراغٌ لا صفر", () => {
+    const m = mirrorOrder(order({ meta: { foodics: { kitchen_received_at: "2026-10-10 20:21:05", kitchen_done_at: "2026-10-10 20:28:00", receipt_qr: "…" } } }));
+    expect(m?.order.kitchenReceivedAt?.toISOString()).toBe("2026-10-10T20:21:05.000Z");
+    expect(m?.order.kitchenDoneAt?.toISOString()).toBe("2026-10-10T20:28:00.000Z");
+    expect(mirrorOrder(order())?.order.kitchenDoneAt).toBeNull();
+  });
+  it("يعدّ أسطرَ المرتجَع التي قال الكاشير إنّ مكوّناتها هُدرت", () => {
+    const base = order().products!;
+    const m = mirrorOrder(order({ status: ORDER_STATUS.RETURNED, products: [{ ...base[0], is_ingredients_wasted: 1 }, { ...base[1], is_ingredients_wasted: 0 }] }));
+    expect(m?.order.wastedLines).toBe(1);
+  });
 });

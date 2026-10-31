@@ -112,6 +112,9 @@ export const AREAS: readonly NavArea[] = [
     owns: ["/finance/rows", "/finance/report", "/finance/inputs"],
     children: [
       { href: "/finance", label: "الربح" },
+      /* كلُّ جانبٍ بنسبته بجانب المعتاد — والمستشارُ يجيب ويخطّط فوقه (٣١ أكتوبر ٢٠٢٦) */
+      { href: "/finance/performance", label: "الأداء" },
+      { href: "/finance/advisor", label: "المستشار", needs: "month:close" },
       { href: "/finance/position", label: "الوضع الآن" },
       { href: "/finance/sales", label: "المبيعات" },
       /* لكلّ صنف مخزون: كم اشتُري، كم بِيع منه، وأين ذهب الباقي */

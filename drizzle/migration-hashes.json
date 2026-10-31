@@ -90,5 +90,7 @@
   "089_month_seals.sql": "d3f2a82f21aaa5996f060049f3c057552b3cb19d801568cfc5d5fdcb356b2f59",
   "090_other_sales_category.sql": "bbfc898f4aa2ea42a9083ecfc01dcaa303325d5e9b002cae6743d66faef40794",
   "091_supplier_merge.sql": "15fcdff8fb408fcd04102031f7810c89153547b551ca903f589adea47a0a3fed",
-  "092_push_subscriptions.sql": "2edac05fc047db4026976362b694e5fd97e56e1c4ed1be39edf71bfa7ff96d83"
+  "092_push_subscriptions.sql": "2edac05fc047db4026976362b694e5fd97e56e1c4ed1be39edf71bfa7ff96d83",
+  "093_foodics_kitchen_times.sql": "eefaf097b929cd85d4f234f2f52f22b55b0021a5e66e36f4af2e2eb05d6350fc",
+  "094_advisor.sql": "b2548b083086b2645b1c521007fdb441e0ad2a05c3b57885237d18ee9b564a19"
 }

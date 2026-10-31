@@ -28,6 +28,7 @@ import { chromium, type Page } from "playwright-core";
 import { entryHref, visibleAccountLinks, visibleAreas, visibleChildren } from "@/lib/nav";
 import { commandsFor } from "@/lib/commands";
 import type { Role } from "@/lib/permissions";
+import { PAGE, countNoun } from "@/lib/arabic";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const QUICK = process.argv.includes("--quick");
@@ -253,7 +254,7 @@ async function main() {
     }
   }
   await browser.close();
-  report([...seen], findings, `${seen.size} صفحة${QUICK ? "" : ` × ${VARIANTS.length} أوجه`}`, ROLE === "OWNER" ? "" : `-${ROLE}`);
+  report([...seen], findings, `${countNoun(seen.size, PAGE)}${QUICK ? "" : ` × ${VARIANTS.length} أوجه`}`, ROLE === "OWNER" ? "" : `-${ROLE}`);
 }
 
 /** قائمةٌ جاهزة (مسارٌ في كلّ سطر — يقبل سطرَ السجلّ «✓ وجه /مسار») بوجهٍ واحد. */
@@ -270,7 +271,7 @@ async function listed(browser: Awaited<ReturnType<typeof chromium.launch>>, file
     process.stdout.write(`${r.findings.length ? "✕" : "✓"} ${v.name} ${route}\n`);
   }
   await browser.close();
-  report(routes, findings, `${routes.length} صفحة بوجه ${v.name}`, `-${v.name}`);
+  report(routes, findings, `${countNoun(routes.length, PAGE)} بوجه ${v.name}`, `-${v.name}`);
 }
 
 function report(pages: string[], findings: Finding[], what: string, suffix: string) {

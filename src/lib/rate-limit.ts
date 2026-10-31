@@ -153,6 +153,12 @@ export const RULES: Record<string, RateLimitRule> = {
     لتحليل كلّ المورّدين مرّتين في الساعة، ولا يتّسع لحلقةٍ عالقة.
   */
   "ai-analysis": { limit: 80, windowSeconds: 3600 },
+  /*
+    المستشار: كلُّ رسالةٍ أدواتٌ ونداءاتُ تفكيرٍ عدّة — محادثةٌ جادّة في الساعة تتّسع لها،
+    وحلقةٌ عالقة لا. وتعديلُ الخطّة بيدٍ رخيص.
+  */
+  advisor: { limit: 40, windowSeconds: 3600 },
+  "advisor-plan": { limit: 200, windowSeconds: 3600 },
   "ai-findings": { limit: 300, windowSeconds: 3600 },
   /*
     دِلاءٌ صريحة لما كان يقع في الافتراضيّ: الإقرار الجماعيّ كان يشارك
