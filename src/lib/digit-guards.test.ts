@@ -64,8 +64,9 @@ describe("أرقامُ نصّ الواجهة لاتينيّة", () => {
     expect(indicLiterals("x.tsx", `const a = <p>آخر ٢٤ ساعة</p>; const b = sql\`/* ١ */ select 1\`;`)).toHaveLength(1);
   });
 
+  /* يحلّل كلَّ ملفٍّ في src — ٧٫٦ ثوانٍ في CI تحت التغطية، فمهلةُ الخمس الافتراضيّة أسقطته بلا عطب */
   it("لا رقمَ هنديّاً في نصٍّ ثابت يُعرض", () => {
     const found = files("src").filter((f) => !EXEMPT.some((e) => f.startsWith(e))).flatMap((f) => indicLiterals(f, readFileSync(f, "utf8")));
     expect(found).toEqual([]);
-  });
+  }, 30_000);
 });

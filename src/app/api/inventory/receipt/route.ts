@@ -6,7 +6,8 @@
  * ومعه المرشّحون، فتسأل الشاشةُ صاحبَها أهو نفسُ البند أم شحنةٌ أخرى.
  */
 import { NextResponse } from "next/server";
-import { guard, pgErrorCode, respondTo, failWith } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
+import { pgErrorCode } from "@/lib/pg-error";
 import {
   PossibleDuplicateReceiptError, createReceipt, resolveReceipt, updateReceipt, voidReceipt,
 } from "@/services/inventory-receipt.service";

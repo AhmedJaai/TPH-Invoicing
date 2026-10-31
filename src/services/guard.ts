@@ -4,6 +4,7 @@
  * كانت كل واجهة تكرّر ثماني أسطر من `try/catch` لترجمة الأخطاء إلى رموز
  * HTTP، وكان الحدّ غائباً أصلاً. فجُمع ذلك هنا: تكرارٌ أقلّ، ونسيانٌ أصعب.
  */
+import { pgErrorCode } from "@/lib/pg-error";
 import "@/lib/zod-ar";
 import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
@@ -125,12 +126,6 @@ function ownMessage(e: unknown): string | null {
   return m.slice(0, 300);
 }
 
-/** رمز خطأ PostgreSQL — على الخطأ نفسه أو على سببه (Drizzle يلفّه). */
-export function pgErrorCode(e: unknown): string | undefined {
-  const err = e as { code?: unknown; cause?: { code?: unknown } } | null;
-  const code = err?.code ?? err?.cause?.code;
-  return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code) ? code : undefined;
-}
 
 /** نصُّ ما رفعه مؤثِّرٌ منّا — بالعربيّة وحدها؛ ورسالةُ Postgres الإنجليزيّة لا تُعرَض. */
 function ownDatabaseMessage(e: unknown): string | null {

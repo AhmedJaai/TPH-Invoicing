@@ -12,7 +12,7 @@ import { documents, invoices, paymentAllocations, paymentHoldOverrides, users } 
 import { recordAudit } from "@/lib/audit";
 import { holdReasonOf, isOverridableHold, type HoldOverride, type HoldReason } from "@/lib/payment-run";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 import type { Conn } from "./types";
 
 /** قراراتُ المالك القائمة — بمعرّف الفاتورة. تقرؤها `loadPaymentRun` لكلّ شاشة. */

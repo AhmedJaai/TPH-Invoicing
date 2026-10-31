@@ -9,7 +9,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { ROLES } from "@/lib/permissions";
-import { failWith, guard, pgErrorCode, respondTo } from "@/services/guard";
+import { failWith, guard, respondTo } from "@/services/guard";
+import { pgErrorCode } from "@/lib/pg-error";
 import { applyUserChange, UserChangeRefused } from "@/services/user-admin.service";
 
 export const runtime = "nodejs";

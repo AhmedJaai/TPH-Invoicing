@@ -26,7 +26,7 @@ import { loadDeclarations } from "./profit.service";
 import { buildCommitments, type Commitments } from "@/lib/commitments";
 import { OBLIGATION_KIND_LABEL } from "@/lib/obligations";
 import { loadObligations } from "./obligation.service";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 
 function dues(run: PaymentRun): SupplierDue[] {
   return run.ready.map((s) => ({ supplierId: s.supplierId, supplierName: s.supplierName, amountMinor: s.totalMinor }));

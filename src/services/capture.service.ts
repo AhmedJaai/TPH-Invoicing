@@ -23,7 +23,7 @@ import { extractionSchema } from "@/lib/extraction/schema";
 import { signatureMatches, sniffMimeType } from "@/lib/file-signature";
 import { loadCachedReading, saveCachedReading } from "./reading-cache.service";
 import { loadSupplierRecords } from "./upload-review.service";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 import type { Tx } from "./types";
 
 /** حدُّ المنصّة لجسم الطلب ٤٫٥ ميجابايت — والماسحُ يُخرج دون ١٫٥ عادةً */

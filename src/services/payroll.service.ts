@@ -31,7 +31,7 @@ import { silencedKeys } from "@/lib/signal-decisions";
 import {
   damageCapMinor, isViolationCode, loanCapMinor, monthViolations, REPEAT_WINDOW_DAYS, type AssessedViolation,
 } from "@/lib/payroll/saudi-rules";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 import { assertMonthsOpen } from "./month-guard";
 import type { Conn, Tx } from "./types";
 

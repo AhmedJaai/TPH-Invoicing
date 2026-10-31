@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { parseStoredMinor } from "@/lib/cash-outlook";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 
 const CASH_FLOOR_KEY = "cash_floor_minor";
 

@@ -11,7 +11,7 @@ import {
 } from "@/lib/obligations";
 import { silencedKeys } from "@/lib/signal-decisions";
 import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
-import { pgErrorCode } from "./guard";
+import { pgErrorCode } from "@/lib/pg-error";
 
 type Row = typeof obligations.$inferSelect;
 
