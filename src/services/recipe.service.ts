@@ -11,6 +11,7 @@
  * مسارين (الواجهة ونصُّ تهيئة)، والاتّفاقُ البرمجيّ وحده لا يُعوَّل
  * عليه — درسٌ مكتوبٌ في `CLAUDE.md` عن ثلاث طبقاتٍ لمنع التكرار.
  */
+import { NotFound } from "@/lib/domain-error";
 import { RECIPE, countNoun } from "@/lib/arabic";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -748,7 +749,7 @@ export async function retireStockItem(
        where p.id = ${productId} and p.is_stock_item and p.is_active
        limit 1
     `)).rows;
-    if (!row) throw new Error("لا صنف مخزون بهذا المعرّف");
+    if (!row) throw new NotFound("هذا الصنف لم يعد في الجرد، فربما أُخرج من نافذة أخرى. حدّث الصفحة.");
 
     /* الوصفاتُ السارية وحدها تمنع — والمؤرشفةُ ذكرى، لا استعمال */
     const used = (await tx.execute<{ name_ar: string }>(sql`
@@ -795,7 +796,7 @@ export async function restoreStockItem(
        where p.id = ${productId} and p.is_stock_item and not p.is_active
        limit 1
     `)).rows;
-    if (!row) throw new Error("لا صنف مُخرَج بهذا المعرّف، فربما أُعيد من قبل");
+    if (!row) throw new NotFound("لا صنف مُخرَج بهذا المعرّف، فربما أُعيد من قبل. حدّث الصفحة.");
 
     await tx.execute(sql`update products set is_active = true where id = ${productId}`);
 

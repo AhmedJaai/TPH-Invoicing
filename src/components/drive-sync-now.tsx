@@ -192,9 +192,9 @@ export function DriveSyncNow({
               <SubmitButton className={buttonClass("primary", "lg")}>أعد ربط الدرايف</SubmitButton>
             </form>
           ) : (
-            <button type="button" disabled className={buttonClass("secondary", "lg")}>زامن الآن</button>
+            <button type="button" disabled aria-describedby="sync-why" className={buttonClass("secondary", "lg")}>زامن الآن</button>
           )}
-          <p className="text-[11px] text-muted sm:text-end">
+          <p id="sync-why" className="text-[11px] text-muted sm:text-end">
             {canRun ? "يفحص الدرايف ويقرأ الملفات ويؤرشفها ويعيد تسميتها، كما تفعل المزامنة التلقائية." : state === "preview" ? "الدرايف غير متاح في النسخة التجريبية." : "اسمح أولاً بالوصول من حساب جوجل."}
           </p>
         </div>

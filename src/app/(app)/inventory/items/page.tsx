@@ -59,10 +59,11 @@ export default async function InventoryItemsPage({
 
   const rows = await db.execute<Record<string, unknown>>(sql`
     select p.id, p.name_ar, p.category, p.base_unit,
-           (select count(distinct ri.recipe_version_id)::int
+           -- القاعدةُ نفسها التي تمنع إخراجَه (retireStockItem): وصفاتٌ ساريةٌ لم تنتهِ
+           (select count(distinct rv.recipe_id)::int
               from recipe_ingredients ri
               join recipe_versions rv on rv.id = ri.recipe_version_id
-             where ri.product_id = p.id and rv.status = 'ACTIVE') as in_recipes,
+             where ri.product_id = p.id and rv.status = 'ACTIVE' and rv.effective_to is null) as in_recipes,
            (select count(*)::int from inventory_count_lines l
              where l.product_id = p.id and l.actual_milli is not null) as counted_times,
            last.variance_milli as last_milli,
@@ -158,7 +159,10 @@ export default async function InventoryItemsPage({
   if (canEdit) {
     columns = [...columns, {
       key: "retire", header: "", wrap: true, align: "end",
-      cell: (r) => <RetireItem productId={r.id} name={r.name} />,
+      /* مكوّنٌ في وصفةٍ سارية لا يُخرج — يُقال قبل الضغط لا بعده (كان الزرُّ يُردّ بـ409) */
+      cell: (r) => r.inRecipes > 0
+        ? <Link href="/inventory/recipes" className="relative z-10 text-[11px] leading-relaxed text-muted hover:text-accent"><T s="يُخرج بعد حذفه من وصفاته" /></Link>
+        : <RetireItem productId={r.id} name={r.name} />,
     }];
   }
 

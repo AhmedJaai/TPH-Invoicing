@@ -126,5 +126,6 @@
 "عندي نقداً ولم يُصرف": "I hold it in cash, unspent",
 "يُصرف منه على المقهى": "It's spent on the café",
 "نقد عندك لم يُودَع": "Cash you hold, not deposited",
-"النقد عندك ولم يُصرف": "The cash is with you, unspent"
+"النقد عندك ولم يُصرف": "The cash is with you, unspent",
+"يُخرج بعد حذفه من وصفاته": "Can be removed once it's out of its recipes"
 }
