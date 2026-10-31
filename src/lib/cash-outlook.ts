@@ -18,6 +18,7 @@
  *
  * دالّةٌ خالصة — تأخذ وقائع وتُرجع دلاءً مرتّبة.
  */
+import { PAYDAY } from "./payroll/period";
 import { formatDay, formatMonth, addDays, daysInMonth } from "./riyadh-time";
 import { MAX_AMOUNT_MINOR, formatRiyalsDisplay } from "./money";
 import { addMonths, monthsBetween } from "./filing";
@@ -105,8 +106,11 @@ export interface PayrollDue {
   undistributedMinor?: number;
 }
 
-/** يومُ الرواتب في المقهى (`docs/decisions/payroll.md`) */
-export const PAYDAY = 25;
+/**
+ * يومُ الرواتب — من فترة الخصم نفسها (`lib/payroll/period.ts`)، لا نسخةً هنا. كان ٢٥ والمقهى
+ * يصرف يوم ٢٧ (أحمد، ١ نوفمبر ٢٠٢٦)، فيقول «النقد القادم» إنّ الرواتب تخرج قبل موعدها بيومين.
+ */
+export { PAYDAY } from "./payroll/period";
 
 export interface OutflowLine {
   id: string;

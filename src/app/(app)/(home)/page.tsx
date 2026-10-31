@@ -89,7 +89,7 @@ export default async function HomePage() {
     canBank ? loadCashPosition() : Promise.resolve(null),
     canPay || canBank ? loadRecurringInputs() : Promise.resolve([]),
     loadDayFigures(yesterday),
-    /* الرواتبُ من المسيّر — كانت «مدفوعات هذا الأسبوع ٢٤٠» ورواتبُ الشهر تُستحقّ يوم ٢٥ */
+    /* الرواتبُ من المسيّر — كانت «مدفوعات هذا الأسبوع ٢٤٠» ورواتبُ الشهر تُستحقّ يوم الصرف (٢٧) */
     canPay || canBank ? loadPayrollDues([runMonth, currentMonthRiyadh()]) : Promise.resolve([]),
   ]);
   /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر والرواتب، كما في «النقد القادم» */

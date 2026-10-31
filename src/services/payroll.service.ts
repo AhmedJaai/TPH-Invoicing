@@ -980,7 +980,7 @@ export interface PayrollAttentionFacts {
   /** موظّفون يعملون هذا الشهر بلا راتبٍ مكتوب. */
   missingRates: string[];
   /**
-   * رواتبُ لم تُحوَّل كاملة: الشهرُ الماضي من أوّل الشهر، والجاري من يوم ٢٥ — موعدُ الرواتب.
+   * رواتبُ لم تُحوَّل كاملة: الشهرُ الماضي من أوّل الشهر، والجاري من يوم الصرف (٢٧، `PAYDAY`).
    * `null`: لا شيء باقٍ.
    */
   owed: { month: string; remainingMinor: number; people: number } | null;

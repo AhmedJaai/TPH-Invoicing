@@ -313,16 +313,16 @@ describe("الرواتب في الإسقاط", () => {
     expect(o.buckets).toHaveLength(0);
   });
 
-  it("هذا الأسبوع: الماضي مستحقٌّ الآن، والجاري يومَ ٢٥", () => {
+  it("هذا الأسبوع: الماضي مستحقٌّ الآن، والجاري يومَ الصرف ٢٧", () => {
     const w = dueThisWeek({ today: "2026-10-22", overdueRun: [], recurring: [], payroll: [
       { month: "2026-09", amountMinor: 100_00, people: 1, unknownPeople: 0 },
       { month: "2026-10", amountMinor: 200_00, people: 2, unknownPeople: 0 },
     ] });
-    expect(w.lines.map((l) => [l.id, l.date])).toEqual([["pay:2026-09", null], ["pay:2026-10", "2026-10-25"]]);
+    expect(w.lines.map((l) => [l.id, l.date])).toEqual([["pay:2026-09", null], ["pay:2026-10", "2026-10-27"]]);
     expect(w.totalMinor).toBe(300_00);
   });
 
-  it("ويوم ٢٥ بعد الأسبوع لا يدخله", () => {
+  it("ويومُ الصرف بعد الأسبوع لا يدخله", () => {
     const w = dueThisWeek({ today: "2026-10-05", overdueRun: [], recurring: [], payroll: [{ month: "2026-10", amountMinor: 200_00, people: 2, unknownPeople: 0 }] });
     expect(w.lines).toHaveLength(0);
   });
