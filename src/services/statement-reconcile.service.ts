@@ -463,10 +463,18 @@ export interface StatementMissingLine {
  * المورّد (أحمد: «لازم أدخل وأضغط عليه عشان تبان»). فالسطرُ نفسُه يبلغ التنبيهَ وقائمةَ المورّدين.
  */
 export async function latestStatementMissing(conn: Conn = db): Promise<StatementMissingLine[]> {
+  /*
+    يُقرأ تفصيلُ من في آخر كشفه سطرٌ لم يُطابَق وحده: هذا يجري في كلّ صفحة (عددُ «يحتاج قرارك»
+    في القشرة)، وقراءةُ كشوف المورّدين كلِّهم سطراً سطراً كانت عشراتِ الرحلات إلى القاعدة لكلّ صفحة.
+  */
   const suppliersWithStatements = (await conn.execute<{ id: string; name_ar: string; slug: string }>(sql`
-    select distinct s.id, s.name_ar, s.slug
-      from statements st join suppliers s on s.id = st.supplier_id
-     where st.period_end is not null and exists (select 1 from statement_lines sl where sl.statement_id = st.id)`)).rows;
+    select l.supplier_id as id, s.name_ar, s.slug
+      from (select distinct on (st.supplier_id) st.supplier_id, st.id
+              from statements st
+             where st.period_end is not null and exists (select 1 from statement_lines sl where sl.statement_id = st.id)
+             order by st.supplier_id, st.period_end desc) l
+      join suppliers s on s.id = l.supplier_id
+     where exists (select 1 from statement_lines sl where sl.statement_id = l.id and sl.match_status = 'UNMATCHED')`)).rows;
   const out: StatementMissingLine[] = [];
   for (const s of suppliersWithStatements) {
     const d = await latestStatementDiscrepancies(s.id, conn);
