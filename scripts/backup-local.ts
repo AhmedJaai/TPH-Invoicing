@@ -2,7 +2,8 @@
  * النسخة الاحتياطيّة اليوميّة على جهاز المالك — قراءةٌ كلّها، لا يُكتب في القاعدة ولا في الدرايف.
  *
  *   npm run backup:local                 ← يدوياً
- *   npm run backup:install               ← يُجدوِلها كلَّ يوم (launchd)
+ *   npm run backup:local -- --force      ← ولو اكتملت نسخةُ اليوم
+ *   npm run backup:install               ← يُجدوِلها (launchd): كلَّ ساعة حتّى تكتمل نسخةُ اليوم
  *
  * تُكتب في ~/TPH-Backups (أو BACKUP_ROOT):
  *   days/<اليوم>/db/        القاعدة كاملةً بنصّ `db:backup` ولقطتِه المتّسقة
@@ -30,8 +31,10 @@ import type { drive_v3 } from "googleapis";
 import { Client } from "pg";
 import { driveForCli, getFileMeta, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import {
-  daysToPrune, disambiguate, GOOGLE_EXPORTS, mirrorVersion, needsDownload, safeSegment,
+  daysToPrune, disambiguate, errorSummary, failedDaysToPrune, GOOGLE_EXPORTS, isTransient, mirrorVersion,
+  needsDownload, safeSegment, shouldNotify, shouldRun, type LastRun,
 } from "@/lib/ops/local-backup";
+import { lookup } from "node:dns/promises";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 
 const REPO = path.resolve(__dirname, "..");
@@ -54,6 +57,36 @@ function sizeOf(p: string): number {
   return readdirSync(p).reduce((a, n) => a + sizeOf(path.join(p, n)), 0);
 }
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} م.ب`;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** يعيد المحاولة لخطأ الشبكة العابر وحده، بانتظارٍ يطول. والدائمُ يسقط فوراً. */
+async function retry<T>(what: string, fn: () => T | Promise<T>, tries = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (i >= tries || !isTransient(msg)) throw e;
+      log(`  ${what}: ${msg} — محاولة ${i + 1} من ${tries} بعد ${15 * i} ثانية`);
+      await sleep(15_000 * i);
+    }
+  }
+}
+
+/** هل الشبكة قائمة؟ الجهاز يصحو أحياناً قبل أن يتّصل. */
+async function networkUp(): Promise<boolean> {
+  const host = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "www.googleapis.com";
+  for (let i = 0; i < 4; i++) {
+    try {
+      await lookup(host);
+      await lookup("www.googleapis.com");
+      return true;
+    } catch {
+      await sleep(15_000);
+    }
+  }
+  return false;
+}
 
 /* ── ١. القاعدة ── */
 function backupDatabase(): string {
@@ -63,7 +96,8 @@ function backupDatabase(): string {
   const r = spawnSync(process.execPath, [tsx, "--env-file=.env", "scripts/backup.ts", out], {
     cwd: REPO, encoding: "utf8", timeout: 20 * 60_000,
   });
-  if (r.status !== 0) throw new Error((r.stderr || r.stdout || "توقّف بلا رسالة").trim().split("\n").slice(-3).join(" "));
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(errorSummary(`${r.stderr ?? ""}\n${r.stdout ?? ""}`));
   // البيان يحمل بصمة كلّ ملفّ — يُفحص فوراً أنّ ما على القرص هو ما كُتب.
   const manifest = JSON.parse(readFileSync(path.join(out, "manifest.json"), "utf8")) as {
     files: Record<string, string>; tables: Record<string, { n: number }>;
@@ -141,13 +175,14 @@ async function backupDrive(): Promise<string> {
   await pg.connect();
   await pg.query("set default_transaction_read_only = on");
   let drive: drive_v3.Drive;
-  let referenced: string[];
+  let referenced: { id: string; rejected: boolean }[];
   try {
     drive = await storedDrive(pg);
-    referenced = (await pg.query<{ id: string }>(
-      `select drive_file_id id from documents where drive_file_id is not null
-       union select contract_drive_file_id from suppliers where contract_drive_file_id is not null`,
-    )).rows.map((r) => r.id);
+    // المرفوضُ قد يُحذف من الدرايف بعد رفضه — لا يُعدّ غيابُه فقداً.
+    referenced = (await pg.query<{ id: string; rejected: boolean }>(
+      `select drive_file_id id, status = 'REJECTED' rejected from documents where drive_file_id is not null
+       union select contract_drive_file_id, false from suppliers where contract_drive_file_id is not null`,
+    )).rows;
   } finally {
     await pg.end();
   }
@@ -158,7 +193,7 @@ async function backupDrive(): Promise<string> {
   // المشي على الأرشيف كلّه: كلّ ملفٍّ بمساره من الجذر.
   const found: { file: DriveFile; rel: string; drivePath: string }[] = [];
   const walk = async (folderId: string, rel: string, drivePath: string) => {
-    const children = await listChildren(drive, folderId);
+    const children = await retry("سرد مجلّد", () => listChildren(drive, folderId));
     const used = new Set<string>();
     for (const c of children) {
       let seg = safeSegment(c.name);
@@ -174,10 +209,10 @@ async function backupDrive(): Promise<string> {
   // وما يشير إليه دفترُنا خارج الأرشيف (عقدٌ في مجلّدٍ آخر مثلاً).
   const seen = new Set(found.map((x) => x.file.id));
   const missing: string[] = [];
-  for (const id of referenced) {
+  for (const { id, rejected } of referenced) {
     if (seen.has(id)) continue;
     const meta = await getFileMeta(drive, id).catch(() => null);
-    if (!meta || isFolder(meta)) { missing.push(id); continue; }
+    if (!meta || isFolder(meta)) { if (!rejected) missing.push(id); continue; }
     found.push({ file: meta, rel: path.join("_خارج الأرشيف", disambiguate(safeSegment(meta.name), meta.id)), drivePath: `(خارج الأرشيف)/${meta.name}` });
     seen.add(id);
   }
@@ -201,7 +236,7 @@ async function backupDrive(): Promise<string> {
           mkdirSync(path.dirname(old), { recursive: true });
           renameSync(path.join(MIRROR, "files", prev.path), old);
         }
-        await download(drive, file, path.join(MIRROR, "files", rel));
+        await retry(file.name, () => download(drive, file, path.join(MIRROR, "files", rel)));
         state[file.id] = { version: mirrorVersion(file), path: rel, name: file.name, drivePath };
         done++;
         if (done % 50 === 0) {
@@ -236,7 +271,17 @@ function notify(title: string, body: string) {
   spawnSync("osascript", ["-e", `display notification "${q(body)}" with title "${q(title)}"`]);
 }
 
+const LAST_RUN = path.join(ROOT, "last-run.json");
+
 async function main() {
+  mkdirSync(ROOT, { recursive: true });
+  const last: LastRun & Record<string, unknown> = existsSync(LAST_RUN) ? JSON.parse(readFileSync(LAST_RUN, "utf8")) : {};
+  // تُستدعى كلَّ ساعة: يومٌ اكتمل لا يُعاد (إلّا بـ--force).
+  if (!shouldRun(last, DAY, process.argv.includes("--force"))) return;
+  if (!(await networkUp())) {
+    log("  لا شبكة — تُعاد المحاولة في الساعة التالية");
+    return;
+  }
   mkdirSync(DAY_DIR, { recursive: true });
   log(`— نسخة ${DAY} في ${DAY_DIR}`);
 
@@ -249,7 +294,8 @@ async function main() {
   const results: Record<string, { ok: boolean; detail: string }> = {};
   for (const [name, fn] of steps) {
     try {
-      const detail = await fn();
+      // القاعدة والدرايف عبر الشبكة؛ والمحاولة الثانية باتّصالٍ وتفويضٍ جديدين.
+      const detail = await retry(name, fn);
       results[name] = { ok: true, detail };
       log(`✓ ${name}: ${detail}`);
     } catch (e) {
@@ -263,27 +309,41 @@ async function main() {
 
   // الكنس بعد نجاحٍ كامل وحده: يومٌ فاشل لا يحذف نسخةً سليمة.
   if (ok) {
-    for (const d of daysToPrune(readdirSync(path.join(ROOT, "days")))) {
+    const days = readdirSync(path.join(ROOT, "days")).map((day) => {
+      const f = path.join(ROOT, "days", day, "report.json");
+      return { day, ok: existsSync(f) && JSON.parse(readFileSync(f, "utf8")).ok === true };
+    });
+    for (const d of failedDaysToPrune(days)) {
+      rmSync(path.join(ROOT, "days", d), { recursive: true, force: true });
+      log(`  حُذفت نسخة ${d} الناقصة (بعدها نسخةٌ كاملة)`);
+    }
+    const kept = days.filter((d) => d.ok).map((d) => d.day);
+    for (const d of daysToPrune(kept)) {
       rmSync(path.join(ROOT, "days", d), { recursive: true, force: true });
       log(`  حُذفت نسخة ${d} (خارج مدّة الحفظ)`);
     }
   }
 
-  const prev = existsSync(path.join(ROOT, "last-run.json")) ? JSON.parse(readFileSync(path.join(ROOT, "last-run.json"), "utf8")) : {};
-  writeFileSync(path.join(ROOT, "last-run.json"), JSON.stringify({
-    lastAttempt: new Date().toISOString(), lastSuccess: ok ? new Date().toISOString() : prev.lastSuccess ?? null, day: DAY, ok, results,
+  const now = new Date();
+  const alert = !ok && shouldNotify(last, DAY, now);
+  writeFileSync(LAST_RUN, JSON.stringify({
+    lastAttempt: now.toISOString(),
+    lastSuccess: ok ? now.toISOString() : last.lastSuccess ?? null,
+    successDay: ok ? DAY : last.successDay ?? null,
+    notifiedDay: alert ? DAY : last.notifiedDay ?? null,
+    day: DAY, ok, results,
   }, null, 2));
-  log(`${ok ? "✓ اكتملت" : "✕ ناقصة"} — الحجم الكلّي ${mb(sizeOf(ROOT))}`);
+  log(`${ok ? "✓ اكتملت" : "✕ ناقصة — تُعاد في الساعة التالية"} — الحجم الكلّي ${mb(sizeOf(ROOT))}`);
 
-  if (!ok) {
+  if (alert) {
     const bad = Object.entries(results).filter(([, r]) => !r.ok).map(([n]) => n).join("، ");
-    notify("نسخة ذا بوبليك هاوس ناقصة", `تعذّر: ${bad}. التفصيل في ~/TPH-Backups/backup.log`);
-    process.exit(1);
+    const since = last.lastSuccess ? `آخر نسخة كاملة ${String(last.lastSuccess).slice(0, 10)}. ` : "";
+    notify("نسخة ذا بوبليك هاوس ناقصة", `${since}تعذّر: ${bad}. التفصيل في ~/TPH-Backups/backup.log`);
   }
+  if (!ok) process.exit(1);
 }
 
 main().catch((e) => {
   log(`✕ ${(e as Error).message}`);
-  notify("نسخة ذا بوبليك هاوس فشلت", (e as Error).message.slice(0, 120));
   process.exit(1);
 });

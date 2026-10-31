@@ -5,6 +5,7 @@ import {
 } from "./backup";
 
 const cat: Catalog = {
+  extensions: [{ name: "pg_trgm", sch: "public" }, { name: "pgcrypto", sch: "public" }],
   enums: [{ sch: "public", name: "month_close_status", labels: ["OPEN", "CLOSED"] }],
   tables: [{ sch: "public", name: "month_closes" }],
   columns: [
@@ -33,6 +34,12 @@ describe("مولّد النسخة", () => {
   it("الدالّة قبل الجدول الذي تقرؤه، والجدول في ما قبل البيانات", () => {
     expect(pre.indexOf("month_is_closed")).toBeLessThan(pre.indexOf('create table "public"."month_closes"'));
     expect(pre.indexOf("create type")).toBeLessThan(pre.indexOf("create table"));
+  });
+
+  it("كلُّ امتدادٍ في القاعدة يُنشأ قبل الجداول — وإلّا سقط فهرسُ gin_trgm_ops عند الاستعادة", () => {
+    expect(pre).toContain('create extension if not exists "pg_trgm" with schema "public";');
+    expect(pre.match(/create extension if not exists "pgcrypto"/g)).toHaveLength(1);
+    expect(pre.indexOf('"pg_trgm"')).toBeLessThan(pre.indexOf("create table"));
   });
 
   it("القيود والفهارس والمؤثّرات بعد البيانات لا قبلها", () => {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { daysToPrune, disambiguate, mirrorVersion, needsDownload, safeSegment } from "./local-backup";
+import {
+  daysToPrune, disambiguate, errorSummary, failedDaysToPrune, isTransient, mirrorVersion, needsDownload, safeSegment,
+  shouldNotify, shouldRun,
+} from "./local-backup";
 
 function range(from: string, n: number): string[] {
   const out: string[] = [];
@@ -64,5 +67,45 @@ describe("needsDownload", () => {
   it("مستند جوجل بوقت تعديله", () => {
     expect(mirrorVersion({ modifiedTime: "2026-01-01T00:00:00Z" })).toBe("t:2026-01-01T00:00:00Z");
     expect(mirrorVersion({ md5Checksum: "x", modifiedTime: "t" })).toBe("x");
+  });
+});
+
+describe("التشغيل كلَّ ساعة", () => {
+  it("لا يُعاد يومٌ اكتمل إلّا بطلب", () => {
+    expect(shouldRun({ successDay: "2026-10-30" }, "2026-10-30", false)).toBe(false);
+    expect(shouldRun({ successDay: "2026-10-30" }, "2026-10-30", true)).toBe(true);
+    expect(shouldRun({ successDay: "2026-10-29" }, "2026-10-30", false)).toBe(true);
+    expect(shouldRun({}, "2026-10-30", false)).toBe(true);
+  });
+
+  it("إشعارٌ واحد في اليوم، وبعد يومٍ ونصف بلا نسخةٍ كاملة", () => {
+    const now = new Date("2026-10-30T12:00:00Z");
+    expect(shouldNotify({ lastSuccess: "2026-10-30T01:00:00Z" }, "2026-10-30", now)).toBe(false);
+    expect(shouldNotify({ lastSuccess: "2026-10-27T10:00:00Z" }, "2026-10-30", now)).toBe(true);
+    expect(shouldNotify({ lastSuccess: "2026-10-27T10:00:00Z", notifiedDay: "2026-10-30" }, "2026-10-30", now)).toBe(false);
+    expect(shouldNotify({}, "2026-10-30", now)).toBe(true);
+  });
+
+  it("الأيّام الناقصة قبل آخر يومٍ كامل تُحذف، وما بعده يبقى", () => {
+    expect(failedDaysToPrune([
+      { day: "2026-10-26", ok: false }, { day: "2026-10-27", ok: true },
+      { day: "2026-10-28", ok: false }, { day: "2026-10-30", ok: true }, { day: "2026-10-31", ok: false },
+    ])).toEqual(["2026-10-26", "2026-10-28"]);
+    expect(failedDaysToPrune([{ day: "2026-10-26", ok: false }])).toEqual([]);
+  });
+});
+
+describe("errorSummary", () => {
+  it("يأخذ سطر الخطأ لا ذيل المكدّس", () => {
+    const out = "file:///x.js:12\n  throw e\nError: read ECONNRESET\n    at TLSWrap.onStreamRead\n{\n  errno: -54\n}\n\nNode.js v20.20.2";
+    expect(errorSummary(out)).toBe("Error: read ECONNRESET");
+    expect(errorSummary("✕ getaddrinfo ENOTFOUND host")).toBe("getaddrinfo ENOTFOUND host");
+    expect(errorSummary("}\nNode.js v20.20.2\n")).toBe("توقّف بلا رسالة");
+  });
+  it("العابرُ يُعاد، والدائمُ لا", () => {
+    expect(isTransient("read ECONNRESET")).toBe(true);
+    expect(isTransient("getaddrinfo ENOTFOUND x")).toBe(true);
+    expect(isTransient("Request had invalid authentication credentials.")).toBe(true);
+    expect(isTransient("relation \"x\" does not exist")).toBe(false);
   });
 });
