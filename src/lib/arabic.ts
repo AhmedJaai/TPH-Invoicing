@@ -139,6 +139,14 @@ export const RECIPE: NounForms = {
   zero: "لا وصفات",
 };
 
+export const RULE: NounForms = {
+  one: "قاعدة واحدة",
+  two: "قاعدتان",
+  few: "قواعد",
+  many: "قاعدة",
+  zero: "لا قواعد",
+};
+
 export const SUPPLIER: NounForms = {
   one: "مورّد واحد",
   two: "مورّدان",

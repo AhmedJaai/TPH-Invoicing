@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInvoiceTotals, formatRiyals, formatRiyalsDisplay, parseRiyals } from "./money";
+import { checkInvoiceTotals, formatRiyals, formatRiyalsDisplay, formatSignedRiyalsDisplay, parseRiyals } from "./money";
 
 describe("تحويل المبالغ", () => {
   it("يقرأ الأرقام اللاتينية", () => {
@@ -132,5 +132,12 @@ describe("المنسّق الواحد يطابق النسخ المحلّيّة �
 
   it("formatRiyals = ‎(m / 100).toFixed(2)‎ — نصّ النموذج لم يتغيّر", () => {
     for (const m of amounts) expect(formatRiyals(m)).toBe(oldFixed(m));
+  });
+});
+
+describe("المبلغ بإشارته في نصّ", () => {
+  it("علامةُ الطرح لا الشَّرطة، معزولة، والموجبُ بلا علامة", () => {
+    expect(formatSignedRiyalsDisplay(-1_416_69)).toBe("⁦−1,416.69⁩");
+    expect(formatSignedRiyalsDisplay(25_00)).toBe("⁦25.00⁩");
   });
 });

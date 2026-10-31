@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeVatReturn, filingDeadline, isIncluded, monthsBefore, nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths,
-  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txCaution, txVat, type VatInvoice, type VatTx,
+  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txCaution, txVat, untypedFoodicsCash, type VatInvoice, type VatTx,
 } from "./vat-return";
 import { vatInsideGross, vatOnNet } from "./vat";
 
@@ -223,5 +223,19 @@ describe("خصائص الفترة والحساب", () => {
     expect(computeVatReturn({ invoices, txs: chosen }).netMinor).not.toBe(base.netMinor);
     expect(computeVatReturn({ invoices, txs: chosen.map((t) => (t.id === "5" ? { ...t, choice: null } : t)) }).netMinor).toBe(base.netMinor);
     expect(base.input.totalMinor).toBe(base.input.invoices.vatMinor + base.input.bankVat.vatMinor + base.input.selected.vatMinor);
+  });
+});
+
+describe("نقدُ فودكس الذي لم يُكتب في الإقرار", () => {
+  it("شهرٌ بنقدٍ في فودكس وخانتُه فارغةٌ أو صفر يُقال بضريبته، والمكتوبُ لا يُقال", () => {
+    const gaps = untypedFoodicsCash(
+      [{ month: "2026-07", grossMinor: 0 }, { month: "2026-08", grossMinor: null }, { month: "2026-09", grossMinor: 6_731_51 }],
+      new Map([["2026-07", 5_852_85], ["2026-08", 6_028_17], ["2026-09", 6_731_51]]),
+    );
+    expect(gaps.map((g) => g.month)).toEqual(["2026-07", "2026-08"]);
+    expect(gaps[0].vatMinor).toBe(vatInsideGross(5_852_85));
+  });
+  it("بلا نقدٍ في فودكس لا يُقال شيء", () => {
+    expect(untypedFoodicsCash([{ month: "2026-07", grossMinor: null }], new Map())).toEqual([]);
   });
 });

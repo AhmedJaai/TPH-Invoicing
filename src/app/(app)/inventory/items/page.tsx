@@ -138,7 +138,7 @@ export default async function InventoryItemsPage({
             <span className="inline-flex flex-wrap items-center gap-x-2">
               <DirectionTag milli={r.lastVarianceMilli} />
               <span className="nums text-muted">{formatBp(r.lastVarianceBp)}</span>
-              {showAmounts && r.lastVarianceCostMinor !== null && <Money minor={Math.abs(r.lastVarianceCostMinor)} />}
+              {showAmounts && r.lastVarianceCostMinor !== null && <Money minor={Math.abs(r.lastVarianceCostMinor)} currency />}
             </span>
           )
       ),

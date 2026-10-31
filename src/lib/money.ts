@@ -189,6 +189,15 @@ export function formatRiyals(minor: number): string {
 }
 
 /** للعرض في الواجهة مع فواصل الآلاف: "17,572.00" */
+/**
+ * مبلغٌ بإشارته للعرض في نصّ: «−1,416.69» بعلامة الطرح لا بالشَّرطة، معزولاً كي لا تقفز
+ * الإشارةُ في سطرٍ عربيّ. `formatRiyalsDisplay` يبقى بالشَّرطة لما يُنسخ ويُصدَّر.
+ */
+export function formatSignedRiyalsDisplay(minor: number): string {
+  const body = formatRiyalsDisplay(Math.abs(minor));
+  return `\u2066${minor < 0 ? "\u2212" : ""}${body}\u2069`;
+}
+
 export function formatRiyalsDisplay(minor: number): string {
   const [whole, fraction] = formatRiyals(minor).split(".");
   const sign = whole.startsWith("-") ? "-" : "";

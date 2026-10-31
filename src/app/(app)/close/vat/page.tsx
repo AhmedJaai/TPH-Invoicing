@@ -11,6 +11,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { VatBulk, VatCashField, VatFilePanel, VatTxToggle, VatVoidFiling } from "@/components/vat-choice";
 import { SalesWitnessPanel, SalesWitnessSkeleton } from "@/components/sales-witness";
+import { loadFoodicsCashByMonth } from "@/services/sales-witness.service";
 import { SectionBoundary } from "@/components/ui-client";
 import { WhyNumber } from "@/components/why-number";
 import { FiledQuartersSection } from "@/components/vat-compare";
@@ -18,7 +19,7 @@ import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { INPUT_VAT_LABEL } from "@/lib/accountant-pack";
 import { currentMonthRiyadh, daysSinceRiyadh, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import {
-  filingDeadline, parseVatPeriod, periodBounds, periodKey, periodMonths, previousQuarter, quarterLabel, quarterOfMonth,
+  filingDeadline, parseVatPeriod, periodBounds, periodKey, periodMonths, previousQuarter, quarterLabel, quarterOfMonth, untypedFoodicsCash,
   type VatPeriod, type VatQuarter,
 } from "@/lib/vat-return";
 import { formatRiyals } from "@/lib/money";
@@ -68,6 +69,10 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   if (!quarters.some((p) => periodKey(p) === periodKey(quarter))) quarters.push(quarter);
 
   const { result: r, filing } = view;
+  /* نقدُ فودكس الذي لم يُكتب — يُقال قبل التقديم وبعده، لا «للمقارنة» في آخر الصفحة وحدها */
+  const cashGaps = untypedFoodicsCash(view.cash, await loadFoodicsCashByMonth(view.cash.map((c) => c.month)));
+  const cashGapVat = cashGaps.reduce((sum, g) => sum + g.vatMinor, 0);
+  const cashGapText = cashGaps.map((g) => `${formatMonth(g.month)} ${riyalsText(g.foodicsCashMinor)}`).join(" · ");
   /* الإقرارُ ربعيّ: موعدُ الشهر موعدُ ربعه، لا آخرُ الشهر التالي له */
   const deadline = filingDeadline(quarter);
   const daysLeft = -daysSinceRiyadh(deadline);
@@ -207,12 +212,17 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                   ? " والحساب اليوم مطابق لما قُدّم."
                   : ` والحساب اليوم ${riyalsText(Math.abs(r.netMinor))}${r.netMinor < 0 ? " رصيداً لصالحك" : ""}، والفرق ${riyalsText(Math.abs(r.netMinor - filing.netMinor))} سببه تغييرات بعد التقديم (فاتورة رُفعت أو صُحّحت، أو تغيّر تصنيف حركة). راجع المحاسب، فقد يلزم تصحيح في إقرار لاحق.`]} /></Callout>
             )}
+            {filing && cashGaps.length > 0 && (
+              <Callout tone="warn" icon={TriangleAlert} title={`قُدّم الإقرار بلا نقد فودكس: ضريبة نحو ${riyalsText(cashGapVat)} خارجه`}>
+                <T s="سجّل فودكس مبيعات نقدية لم تُكتب في «نقد لم يُودَع»: {0}. إن لم تودعها في الحساب فضريبتها مستحقة. راجع المحاسب لتصحيحها في الإقرار القادم أو بإقرار معدّل." a={[cashGapText]} />
+              </Callout>
+            )}
             {whole && !filing && quarterEnded && (
               <Callout
                 tone={daysLeft < 0 ? "warn" : "info"}
                 icon={CalendarClock}
                 title={daysLeft >= 0 ? `قدّمه في بوابة الهيئة قبل ${formatDay(deadline)}` : "إن كنت قدّمته فسجّل ذلك"}
-                action={<VatFilePanel period={periodKey(quarter)} today={today} credit={r.netMinor < 0} />}
+                action={<VatFilePanel period={periodKey(quarter)} today={today} credit={r.netMinor < 0} cashWarning={cashGaps.length > 0 ? `نقد فودكس غير مُدخل في «نقد لم يُودَع»: ${cashGapText}. ضريبته نحو ${riyalsText(cashGapVat)} لا تدخل هذا الإقرار. أدخله قبل التقديم، إلا إن كنت أودعته في الحساب.` : undefined} />}
               >
                 بعد تقديمه في بوابة الهيئة اضغط «قدّمته للهيئة»، فيحفظ النظام الرقم الذي قدّمته ولا يغيّره ما ترفعه لاحقاً، ويختفي التذكير من «يحتاج قرارك».
               </Callout>

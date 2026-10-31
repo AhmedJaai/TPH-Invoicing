@@ -312,3 +312,28 @@ export function computeVatReturn(input: VatReturnInput): VatReturn {
     netMinor: outputVat - inputTotal - carriedIn,
   };
 }
+
+/**
+ * نقدٌ قبضه فودكس ولم يُكتب في «نقد لم يُودَع» — ضريبتُه خارج الإقرار.
+ *
+ * قُدّم إقرارُ الربع الثالث ٢٠٢٦ بنقدٍ صفرٍ في أشهره الثلاثة وفودكس يقول ١٨٬٦١٢ ريالاً نقداً
+ * (نحو ٢٬٤٠٠ ضريبة)، وصفحةُ الإقرار تعرض الفرقَ «للمقارنة فقط» في آخرها. فيُقال هنا قبل
+ * «سجّل التقديم» وبعده. وفودكس شاهدٌ لا يكتب في الإقرار: الرقمُ يُعرض ويُدخله صاحبه بيده.
+ */
+export interface UntypedCash {
+  month: string;
+  foodicsCashMinor: number;
+  /** ضريبتُه بنسبة ١٥٪ من داخل الإجمالي — تقديرٌ لما خرج من الإقرار. */
+  vatMinor: number;
+}
+
+export function untypedFoodicsCash(
+  typed: readonly { month: string; grossMinor: number | null }[],
+  foodicsCash: ReadonlyMap<string, number>,
+): UntypedCash[] {
+  return typed.flatMap((t) => {
+    const cash = foodicsCash.get(t.month) ?? 0;
+    if (cash <= 0 || (t.grossMinor ?? 0) > 0) return [];
+    return [{ month: t.month, foodicsCashMinor: cash, vatMinor: vatInsideGross(cash) }];
+  });
+}

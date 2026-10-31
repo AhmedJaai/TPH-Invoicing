@@ -67,7 +67,12 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   });
   /* اليومَ لا يُعدّ غائباً من لم يبدأ دوامُه بعد */
   const clock = day === today ? riyadhClock(new Date()) : "24:00";
-  const started = (b: BoardRow) => !b.employee.shiftStart || b.employee.shiftStart <= clock;
+  /*
+    بلا وقت دوامٍ لا يُعرف أبدأ يومُه: كان يُعدّ بادئاً منذ منتصف الليل، فيقال في السابعة صباحاً
+    «لم يسجّلا حضوراً في يوم عملهم» وبجانبه «غائب» يخصم اليوم. فاليومُ لا يُحكم فيه على من لا
+    وقتَ له حتى ينقضي، والأيّامُ الماضية كما كانت.
+  */
+  const started = (b: BoardRow) => (b.employee.shiftStart ? b.employee.shiftStart <= clock : day !== today);
   /* «لم يسجّل» لمن معه رابطُ حضور — ومن لا رابطَ له لم يُطلب منه التسجيل، فغيابُ تسجيله ليس غياباً */
   const missing = board.filter((b) => b.workday && started(b) && b.employee.hasCheckinLink && b.ins.length === 0 && !b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE"));
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
@@ -89,7 +94,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     {
       key: "status", header: "الحال",
       cell: (b) => b.status.length === 0 ? (b.workday && b.ins.length === 0
-        ? (!b.employee.hasCheckinLink ? <Badge tone="muted">بلا رابط حضور</Badge> : started(b) ? <Badge tone="warn">لم يسجّل</Badge> : <Badge tone="muted">لم يبدأ دوامه</Badge>)
+        ? (!b.employee.hasCheckinLink ? <Badge tone="muted">بلا رابط حضور</Badge> : started(b) ? <Badge tone="warn">لم يسجّل</Badge> : <Badge tone="muted">{b.employee.shiftStart ? "لم يبدأ دوامه" : "لم يسجّل بعد"}</Badge>)
         : <span className="text-muted">—</span>) : (
         <span className="flex flex-wrap gap-1">{b.status.map((s, i) => (
           <Badge key={i} tone={s.kind === "LEAVE" ? "muted" : "danger"}>

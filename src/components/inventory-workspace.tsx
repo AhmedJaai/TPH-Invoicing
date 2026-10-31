@@ -4,7 +4,7 @@ import {
   ArrowLeft, CircleCheck, FileSpreadsheet, Link2, Lock, OctagonAlert, Package, ShieldCheck, TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatSignedRiyalsDisplay } from "@/lib/money";
 import { Badge, Callout, EmptyState, LinkButton, Meter, Section, type Tone } from "./ui";
 import { Money, Prose } from "./money";
 import { DiscardCount, FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
@@ -177,7 +177,7 @@ export function InventoryWorkspace({
               <Mini
                 label="حجم الفروق"
                 value={<Money minor={summary.absoluteCostMinor} />}
-                hint={`النقص والزيادة معاً · والصافي ⁦${formatRiyalsDisplay(summary.netCostMinor)}⁩`}
+                hint={`النقص والزيادة معاً · والصافي ${formatSignedRiyalsDisplay(summary.netCostMinor)}`}
               />
             )}
             <Mini

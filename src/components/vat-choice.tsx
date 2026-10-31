@@ -188,11 +188,13 @@ export function VatCashField({ month, label, initial, locked }: {
  * «قدّمتُه»: يسجّل أنّ إقرار الربع قُدِّم — فيُحفَظ رقمُه كما هو الآن وتُقفل اختياراتُه.
  * الأرقامُ يحسبها الخادم؛ من هنا يومُ التقديم والمرجعُ وما فُعل بالرصيد الدائن.
  */
-export function VatFilePanel({ period, today, credit, disabled }: {
+export function VatFilePanel({ period, today, credit, disabled, cashWarning }: {
   period: string;
   today: string;
   /** الصافي رصيدٌ لك — فيُسأل: ترحيلٌ أم استرداد. */
   credit: boolean;
+  /** نقدُ فودكس لم يُكتب — يُقال قبل «سجّل التقديم» (قُدّم الربع الثالث بلا نقده). */
+  cashWarning?: string;
   /** لماذا لا يُقدَّم الآن. */
   disabled?: string;
 }) {
@@ -247,6 +249,7 @@ export function VatFilePanel({ period, today, credit, disabled }: {
               </div>
             </fieldset>
           )}
+          {cashWarning && <p role="alert" className="rounded-lg bg-warn-bg px-3 py-2 text-xs font-bold leading-relaxed text-warn">{cashWarning}</p>}
           <div className="flex flex-wrap gap-2">
             <ActionButton
               size="sm"

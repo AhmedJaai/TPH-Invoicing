@@ -1,4 +1,4 @@
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatSignedRiyalsDisplay } from "@/lib/money";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
@@ -119,7 +119,7 @@ export default async function InventoryTrendPage({
                   <Stat
                     label="حجم الفروق"
                     minor={total.absoluteCostMinor}
-                    sub={`النقص والزيادة معاً · الصافي ${formatRiyalsDisplay(total.netCostMinor)}`}
+                    sub={`النقص والزيادة معاً · الصافي ${formatSignedRiyalsDisplay(total.netCostMinor)}`}
                   />
                   <Stat label="الجرود في المدة" value={countNoun(counted, COUNT)} sub={`من ${formatWeek(chrono[0].periodStart, chrono[chrono.length - 1].periodEnd)}`} />
                   <Stat

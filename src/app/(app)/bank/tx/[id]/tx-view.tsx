@@ -2,6 +2,9 @@ import { Fragment } from "react";
 import { BankBounce } from "@/components/bank-bounce";
 import { findBouncePartner } from "@/services/bank-bounce.service";
 import { db } from "@/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { employees, payrollLinks } from "@/db/schema";
+import { PURPOSE_LABEL } from "@/lib/payroll/calc";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleAlert, Landmark, Receipt } from "lucide-react";
@@ -18,7 +21,7 @@ import { HIDDEN_SALARY_TX, loadFocusedTx, loadTxAllocations } from "@/services/b
 import { seesSalaries } from "@/lib/payroll/visibility";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
-import { formatDay } from "@/lib/riyadh-time";
+import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
 
 /**
@@ -74,6 +77,16 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
     !tx.paymentId && canUndo ? loadHandPaymentLinks() : Promise.resolve([]),
     canUndo ? findBouncePartner(db, id) : Promise.resolve(null),
   ]);
+  /*
+    ما وُزّع من الحوالة في المسيّر: «تحويل شخصي» بـ٨٬٦٧٠ كان رواتبَ ثلاثة موظّفين، وصفحتُه لا
+    تقول إلّا «تحويل شخصي» — فيُظنّ مالاً أخذه المالك. للمالك وحده (الرواتب).
+  */
+  const payrollParts = seesSalaries(user.role)
+    ? await db.select({ name: employees.name, purpose: payrollLinks.purpose, month: payrollLinks.month, amountMinor: payrollLinks.amountMinor })
+      .from(payrollLinks).innerJoin(employees, eq(employees.id, payrollLinks.employeeId))
+      .where(and(eq(payrollLinks.bankTransactionId, id), isNull(payrollLinks.voidedAt)))
+    : [];
+  const payrollTotal = payrollParts.reduce((sum, p) => sum + p.amountMinor, 0);
   const allocated = allocations.reduce((s, a) => s + a.amountMinor, 0);
   const handLink = handLinks.find((l) => l.transferId === id) ?? null;
   const title = tx.who || tx.description?.trim().slice(0, 60) || "حركة بلا وصف";
@@ -118,6 +131,21 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
             </p>
           </div>
         </div>
+        {payrollParts.length > 0 && (
+          <div>
+            <p className="mb-2 text-[11px] font-bold text-muted">
+              <T s="وُزّعت في مسيّر الرواتب: {0} من {1}" a={[<Money key="0" minor={payrollTotal} />, <Money key="1" minor={tx.amountMinor} />]} />
+            </p>
+            <ul className="divide-y divide-line-soft rounded-lg border border-line-soft text-xs">
+              {payrollParts.map((p, i) => (
+                <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <span><span className="font-bold">{p.name}</span> · {PURPOSE_LABEL[p.purpose]} · <Link href={`/payroll?month=${p.month}`} className="text-accent hover:underline">{formatMonth(p.month)}</Link></span>
+                  <Money minor={p.amountMinor} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div>
           <p className="mb-2 text-[11px] font-bold text-muted">لماذا طوبقت، وكيف تتراجع عن المطابقة</p>
           <MatchExplain match={tx.match} canUndo={canUndo} inline />

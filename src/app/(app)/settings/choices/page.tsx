@@ -7,7 +7,8 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { PostAction } from "@/components/post-action";
 import { Badge, Callout, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
-import { ITEM, countNoun } from "@/lib/arabic";
+import { ITEM, RULE, countNoun } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 import {
   CHOICE_GROUP_HINT, CHOICE_GROUP_LABEL, CHOICE_STATE_LABEL, type ChoiceRow, type ChoiceState,
 } from "@/lib/choices";
@@ -91,6 +92,10 @@ export default async function ChoicesPage() {
 
   const ledger = await loadChoiceLedger(!can(user.role, "payroll:view"));
 
+  const idleRules = ledger.notApplied.filter((r) => r.group === "rule");
+
+  const notWorking = ledger.notApplied.filter((r) => r.group !== "rule");
+
   return (
     <PageShell
       user={user}
@@ -105,11 +110,21 @@ export default async function ChoicesPage() {
         />
       ) : (
         <>
-          {ledger.notApplied.length > 0 ? (
-            <Callout tone="warn" icon={CircleSlash} title={`اختيارات لا تعمل الآن: ${countNoun(ledger.notApplied.length, ITEM)}`}>
+          {/*
+            قاعدةُ تصنيفٍ لم تطابق حركةً بعد لا أثرَ لها ولا ضرر — كانت ٤٣ منها تُعدّ تحت «اختيارات لا
+            تعمل» التحذيريّة بجانب ما يغيّر الإقرار فعلاً، فيغرق المهمُّ في ما لا يُفعل له شيء.
+          */}
+          {notWorking.length > 0 && (
+            <Callout tone="warn" icon={CircleSlash} title={`اختيارات لا تعمل الآن: ${countNoun(notWorking.length, ITEM)}`}>
               اخترتها لكنها لا تعمل اليوم. سبب كل منها في أول قسمه أدناه. اختيارك محفوظ كما هو، فاسحبه أو عالج السبب.
             </Callout>
-          ) : (
+          )}
+          {idleRules.length > 0 && (
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              <T s="و{0} لم تطابق أي حركة بعد. لا أثر لها ولا ضرر، وتعمل حين تصل حركة بوصفها. تجدها في {1}." a={[countNoun(idleRules.length, RULE), <a key="1" href="#rule" className="font-bold text-accent hover:underline">قواعد التصنيف</a>]} />
+            </p>
+          )}
+          {notWorking.length > 0 ? null : (
             <Callout tone="ok" icon={CircleCheck} title={`${countNoun(ledger.total, ITEM)}: كلها تعمل كما اخترت، أو مقفلة بإقرار سابق`} />
           )}
 
