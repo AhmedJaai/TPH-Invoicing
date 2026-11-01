@@ -92,6 +92,11 @@ describe("classifyCredit — الكلمة الصريحة تسبق", () => {
     expect(classifyCredit(line({ id: "a", description: "تسوية بحوالة بنكية" }))).toBe("PAYMENT");
     expect(classifyCredit(line({ id: "b", description: "سداد بعد الخصم" }))).toBe("PAYMENT");
   });
+  it("«Reversal of INV/…» إشعارٌ دائن لا سداد — كشفُ أفال يعكس فاتورةً خاطئة", () => {
+    expect(classifyCredit(line({ id: "r", reference: "RINV/2026/00016 (Reversal of: INV/2026/00080)" }))).toBe("CREDIT_NOTE");
+    expect(classifyCredit(line({ id: "s", reference: "RINV/2026/00016" }))).toBe("CREDIT_NOTE");
+    expect(classifyCredit(line({ id: "t", reference: "INV/2026/00080" }))).toBe("PAYMENT");
+  });
   it("و«إشعار دائن» باسمه إشعار ولو ذكر معه سداد", () => {
     expect(classifyCredit(line({ id: "c", description: "إشعار دائن عن دفعة مرتجعة" }))).toBe("CREDIT_NOTE");
     expect(classifyCredit(line({ id: "d", reference: "CN-123", description: null }))).toBe("CREDIT_NOTE");

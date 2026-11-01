@@ -39,8 +39,8 @@ const PAYMENT_MARKERS = [
 
 export function classifyCredit(line: CreditLine): CreditKind {
   const text = `${line.description ?? ""} ${line.reference ?? ""}`;
-  /* «إشعار دائن» باسمه يسبق كلَّ شيء: المورّدُ سمّاه */
-  if (/[اإ]شعار\s*دائن|credit\s*note|\bCN[-\s]?\d/i.test(text)) return "CREDIT_NOTE";
+  /* «إشعار دائن» باسمه يسبق كلَّ شيء: المورّدُ سمّاه. و«Reversal of INV/…» عكسٌ لفاتورةٍ صراحةً (أفال: RINV/2026/00016) */
+  if (/[اإ]شعار\s*دائن|credit\s*note|\bCN[-\s]?\d|reversal\s+of\b|\bRINV[\/\-\s]?\d/i.test(text)) return "CREDIT_NOTE";
   if (PAYMENT_MARKERS.some((m) => m.test(text))) return "PAYMENT";
   return CREDIT_MARKERS.some((m) => m.test(text)) ? "CREDIT_NOTE" : "PAYMENT";
 }

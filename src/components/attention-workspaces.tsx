@@ -1,4 +1,8 @@
 import { whatsappHref } from "@/lib/supplier-edit";
+import { SettleFromCredit } from "@/components/settle-from-credit";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
+import { formatRiyalsDisplay } from "@/lib/money";
+import { canSettleFromCredit, findCreditNoteEvidence } from "@/services/unbacked-credit.service";
 import { statementRequestMonth } from "@/lib/supplier-requests";
 import Link from "next/link";
 import { DocumentPaper } from "./document-paper";
@@ -61,8 +65,17 @@ const LIST = "divide-y divide-line-soft overflow-hidden rounded-xl border border
 /** «دفعاتٌ لم تُنسب إلى فاتورة» — تُطلَب فواتيرُها من هنا. */
 export async function UnbackedWorkspace({ canApprove, canRequest = false }: { canApprove: boolean; canRequest?: boolean }) {
   /* متى طولب كلٌّ — فيُقال «طولب قبل ٩ أيّام — ذكِّره» ولا يُطلَب مرّتين */
-  const [payments, marks] = await Promise.all([loadUnbackedPayments(), loadInvoiceRequestMarks()]);
+  const [payments, marks, balances] = await Promise.all([loadUnbackedPayments(), loadInvoiceRequestMarks(), loadBalanceTotals()]);
+  /* الزرُّ لمن له رصيدٌ ومفتوحٌ معاً — لا يُعرض لما يُردّ بعد الضغط (`unbacked-credit.service.ts`) */
+  const settleable = new Map(balances.rows.filter((b) => canSettleFromCredit(b)).map((b) => [b.supplierId, b]));
   const groups = groupUnbackedBySupplier(payments);
+  /* دليلُ الخصم من كشف المورّد نفسه (إشعارٌ دائن بالمبلغ ذاته) — لمن يُعرض له الزرّ وحده */
+  const evidence = new Map(
+    canApprove
+      ? await Promise.all(groups.filter((g) => g.supplierId && settleable.has(g.supplierId)).flatMap((g) =>
+          g.payments.map(async (p) => [p.paymentId, await findCreditNoteEvidence(g.supplierId as string, p.unbackedMinor)] as const)))
+      : [],
+  );
   /* قائمةُ المورّدين لا تُقرأ إلّا حين توجد دفعةٌ بلا جهة تُنسَب إلى أحدهم */
   const hasOrphans = groups.some((g) => !g.supplierId && g.payments.some((p) => !p.bankTransactionId));
   const supplierOptions = hasOrphans && canApprove
@@ -120,6 +133,15 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
                 canMark={canRequest}
               />
               {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm" variant="quiet">صفحته</LinkButton>}
+              {/* دفعةٌ زادت واستُردّت بخصمها من لاحقة: القرارُ لصاحبها، وبجملةٍ يشرح بها */}
+              {canApprove && settleable.has(g.supplierId) && g.payments.map((p) => (
+                <SettleFromCredit
+                  key={p.paymentId}
+                  paymentId={p.paymentId}
+                  amountLabel={`${formatRiyalsDisplay(p.unbackedMinor)} ريال (${formatDay(p.paidOn)})`}
+                  evidence={evidence.get(p.paymentId) ? { ref: evidence.get(p.paymentId)?.ref ?? null, dateIso: evidence.get(p.paymentId)?.dateIso ?? "" } : null}
+                />
+              ))}
             </div>
           ) : (
             /*
