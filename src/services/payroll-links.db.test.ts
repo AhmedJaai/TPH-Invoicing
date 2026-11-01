@@ -42,8 +42,8 @@ describe("splitTransfer — توزيعُ الحوالة كلُّه أو لا ش�
   it("يوزّع على اثنين، والباقي لمن لم يُكتب مبلغه، ولا يتجاوز الحوالة", () =>
     withRollback(async (tx) => {
       const me = await someone(tx);
-      const a = await employee(tx, "أ");
-      const b = await employee(tx, "ب");
+      const a = await employee(tx, "أنس");
+      const b = await employee(tx, "البراء");
       const t = await salaryTransfer(tx, "2026-10-28", 5_000_00, { category: "PERSONAL" });
       expect(await splitTransfer(t, [part(a, 3_000_00), part(b, null)], me, tx)).toEqual([3_000_00, 2_000_00]);
       /* موزّعةٌ كلُّها: لا يُزاد عليها */
@@ -53,7 +53,7 @@ describe("splitTransfer — توزيعُ الحوالة كلُّه أو لا ش�
   it("مجموعٌ أكبر من الحوالة يُردّ ولا يُكتب منه سطر", () =>
     withRollback(async (tx) => {
       const me = await someone(tx);
-      const a = await employee(tx, "أ");
+      const a = await employee(tx, "أنس");
       const t = await salaryTransfer(tx, "2026-10-28", 1_000_00, { category: "PERSONAL" });
       expect(await caught(splitTransfer(t, [part(a, 600_00), part(a, 500_00)], me, tx))).toBeInstanceOf(PayrollRefused);
       const rows = await tx.select({ id: payrollLinks.id }).from(payrollLinks).where(eq(payrollLinks.bankTransactionId, t));
@@ -73,7 +73,7 @@ describe("splitTransfer — توزيعُ الحوالة كلُّه أو لا ش�
   it("شهرُ الحوالة المقفل: لا تُربط ولا يُفكّ ربطُها — بالخدمة وبالقاعدة", () =>
     withRollback(async (tx) => {
       const me = await someone(tx);
-      const a = await employee(tx, "أ");
+      const a = await employee(tx, "أنس");
       const t = await salaryTransfer(tx, "2026-10-28", 3_000_00, { expenseMonth: "2026-10" });
       const t2 = await salaryTransfer(tx, "2026-10-29", 2_000_00, { expenseMonth: "2026-10" });
       /* الأولى مربوطةٌ قبل الإقفال، والثانية لا */
