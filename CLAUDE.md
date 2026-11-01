@@ -35,9 +35,9 @@
 
 ## البنية التقنية
 
-Next.js **16.3.4** (App Router — **ليس ما تعرفه**، انظر `AGENTS.md`) · React 19.2.8 · TypeScript 5 صارم · Tailwind v4
+Next.js **16.4.3** (App Router — **ليس ما تعرفه**، انظر `AGENTS.md`) · React 19.2.8 · TypeScript 5 صارم · Tailwind v4
 Drizzle ORM 0.45.2 + `pg` 8.23 على **Neon Postgres** · Auth.js v5 (`next-auth@5.0.0-beta.32`) + جوجل، جلسات في القاعدة
-Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anthropic-ai/sdk` 0.123 (مزوّدٌ بديلٌ خامل)
+Vitest 4.1.12 · zod 4.6.7 · googleapis 178 (الدرايف وحده) · `@anthropic-ai/sdk` 0.123 (مزوّدٌ بديلٌ خامل)
 
 **الذكاء: DeepSeek وحده**، بـ`fetch` على واجهةٍ متوافقة مع OpenAI. `deepseek-flash` رؤيةً ونصّاً، `deepseek-v4-pro` استدلالاً. الأسماء في `src/lib/ai/models.ts` **وحده**. جيميني وOllama خاملان ولا يُختاران إلّا بـ`EXTRACTION_PROVIDER` **و**`EXTRACTION_ALLOW_ALT_PROVIDER=true` — الطبقات المجانية تتدرّب على الفواتير.
 

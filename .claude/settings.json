@@ -1,0 +1,31 @@
+{
+  "extraKnownMarketplaces": {
+    "trailofbits": {
+      "source": { "source": "github", "repo": "trailofbits/skills" }
+    }
+  },
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "dimensional-analysis@trailofbits": true,
+    "property-based-testing@trailofbits": true,
+    "supply-chain-risk-auditor@trailofbits": true,
+    "insecure-defaults@trailofbits": true,
+    "sharp-edges@trailofbits": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous-git.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

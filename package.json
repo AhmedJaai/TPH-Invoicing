@@ -82,7 +82,7 @@
     "googleapis": "^178.0.0",
     "heic-convert": "^2.1.0",
     "lucide-react": "^1.48.0",
-    "next": "16.3.4",
+    "next": "16.4.3",
     "next-auth": "5.0.0-beta.32",
     "onnxruntime-web": "^1.30.0",
     "pdfjs-dist": "^4.10.38",
@@ -90,10 +90,10 @@
     "qr": "^0.7.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "unpdf": "^1.7.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@stryker-mutator/core": "9.6.1",
@@ -104,16 +104,21 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.3",
     "fast-check": "^4.10.2",
     "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "$zod"
+    }
   }
 }
