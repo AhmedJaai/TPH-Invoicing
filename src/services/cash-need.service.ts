@@ -17,9 +17,9 @@ export interface CashNeed {
   coverage: ReturnType<typeof coverageOf>;
 }
 
-async function loadBankMonths(months: readonly string[]): Promise<{ rows: BankMonthRow[]; lastBankDay: string | null }> {
+async function loadBankMonths(months: readonly string[]): Promise<{ rows: BankMonthRow[]; lastBankDay: string | null; payrollViaOwner: { month: string; minor: number }[] }> {
   const list = sql.join(months.map((m) => sql`${m}`), sql`, `);
-  const [rows, last] = await Promise.all([
+  const [rows, last, viaOwner] = await Promise.all([
     db.execute<{ month: string; category: string; direction: string; minor: string }>(sql`
       select to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') as month, category::text as category,
              direction::text as direction, sum(amount_minor)::bigint as minor
@@ -27,10 +27,21 @@ async function loadBankMonths(months: readonly string[]): Promise<{ rows: BankMo
        where to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') in (${list})
        group by 1, 2, 3`),
     db.execute<{ day: string | null }>(sql`select to_char(max(value_date at time zone 'Asia/Riyadh'), 'YYYY-MM-DD') as day from bank_transactions`),
+    /* حوالةٌ «شخصي» وزّعها المالكُ على موظّفيه رواتبَ أو سلفاً: خرجت من البنك وهي راتب (`payroll.md`) */
+    db.execute<{ month: string; minor: string }>(sql`
+      select to_char(bank_transactions.value_date at time zone 'Asia/Riyadh', 'YYYY-MM') as month, sum(payroll_links.amount_minor)::bigint as minor
+        from payroll_links
+        join bank_transactions on bank_transactions.id = payroll_links.bank_transaction_id
+       where payroll_links.voided_at is null
+         and payroll_links.purpose in ('SALARY', 'ADVANCE', 'LOAN')
+         and bank_transactions.direction = 'DEBIT' and bank_transactions.category::text = 'PERSONAL'
+         and to_char(bank_transactions.value_date at time zone 'Asia/Riyadh', 'YYYY-MM') in (${list})
+       group by 1`),
   ]);
   return {
     rows: rows.rows.flatMap((r) => (r.direction === "DEBIT" || r.direction === "CREDIT" ? [{ month: r.month, category: r.category, direction: r.direction, minor: Number(r.minor) } satisfies BankMonthRow] : [])),
     lastBankDay: last.rows[0]?.day ?? null,
+    payrollViaOwner: viaOwner.rows.map((r) => ({ month: r.month, minor: Number(r.minor) })),
   };
 }
 
@@ -43,7 +54,7 @@ export async function loadCashNeed(outlook: Awaited<ReturnType<typeof loadCashOu
   const [payroll, upcoming, bank] = await Promise.all([loadPayrollDues(window), loadUpcomingDues(), loadBankMonths(past)]);
   const { recurring, overdueRun, nextRun, paidThisMonth, vat } = outlook.inputs;
   const registered = new Set(recurring.flatMap((r) => (r.category ? [r.category] : [])));
-  const averages = bankAverages(bank.rows, first, bank.lastBankDay, registered);
+  const averages = bankAverages(bank.rows, first, bank.lastBankDay, registered, bank.payrollViaOwner);
   const sum = (xs: readonly { amountMinor: number }[]) => xs.reduce((s, x) => s + Math.max(0, x.amountMinor), 0);
   const plan = buildCashNeed({
     today,

@@ -227,7 +227,8 @@ const TOOLS = [
       need.plan.months.forEach((m, i) => f.sar(`النقد المطلوب — ${formatMonth(m)} (مورّدون ورواتب وإيجار ومصروفات وضريبة)`, need.plan.monthTotals[i]));
       f.sar("النقد المطلوب للأشهر الثلاثة القادمة (لا يشمل ما سيدخل من المبيعات)", need.plan.totalMinor);
       f.sar("منه تقدير بمتوسط آخر ثلاثة أشهر أو بمبلغ دفعة سابقة، لا معروفٌ بذاته", need.plan.estimateMinor);
-      if (need.averages.ownerDrawsPerMonthMinor !== null) f.sar("سحوبات المالك الشخصية المعتادة شهرياً (غير داخلة في المطلوب)", need.averages.ownerDrawsPerMonthMinor);
+      if (need.averages.payrollViaOwnerPerMonthMinor) f.sar("من الرواتب ما وزّعه المالك على موظفيه من حوالاته الشخصية، شهرياً في آخر ثلاثة أشهر (داخلٌ في الرواتب المحسوبة كاملة، وليس سحباً شخصياً)", need.averages.payrollViaOwnerPerMonthMinor);
+      if (need.averages.ownerDrawsPerMonthMinor !== null) f.sar("سحوبات المالك لنفسه شهرياً بعد ما وزّعه على الرواتب (غير داخلة في المطلوب)", need.averages.ownerDrawsPerMonthMinor);
       if (need.averages.depositsPerMonthMinor !== null) f.sar("متوسط ما أُودع شهرياً من مبيعات الشبكة في آخر ثلاثة أشهر (للمقارنة، لا تنبّؤ)", need.averages.depositsPerMonthMinor);
       for (const u of need.plan.unknown) f.note("مبلغ غير معروف في خطة الأشهر الثلاثة", u);
       for (const p of need.plan.beyond) f.sar(`بعد الأشهر الثلاثة مباشرة${p.scheduled ? "" : " (تقدير)"} — ${p.label}: ${p.dueDay ? formatDay(p.dueDay) : formatMonth(p.dueMonth)}`, p.estimateMinor);

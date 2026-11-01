@@ -21,6 +21,26 @@ describe("bankAverages — متوسط آخر ثلاثة أشهر كاملة", ()
     expect(a.salaryPerMonthMinor).toBe(4_000_00);
   });
 
+  it("ما وزّعه المالكُ من حوالاته الشخصية على الموظّفين راتبٌ لا سحب: يُطرح من السحوبات ويُنسب للرواتب", () => {
+    const personal = [row("2026-08", "PERSONAL", 19_496_00), row("2026-09", "PERSONAL", 20_538_67), row("2026-10", "PERSONAL", 21_670_00)];
+    const viaOwner = [{ month: "2026-08", minor: 6_440_00 }, { month: "2026-09", minor: 13_871_67 }, { month: "2026-10", minor: 16_330_00 }, { month: "2026-07", minor: 5_500_00 }];
+    const a = bankAverages([...personal, row("2026-10", "SALARY", 12_000_00)], "2026-11", "2026-10-30", new Set(), viaOwner);
+    expect(a.payrollViaOwnerPerMonthMinor).toBe(Math.round((6_440_00 + 13_871_67 + 16_330_00) / 3));
+    expect(a.ownerDrawsPerMonthMinor).toBe(Math.round((19_496_00 + 20_538_67 + 21_670_00 - 6_440_00 - 13_871_67 - 16_330_00) / 3));
+    expect(a.salaryPerMonthMinor).toBe(4_000_00);
+  });
+
+  it("ولا يزيد الموزَّعُ على الحوالات نفسها: السحبُ لا يصير سالباً", () => {
+    const a = bankAverages([row("2026-10", "PERSONAL", 3_000_00)], "2026-11", "2026-10-30", new Set(), [{ month: "2026-10", minor: 5_000_00 }]);
+    expect(a.ownerDrawsPerMonthMinor).toBe(0);
+    expect(a.payrollViaOwnerPerMonthMinor).toBe(1_000_00);
+  });
+
+  it("بلا توزيعٍ مسجَّل: السحوبُ كما كانت", () => {
+    const a = bankAverages([row("2026-10", "PERSONAL", 3_000_00)], "2026-11", "2026-10-30", new Set());
+    expect(a).toMatchObject({ ownerDrawsPerMonthMinor: 1_000_00, payrollViaOwnerPerMonthMinor: 0 });
+  });
+
   it("ما سجّله صاحبُه متكرّراً لا يُحسب مرّتين في المعتاد", () => {
     const all = bankAverages(rows, "2026-11", "2026-10-30", new Set());
     const noGov = bankAverages(rows, "2026-11", "2026-10-30", new Set(["GOVERNMENT"]));
@@ -30,7 +50,7 @@ describe("bankAverages — متوسط آخر ثلاثة أشهر كاملة", ()
 
   it("كشفٌ لا يبلغ نهاية الشهر الأخير: المتوسطات «غير معروفة» لا أصفار", () => {
     const a = bankAverages(rows, "2026-11", "2026-10-12", new Set());
-    expect(a).toMatchObject({ supplierPerMonthMinor: null, usualPerMonthMinor: null, ownerDrawsPerMonthMinor: null, salaryPerMonthMinor: null, depositsPerMonthMinor: null });
+    expect(a).toMatchObject({ supplierPerMonthMinor: null, usualPerMonthMinor: null, ownerDrawsPerMonthMinor: null, salaryPerMonthMinor: null, payrollViaOwnerPerMonthMinor: null, depositsPerMonthMinor: null });
     expect(bankAverages(rows, "2026-11", null, new Set()).supplierPerMonthMinor).toBeNull();
   });
 });

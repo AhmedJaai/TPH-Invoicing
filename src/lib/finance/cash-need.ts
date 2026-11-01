@@ -33,9 +33,12 @@ export interface BankAverages {
   supplierPerMonthMinor: number | null;
   /** كهرباء · حكومي · أخرى · رسوم البنك والشبكة — بلا ما سُجّل متكرّراً ولا الرواتب ولا الإيجار. */
   usualPerMonthMinor: number | null;
+  /** سحوباتُ المالك لنفسه **بعد ما وزّعه منها على الرواتب** — ذاك رواتبُ لا سحب، وهو داخلٌ في المسيّر فلا يُحسب ثانيةً. */
   ownerDrawsPerMonthMinor: number | null;
-  /** ما خرج من البنك للرواتب فعلاً — يُقابَل بالمسيّر فيُرى إن كان بعضُه يُدفع من خارج الحساب. */
+  /** ما خرج من البنك للرواتب مباشرةً (باب «راتب»). */
   salaryPerMonthMinor: number | null;
+  /** ما حوّله المالكُ لنفسه ثمّ وزّعه على الموظّفين رواتب (`payroll_links`) — خرج من البنك باب «شخصي» وهو راتب. */
+  payrollViaOwnerPerMonthMinor: number | null;
   /** ما أُودع من تسوية الشبكة (فودكس) — للمقارنة، لا تنبّؤاً. */
   depositsPerMonthMinor: number | null;
 }
@@ -52,19 +55,25 @@ export function bankAverages(
   lastBankDay: string | null,
   /** أبوابُ ما سجّله صاحبُه متكرّراً فاعلاً — لا تُحسب مرّتين. */
   registeredCategories: ReadonlySet<string>,
+  /** ما وُزّع من حوالات «شخصي» رواتبَ وسلفاً، بشهر الحوالة — يُطرح من سحوبات المالك ويُنسب إلى الرواتب. */
+  payrollViaOwner: readonly { month: string; minor: number }[] = [],
 ): BankAverages {
   const months = Array.from({ length: CASH_NEED_MONTHS }, (_, i) => addMonths(thisMonth, i - CASH_NEED_MONTHS));
   const last = months[months.length - 1];
   const covered = lastBankDay !== null && lastBankDay >= `${last}-${String(COVERED_FROM_DAY).padStart(2, "0")}`;
-  if (!covered) return { months, supplierPerMonthMinor: null, usualPerMonthMinor: null, ownerDrawsPerMonthMinor: null, salaryPerMonthMinor: null, depositsPerMonthMinor: null };
+  if (!covered) return { months, supplierPerMonthMinor: null, usualPerMonthMinor: null, ownerDrawsPerMonthMinor: null, salaryPerMonthMinor: null, payrollViaOwnerPerMonthMinor: null, depositsPerMonthMinor: null };
   const inWindow = rows.filter((r) => months.includes(r.month));
-  const avg = (pick: (r: BankMonthRow) => boolean) => Math.round(inWindow.filter(pick).reduce((s, r) => s + r.minor, 0) / months.length);
+  const total = (pick: (r: BankMonthRow) => boolean) => inWindow.filter(pick).reduce((s, r) => s + r.minor, 0);
+  const avg = (pick: (r: BankMonthRow) => boolean) => Math.round(total(pick) / months.length);
+  const viaOwner = payrollViaOwner.filter((p) => months.includes(p.month)).reduce((s, p) => s + p.minor, 0);
+  const personal = total((r) => r.direction === "DEBIT" && r.category === "PERSONAL");
   return {
     months,
     supplierPerMonthMinor: avg((r) => r.direction === "DEBIT" && r.category === "SUPPLIER"),
     usualPerMonthMinor: avg((r) => r.direction === "DEBIT" && USUAL_CATEGORIES.has(r.category) && !registeredCategories.has(r.category)),
-    ownerDrawsPerMonthMinor: avg((r) => r.direction === "DEBIT" && r.category === "PERSONAL"),
+    ownerDrawsPerMonthMinor: Math.round(Math.max(0, personal - viaOwner) / months.length),
     salaryPerMonthMinor: avg((r) => r.direction === "DEBIT" && r.category === "SALARY"),
+    payrollViaOwnerPerMonthMinor: Math.round(Math.min(viaOwner, personal) / months.length),
     depositsPerMonthMinor: avg((r) => r.direction === "CREDIT" && r.category === "POS_SETTLEMENT"),
   };
 }

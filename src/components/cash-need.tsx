@@ -43,9 +43,9 @@ export function CashNeedPanel({ need }: { need: CashNeed }) {
     ...plan.months.map((m, i): Column<Line> => ({ key: m, header: formatMonth(m), numeric: true, cell: (r) => <CellView cell={r.cells[i]} /> })),
     { key: "total", header: "الثلاثة أشهر", numeric: true, cell: (r) => <span className="font-bold"><Money minor={r.totalMinor} /></span> },
   ];
-  /* المسيّر أكبرُ بكثير ممّا خرج من البنك للرواتب؟ يُقال، فقد يكون بعضُه يُدفع من خارج الحساب فلا يلزمه رصيد */
+  /* الرواتب كاملةً من المسيّر؛ وما وزّعه المالكُ من حوالاته الشخصية على موظّفيه راتبٌ خرج من البنك فعلاً — يُقال كي يُفهم الفرقُ بين المسيّر وباب «راتب» في الكشف */
   const payrollMonth = plan.rows.find((r) => r.key === "PAYROLL")?.cells[0].minor ?? null;
-  const salaryGap = payrollMonth !== null && averages.salaryPerMonthMinor !== null && averages.salaryPerMonthMinor > 0 && payrollMonth > averages.salaryPerMonthMinor * 1.25;
+  const viaOwner = averages.payrollViaOwnerPerMonthMinor;
   const withDraws = averages.ownerDrawsPerMonthMinor === null ? null : plan.totalMinor + averages.ownerDrawsPerMonthMinor * plan.months.length;
 
   return (
@@ -86,11 +86,11 @@ export function CashNeedPanel({ need }: { need: CashNeed }) {
             ? <T s="الرقم مبلغٌ يخرج فقط، ولا يدخله ما سيدخل من المبيعات. للمقارنة: أُودع من مبيعات الشبكة نحو {0} شهرياً في آخر ثلاثة أشهر." a={[<Money key="0" minor={averages.depositsPerMonthMinor} />]} />
             : "الرقم مبلغٌ يخرج فقط، ولا يدخله ما سيدخل من المبيعات."}
         </li>
-        {salaryGap && payrollMonth !== null && averages.salaryPerMonthMinor !== null && (
-          <li><T s="الرواتب هنا من المسيّر ({0} شهرياً)، بينما خرج من البنك للرواتب نحو {1} شهرياً في آخر ثلاثة أشهر. فإن كان الفرق يُدفع من خارج الحساب فلا يلزمه رصيد." a={[<Money key="0" minor={payrollMonth} />, <Money key="1" minor={averages.salaryPerMonthMinor} />]} /></li>
+        {payrollMonth !== null && viaOwner !== null && viaOwner > 0 && averages.salaryPerMonthMinor !== null && (
+          <li><T s="الرواتب محسوبة كاملةً من المسيّر ({0} شهرياً). وفي آخر ثلاثة أشهر خرج للرواتب من البنك نحو {1} شهرياً: {2} مباشرة و{3} من حوالاتك الشخصية التي وزّعتها على الموظفين، فلا تُعدّ سحوباتٍ شخصية." a={[<Money key="0" minor={payrollMonth} />, <Money key="1" minor={averages.salaryPerMonthMinor + viaOwner} />, <Money key="2" minor={averages.salaryPerMonthMinor} />, <Money key="3" minor={viaOwner} />]} /></li>
         )}
         {withDraws !== null && averages.ownerDrawsPerMonthMinor !== null && averages.ownerDrawsPerMonthMinor > 0 && (
-          <li><T s="ولا يشمل سحوباتك الشخصية المعتادة (نحو {0} شهرياً)؛ ومعها تصير الحاجة {1}." a={[<Money key="0" minor={averages.ownerDrawsPerMonthMinor} />, <Money key="1" minor={withDraws} />]} /></li>
+          <li><T s="ولا يشمل سحوباتك الشخصية لنفسك (نحو {0} شهرياً، بعد ما وزّعته على الرواتب)؛ ومعها تصير الحاجة {1}." a={[<Money key="0" minor={averages.ownerDrawsPerMonthMinor} />, <Money key="1" minor={withDraws} />]} /></li>
         )}
         <li>المورّدون والمعتاد غير المسجّل بمتوسط آخر ثلاثة أشهر من كشف البنك، فتتأثر بالدفعات الكبيرة فيها. والرواتب بالراتب المكتوب قبل أي خصم أو إضافة لم تقع بعد.</li>
       </ul>
