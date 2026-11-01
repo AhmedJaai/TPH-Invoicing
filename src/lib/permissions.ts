@@ -182,6 +182,22 @@ export function parseAllowlist(raw: string | undefined): Map<string, Role> {
   return map;
 }
 
+/**
+ * أيُدخَل بهذه الهويّة؟ — البريدُ في القائمة **وجوجل يشهد أنّه بريدُ صاحبه**.
+ *
+ * كان `signIn` يقرأ `user.email` وحده. وجوجل يُرجع معه `email_verified`، ووثائقُ
+ * Auth.js توصي بفحصه: هويّةٌ لم يُتحقَّق بريدُها لا يُبنى عليها بابُ المال كلّه.
+ * وما ليس جوجل (لا مزوّدَ غيرُه اليوم) لا يُدخَل — الإضافةُ قرارٌ لا افتراض.
+ */
+export function identityAllowed(
+  input: { email: string | null | undefined; provider: string | undefined; emailVerified: unknown },
+  list: Map<string, Role>,
+): boolean {
+  const email = input.email?.toLowerCase();
+  if (!email || !list.has(email)) return false;
+  return input.provider === "google" && input.emailVerified === true;
+}
+
 export function allowlist(): Map<string, Role> {
   return parseAllowlist(process.env.ALLOWED_EMAILS);
 }

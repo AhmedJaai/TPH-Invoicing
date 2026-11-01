@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can, capabilitiesOf, parseAllowlist, require_, ForbiddenError } from "./permissions";
+import { can, capabilitiesOf, identityAllowed, parseAllowlist, require_, ForbiddenError } from "./permissions";
 
 describe("مصفوفة الصلاحيات", () => {
   it("المالك يملك كل شيء", () => {
@@ -73,5 +73,25 @@ describe("من يصنّف حركات البنك ينشئ مورّداً", () => 
     for (const role of ["OWNER", "ACCOUNTANT", "PURCHASING"] as const) {
       if (can(role, "bank:edit")) expect(can(role, "supplier:edit")).toBe(true);
     }
+  });
+});
+
+describe("identityAllowed — القائمة وشهادة جوجل معاً", () => {
+  const list = parseAllowlist("owner@gmail.com:OWNER");
+  it("بريدٌ في القائمة شهد جوجل أنّه لصاحبه يدخل، بأيّ حالة أحرف", () => {
+    expect(identityAllowed({ email: "Owner@Gmail.com", provider: "google", emailVerified: true }, list)).toBe(true);
+  });
+  it("وبلا شهادة التحقّق لا يدخل — ولو كان في القائمة", () => {
+    expect(identityAllowed({ email: "owner@gmail.com", provider: "google", emailVerified: false }, list)).toBe(false);
+    expect(identityAllowed({ email: "owner@gmail.com", provider: "google", emailVerified: undefined }, list)).toBe(false);
+    expect(identityAllowed({ email: "owner@gmail.com", provider: "google", emailVerified: "true" }, list)).toBe(false);
+  });
+  it("ومزوّدٌ غير جوجل لا يدخل، ولا بريدٌ خارج القائمة ولا فارغ", () => {
+    expect(identityAllowed({ email: "owner@gmail.com", provider: "github", emailVerified: true }, list)).toBe(false);
+    expect(identityAllowed({ email: "x@gmail.com", provider: "google", emailVerified: true }, list)).toBe(false);
+    expect(identityAllowed({ email: null, provider: "google", emailVerified: true }, list)).toBe(false);
+  });
+  it("والقائمةُ الفارغة تغلق الباب كلَّه", () => {
+    expect(identityAllowed({ email: "owner@gmail.com", provider: "google", emailVerified: true }, parseAllowlist(undefined))).toBe(false);
   });
 });

@@ -15,7 +15,7 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
-import { allowlist, type Role } from "@/lib/permissions";
+import { allowlist, identityAllowed, type Role } from "@/lib/permissions";
 import { sealToken } from "@/lib/token-crypto";
 
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
@@ -64,12 +64,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/login", error: "/login" },
 
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
       const email = user.email?.toLowerCase();
       if (!email) return false;
-
-      const list = allowlist();
-      if (!list.has(email)) return false;
+      if (!identityAllowed({ email, provider: account?.provider, emailVerified: profile?.email_verified }, allowlist())) return false;
 
       // المستخدم المعطَّل في النظام يُمنع ولو بقي في القائمة البيضاء
       const [existing] = await db
