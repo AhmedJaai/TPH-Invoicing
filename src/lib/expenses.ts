@@ -9,6 +9,8 @@
  */
 import { createHash } from "node:crypto";
 import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
+import { monthlyShareOf, type Cadence } from "./cadence";
+import { occursIn } from "./cash-outlook";
 import { isoDay } from "@/lib/riyadh-time";
 
 export type ExpenseSource = "BANK" | "INVOICE" | "MANUAL";
@@ -31,8 +33,11 @@ export interface RecurringExpense {
   label: string;
   category: TxCategory;
   amountMinor: number;
-  cadence: "MONTHLY" | "QUARTERLY" | "ANNUAL";
+  cadence: Cadence;
   isActive: boolean;
+  /** أوّلُ استحقاق وآخرُه — منهما يُعرف في أيّ شهرٍ يقع غيرُ الشهريّ. فارغان: لا يُخترَع له شهر. */
+  startsOn?: string | null;
+  endsOn?: string | null;
 }
 
 export interface BankTx {
@@ -174,9 +179,17 @@ export function unrecordedFromBank(derived: DerivedExpenses): { count: number; a
 
 /** حصّة الشهر من مصروف متكرّر. */
 export function monthlyShare(e: Pick<RecurringExpense, "amountMinor" | "cadence">): number {
-  if (e.cadence === "MONTHLY") return e.amountMinor;
-  if (e.cadence === "QUARTERLY") return Math.round(e.amountMinor / 3);
-  return Math.round(e.amountMinor / 12);
+  return monthlyShareOf(e.amountMinor, e.cadence);
+}
+
+/**
+ * المتوقَّعُ في شهرٍ بعينه. الشهريّ بمبلغه كلَّ شهر، وغيرُ الشهريّ بمبلغه **كاملاً في شهر استحقاقه وصفراً في غيره**: الإيجارُ
+ * نصفُ السنوي ٤٧٬٥٠٠ يُدفع في أغسطس وفبراير، فمقارنتُه بسدسه في أكتوبر تقول «صرفتَ أقلّ» وفي أغسطس «صرفتَ أكثر» وكلاهما
+ * أثرٌ للتوزيع لا حقيقة. وبلا تاريخٍ يُعرف به شهرُه يبقى حصّةَ الشهر، فلا يُخترَع له شهر.
+ */
+function expectedIn(e: Pick<RecurringExpense, "amountMinor" | "cadence" | "startsOn" | "endsOn">, month: string): number {
+  if (e.cadence === "MONTHLY" || !e.startsOn) return monthlyShare(e);
+  return occursIn({ id: "", label: "", amountMinor: e.amountMinor, cadence: e.cadence, startsOn: e.startsOn, endsOn: e.endsOn ?? null }, month).occurs ? e.amountMinor : 0;
 }
 
 export interface CategoryVariance {
@@ -204,7 +217,7 @@ export function expectedVsActual(
   const expected = new Map<TxCategory, number>();
   for (const r of recurring) {
     if (!r.isActive) continue;
-    expected.set(r.category, (expected.get(r.category) ?? 0) + monthlyShare(r));
+    expected.set(r.category, (expected.get(r.category) ?? 0) + expectedIn(r, month));
   }
 
   const actualByCat = new Map<TxCategory, number>();
@@ -256,6 +269,11 @@ export function unmetRecurring(
   return recurring.filter((r) => {
     if (!r.isActive) return false;
     if (paidIds.has(r.id)) return false;
+    /*
+      غيرُ الشهريّ لا يُطلب إلّا في شهر استحقاقه: الإيجارُ نصفُ السنوي يُدفع في أغسطس وفبراير، ولو سُئل عنه كلَّ شهرٍ
+      لقيل «لم يُدفع» خمسةَ أشهرٍ من ستّة. وبلا تاريخٍ يُعرف به شهرُه لا يُسأل عنه في شهرٍ مخترَع.
+    */
+    if (r.cadence !== "MONTHLY" && !occursIn({ ...r, startsOn: r.startsOn ?? null, endsOn: r.endsOn ?? null }, month).occurs) return false;
     // بلا ربط صريح: يُعدّ مدفوعاً إن بلغ صرفُ بابه حصّةَ الشهر
     return (spentByCategory.get(r.category) ?? 0) < monthlyShare(r);
   });
@@ -292,8 +310,9 @@ export function totalActual(actual: readonly Expense[], month: string): number {
     .reduce((s, e) => s + e.amountMinor, 0);
 }
 
-export function totalExpected(recurring: readonly RecurringExpense[]): number {
-  return recurring.filter((r) => r.isActive).reduce((s, r) => s + monthlyShare(r), 0);
+/** مجموعُ المتوقَّع — في `month` إن أُعطي (غيرُ الشهريّ في شهر استحقاقه)، وإلّا الحصصُ الشهرية. */
+export function totalExpected(recurring: readonly RecurringExpense[], month?: string): number {
+  return recurring.filter((r) => r.isActive).reduce((s, r) => s + (month ? expectedIn(r, month) : monthlyShare(r)), 0);
 }
 
 

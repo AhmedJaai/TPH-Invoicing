@@ -9,6 +9,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, expenses, recurringExpenses } from "@/db/schema";
 import { createId } from "@/lib/id";
+import { asCadence } from "@/lib/cadence";
 import { expenseEventKey } from "@/lib/expenses";
 import { recordAudit } from "@/lib/audit";
 import type { Conn, Tx } from "./types";
@@ -348,8 +349,10 @@ export async function activeRecurring(conn: Conn = db): Promise<RecurringExpense
     label: r.label,
     category: r.category,
     amountMinor: r.amountMinor,
-    cadence: (r.cadence as RecurringExpense["cadence"]) ?? "MONTHLY",
+    cadence: asCadence(r.cadence),
     isActive: r.isActive,
+    startsOn: r.startsOn,
+    endsOn: r.endsOn,
   }));
 }
 

@@ -12,6 +12,7 @@ import { addDays, currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadPnlSeries, type PnlView } from "./profit.service";
 import { loadBalanceTotals } from "./supplier-balance.service";
 import { loadCashOutlook } from "./cash-outlook.service";
+import { loadCashNeed, type CashNeed } from "./cash-need.service";
 
 type Conn = typeof db;
 
@@ -96,6 +97,8 @@ export interface CafePerformance {
   returns: ReturnsWitness & { from: string; to: string };
   cash: { balanceMinor: number | null; balanceAsOf: string | null; dueNext60Minor: number; shortfallAt: string | null };
   owedMinor: number;
+  /** النقدُ المطلوب للأشهر الثلاثة القادمة — من الوقائع نفسها وبمتوسطات البنك (`cash-need.service.ts`). */
+  cashNeed: CashNeed;
 }
 
 export async function loadPerformance(opts: { canSeePayroll: boolean }): Promise<CafePerformance> {
@@ -122,5 +125,6 @@ export async function loadPerformance(opts: { canSeePayroll: boolean }): Promise
     returns: { ...returns, from: returnsFrom, to: yesterday },
     cash: { balanceMinor: outlook.balanceMinor, balanceAsOf: outlook.balanceAsOf, dueNext60Minor: outlook.totalMinor, shortfallAt: outlook.shortfallAt },
     owedMinor: balances.totals.owedMinor,
+    cashNeed: await loadCashNeed(outlook),
   };
 }

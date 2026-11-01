@@ -169,7 +169,9 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <Callout tone="accent" icon={CalendarClock} className="mt-3" title="خصّص مبلغاً للدفعة المقدّمة القادمة">
           {o.prepaid.map((p) => (
             <span key={p.label} className="block">
-              <T s="{0}: تغطي حتى {1}، والدفعة التالية نحو {2} في {3} (تقدير بمبلغ السابقة)." a={[p.label, formatMonth(p.coveredThrough), <Money key="2" minor={p.estimateMinor} />, formatMonth(p.dueMonth)]} />
+              {p.scheduled
+                ? <T s="{0}: الدفعة التالية {1} في {2} (مسجّلة في المصروفات المتكررة)." a={[p.label, <Money key="1" minor={p.estimateMinor} />, <bdi key="2">{p.dueDay ? formatDay(p.dueDay) : formatMonth(p.dueMonth)}</bdi>]} />
+                : <T s="{0}: تغطي حتى {1}، والدفعة التالية نحو {2} في {3} (تقدير بمبلغ السابقة)." a={[p.label, formatMonth(p.coveredThrough), <Money key="2" minor={p.estimateMinor} />, formatMonth(p.dueMonth)]} />}
             </span>
           ))}
           <span className="mt-1 block text-[11px] text-muted">موعدها بعد الفترة التي يغطيها الجدول، فلا تُطرح من «يتبقى بعدها»، لكنها من أكبر ما سيخرج من الحساب.</span>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Fragment } from "react";
-import { Activity, Gauge, HandCoins, Landmark, Percent, Sparkles, Timer, TrendingUp, Undo2 } from "lucide-react";
+import { Activity, CalendarClock, Gauge, HandCoins, Landmark, Percent, Sparkles, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -12,6 +12,7 @@ import { ORDER, countNoun } from "@/lib/arabic";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadPerformance } from "@/services/performance.service";
 import { loadCashCustody } from "@/services/app-settings.service";
+import { CashNeedPanel } from "@/components/cash-need";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -236,6 +237,10 @@ export default async function PerformancePage() {
           <KeyFigure icon={Activity} label="ما يُدفع حتى آخر الشهر القادم" tone={perf.cash.shortfallAt ? "warn" : undefined} value={<Money minor={perf.cash.dueNext60Minor} currency />}
             sub={perf.cash.shortfallAt ? `يقصر الرصيد عنه في ${formatDay(perf.cash.shortfallAt)}` : "الرصيد يكفيه حسب الجدول"} href="/cash" />
         </div>
+      </Section>
+
+      <Section id="cash-need" title="النقد المطلوب للأشهر الثلاثة القادمة" icon={CalendarClock} hint="كل ما سيخرج من الحساب: المورّدون والرواتب والإيجار والمصروفات المسجّلة والضريبة. ما لم يصل بعد يُقدَّر بمتوسط الأشهر الماضية ويُسمّى تقديراً.">
+        <CashNeedPanel need={perf.cashNeed} />
       </Section>
     </PageShell>
   );

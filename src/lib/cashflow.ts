@@ -8,6 +8,7 @@
  * دوال خالصة: تأخذ حركات وتُرجع نتائج.
  */
 import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
+import { monthlyShareOf, type Cadence } from "./cadence";
 
 export interface CashMovement {
   /** YYYY-MM */
@@ -209,7 +210,7 @@ export interface RecurringExpense {
   label: string;
   category: TxCategory;
   amountMinor: number;
-  cadence: "MONTHLY" | "QUARTERLY" | "ANNUAL";
+  cadence: Cadence;
 }
 
 export interface ExpectedVsActual {
@@ -224,9 +225,7 @@ export interface ExpectedVsActual {
 
 /** حصّة الشهر من مصروف متكرّر. */
 export function monthlyShare(e: RecurringExpense): number {
-  if (e.cadence === "MONTHLY") return e.amountMinor;
-  if (e.cadence === "QUARTERLY") return Math.round(e.amountMinor / 3);
-  return Math.round(e.amountMinor / 12);
+  return monthlyShareOf(e.amountMinor, e.cadence);
 }
 
 /**

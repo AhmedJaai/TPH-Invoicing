@@ -121,16 +121,24 @@ export default async function FinancePositionPage() {
                 <span className="font-bold"><MaybeMoney minor={v.amountMinor} why="أيام بلا كشف" /></span>
               </li>
             ))}
+            {pos.upcoming.map((p) => (
+              <li key={`${p.category}:${p.dueMonth}`} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-line bg-raised px-4 py-3 text-sm shadow-raised">
+                <span>
+                  <T s="{0}، {1}{2}" a={[p.label, <bdi key="1">{p.dueDay ? formatDay(p.dueDay) : formatMonth(p.dueMonth)}</bdi>, <span key="2" className="text-[11px] text-muted">{p.scheduled ? " (مسجّل في المصروفات المتكررة)" : " (تقدير بمبلغ آخر دفعة)"}</span>]} />
+                </span>
+                <span className="font-bold"><Money minor={p.estimateMinor} /></span>
+              </li>
+            ))}
             {pos.suppliers.overdue.slice(0, 5).map((o) => (
               <li key={o.supplierId} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm">
                 <span><T s="{0}: أقدم فاتورة منذ {1}" a={[o.nameAr, countNoun(o.oldestDays, DAY)]} /></span>
                 <span className="font-bold"><Money minor={o.owedMinor} /></span>
               </li>
             ))}
-            {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && start.has.documents && (
+            {pos.vat.length === 0 && pos.upcoming.length === 0 && pos.suppliers.overdue.length === 0 && start.has.documents && (
               <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا ضريبة معلّقة، ولا مورّد تأخر سداد مستحقاته.</li>
             )}
-            {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && !start.has.documents && (
+            {pos.vat.length === 0 && pos.upcoming.length === 0 && pos.suppliers.overdue.length === 0 && !start.has.documents && (
               <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا يعرف النظام بعدُ ما يستحق: لم تصل فواتير ولا كشف بنك.</li>
             )}
           </ul>

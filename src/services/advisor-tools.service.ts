@@ -15,13 +15,14 @@ import { FactList, type Fact } from "@/lib/finance/reading";
 import { BENCHMARKS, verdictOf, type BenchmarkKey } from "@/lib/finance/performance";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import { DAY, INVOICE, ORDER, PAYMENT, SUPPLIER, countNoun } from "@/lib/arabic";
-import { addDays, currentMonthRiyadh, formatMonth, isoDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, currentMonthRiyadh, formatDay, formatMonth, isoDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { DeepseekTool } from "@/lib/ai/deepseek";
 import { loadPnl, visibleOpexRows } from "./profit.service";
 import { kpiOf, loadServiceSpeed, loadReturnsWitness } from "./performance.service";
 import { loadSalesAnalysis } from "./sales-analysis.service";
 import { loadCashOutlook } from "./cash-outlook.service";
 import { loadBalanceTotals, loadOverdueBalances } from "./supplier-balance.service";
+import { loadCashNeed } from "./cash-need.service";
 import { loadPayrollMonth } from "./payroll.service";
 import { loadFinancePosition } from "./finance-position.service";
 import { loadCashCustody } from "./app-settings.service";
@@ -218,7 +219,18 @@ const TOOLS = [
       f.sar("مجموع ما يُدفع حتى آخر الشهر القادم", o.totalMinor);
       if (o.shortfallAt) f.note("يقصر الرصيد عن الجدول", `في ${o.shortfallAt}`);
       for (const v of [...o.vatIncluded, ...o.vatAhead]) f.sar(`ضريبة القيمة المضافة — ${v.label}`, v.amountMinor);
-      for (const p of o.prepaid) f.sar(`دفعة مقدّمة قادمة (تقدير بمبلغ السابقة) — ${p.label}: تغطي حتى ${formatMonth(p.coveredThrough)} والتالية في ${formatMonth(p.dueMonth)}`, p.estimateMinor);
+      for (const p of o.prepaid) f.sar(p.scheduled
+        ? `دفعة قادمة مسجّلة في المصروفات المتكررة (لا تقدير) — ${p.label}: تستحق ${p.dueDay ? formatDay(p.dueDay) : formatMonth(p.dueMonth)}`
+        : `دفعة مقدّمة قادمة (تقدير بمبلغ السابقة) — ${p.label}: تغطي حتى ${formatMonth(p.coveredThrough)} والتالية في ${formatMonth(p.dueMonth)}`, p.estimateMinor);
+      /* الأشهر الثلاثة القادمة كلُّها — ما عُرف وما قُدِّر بمتوسط البنك، مسمّى كلٌّ بما هو */
+      const need = await loadCashNeed(o);
+      need.plan.months.forEach((m, i) => f.sar(`النقد المطلوب — ${formatMonth(m)} (مورّدون ورواتب وإيجار ومصروفات وضريبة)`, need.plan.monthTotals[i]));
+      f.sar("النقد المطلوب للأشهر الثلاثة القادمة (لا يشمل ما سيدخل من المبيعات)", need.plan.totalMinor);
+      f.sar("منه تقدير بمتوسط آخر ثلاثة أشهر أو بمبلغ دفعة سابقة، لا معروفٌ بذاته", need.plan.estimateMinor);
+      if (need.averages.ownerDrawsPerMonthMinor !== null) f.sar("سحوبات المالك الشخصية المعتادة شهرياً (غير داخلة في المطلوب)", need.averages.ownerDrawsPerMonthMinor);
+      if (need.averages.depositsPerMonthMinor !== null) f.sar("متوسط ما أُودع شهرياً من مبيعات الشبكة في آخر ثلاثة أشهر (للمقارنة، لا تنبّؤ)", need.averages.depositsPerMonthMinor);
+      for (const u of need.plan.unknown) f.note("مبلغ غير معروف في خطة الأشهر الثلاثة", u);
+      for (const p of need.plan.beyond) f.sar(`بعد الأشهر الثلاثة مباشرة${p.scheduled ? "" : " (تقدير)"} — ${p.label}: ${p.dueDay ? formatDay(p.dueDay) : formatMonth(p.dueMonth)}`, p.estimateMinor);
       f.sar(`المستحقّ للمورّدين (${countNoun(b.totals.owedSuppliers, SUPPLIER)})`, b.totals.owedMinor);
       /* نقدُ الصندوق لا يدخل البنك — وما دُفع منه لا يظهر تكلفة: أرجحُ ما يغيب عن الدفاتر */
       const [position, custody] = await Promise.all([loadFinancePosition(), loadCashCustody()]);

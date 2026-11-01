@@ -6,7 +6,8 @@ import { CaptureLinks } from "@/components/capture-links";
 import { listLinks } from "@/services/capture.service";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
-import { asCadence } from "@/lib/cash-outlook";
+import { loadRecurringSuggestions } from "@/services/cash-outlook.service";
+import { asCadence } from "@/lib/cadence";
 import { db } from "@/db";
 import { currentUser, isAuthBypassed } from "@/lib/session";
 import { can, ROLE_LABEL } from "@/lib/permissions";
@@ -114,6 +115,8 @@ export default async function SettingsPage() {
   /* إدارةُ المستخدمين للمالك وحده — والخادمُ يحرسها بالقدرة نفسها (`/api/users`) */
   /* ما أنفقه القارئُ هذا الشهر — `null` إن لم يُعرف (لا يُعرض صفراً)، وصفرُ نداءٍ «لم يُقيَّد شيء» */
   const spend = showMoney ? await aiSpendThisMonth() : null;
+  /* دفعةٌ مقدّمة معروفة (إيجارُ نصفِ سنة) يُقترح تسجيلُها متكرّرةً — لمن يرى المبالغ ويحرّر المصروفات وحده */
+  const recurringSuggestions = showMoney && can(user.role, "expense:edit") ? await loadRecurringSuggestions() : [];
   const aiSpend = spend && spend.calls > 0 ? spend : null;
   const aiBudget = dailyBudgetMicroUsd(process.env.AI_DAILY_BUDGET_USD);
   /* رصيدُ المزوّد كما وجده فحصُ الصباح — والمجهولُ «غير معروف» لا صفر */
@@ -230,7 +233,7 @@ export default async function SettingsPage() {
               hint="مصروفات تتكرر بلا فاتورة: الإيجار والاشتراكات والخدمات. يعتمد عليها «النقد القادم»، ويقارن بها المتوقع بالفعلي. والرواتب يحملها مسيّر الرواتب."
               action={can(user.role, "bank:view") ? <Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link> : undefined}
             >
-              <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />
+              <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} suggestions={recurringSuggestions.flatMap((s) => (isTxCategory(s.category) ? [{ ...s, category: s.category }] : []))} />
             </Section>
           )}
 

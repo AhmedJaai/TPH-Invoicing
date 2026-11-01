@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addMonths } from "./filing";
-import { buildCashOutlook, dueThisWeek, withoutPayrollDuplicates, floorBreach, occursIn, parseStoredMinor, prepaidRenewals, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { buildCashOutlook, dueThisWeek, withoutPayrollDuplicates, floorBreach, occursIn, parseStoredMinor, prepaidRenewals, nextOccurrence, nextDueFrom, scheduledDues, scheduledAhead, mergePrepaid, semiannualSuggestions, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",
@@ -353,3 +353,96 @@ describe("الدفعةُ المقدَّمة التالية", () => {
     expect(prepaidRenewals([{ kind: "SPREAD", category: "RENT", label: "x", amountMinor: 100, fromMonth: "2026-07", toMonth: "2026-12" }], "2026-10")[0].dueMonth).toBe("2027-01");
   });
 });
+
+/* الإيجار: ٤٧٬٥٠٠ كلَّ ستّة أشهر، آخرُ دفعةٍ ١٠ أغسطس ٢٠٢٦ (أحمد، ١ نوفمبر ٢٠٢٦) */
+const semiRent: RecurringInput = { id: "rent", label: "الإيجار", amountMinor: 47_500_00, cadence: "SEMIANNUAL", startsOn: "2026-08-10", endsOn: null, category: "RENT" };
+
+describe("النصفُ سنويّ — الإيجار", () => {
+  it("يقع في شهر بدئه وبعد ستّة أشهر وكذلك، ولا يقع بينهما", () => {
+    const months = ["2026-08", "2026-09", "2026-11", "2027-01", "2027-02", "2027-03", "2027-08"];
+    expect(months.map((m) => occursIn(semiRent, m).occurs)).toEqual([true, false, false, false, true, false, true]);
+    expect(occursIn(semiRent, "2027-02").day).toBe(10);
+  });
+
+  it("لا يقع قبل شهر بدئه ولا بعد انتهاء مدّته، وبلا تاريخٍ لا يُخترع له شهر", () => {
+    expect(occursIn(semiRent, "2026-02").occurs).toBe(false);
+    expect(occursIn({ ...semiRent, endsOn: "2027-01-31" }, "2027-02").occurs).toBe(false);
+    expect(occursIn({ ...semiRent, startsOn: null }, "2026-08").occurs).toBe(false);
+  });
+
+  it("الموعدُ التالي: فبراير ٢٠٢٧ بيومه، ويُقصّ اليوم ٣١ في شهرٍ قصير", () => {
+    expect(nextOccurrence(semiRent, "2026-11")).toEqual({ month: "2027-02", day: "2027-02-10" });
+    expect(nextOccurrence({ ...semiRent, startsOn: "2026-08-31" }, "2026-11")).toEqual({ month: "2027-02", day: "2027-02-28" });
+    expect(nextOccurrence({ ...semiRent, startsOn: null }, "2026-11")).toBeNull();
+  });
+
+  it("خارجَ أفق الجدول يُقال «خصّص له» بمبلغه المسجَّل — وداخلَه يراه الجدولُ بيومه فلا يتكرّر", () => {
+    /* نوفمبر: الأفقُ نوفمبر وديسمبر، وفبراير وراءه */
+    expect(scheduledAhead([semiRent], "2026-11")).toEqual([
+      { label: "الإيجار", category: "RENT", coveredThrough: "2027-01", dueMonth: "2027-02", estimateMinor: 47_500_00, dueDay: "2027-02-10", scheduled: true },
+    ]);
+    /* يناير: الأفقُ يناير وفبراير — الجدولُ يراه */
+    expect(scheduledAhead([semiRent], "2027-01")).toEqual([]);
+    /* الشهريُّ لا يدخل هنا أبداً */
+    expect(scheduledAhead([{ ...semiRent, cadence: "MONTHLY" }], "2026-11")).toEqual([]);
+  });
+
+  it("المجدولُ يحلّ محلّ ما اشتُقّ للباب نفسه من التوزيع — فلا يظهر الإيجارُ مرّتين", () => {
+    const derived = prepaidRenewals([{ kind: "SPREAD", category: "RENT", label: "إيجار — دفعةُ أغسطس", amountMinor: 47_500_00, fromMonth: "2026-08", toMonth: "2027-01" }], "2026-11");
+    expect(derived).toHaveLength(1);
+    const merged = mergePrepaid(derived, scheduledAhead([semiRent], "2026-11"));
+    expect(merged).toHaveLength(1);
+    expect(merged[0].scheduled).toBe(true);
+    /* وبابٌ آخر مشتقٌّ يبقى */
+    const other = { label: "ترخيص", category: "GOVERNMENT", coveredThrough: "2027-03", dueMonth: "2027-04", estimateMinor: 1_000_00 };
+    expect(mergePrepaid([...derived, other], scheduledAhead([semiRent], "2026-11")).map((p) => p.category)).toEqual(["RENT", "GOVERNMENT"]);
+  });
+
+  it("للمالية يُعرض أقربُ استحقاقٍ من اليوم ولو كان داخل الأفق — واليومُ نفسُه يُحسب، وما فات فالذي بعده", () => {
+    expect(scheduledDues([semiRent], "2026-11-01")).toMatchObject([{ dueMonth: "2027-02", dueDay: "2027-02-10", estimateMinor: 47_500_00 }]);
+    expect(scheduledDues([semiRent], "2027-02-10")[0].dueDay).toBe("2027-02-10");
+    expect(scheduledDues([semiRent], "2027-02-11")[0].dueDay).toBe("2027-08-10");
+    expect(nextDueFrom({ ...semiRent, endsOn: "2027-03-31" }, "2027-02-11")).toBeNull();
+  });
+
+  it("ما سُجّل لا يظهر مجدولاً إن لم يكن له بابٌ، ولا بمبلغٍ صفر", () => {
+    expect(scheduledAhead([{ ...semiRent, category: undefined }], "2026-11")).toEqual([]);
+    expect(scheduledAhead([{ ...semiRent, amountMinor: 0 }], "2026-11")).toEqual([]);
+  });
+});
+
+describe("semiannualSuggestions — يقترح الإيجار من آخر دفعة", () => {
+  const spread = { kind: "SPREAD", category: "RENT", label: "إيجار — دفعةُ أغسطس لستّة أشهر", amountMinor: 47_500_00, fromMonth: "2026-08", toMonth: "2027-01", bankTransactionId: "tx1" };
+  const run = (over: Partial<Parameters<typeof semiannualSuggestions>[0]> = {}) => semiannualSuggestions({
+    declarations: [spread], txDay: new Map([["tx1", "2026-08-10"]]), registeredCategories: new Set(), categoryLabel: () => "إيجار", today: "2026-11-01", ...over,
+  });
+
+  it("آخرُ دفعة ٤٧٬٥٠٠ في ١٠ أغسطس ← التالية ١٠ فبراير ٢٠٢٧", () => {
+    expect(run()).toEqual([{ category: "RENT", label: "إيجار", amountMinor: 47_500_00, cadence: "SEMIANNUAL", startsOn: "2026-08-10", nextDue: "2027-02-10" }]);
+  });
+
+  it("يومُ الاستحقاق نفسُه اليومَ يُحسب اليوم لا بعد ستّة أشهر", () => {
+    expect(run({ today: "2027-02-10" })[0].nextDue).toBe("2027-02-10");
+    expect(run({ today: "2027-02-11" })[0].nextDue).toBe("2027-08-10");
+  });
+
+  it("لا يُقترح لباب له متكرّرٌ فاعل، ولا لما مدّته غيرُ ستّة أشهر، ولا ما لا يُعرف يومُ دفعه", () => {
+    expect(run({ registeredCategories: new Set(["RENT"]) })).toEqual([]);
+    expect(run({ declarations: [{ ...spread, toMonth: "2026-12" }] })).toEqual([]);
+    expect(run({ declarations: [{ ...spread, bankTransactionId: null }] })).toEqual([]);
+    expect(run({ txDay: new Map() })).toEqual([]);
+    expect(run({ declarations: [{ ...spread, kind: "OFF_BOOK" }] })).toEqual([]);
+  });
+
+  it("الرواتبُ لا تُقترح هنا — يحملها المسيّر", () => {
+    expect(run({ declarations: [{ ...spread, category: "SALARY" }] })).toEqual([]);
+  });
+
+  it("الأحدثُ لكلّ باب: دفعةُ أغسطس تحلّ محلّ دفعة فبراير", () => {
+    const feb = { ...spread, fromMonth: "2026-02", toMonth: "2026-07", bankTransactionId: "tx0" };
+    const out = run({ declarations: [feb, spread], txDay: new Map([["tx0", "2026-02-10"], ["tx1", "2026-08-10"]]) });
+    expect(out).toHaveLength(1);
+    expect(out[0].startsOn).toBe("2026-08-10");
+  });
+});
+

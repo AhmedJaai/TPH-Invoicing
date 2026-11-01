@@ -11,10 +11,10 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import type { VatDue } from "@/lib/cash-outlook";
+import type { PrepaidRenewal, VatDue } from "@/lib/cash-outlook";
 import type { BalanceTotals } from "@/lib/supplier-balances";
 import { loadCashPosition } from "./briefing.service";
-import { loadVatDues } from "./cash-outlook.service";
+import { loadUpcomingDues, loadVatDues } from "./cash-outlook.service";
 import { loadBalanceTotals, loadOverdueBalances, type OverdueBalance } from "./supplier-balance.service";
 
 export interface TillRow {
@@ -37,6 +37,8 @@ export interface FinancePosition {
   bank: { balanceMinor: number | null; asOf: string | null };
   suppliers: { totals: BalanceTotals; overdue: OverdueBalance[]; top: { supplierId: string; slug: string | null; name: string; owedMinor: number }[] };
   vat: VatDue[];
+  /** دفعاتٌ كبيرة قادمة غيرُ شهريّة — الإيجارُ بموعده ومبلغه: المسجَّلُ منه، وإلّا تقديرٌ من آخر دفعة. */
+  upcoming: PrepaidRenewal[];
   /** ضريبةُ مبيعات فودكس للربع الجاري — شاهدٌ بجانب رقم الإقرار. */
   cash: {
     /** ما قبضه فودكس نقداً منذ أوّل يوم، وهذا الشهر. */
@@ -67,11 +69,12 @@ export async function loadTills(limit: number): Promise<TillRow[]> {
 }
 
 export async function loadFinancePosition(): Promise<FinancePosition> {
-  const [bank, balances, overdue, vat, cash, tillMonths, recent, names] = await Promise.all([
+  const [bank, balances, overdue, vat, upcoming, cash, tillMonths, recent, names] = await Promise.all([
     loadCashPosition(),
     loadBalanceTotals(),
     loadOverdueBalances(),
     loadVatDues(),
+    loadUpcomingDues(),
     db.execute<{ month: string; cash: string; first_day: string | null }>(sql`
       select substr(p.business_date, 1, 7) as month, sum(p.amount_minor)::bigint as cash,
              (select min(business_date) from foodics_orders) as first_day
@@ -105,6 +108,7 @@ export async function loadFinancePosition(): Promise<FinancePosition> {
         .map((r) => ({ supplierId: r.supplierId, slug: slugOf.get(r.supplierId) ?? null, name: nameOf.get(r.supplierId) ?? "مورّد", owedMinor: r.owedMinor })),
     },
     vat,
+    upcoming,
     cash: {
       totalMinor: months.reduce((s, m) => s + m.cashMinor, 0),
       monthMinor: months[months.length - 1]?.cashMinor ?? 0,

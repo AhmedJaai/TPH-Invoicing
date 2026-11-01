@@ -6,7 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { recurringExpenses } from "@/db/schema";
 import { isTxCategory } from "@/lib/bank/rules";
-import { asCadence } from "@/lib/cash-outlook";
+import { asCadence } from "@/lib/cadence";
 import { monthlyShare } from "@/lib/expenses";
 import {
   detectRecurring, noteKey, registeredFor, suggestionKey,

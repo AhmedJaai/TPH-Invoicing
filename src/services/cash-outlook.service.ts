@@ -3,11 +3,13 @@
  * `recurring_expenses`، والرصيدُ من آخر فترة تسويةٍ معروفة. والبناءُ في
  * `lib/cash-outlook.ts` الخالصة.
  */
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses, recurringExpenses } from "@/db/schema";
+import { asCadence } from "@/lib/cadence";
+import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import {
-  asCadence, buildCashOutlook, withoutPayrollDuplicates, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue, prepaidRenewals, type PrepaidRenewal,
+  buildCashOutlook, withoutPayrollDuplicates, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type PayrollDue, type RecurringInput, type SupplierDue, type VatDue, type WeekDue, prepaidRenewals, type PrepaidRenewal, scheduledAhead, scheduledDues, mergePrepaid, semiannualSuggestions, type RecurringSuggestion,
 } from "@/lib/cash-outlook";
 import { addMonths } from "@/lib/filing";
 import { payrollTotals, suggestedPayMonth } from "@/lib/payroll/calc";
@@ -44,6 +46,39 @@ export async function loadRecurringInputs(): Promise<RecurringInput[]> {
     endsOn: r.endsOn,
     category: r.category,
   }));
+}
+
+/**
+ * ما سيأتي من دفعاتٍ كبيرة غيرِ شهريّة (إيجارُ نصفِ سنة): المسجَّلُ في «المصروفات المتكررة» بيومه ومبلغه، وإلّا المشتقُّ من التوزيع
+ * تقديراً. للمالية («الوضع الآن»). والرواتبُ يحملها المسيّر فلا تُعرض هنا.
+ */
+export async function loadUpcomingDues(): Promise<PrepaidRenewal[]> {
+  const [declarations, recurring] = await Promise.all([loadDeclarations(), loadRecurringInputs()]);
+  const today = todayInRiyadh();
+  return mergePrepaid(
+    prepaidRenewals(declarations, today.slice(0, 7)).filter((p) => p.category !== "SALARY"),
+    scheduledDues(recurring.filter((r) => r.category !== "SALARY"), today),
+  );
+}
+
+/**
+ * دفعاتٌ مقدّمة معروفة (إيجارُ نصفِ سنة) يُقترح تسجيلُها متكرّرةً في الإعدادات — بآخر مبلغٍ دُفع ويومِه وموعد التالية.
+ * القراءةُ وحدها: يُسجَّل بضغطة صاحب الصلاحية على نموذج المصروفات المتكررة، لا من هنا.
+ */
+export async function loadRecurringSuggestions(): Promise<RecurringSuggestion[]> {
+  const [declarations, recurring] = await Promise.all([loadDeclarations(), loadRecurringInputs()]);
+  const ids = declarations.flatMap((d) => (d.kind === "SPREAD" && d.bankTransactionId ? [d.bankTransactionId] : []));
+  if (ids.length === 0) return [];
+  const { rows } = await db.execute<{ id: string; day: string }>(sql`
+    select id, to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day
+      from bank_transactions where id in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`);
+  return semiannualSuggestions({
+    declarations,
+    txDay: new Map(rows.map((r) => [r.id, r.day])),
+    registeredCategories: new Set(recurring.flatMap((r) => (r.category ? [r.category] : []))),
+    categoryLabel: (c) => (isTxCategory(c) ? CATEGORY_LABEL[c] : c),
+    today: todayInRiyadh(),
+  });
 }
 
 /**
@@ -185,7 +220,7 @@ export async function loadCashOutlook(opts: { withVat?: boolean; canSeePayroll?:
   /* ما أُخرج بطلب صاحبه يُسمّى — فلا يُظنّ أنّ الضريبةَ صفر */
   return {
     ...outlook, runMonth, thisMonth, vatOff: withVat ? [] : vat, floorMinor, breach: floorBreach(outlook.buckets, floorMinor),
-    prepaid: prepaidRenewals(declarations, thisMonth),
+    prepaid: mergePrepaid(prepaidRenewals(declarations, thisMonth), scheduledAhead(recurring, thisMonth)),
     inputs: { overdueRun: dues(overdue), nextRun: dues(next), recurring, paidThisMonth, vat, payroll, payrollHref: opts.canSeePayroll ?? false },
   };
 }

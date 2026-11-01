@@ -6,6 +6,9 @@ import { Plus, Repeat, RotateCcw } from "lucide-react";
 import { Money } from "./money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson } from "@/lib/http-client";
+import { type Cadence } from "@/lib/cadence";
+import { formatRiyals } from "@/lib/money";
+import { formatDay } from "@/lib/riyadh-time";
 import { buttonClass } from "./ui-tokens";
 import { ReadySubmit, toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
@@ -15,16 +18,17 @@ export interface ExpenseRow {
   label: string;
   category: TxCategory;
   amountMinor: number;
-  cadence: "MONTHLY" | "QUARTERLY" | "ANNUAL";
+  cadence: Cadence;
   monthlyMinor: number;
   /** أوّلُ استحقاق — منه يومُ الشهر في «النقد القادم»، وإلّا «يومٌ غير محدَّد». */
   startsOn: string | null;
 }
 
 const CATEGORIES: TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "ZAKAT", "OTHER"];
-const CADENCE_LABEL: Record<ExpenseRow["cadence"], string> = {
+const CADENCE_LABEL: Record<Cadence, string> = {
   MONTHLY: "شهري",
   QUARTERLY: "ربع سنوي",
+  SEMIANNUAL: "نصف سنوي",
   ANNUAL: "سنوي",
 };
 
@@ -37,20 +41,32 @@ const field = "min-h-11 w-full rounded-lg border border-line-input bg-raised px-
  * خفيفة. وأوّلُ استحقاقٍ اختياريّ: به يقع البندُ في «النقد القادم» في يومه.
  * والتعطيلُ لا حذف، ويُتراجَع عنه من الإشعار.
  */
+/** دفعةٌ مقدّمة معروفة من الكشف يُقترح تسجيلُها متكرّرةً — `RecurringSuggestion` بلا اعتمادٍ على الخادم. */
+export interface RecurringSuggestionRow {
+  category: TxCategory;
+  label: string;
+  amountMinor: number;
+  cadence: Cadence;
+  startsOn: string;
+  nextDue: string;
+}
+
 export function RecurringExpenses({
   rows,
   inactive = [],
   canEdit = true,
+  suggestions = [],
 }: {
   rows: ExpenseRow[];
   inactive?: ExpenseRow[];
   canEdit?: boolean;
+  suggestions?: RecurringSuggestionRow[];
 }) {
   const router = useRouter();
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<TxCategory>("RENT");
-  const [cadence, setCadence] = useState<ExpenseRow["cadence"]>("MONTHLY");
+  const [cadence, setCadence] = useState<Cadence>("MONTHLY");
   const [startsOn, setStartsOn] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +97,12 @@ export function RecurringExpenses({
     }
   }
 
+  /* ضغطةُ صاحب الصلاحية هي الإقرار: يُسجَّل بما في الكشف، والخادمُ يتحقّق من التاريخ والدورة كأيّ إضافة */
+  async function adopt(s: RecurringSuggestionRow) {
+    const ok = await send({ action: "create", label: s.label, amount: formatRiyals(s.amountMinor), category: s.category, cadence: s.cadence, startsOn: s.startsOn });
+    if (ok) toast({ tone: "ok", title: `سُجّل «${s.label}» كل ستة أشهر`, body: `الاستحقاق التالي ${formatDay(s.nextDue)}، ويظهر في «النقد القادم» وعند المستشار.` });
+  }
+
   async function deactivate(r: ExpenseRow) {
     const ok = await send({ action: "delete", id: r.id });
     if (ok) {
@@ -97,6 +119,19 @@ export function RecurringExpenses({
 
   return (
     <div className="space-y-3">
+      {canEdit && suggestions.map((s) => (
+        <div key={s.category} className="rounded-xl border border-accent-line bg-accent-soft p-4">
+          <p className="text-[13px] font-bold leading-relaxed">
+            <T s="{0}: آخر دفعة {1} في {2}. هل تُدفع كل ستة أشهر؟" a={[s.label, <Money key="1" minor={s.amountMinor} />, <bdi key="2">{formatDay(s.startsOn)}</bdi>]} />
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+            <T s="إن سجّلته فالاستحقاق التالي {0}: يظهر في «النقد القادم» قبل موعده، وعند المستشار، ويُسأل عنه في شهره فقط." a={[<bdi key="0">{formatDay(s.nextDue)}</bdi>]} />
+          </p>
+          <button type="button" onClick={() => void adopt(s)} disabled={busy} aria-busy={busy} className={`${buttonClass("primary", "sm")} mt-3`}>
+            <T s="{0}سجّله كل ستة أشهر" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} />
+          </button>
+        </div>
+      ))}
       {rows.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
           <ul className="divide-y divide-line-soft">
@@ -175,8 +210,8 @@ export function RecurringExpenses({
             </label>
             <label className="block text-xs">
               <span className="font-bold text-ink-soft">الدورة</span>
-              <select value={cadence} onChange={(e) => setCadence(e.target.value as ExpenseRow["cadence"])} className={`${field} mt-1.5`}>
-                {(Object.keys(CADENCE_LABEL) as ExpenseRow["cadence"][]).map((c) => (
+              <select value={cadence} onChange={(e) => setCadence(e.target.value as Cadence)} className={`${field} mt-1.5`}>
+                {(Object.keys(CADENCE_LABEL) as Cadence[]).map((c) => (
                   <option key={c} value={c}>{CADENCE_LABEL[c]}</option>
                 ))}
               </select>
@@ -190,12 +225,16 @@ export function RecurringExpenses({
               </select>
             </label>
             <label className="block text-xs sm:col-span-2 lg:col-span-2">
-              <span className="font-bold text-ink-soft"><T s="أول استحقاق {0}" a={[<span key="0" className="font-normal text-muted">(اختياري، ومنه يُعرف يوم الشهر)</span>]} /></span>
+              <span className="font-bold text-ink-soft">
+                {cadence === "MONTHLY"
+                  ? <T s="أول استحقاق {0}" a={[<span key="0" className="font-normal text-muted">(اختياري، ومنه يُعرف يوم الشهر)</span>]} />
+                  : <T s="تاريخ استحقاق {0}" a={[<span key="0" className="font-normal text-muted">(مطلوب: منه يُعرف الشهر الذي يقع فيه، ثم يتكرر كل دورة)</span>]} />}
+              </span>
               <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} dir="ltr" className={`${field} mt-1.5`} />
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <ReadySubmit ready={label.trim().length >= 2 && amount.trim() !== ""} busy={busy} size="sm" missing={label.trim().length < 2 ? "اكتب اسم المصروف (حرفان على الأقل)." : "اكتب المبلغ بالريال."}>
+            <ReadySubmit ready={label.trim().length >= 2 && amount.trim() !== "" && (cadence === "MONTHLY" || startsOn !== "")} busy={busy} size="sm" missing={label.trim().length < 2 ? "اكتب اسم المصروف (حرفان على الأقل)." : amount.trim() === "" ? "اكتب المبلغ بالريال." : "اكتب تاريخ الاستحقاق: بدونه لا يُعرف في أي شهر يقع."}>
               <T s="{0}أضف" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></ReadySubmit>
             {error && <p role="alert" className="text-xs font-bold text-danger">{error}</p>}
           </div>

@@ -17,13 +17,13 @@ import { parseRiyals } from "@/lib/money";
 import { recordAudit } from "@/lib/audit";
 import type { TxCategory } from "@/lib/bank/rules";
 import { isoDay } from "@/lib/riyadh-time";
+import { CADENCES } from "@/lib/cadence";
 
 export const runtime = "nodejs";
 
 const CATEGORIES: readonly TxCategory[] = [
   "SALARY", "RENT", "ZAKAT", "UTILITY", "GOVERNMENT", "PERSONAL", "OTHER",
 ];
-const CADENCES = ["MONTHLY", "QUARTERLY", "ANNUAL"] as const;
 
 const Body = z.object({
   action: z.enum(["create", "delete", "activate"]).optional(),
@@ -125,6 +125,11 @@ async function handle(request: Request) {
       return NextResponse.json({ error: "تاريخ أول استحقاق غير صالح" }, { status: 400 });
     }
     startsOn = body.startsOn;
+  }
+
+  /* غيرُ الشهريّ بلا تاريخٍ لا يقع في أيّ شهر، فيُسجَّل ثمّ لا يظهر في «النقد القادم» ولا يُسأل عنه: يُرفض بنصّ */
+  if (cadence !== "MONTHLY" && !startsOn) {
+    return NextResponse.json({ error: "اكتب تاريخ الاستحقاق: بدونه لا يُعرف في أي شهر يقع هذا المصروف" }, { status: 400 });
   }
 
   /* البابُ بعد التحقّق — يُثبَّت لأنّ التضييق لا يعبر إلى داخل المعاملة */

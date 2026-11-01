@@ -11,6 +11,7 @@ import { isSalaryRow, seesSalaries } from "@/lib/payroll/visibility";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { DeriveExpenses } from "@/components/derive-expenses";
 import { ManualExpense } from "@/components/manual-expense";
 import { activeRecurring, countUnrecordedBankExpenses } from "@/services/expense.service";
@@ -151,7 +152,14 @@ export default async function ExpensesPage({
   const suspects = suspectedSupplierExpenses(actual, supplierRows.map((s) => s.nameAr));
   const unmet = unmetRecurring(shownRecurring, actual, month);
   const actualTotal = totalActual(allActual, month);
-  const expectedTotal = totalExpected(recurring);
+  const expectedTotal = totalExpected(recurring, month);
+  /*
+    يُقارَن المتوقَّعُ بالفعليّ في **أبوابه** وحدها: من سجّل الإيجارَ وحده يرى ٧٬٩١٧ متوقَّعةً مقابل ٤٤٬٦١١ هي كلُّ ما صُرف
+    في الشهر، فيُقال «صرفتَ أكثر بـ٣٦٬٦٩٤» وليس كذلك — الباقي أبوابٌ لم يُتوقَّع منها شيء بعد.
+  */
+  const expectedCategories = new Set(recurring.map((r) => r.category));
+  const comparableActual = allActual.filter((e) => expectedCategories.has(e.category)).reduce((s, e) => s + e.amountMinor, 0);
+  const outsideExpected = actualTotal - comparableActual;
   const hiddenSalaryRows = allActual.length - actual.length;
 
   /* الأبوابُ في الشهر — من القيود نفسها التي تحتها، لا من استعلامٍ ثانٍ */
@@ -184,7 +192,7 @@ export default async function ExpensesPage({
       )}
 
       {/* ── رقمُ الشهر — والمقارنةُ حين يوجد ما يُقارَن به ── */}
-      {expectedTotal === 0 ? (
+      {recurring.length === 0 ? (
         /*
           بلا متوقَّعٍ مسجَّل تُعرَض بطاقةُ الفعليّ وحدها — «المتوقَّع ٠٫٠٠»
           تقول إنّ المقهى لا يتوقّع أن يصرف شيئاً، وذلك غير «لم يُسجَّل بعد».
@@ -208,18 +216,22 @@ export default async function ExpensesPage({
         </div>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-          <Hero label="المتوقع شهرياً" minor={expectedTotal} note={countNoun(recurring.length, ITEM)} />
           <Hero
-            label={`الفعلي في ${formatMonth(month)}`}
-            minor={actualTotal}
+            label={`المتوقع في ${formatMonth(month)}`}
+            minor={expectedTotal}
+            note={recurring.some((r) => r.cadence !== "MONTHLY") ? `${countNoun(recurring.length, ITEM)}، وغير الشهري في شهر استحقاقه فقط` : countNoun(recurring.length, ITEM)}
+          />
+          <Hero
+            label={`الفعلي في ${formatMonth(month)} في هذه الأبواب`}
+            minor={comparableActual}
             tone={incomplete ? "warn" : undefined}
-            note={incomplete ? `${countNoun(actual.length, ITEM)}، وينقصه ما لم يُسجَّل` : countNoun(actual.length, ITEM)}
+            note={outsideExpected > 0 ? `وصُرف خارج الأبواب المتوقعة ${formatRiyalsDisplay(outsideExpected)} ريال` : incomplete ? `${countNoun(actual.length, ITEM)}، وينقصه ما لم يُسجَّل` : countNoun(actual.length, ITEM)}
           />
           <Hero
             label="الفرق"
-            minor={actualTotal - expectedTotal}
-            tone={actualTotal > expectedTotal ? "warn" : "ok"}
-            note={incomplete ? "المصروف الفعلي ناقص، فالفرق مؤقت" : actualTotal > expectedTotal ? "صرفت أكثر من المتوقع" : "صرفت أقل من المتوقع"}
+            minor={comparableActual - expectedTotal}
+            tone={comparableActual > expectedTotal ? "warn" : "ok"}
+            note={incomplete ? "المصروف الفعلي ناقص، فالفرق مؤقت" : comparableActual === expectedTotal ? "مطابق للمتوقع" : comparableActual > expectedTotal ? "صرفت أكثر من المتوقع" : "صرفت أقل من المتوقع"}
           />
         </div>
       )}

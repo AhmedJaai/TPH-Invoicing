@@ -234,6 +234,54 @@ describe("expectedVsActual", () => {
   });
 });
 
+describe("المتوقَّع في شهرٍ بعينه — غيرُ الشهريّ في شهر استحقاقه", () => {
+  const semi = rec({ id: "rent", amountMinor: 47_500_00, cadence: "SEMIANNUAL", startsOn: "2026-08-10" });
+  const water = rec({ id: "w", category: "UTILITY", amountMinor: 300_00 });
+
+  it("الإيجارُ نصفُ السنوي كاملاً في أغسطس وفبراير وصفراً بينهما", () => {
+    const at = (m: string) => totalExpected([semi, water], m);
+    expect(at("2026-08")).toBe(47_800_00);
+    expect(at("2026-10")).toBe(300_00);
+    expect(at("2027-02")).toBe(47_800_00);
+  });
+
+  it("وبلا شهر: الحصصُ الشهرية كما كانت", () => {
+    expect(totalExpected([semi, water])).toBe(791_667 + 300_00);
+  });
+
+  it("وبلا تاريخٍ يُعرف به شهرُه يبقى حصّةَ الشهر", () => {
+    expect(totalExpected([{ ...semi, startsOn: null }], "2026-10")).toBe(791_667);
+  });
+
+  it("والمقارنةُ بالفعليّ بابٌ بابٌ تتبع ذلك: دُفع الإيجارُ في أغسطس فلا فرق، ولا يُقال «أقلّ» في أكتوبر", () => {
+    const aug = expectedVsActual([semi], [exp({ id: "e", periodMonth: "2026-08", amountMinor: 47_500_00 })], "2026-08");
+    expect(aug[0]).toMatchObject({ expectedMinor: 47_500_00, actualMinor: 47_500_00, varianceMinor: 0 });
+    expect(expectedVsActual([semi], [], "2026-10")).toEqual([expect.objectContaining({ expectedMinor: 0, varianceMinor: 0 })]);
+  });
+});
+
+describe("unmetRecurring — النصفُ سنويّ لا يُسأل عنه إلا في شهره", () => {
+  const semi = rec({ id: "rent", amountMinor: 47_500_00, cadence: "SEMIANNUAL", startsOn: "2026-08-10" });
+
+  it("في شهر استحقاقه يُقال «لم يُدفع»، وفي الأشهر الخمسة بينهما لا", () => {
+    expect(unmetRecurring([semi], [], "2027-02").map((r) => r.id)).toEqual(["rent"]);
+    for (const m of ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-03"]) expect(unmetRecurring([semi], [], m)).toEqual([]);
+  });
+
+  it("وإن دُفع في شهره بمبلغ حصّة الشهر فأكثر عُدّ مدفوعاً", () => {
+    expect(unmetRecurring([semi], [exp({ id: "e", periodMonth: "2027-02", amountMinor: 47_500_00 })], "2027-02")).toEqual([]);
+  });
+
+  it("وبلا تاريخٍ لا يُسأل عنه في شهرٍ مخترَع، أما الشهريُّ فيُسأل عنه كلَّ شهر", () => {
+    expect(unmetRecurring([{ ...semi, startsOn: null }], [], "2027-02")).toEqual([]);
+    expect(unmetRecurring([rec({ id: "m" })], [], "2027-02")).toHaveLength(1);
+  });
+
+  it("حصّةُ الشهر منه سدسُ المبلغ", () => {
+    expect(monthlyShare(semi)).toBe(791_667);
+  });
+});
+
 describe("unmetRecurring", () => {
   it("تكشف الإيجار الذي لم يدفع", () => {
     const out = unmetRecurring([rec({ id: "rent" })], [], "2026-09");

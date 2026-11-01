@@ -23,13 +23,8 @@ import { formatDay, formatMonth, addDays, daysInMonth } from "./riyadh-time";
 import { MAX_AMOUNT_MINOR, formatRiyalsDisplay } from "./money";
 import { addMonths, monthsBetween } from "./filing";
 import { EMPLOYEE, countNoun } from "./arabic";
+import { CADENCE_MONTHS, type Cadence } from "./cadence";
 
-export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
-
-/** دورةُ المصروف من نصّ القاعدة — وما ليس ربعيّاً ولا سنويّاً شهريّ، كما يكتبه النموذج. */
-export function asCadence(v: string): Cadence {
-  return v === "QUARTERLY" || v === "ANNUAL" ? v : "MONTHLY";
-}
 
 export interface RecurringInput {
   id: string;
@@ -153,8 +148,8 @@ export interface CashOutlook {
 
 /**
  * أيقع المصروفُ المتكرّر في هذا الشهر؟ ويومُه إن عُرف.
- * الشهريّ كلَّ شهر، والربعيّ كلَّ ثلاثة من شهر بدئه، والسنويّ في شهر بدئه.
- * وبلا تاريخ بدءٍ لا يُعرف شهرُ الربعيّ والسنويّ — فلا يُوضَع في شهرٍ مخترَع.
+ * الشهريّ كلَّ شهر، والربعيّ كلَّ ثلاثة من شهر بدئه، والنصفُ سنويّ (الإيجار) كلَّ ستّة، والسنويّ في شهر بدئه.
+ * وبلا تاريخ بدءٍ لا يُعرف شهرُ غير الشهريّ — فلا يُوضَع في شهرٍ مخترَع.
  */
 export function occursIn(r: RecurringInput, month: string): { occurs: boolean; day: number | null } {
   const start = r.startsOn?.slice(0, 7) ?? null;
@@ -165,8 +160,7 @@ export function occursIn(r: RecurringInput, month: string): { occurs: boolean; d
   if (r.cadence === "MONTHLY") return { occurs: true, day };
   if (!start) return { occurs: false, day: null };
   const gap = monthsBetween(start, month);
-  const period = r.cadence === "QUARTERLY" ? 3 : 12;
-  return { occurs: gap >= 0 && gap % period === 0, day };
+  return { occurs: gap >= 0 && gap % CADENCE_MONTHS[r.cadence] === 0, day };
 }
 
 /** متكرّرٌ بباب «راتب» والمسيّرُ يحمل الرواتب: يُترك، وإلّا طُرحت الرواتبُ مرّتين */
@@ -516,8 +510,12 @@ export interface PrepaidRenewal {
   coveredThrough: string;
   /** الشهرُ المتوقَّعُ للدفعة التالية. */
   dueMonth: string;
-  /** بمبلغ السابقة — تقديرٌ يُقال إنّه تقدير. */
+  /** بمبلغ السابقة — تقديرٌ يُقال إنّه تقدير، إلّا إن كان `scheduled`. */
   estimateMinor: number;
+  /** اليومُ المعروف للاستحقاق (`YYYY-MM-DD`) — حين يكون مجدولاً في «المصروفات المتكررة». */
+  dueDay?: string;
+  /** سجّله صاحبُه في الإعدادات (دورةً وتاريخاً ومبلغاً) فليس تقديراً من دفعةٍ سابقة. */
+  scheduled?: boolean;
 }
 
 export function prepaidRenewals(
@@ -534,4 +532,106 @@ export function prepaidRenewals(
   return [...latest.values()].map((d) => ({
     label: d.label, category: d.category, coveredThrough: d.toMonth, dueMonth: addMonths(d.toMonth, 1), estimateMinor: d.amountMinor,
   })).sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
+}
+
+/** أوّلُ استحقاقٍ لمتكرّر غير شهريّ في `fromMonth` أو بعده — `null` إن لم يُعرف شهرُه أو انتهت مدّتُه. */
+export function nextOccurrence(r: RecurringInput, fromMonth: string, lookaheadMonths = 24): { month: string; day: string | null } | null {
+  for (let i = 0; i <= lookaheadMonths; i++) {
+    const month = addMonths(fromMonth, i);
+    const o = occursIn(r, month);
+    if (o.occurs) {
+      /* اليومُ يُقصّ إلى آخر الشهر: ٣١ في شهرٍ من ثلاثين يقع في آخره */
+      const day = o.day === null ? null : `${month}-${String(Math.min(o.day, daysInMonth(month))).padStart(2, "0")}`;
+      return { month, day };
+    }
+    if (r.endsOn && month > r.endsOn.slice(0, 7)) return null;
+  }
+  return null;
+}
+
+/** استحقاقُ متكرّر غير شهريّ من اليوم فصاعداً — اليومُ نفسُه يُحسب، وما فات يومُه هذا الشهر فالذي بعده. */
+export function nextDueFrom(r: RecurringInput, today: string): { month: string; day: string | null } | null {
+  const next = nextOccurrence(r, today.slice(0, 7));
+  if (next && next.day !== null && next.day < today) return nextOccurrence(r, addMonths(next.month, 1));
+  return next;
+}
+
+/**
+ * ما سجّله صاحبُه في «المصروفات المتكررة» غيرَ شهريّ (الإيجار نصفُ سنوي): أقربُ استحقاقٍ له بيومه **ومبلغِه المسجَّل**
+ * لا بتقدير دفعةٍ سابقة. وحيث يُعرض «ما سيأتي» (الوضع الآن · خصّص له) يُعرض هو.
+ */
+export function scheduledDues(recurring: readonly RecurringInput[], today: string): PrepaidRenewal[] {
+  const out: PrepaidRenewal[] = [];
+  for (const r of recurring) {
+    if (r.cadence === "MONTHLY" || r.amountMinor <= 0 || !r.category) continue;
+    const next = nextDueFrom(r, today);
+    if (!next) continue;
+    out.push({
+      label: r.label, category: r.category, coveredThrough: addMonths(next.month, -1), dueMonth: next.month,
+      estimateMinor: r.amountMinor, dueDay: next.day ?? undefined, scheduled: true,
+    });
+  }
+  return out.sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
+}
+
+/**
+ * منها ما يقع بعد أفق «النقد القادم»: يُقال «خصّص له» ولا يُطرح من الرصيد (كالضريبة بعد الأفق). وما داخل الأفق يراه الجدولُ
+ * بيومه فلا يتكرّر هنا. ويحلّ محلّ ما اشتُقّ للباب نفسِه من التوزيع (`prepaidRenewals`) فلا يظهر الإيجارُ مرّتين.
+ */
+export function scheduledAhead(recurring: readonly RecurringInput[], thisMonth: string): PrepaidRenewal[] {
+  const horizonEnd = addMonths(thisMonth, 1);
+  return scheduledDues(recurring, `${thisMonth}-01`).filter((d) => d.dueMonth > horizonEnd);
+}
+
+/** المجدولُ يسبق المشتقَّ للباب نفسه، ثمّ يُرتَّب بالموعد. */
+export function mergePrepaid(derived: readonly PrepaidRenewal[], scheduled: readonly PrepaidRenewal[]): PrepaidRenewal[] {
+  const covered = new Set(scheduled.map((s) => s.category));
+  return [...scheduled, ...derived.filter((d) => !covered.has(d.category))].sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
+}
+
+/** اقتراحٌ لتسجيل دفعةٍ مقدّمة معروفة متكرّرةً: آخرُ دفعة ومبلغُها ويومُها ثمّ موعدُ التالية. */
+export interface RecurringSuggestion {
+  category: string;
+  label: string;
+  amountMinor: number;
+  cadence: "SEMIANNUAL";
+  /** يومُ آخر دفعة — منه يُعرف الشهرُ واليوم، ثمّ يتكرّر كلَّ ستّة أشهر. */
+  startsOn: string;
+  /** أوّلُ استحقاقٍ من اليوم فصاعداً. */
+  nextDue: string;
+}
+
+/** أبوابُ الإعدادات القابلة للتسجيل متكرّرةً — كما في نموذج «المصروفات المتكررة». */
+const SUGGESTIBLE = new Set(["RENT", "UTILITY", "GOVERNMENT", "ZAKAT", "OTHER"]);
+
+/**
+ * دفعةٌ توزَّعت على ستّة أشهرٍ بالضبط (`SPREAD`) ويُعرف يومُ دفعها من حركة بنكها: هذا إيجارُ نصفٍ سنوي (أحمد، ١ نوفمبر ٢٠٢٦:
+ * «اضف الايجار نصف سنوية وانت تعرف موعد الاستحقاق التالي»). فيُقترَح تسجيلُه بمبلغ آخر دفعةٍ ويومها، والموعدُ التالي منهما.
+ * لا يُقترح لبابٍ له متكرّرٌ فاعل، ولا ما لا يُعرف يومُ دفعه، ولا ما مدّتُه غيرُ ستّة أشهر.
+ */
+export function semiannualSuggestions(input: {
+  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string; bankTransactionId: string | null }[];
+  /** يومُ كلّ حركةِ بنك (`YYYY-MM-DD`) بمعرّفها. */
+  txDay: ReadonlyMap<string, string>;
+  registeredCategories: ReadonlySet<string>;
+  categoryLabel: (category: string) => string;
+  today: string;
+}): RecurringSuggestion[] {
+  const latest = new Map<string, { d: (typeof input.declarations)[number]; day: string }>();
+  for (const d of input.declarations) {
+    if (d.kind !== "SPREAD" || d.amountMinor <= 0 || !d.bankTransactionId || !SUGGESTIBLE.has(d.category)) continue;
+    if (input.registeredCategories.has(d.category)) continue;
+    if (monthsBetween(d.fromMonth, d.toMonth) + 1 !== 6) continue;
+    const day = input.txDay.get(d.bankTransactionId);
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const prev = latest.get(d.category);
+    if (!prev || day > prev.day) latest.set(d.category, { d, day });
+  }
+  const out: RecurringSuggestion[] = [];
+  for (const { d, day } of latest.values()) {
+    const due = nextDueFrom({ id: "", label: "", amountMinor: d.amountMinor, cadence: "SEMIANNUAL", startsOn: day, endsOn: null }, input.today)?.day;
+    if (!due) continue;
+    out.push({ category: d.category, label: input.categoryLabel(d.category), amountMinor: d.amountMinor, cadence: "SEMIANNUAL", startsOn: day, nextDue: due });
+  }
+  return out.sort((a, b) => a.nextDue.localeCompare(b.nextDue));
 }
