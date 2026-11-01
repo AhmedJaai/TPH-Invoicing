@@ -36,8 +36,9 @@ export function applyEdits(x: ExtractionResult, e: ReviewEdits): ExtractionResul
   if (e.discount !== undefined && clean(e.discount) !== clean(x.discountAmount ?? "")) {
     const read = settlePreVatDiscount(x);
     const gross = read.discount?.grossMinor ?? parseRiyals(x.subtotalAmount);
-    const typed = parseRiyals(clean(e.discount) || "0") ?? 0;
-    if (gross !== null && typed >= 0 && typed < gross) {
+    /* ما لا يُقرأ رقماً لا يُقرأ «لا خصم» — كان يُمحى به الخصمُ المقروء ويعود الوعاءُ قبله */
+    const typed = parseRiyals(clean(e.discount) || "0");
+    if (gross !== null && typed !== null && typed >= 0 && typed < gross) {
       out.discountAmount = typed > 0 ? formatRiyals(typed) : "";
       out.subtotalAmount = formatRiyals(gross - typed);
     }

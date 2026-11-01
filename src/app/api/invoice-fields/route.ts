@@ -53,11 +53,18 @@ const Body = z.object({
   supplierId: z.string().trim().min(1).max(64).optional(),
 }).strict();
 
-/** ما لا يُقرأ رقماً يُترَك على حاله ولا يُكتَب صفراً. */
-function amount(v: string | null | undefined): number | null | undefined {
+/**
+ * غيابُه «اتركه»، والفراغُ «امحُه» (`null`، لا صفر)، وما لا يُقرأ رقماً يُرفض باسم حقله.
+ * كان يُترَك على حاله ويُردّ «حُفظ» — فيظنّ صاحبُه أنّ الإجماليَّ صُحّح ولم يُصحَّح.
+ */
+class UnreadableAmount extends Error {}
+const FIELD_LABEL = { subtotal: "المبلغ قبل الضريبة", vat: "الضريبة", total: "الإجمالي", discount: "الخصم", charges: "الرسوم" } as const;
+function amount(field: keyof typeof FIELD_LABEL, v: string | null | undefined): number | null | undefined {
   if (v === undefined) return undefined;
   if (v === null || v.trim() === "") return null;
-  return parseRiyals(v) ?? undefined;
+  const minor = parseRiyals(v);
+  if (minor === null) throw new UnreadableAmount(`تعذّرت قراءة «${FIELD_LABEL[field]}»: ${v.slice(0, 30)}. اكتبه رقماً بالريال، مثل 1250.50`);
+  return minor;
 }
 
 export async function POST(request: Request) {
@@ -87,11 +94,11 @@ export async function POST(request: Request) {
       invoiceNumber: b.invoiceNumber,
       sellerVat: b.sellerVat,
       buyerVat: b.buyerVat,
-      subtotalMinor: amount(b.subtotal),
-      vatMinor: amount(b.vat),
-      totalMinor: amount(b.total),
-      discountMinor: amount(b.discount),
-      chargesMinor: amount(b.charges),
+      subtotalMinor: amount("subtotal", b.subtotal),
+      vatMinor: amount("vat", b.vat),
+      totalMinor: amount("total", b.total),
+      discountMinor: amount("discount", b.discount),
+      chargesMinor: amount("charges", b.charges),
       invoiceDate: b.invoiceDate,
       supplierId: b.supplierId,
     }, user.id));
@@ -104,6 +111,7 @@ export async function POST(request: Request) {
       findings: out.review.findings.map((f) => ({ code: f.code, severity: f.severity, message: f.message })),
     });
   } catch (e) {
+    if (e instanceof UnreadableAmount) return NextResponse.json({ error: e.message }, { status: 400 });
     if (e instanceof InvoiceCorrectionRefused) return NextResponse.json({ error: e.message }, { status: e.status });
     if (e instanceof MonthClosedError) return NextResponse.json({ error: e.message }, { status: 409 });
     const mapped = respondTo(e);

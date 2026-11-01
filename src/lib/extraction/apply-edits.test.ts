@@ -35,6 +35,13 @@ describe("الحكمُ بعد تعديل الإنسان", () => {
     expect(judge(x).proposedFileName).toBe("2026-09-30_OliveLeaves_Statement_SAR2490.00.pdf");
   });
 
+  it("خصمٌ كُتب بما لا يُقرأ رقماً لا يمحو الخصمَ المقروء ولا يرفع الوعاء", () => {
+    const inv = { ...statement, documentKind: "TAX_INVOICE", subtotalAmount: "90.00", discountAmount: "10.00", vatAmount: "13.50", totalAmount: "103.50" } as unknown as ExtractionResult;
+    const x = applyEdits(inv, { discount: "عشرة" });
+    expect(x.discountAmount).toBe("10.00");
+    expect(x.subtotalAmount).toBe("90.00");
+  });
+
   it("وما لم يتغيّر لا تُرفع ثقتُه", () => {
     expect(applyEdits(statement, { invoiceNumber: "", total: "" }).confidence.amounts).toBe(0.2);
   });
