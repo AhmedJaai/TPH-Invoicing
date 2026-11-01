@@ -26,8 +26,9 @@ import { computeConsumption, type SoldLineInput } from "@/lib/inventory/consumpt
 import { varianceCostMinor } from "@/lib/inventory/purchases";
 import { indexRecipeVersions, type RecipeVersionInput } from "@/lib/inventory/recipe";
 import { toCanonical } from "@/lib/inventory/units";
+import { assertMonthsOpen } from "./month-guard";
 import {
-  buildPnl, isTaxSettlement, ownerPaidDeduction, RECOVERABLE_VAT, spreadShare,
+  buildPnl, isTaxSettlement, monthsBetween, ownerPaidDeduction, RECOVERABLE_VAT, spreadShare,
   type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs,
 } from "@/lib/finance/pnl";
 import { suspectCountJump } from "@/lib/finance/stock-flow";
@@ -44,7 +45,7 @@ import { loadRecipeVersions } from "./recipe.service";
 import { payrollReclass } from "./payroll.service";
 import { loadCountDays } from "./stock-flow.service";
 import { coverageOf } from "./vat-return.service";
-import type { Conn } from "./types";
+import type { Conn, Tx } from "./types";
 
 /* ─────────────────────────── الإيراد ─────────────────────────── */
 
@@ -694,12 +695,17 @@ export interface NewDeclaration {
 /** أشهرُ توزيعٍ فوق هذا خطأُ إدخالٍ على الأرجح. */
 export const MAX_DECLARATION_MONTHS = 36;
 
-export async function createDeclaration(input: NewDeclaration, actorId: string): Promise<string> {
+export async function createDeclaration(input: NewDeclaration, actorId: string, conn?: Tx): Promise<string> {
   if (input.fromMonth > input.toMonth) throw new DeclarationRefused("الشهر الأخير قبل الشهر الأول.");
   const [fy, fm] = input.fromMonth.split("-").map(Number);
   const [ty, tm] = input.toMonth.split("-").map(Number);
   if ((ty - fy) * 12 + (tm - fm) + 1 > MAX_DECLARATION_MONTHS) throw new DeclarationRefused(`المدة أطول من ${MAX_DECLARATION_MONTHS} شهراً. راجع الشهرين.`);
-  return db.transaction(async (t) => {
+  const run = async (t: Tx): Promise<string> => {
+    /*
+      ما يُضاف يغيّر قائمةَ دخل كلّ شهرٍ يغطّيه — فالشهرُ المقفل لا يُكتب فيه من هذا الباب أيضاً.
+      كان يُضاف نقدٌ أو توزيعٌ على سبتمبر المقفل فيتغيّر ربحُه بعد ختمه، ويقول فحصُ الصباح «خالف المختوم».
+    */
+    await assertMonthsOpen(t, monthsBetween(input.fromMonth, input.toMonth));
     let amountMinor = input.amountMinor;
     const label = input.label.trim();
     if (input.kind === "SPREAD") {
@@ -734,17 +740,24 @@ export async function createDeclaration(input: NewDeclaration, actorId: string):
       before: null, after: { kind: input.kind, category: input.category, label, amountMinor, fromMonth: input.fromMonth, toMonth: input.toMonth },
     }, t);
     return row.id;
-  });
+  };
+  return conn ? run(conn) : db.transaction(run);
 }
 
 /** يُسحَب ولا يُحذَف — وسحبُه مرّتين لا يكتب. */
-export async function voidDeclaration(id: string, actorId: string): Promise<boolean> {
-  return db.transaction(async (t) => {
+export async function voidDeclaration(id: string, actorId: string, conn?: Tx): Promise<boolean> {
+  const run = async (t: Tx): Promise<boolean> => {
+    /* والسحبُ كذلك: يعيد أشهرَه إلى ما في الكشف — فلا يقع على شهرٍ مقفل */
+    const [d] = await t.select({ fromMonth: financeDeclarations.fromMonth, toMonth: financeDeclarations.toMonth })
+      .from(financeDeclarations).where(and(eq(financeDeclarations.id, id), isNull(financeDeclarations.voidedAt))).for("update");
+    if (!d) return false;
+    await assertMonthsOpen(t, monthsBetween(d.fromMonth, d.toMonth));
     const done = await t.update(financeDeclarations).set({ voidedAt: new Date(), voidedById: actorId })
       .where(and(eq(financeDeclarations.id, id), isNull(financeDeclarations.voidedAt)))
       .returning({ label: financeDeclarations.label, amountMinor: financeDeclarations.amountMinor });
     if (done.length === 0) return false;
     await recordAudit({ actorId, action: "FINANCE_DECLARATION_VOIDED", entityType: "finance_declaration", entityId: id, before: done[0], after: null }, t);
     return true;
-  });
+  };
+  return conn ? run(conn) : db.transaction(run);
 }

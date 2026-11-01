@@ -143,6 +143,7 @@
 | `093_foodics_kitchen_times.sql` | `foodics_orders.kitchen_received_at` · `kitchen_done_at` (وقتا شاشة التحضير) · `wasted_lines` (أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت) — مرآةٌ لا مال، والفارغ «لم يُقرأ» |
 | `094_advisor.sql` | `advisor_threads` · `advisor_messages` · `advisor_plan_items` — محادثاتُ المستشار وخطّتُه؛ نصٌّ لا مال، والأرقامُ تُحسَب من الدفاتر لحظةَ السؤال |
 | `095_advisor_jobs.sql` | `advisor_messages.status` (`PENDING`·`DONE`·`FAILED`) · `steps` · `error` — الجوابُ يُكمَل في الخلفية ولو أُغلقت الصفحة |
+| `096_declaration_month_lock.sql` | مؤثِّرُ `finance_declarations`: «ما لا يظهر في الكشف» لا يُضاف ولا يُسحب على شهرٍ مقفل في مدّته — كما ٠٢٨ للفاتورة والمصروف |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
