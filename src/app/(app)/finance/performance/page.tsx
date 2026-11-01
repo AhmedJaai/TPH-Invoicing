@@ -11,6 +11,7 @@ import { BENCHMARKS, formatDuration, formatShare, verdictOf, type Benchmark, typ
 import { ORDER, countNoun } from "@/lib/arabic";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadPerformance } from "@/services/performance.service";
+import { loadCashCustody } from "@/services/app-settings.service";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +24,22 @@ const VERDICT: Record<Verdict, { label: string; tone: Tone }> = {
 };
 
 /** ما يُقال تحت رقمٍ أحسنَ من المعتاد بكثير — في الغالب ما غاب عن الدفاتر لا ما تحقّق. */
-const SUSPECT_WHY: Partial<Record<Benchmark["key"], string>> = {
-  netMargin: "هامشٌ بهذا العلوّ نادر في المقاهي، فتحقّق قبل أن تبني عليه: الفواتير التي لم تُرفع، والمصروفات المدفوعة من خارج الحساب، وعملك أنت بلا راتب.",
-  labour: "رواتبٌ بهذا الانخفاض تعني غالباً أنّ بعضها لم يُسجَّل: موظفون لم يُضافوا إلى المسيّر، أو رواتب دُفعت من خارج الحساب، أو عملك أنت بلا راتب.",
+/*
+  ما يُشكّ فيه بجواب المالك عن نقد الصندوق (`cash_custody`): «عندي ولم يُصرف» يُخرجه من المشتبه،
+  وإلّا فهو أوّلُه — كانت الجملةُ ثابتةً على جوابٍ واحد فتسكت عنه إن تغيّر.
+*/
+function suspectWhy(cashHeld: boolean): Partial<Record<Benchmark["key"], string>> {
+  return {
+    netMargin: cashHeld
+      ? "هامشٌ بهذا العلوّ نادر في المقاهي، فتحقّق قبل أن تبني عليه: الفواتير التي لم تُرفع، والمصروفات المدفوعة من خارج الحساب، وعملك أنت بلا راتب."
+      : "هامشٌ بهذا العلوّ نادر في المقاهي، فتحقّق قبل أن تبني عليه: ما دُفع من نقد الصندوق (رواتب أو مشتريات) لا يظهر تكلفةً لأنه لم يمرّ بالبنك، والفواتير التي لم تُرفع، وعملك أنت بلا راتب.",
+    labour: cashHeld
+      ? "رواتبٌ بهذا الانخفاض تعني غالباً أنّ بعضها لم يُسجَّل: موظفون لم يُضافوا إلى المسيّر، أو رواتب دُفعت من خارج الحساب، أو عملك أنت بلا راتب."
+      : "رواتبٌ بهذا الانخفاض تعني غالباً أنّ بعضها لم يُسجَّل: نقدٌ من الصندوق، أو موظفون لم يُضافوا إلى المسيّر، أو عملك أنت بلا راتب.",
+    ...SUSPECT_WHY_FIXED,
+  };
+}
+const SUSPECT_WHY_FIXED: Partial<Record<Benchmark["key"], string>> = {
   cogs: "تكلفةٌ بهذا الانخفاض تعني غالباً مشتريات لم تُرفع فواتيرها، أو جرداً لم يكتمل.",
   prime: "تكلفةٌ أساسية بهذا الانخفاض تعني غالباً رواتب أو مشتريات غائبة عن الدفاتر.",
   rent: "إيجارٌ بهذا الانخفاض يعني غالباً أنّه لم يُسجَّل لكل الأشهر.",
@@ -59,7 +73,7 @@ const monthColumns: Column<MonthKpi>[] = [
   { key: "margin", header: "الهامش", numeric: true, cell: (m) => ratio(m.netMarginBp) },
 ];
 
-function BenchmarkCard({ b, value, display }: { b: Benchmark; value: number | null; display: string }) {
+function BenchmarkCard({ b, value, display, why }: { b: Benchmark; value: number | null; display: string; why: Partial<Record<Benchmark["key"], string>> }) {
   const v = verdictOf(value, b);
   /* شريطُ النطاق: المعتادُ مظلَّلٌ في وسطه، والرقمُ علامةٌ عليه — بلا رقمٍ لا علامة */
   const span = b.high * 2;
@@ -75,7 +89,7 @@ function BenchmarkCard({ b, value, display }: { b: Benchmark; value: number | nu
         <div className="absolute inset-y-0 rounded-full bg-accent-soft" style={{ insetInlineStart: `${(b.low / span) * 100}%`, width: `${((b.high - b.low) / span) * 100}%` }} />
         {at !== null && <div className="absolute -top-1 h-4 w-1 rounded-full bg-ink" style={{ insetInlineStart: `calc(${at}% - 2px)` }} />}
       </div>
-      {v === "SUSPECT" && SUSPECT_WHY[b.key] && <p className="mt-3 text-[11px] font-bold leading-relaxed text-warn">{SUSPECT_WHY[b.key]}</p>}
+      {v === "SUSPECT" && why[b.key] && <p className="mt-3 text-[11px] font-bold leading-relaxed text-warn">{why[b.key]}</p>}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">{b.note}.</p>
     </Card>
   );
@@ -94,7 +108,8 @@ export default async function PerformancePage() {
   if (!can(user.role, "amounts:view")) {
     return <PageShell user={user} title="الأداء"><NoAccess what="أداء المقهى" /></PageShell>;
   }
-  const perf = await loadPerformance({ canSeePayroll: can(user.role, "payroll:view") });
+  const [perf, custody] = await Promise.all([loadPerformance({ canSeePayroll: can(user.role, "payroll:view") }), loadCashCustody()]);
+  const why = suspectWhy(custody.value === "OWNER_HOLDS");
   const k = perf.latest;
   const prev = k ? perf.months.filter((m) => m.month < k.month && !m.open).at(-1) ?? null : null;
   const s30 = perf.speed.last30.speed;
@@ -138,12 +153,12 @@ export default async function PerformancePage() {
 
       <Section title="أين أنت من المعتاد" icon={Gauge} hint="المعتاد نطاق عام في مقاهي القهوة المختصة يتداوله أهل الصناعة، لا رقم من دفاترك ولا معيار نظامي. يختلف كل مقهى بموقعه وحجمه.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <BenchmarkCard b={BENCHMARKS.cogs} value={k.cogsBp} display={formatShare(k.cogsBp)} />
-          <BenchmarkCard b={BENCHMARKS.labour} value={k.labourBp} display={formatShare(k.labourBp)} />
-          <BenchmarkCard b={BENCHMARKS.prime} value={k.primeBp} display={formatShare(k.primeBp)} />
-          <BenchmarkCard b={BENCHMARKS.rent} value={k.rentBp} display={formatShare(k.rentBp)} />
-          <BenchmarkCard b={BENCHMARKS.netMargin} value={k.netMarginBp} display={formatShare(k.netMarginBp)} />
-          <BenchmarkCard b={BENCHMARKS.prepMedian} value={s30.medianSec} display={s30.medianSec === null ? "غير معروف" : formatDuration(s30.medianSec)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.cogs} value={k.cogsBp} display={formatShare(k.cogsBp)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.labour} value={k.labourBp} display={formatShare(k.labourBp)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.prime} value={k.primeBp} display={formatShare(k.primeBp)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.rent} value={k.rentBp} display={formatShare(k.rentBp)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.netMargin} value={k.netMarginBp} display={formatShare(k.netMarginBp)} />
+          <BenchmarkCard why={why} b={BENCHMARKS.prepMedian} value={s30.medianSec} display={s30.medianSec === null ? "غير معروف" : formatDuration(s30.medianSec)} />
         </div>
       </Section>
 
