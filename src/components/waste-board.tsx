@@ -67,19 +67,25 @@ export async function WasteBoardSection() {
             </div>
           </Card>
           <Card>
-            <p className="text-xs font-bold text-muted">أكثر الأصناف هدراً</p>
-            {b.topProducts.length === 0 ? (
-              <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف: لا سعر وحدة لأي صنف من الأصناف المهدرة. سيُعرف بعد أول جرد تُربط فيه مشترياتها.</p>
+            <p className="text-xs font-bold text-muted">الأصناف المهدرة <span className="font-normal">({b.products.length})</span></p>
+            <p className="mt-0.5 text-[11px] text-muted">كلّها، الأعلى تكلفةً أولاً. وما لا سعر لوحدته يأتي في آخرها بلا رقم.</p>
+            {b.products.length === 0 ? (
+              <p className="mt-3 text-xs leading-relaxed text-muted">لا أصناف مهدرة في هذه الأسابيع.</p>
             ) : (
               <div className="mt-3">
                 <BarList
-                  items={b.topProducts.map((p) => ({
-                    key: p.productId,
-                    label: p.productName,
-                    minor: p.costMinor,
-                    sub: p.count === 0 ? "من المرتجع الذي هُدرت مكوّناته" : p.returned ? `${countNoun(p.count, TIME)} · ومن المرتجع` : countNoun(p.count, TIME),
-                    href: `/inventory/items/${p.productId}`,
-                  }))}
+                  items={b.products.map((p) => {
+                    const costless = p.costMinor === 0 && p.unknownCount > 0;
+                    return {
+                      key: p.productId,
+                      label: p.productName,
+                      minor: p.costMinor,
+                      /* المجهولُ ليس صفراً: «تكلفته غير معروفة» لا «0.00» */
+                      display: costless ? <span className="text-xs font-bold text-warn">تكلفته غير معروفة</span> : undefined,
+                      sub: p.count === 0 ? "من المرتجع الذي هُدرت مكوّناته" : p.returned ? `${countNoun(p.count, TIME)} · ومن المرتجع` : countNoun(p.count, TIME),
+                      href: `/inventory/items/${p.productId}`,
+                    };
+                  })}
                 />
               </div>
             )}

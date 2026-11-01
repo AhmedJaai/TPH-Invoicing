@@ -130,5 +130,9 @@
 "يُخرج بعد حذفه من وصفاته": "Can be removed once it's out of its recipes",
 "{0} {1}{2}. هي ما أُرجع وقال الكاشير عند ردّه إن مكوّناته هُدرت، فتُحسب مستهلكة وهدراً معاً ولا تُنقص الاستهلاك المتوقع. وما قال إنه لم يُهدر يعود إلى الرف فيُنقصه.": "{0} {1}{2}. These were returned and the cashier said their ingredients were wasted, so they count as both used and waste and don't reduce expected usage. What the cashier said wasn't wasted goes back to the shelf and does reduce it.",
 "مرتجع هُدرت مكوّناته:": "Returned, ingredients wasted:",
-"تغطّي شهراً مقفلاً، فأعد فتحه لتسحبها": "Covers a closed month — reopen it to withdraw"
+"تغطّي شهراً مقفلاً، فأعد فتحه لتسحبها": "Covers a closed month — reopen it to withdraw",
+"الأصناف المهدرة": "Wasted items",
+"كلّها، الأعلى تكلفةً أولاً. وما لا سعر لوحدته يأتي في آخرها بلا رقم.": "All of them, highest cost first. Items with no unit price come last with no figure.",
+"لا أصناف مهدرة في هذه الأسابيع.": "No wasted items in these weeks.",
+"تكلفته غير معروفة": "Cost unknown"
 }

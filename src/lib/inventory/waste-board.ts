@@ -63,8 +63,12 @@ export interface WasteBoard {
   byReason: { reason: BoardReason; count: number; costMinor: number; unknownCount: number }[];
   /** المرتجعُ بعد التحضير: كم مشروباً (بالمِلّي) — يُعَدّ بعدد المشروبات لا المكوّنات. */
   returnedAfterPrep: { lines: number; unitsMilli: number; costMinor: number; unknownCount: number };
-  /** `count` سجلّاتُ اليد وحدها؛ و`returned` أنّ بعضَ كلفته من مكوّنات المرتجع — لا تُعَدّ «مرّات». */
-  topProducts: { productId: string; productName: string; count: number; costMinor: number; returned: boolean }[];
+  /**
+   * كلُّ الأصناف المهدرة لا أعلاها ثلاثة (أحمد، ١ نوفمبر ٢٠٢٦) — الأعلى كلفةً أوّلاً، وما جُهل سعرُه
+   * بعدها بعدد سجلّاته. `count` سجلّاتُ اليد وحدها؛ و`returned` أنّ بعضَ كلفته من مكوّنات المرتجع
+   * — لا تُعَدّ «مرّات»؛ و`unknownCount` ما لا سعرَ لوحدته فخرج من `costMinor` ولم يُعَدّ صفراً.
+   */
+  products: { productId: string; productName: string; count: number; costMinor: number; returned: boolean; unknownCount: number }[];
   /** أصنافٌ «انتهت صلاحيّتُها» أكثر من مرّة في النافذة. */
   repeatedExpiry: { productId: string; productName: string; count: number }[];
 }
@@ -84,7 +88,7 @@ export function buildWasteBoard(
   returned: { lines: number; unitsMilli: number; ingredients: readonly ReturnedIngredient[] } = { lines: 0, unitsMilli: 0, ingredients: [] },
 ): WasteBoard {
   const reasons = new Map<BoardReason, { count: number; costMinor: number; unknownCount: number }>();
-  const products = new Map<string, { productName: string; count: number; costMinor: number; returned: boolean }>();
+  const products = new Map<string, { productName: string; count: number; costMinor: number; returned: boolean; unknownCount: number }>();
   const expiry = new Map<string, { productName: string; count: number }>();
   let known = 0;
   let unknown = 0;
@@ -96,12 +100,10 @@ export function buildWasteBoard(
     if (cost === null) { r.unknownCount++; unknown++; } else { r.costMinor += cost; known += cost; }
     reasons.set(e.reason, r);
 
-    if (cost !== null) {
-      const p = products.get(e.productId) ?? { productName: e.productName, count: 0, costMinor: 0, returned: false };
-      p.count++;
-      p.costMinor += cost;
-      products.set(e.productId, p);
-    }
+    const p = products.get(e.productId) ?? { productName: e.productName, count: 0, costMinor: 0, returned: false, unknownCount: 0 };
+    p.count++;
+    if (cost === null) p.unknownCount++; else p.costMinor += cost;
+    products.set(e.productId, p);
     if (e.reason === "EXPIRED") {
       const x = expiry.get(e.productId) ?? { productName: e.productName, count: 0 };
       x.count++;
@@ -114,12 +116,12 @@ export function buildWasteBoard(
   let retUnknown = 0;
   for (const i of returned.ingredients) {
     const cost = entryCostMinor({ ...i, reason: "OTHER" }, rates.get(i.productId));
-    if (cost === null) { retUnknown++; continue; }
+    /* المكوّنُ مجموعُ مرتجعاتٍ كثيرة — ليس «مرّةً واحدة» */
+    const p = products.get(i.productId) ?? { productName: i.productName, count: 0, costMinor: 0, returned: false, unknownCount: 0 };
+    p.returned = true;
+    if (cost === null) { retUnknown++; p.unknownCount++; products.set(i.productId, p); continue; }
     retCost += cost;
     known += cost;
-    /* المكوّنُ مجموعُ مرتجعاتٍ كثيرة — ليس «مرّةً واحدة» */
-    const p = products.get(i.productId) ?? { productName: i.productName, count: 0, costMinor: 0, returned: false };
-    p.returned = true;
     p.costMinor += cost;
     products.set(i.productId, p);
   }
@@ -135,8 +137,8 @@ export function buildWasteBoard(
     unknownCount: unknown,
     byReason: [...reasons].map(([reason, v]) => ({ reason, ...v }))
       .sort((a, b) => b.costMinor - a.costMinor || b.count - a.count || a.reason.localeCompare(b.reason)),
-    topProducts: [...products].map(([productId, v]) => ({ productId, ...v }))
-      .sort((a, b) => b.costMinor - a.costMinor || a.productId.localeCompare(b.productId)).slice(0, 3),
+    products: [...products].map(([productId, v]) => ({ productId, ...v }))
+      .sort((a, b) => b.costMinor - a.costMinor || b.count - a.count || a.productId.localeCompare(b.productId)),
     repeatedExpiry: [...expiry].map(([productId, v]) => ({ productId, ...v }))
       .filter((x) => x.count >= REPEATED_EXPIRY_MIN)
       .sort((a, b) => b.count - a.count || a.productId.localeCompare(b.productId)),

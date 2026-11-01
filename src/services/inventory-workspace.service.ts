@@ -43,9 +43,8 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
     ? []
     : await loadPurchaseLinks(header.periodStart, header.periodEnd, stockOptions, conn);
 
-  const waste = header.status === "FINALISED"
-    ? []
-    : await listWaste(header.periodStart, header.periodEnd, header.branchId, conn);
+  /* المقفلُ يُقرأ سجلُّه كاملاً للعرض — كان يُحمَّل للمفتوح وحده فلا يظهر منه سطرٌ في الجرد النهائيّ */
+  const waste = await listWaste(header.periodStart, header.periodEnd, header.branchId, conn);
 
   const supplierRows = await conn.select({ id: suppliers.id, name: suppliers.nameAr })
     .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr));

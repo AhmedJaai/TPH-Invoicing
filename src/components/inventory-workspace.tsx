@@ -11,6 +11,7 @@ import { DiscardCount, FinaliseCount, RecomputeCount, ReopenCount } from "./inve
 import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import type { DuplicateRow, ReceiptRow } from "./inventory-flow-step";
 import { InventoryWaste, type WasteRow } from "./inventory-waste";
+import { WasteLedger } from "./waste-ledger";
 import { DIRECTION, DirectionTag, MagnitudeBar, VarianceSplit, directionOf, formatWeek, type StepId } from "./inventory-ui";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
@@ -281,6 +282,8 @@ export function InventoryWorkspace({
       <Callout tone="muted" icon={ShieldCheck} title="هذا فرق جرد، لا هدر">
         قد يكون سبب الفرق جرعة أكبر مما في الوصفة، أو ميزاناً غير معايَر، أو كمية دخلت ولم تُسجَّل، أو نقلاً لم يُسجَّل، أو عدّاً مستعجلاً. راجعه قبل أن تعدّه فاقداً، وما تعرف سببه سجّله هدراً أدناه ليخرج من «الفرق غير المفسَّر».
       </Callout>
+
+      {locked && <WasteLedger rows={waste} />}
 
       {!locked && inScopeCount > 0 && canCount && (
         <InventoryWaste

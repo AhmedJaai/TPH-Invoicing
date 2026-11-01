@@ -39,9 +39,19 @@ describe("لوحة الهدر", () => {
     ]);
   });
 
-  it("أكثر الأصناف هدراً ثلاثة بالكلفة المعروفة — وما جهلت كلفته لا يتصدّر بصفر", () => {
+  it("كلُّ الأصناف المهدرة لا أعلاها ثلاثة — وما جهلت كلفته في آخرها بلا صفر", () => {
     const b = buildWasteBoard([e({}), e({}), e({ productId: "beans", productName: "بنّ", unit: "KG" })], rates);
-    expect(b.topProducts).toEqual([{ productId: "milk", productName: "حليب", count: 2, costMinor: 24_00, returned: false }]);
+    expect(b.products).toEqual([
+      { productId: "milk", productName: "حليب", count: 2, costMinor: 24_00, returned: false, unknownCount: 0 },
+      { productId: "beans", productName: "بنّ", count: 1, costMinor: 0, returned: false, unknownCount: 1 },
+    ]);
+  });
+
+  it("خمسةُ أصناف تظهر كلُّها", () => {
+    const ids = ["a", "b", "c", "d", "e"];
+    const many = new Map(ids.map((id) => [id, rates.get("milk")!]));
+    const b = buildWasteBoard(ids.map((id) => e({ productId: id, productName: id })), many);
+    expect(b.products.map((p) => p.productId)).toEqual(ids);
   });
 
   it("«انتهت صلاحيّته» مرّتين لصنف إشارة، ومرّة ليست إشارة", () => {
@@ -51,7 +61,7 @@ describe("لوحة الهدر", () => {
 
   it("بلا سجلّات: لوحة فارغة", () => {
     expect(buildWasteBoard([], rates)).toEqual({
-      recordCount: 0, knownCostMinor: 0, unknownCount: 0, byReason: [], topProducts: [], repeatedExpiry: [],
+      recordCount: 0, knownCostMinor: 0, unknownCount: 0, byReason: [], products: [], repeatedExpiry: [],
       returnedAfterPrep: { lines: 0, unitsMilli: 0, costMinor: 0, unknownCount: 0 },
     });
   });
@@ -65,6 +75,6 @@ describe("لوحة الهدر", () => {
     expect(b.returnedAfterPrep.lines).toBe(2);
     expect(b.recordCount).toBe(0);
     /* المكوّنُ من المرتجع لا يُعَدّ «مرّةً» يدويّة */
-    expect(b.topProducts.map((p) => [p.count, p.returned])).toEqual([[0, true]]);
+    expect(b.products.map((p) => [p.count, p.returned])).toEqual([[0, true]]);
   });
 });
