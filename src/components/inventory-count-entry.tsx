@@ -7,6 +7,7 @@ import { Meter, buttonClass } from "./ui";
 import { toast } from "./ui-client";
 import { Money } from "./money";
 import { Toolbar } from "./inventory-toolbar";
+import { sameQuantity } from "@/lib/inventory/same-quantity";
 import { DIRECTION, type Direction } from "./inventory-ui";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { decimalToMilli, isAmbiguousThousands } from "@/lib/inventory/units";
@@ -146,7 +147,8 @@ export function InventoryCountEntry({
     });
   }, [rows, query, category, onlyUncounted, initial]);
 
-  const dirty = rows.filter((r) => (values[r.productId] ?? "") !== (initial[r.productId] ?? ""));
+  /* الكمّيّةُ لا النصّ: «1.600» و«1.6» واحد — وإلّا بقي ما حُفظ «لم يُحفظ بعد» (`same-quantity.ts`) */
+  const dirty = rows.filter((r) => !sameQuantity(values[r.productId] ?? "", initial[r.productId] ?? "") || (units[r.productId] ?? r.baseUnit) !== r.baseUnit && (values[r.productId] ?? "").trim() !== "");
   const counted = rows.filter((r) => (values[r.productId] ?? "").trim() !== "").length;
   const invalid = dirty.filter((r) => !validQuantity(values[r.productId] ?? ""));
 
@@ -171,7 +173,7 @@ export function InventoryCountEntry({
     const known = new Map(rows.map((r) => [r.productId, r] as const));
     const mine = Object.entries(draft).filter(([id, d]) => {
       const row = known.get(id);
-      return row !== undefined && d.value !== row.actual && row.unitChoices.some((c) => c.value === d.unit);
+      return row !== undefined && !sameQuantity(d.value, row.actual) && row.unitChoices.some((c) => c.value === d.unit);
     });
     /* تُقرأ مرّةً عند الفتح من خارج React — ولا تُعرَف وقتَ الرسم في الخادم */
     /* eslint-disable react-hooks/set-state-in-effect */
