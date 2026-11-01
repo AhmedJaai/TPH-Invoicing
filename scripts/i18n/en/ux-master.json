@@ -141,5 +141,15 @@
 "باقي أصناف الجرد بلا فرق يُعرض ({0})": "Other counted items with no variance to show ({0})",
 "مطابق لما كان متوقعاً": "Matches what was expected",
 "لم يُعدّ": "Not counted",
-"عُدّ ولم يُحسب فرقه: لا وصفة تعدّ استهلاكه": "Counted, variance not computed: no recipe accounts for its usage"
+"عُدّ ولم يُحسب فرقه: لا وصفة تعدّ استهلاكه": "Counted, variance not computed: no recipe accounts for its usage",
+"{0} جاءت بعد نهاية الجرد بأيام: متى وصلت بضاعتها؟": "{0} came in just after the count ended: when did the goods arrive?",
+"فواتير جاءت بعد نهاية الجرد بأيام، وقد قرّرت فيها كلها": "Invoices that came in just after the count ended — you've decided on all of them",
+"المورّد قد يسلّم قبل أن يصدر فاتورته. إن وصلت البضاعة بعد {0} فلا تدخل هذا الجرد وتُحسب في الجرد التالي، وإن وصلت قبله دخلت فيه. وبلا قرارك لا تُحسب ولا تُسقط.": "A supplier may deliver before issuing the invoice. If the goods arrived after {0} they stay out of this count and go into the next; if before, they count here. Without your decision they're neither counted nor dropped.",
+"الجرد مقفل: قرارك يُحفظ على الفاتورة، ولا تتغير أرقام هذا الجرد ولا التنبيه فوقه حتى تعيد فتحه ويُعاد حسابه.": "The count is closed: your decision is saved on the invoice, but this count's numbers and the warning above won't change until you reopen it and it's recalculated.",
+"فاتورة {0} · {1}{2}": "Invoice {0} · {1}{2}",
+"وصلت بعد الجرد، لا تدخله": "Arrived after the count — leave it out",
+"وصلت قبل نهايته، يدخله": "Arrived before it ended — count it",
+"قرّرت: وصلت بعد الجرد، فلا تدخله": "You decided: arrived after the count, so it stays out",
+"قرّرت: وصلت يوم {0}، فتدخله": "You decided: arrived on {0}, so it counts",
+"غيّر القرار": "Change decision"
 }

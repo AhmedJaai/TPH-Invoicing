@@ -155,6 +155,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   INVENTORY_RECEIPT_UPDATED: "تعديل استلام بضاعة",
   INVENTORY_RECEIPT_VOIDED: "إلغاء استلام بضاعة",
   INVENTORY_RECEIPT_RESOLVED: "قرار في استلام بضاعة",
+  INVENTORY_INVOICE_RECEIVED_SET: "يوم وصول بضاعة فاتورة",
   /* الجرد وتسوية المخزون */
   SALES_IMPORTED: "استيراد ملفّ مبيعات",
   SUPPLIER_FOODICS_LINKED: "ربط مورّد فودكس بمورّد",

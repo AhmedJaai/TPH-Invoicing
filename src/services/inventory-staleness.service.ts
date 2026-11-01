@@ -41,7 +41,9 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
               between ${header.periodStart} and ${header.periodEnd}) as linked,
       (select count(*)::int from recipe_versions rv
         where coalesce(rv.activated_at, rv.created_at) > ${f} and rv.status = 'ACTIVE'
-          and rv.effective_from <= ${header.periodEnd}) as recipes,
+          /* تسري في أسبوعه فعلاً: بدأت قبل نهايته ولم تنتهِ قبل بدايته — لا نسخةٌ لفترةٍ قديمة فقط */
+          and rv.effective_from <= ${header.periodEnd}
+          and (rv.effective_to is null or rv.effective_to >= ${header.periodStart})) as recipes,
       /*
         افتتاحيّه فعليّ الجرد الذي قبله — فإن أعيد فتح ذاك (مسوّدة الآن) أو
         أقفل ثانيةً بعد هذا، فقد تغيّر أوّل طرف في معادلته.

@@ -12,6 +12,8 @@ import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import type { DuplicateRow, ReceiptRow } from "./inventory-flow-step";
 import { InventoryWaste, type WasteRow } from "./inventory-waste";
 import { WasteLedger } from "./waste-ledger";
+import { LateInvoicesPanel } from "./late-invoices-panel";
+import type { LateInvoice } from "@/services/inventory-late-invoices.service";
 import { DIRECTION, DirectionTag, MagnitudeBar, VarianceSplit, directionOf, formatWeek, type StepId } from "./inventory-ui";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
@@ -53,6 +55,7 @@ export function InventoryWorkspace({
   manualOpenings,
   purchaseLinks,
   stockOptions,
+  lateInvoices,
   waste,
   stale = [],
   today,
@@ -80,6 +83,7 @@ export function InventoryWorkspace({
   manualOpenings: ReadonlyMap<string, { enteredMilli: number; unit: StoredUnit }>;
   purchaseLinks: PurchaseLinkRow[];
   stockOptions: StockItemOption[];
+  lateInvoices: LateInvoice[];
   /** هدرُ الأسبوع المسجَّل غيرُ المُبطَل — يُعرَض ومعه «أبطِله». */
   waste: WasteRow[];
   /** ما تغيّر تحته بعد إقفاله — يُقال، والعلاجُ إعادةُ الفتح. */
@@ -452,8 +456,12 @@ export function InventoryWorkspace({
             receipts={receipts}
             duplicates={duplicates}
             suppliers={suppliers}
-            purchaseLinks={locked ? null : (
-              <PurchaseLinkPanel rows={purchaseLinks} options={stockOptions} canEdit={canCount} />
+            purchaseLinks={(
+              <>
+                {/* القرارُ في الفاتورة المتأخّرة يخصّ المقفلَ كذلك — يُكتب عليها لا على الجرد */}
+                <LateInvoicesPanel rows={lateInvoices} periodEnd={header.periodEnd} canEdit={canCount} locked={locked} showAmounts={showAmounts} />
+                {locked ? null : <PurchaseLinkPanel rows={purchaseLinks} options={stockOptions} canEdit={canCount} />}
+              </>
             )}
             canEdit={canCount}
             canRecipes={canRecipes}

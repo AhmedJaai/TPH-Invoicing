@@ -54,7 +54,7 @@ const COST_LOOKBACK_DAYS = 180;
  * فما وقع في النافذة **يُعرَض بندَ التباسٍ ولا يُضمّ ولا يُسقَط**. ومتى
  * كُتب `received_on` حقيقيٌّ قُدّم عليه وسقط الالتباس.
  */
-const RECEIPT_AMBIGUITY_DAYS = 3;
+export const RECEIPT_AMBIGUITY_DAYS = 3;
 
 /**
  * فترةٌ تتقاطع مع جردٍ قائم — وتُسمّى فترتُه كي يُعرَف أين الاصطدام.

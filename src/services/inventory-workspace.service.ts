@@ -6,6 +6,7 @@
  * والمورّدون (اختياريّون في الاستلام). وموضعٌ واحد كي لا تفترق
  * الصفحتان في ما تعرضانه.
  */
+import { loadLateInvoices, type LateInvoice } from "./inventory-late-invoices.service";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, suppliers } from "@/db/schema";
@@ -27,6 +28,8 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
   /** بنودُ فواتير الأسبوع وربطُها بأصناف الجرد — للمفتوح وحده؛ المقفَلُ يُقرأ من أسطره. */
   purchaseLinks: PurchaseLinkRow[];
   stockOptions: StockItemOption[];
+  /** فواتيرُ تلت نهايةَ الأسبوع بأيّام — القرارُ فيها يخصّ المفتوحَ والمقفل معاً (يُكتب على الفاتورة). */
+  lateInvoices: LateInvoice[];
   /** هدرُ الأسبوع المسجَّل — للمفتوح وحده؛ المقفَلُ لا يُبطَل فيه شيء. */
   waste: WasteRow[];
 }> {
@@ -45,6 +48,8 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
 
   /* المقفلُ يُقرأ سجلُّه كاملاً للعرض — كان يُحمَّل للمفتوح وحده فلا يظهر منه سطرٌ في الجرد النهائيّ */
   const waste = await listWaste(header.periodStart, header.periodEnd, header.branchId, conn);
+
+  const lateInvoices = await loadLateInvoices(header.periodEnd, conn);
 
   const supplierRows = await conn.select({ id: suppliers.id, name: suppliers.nameAr })
     .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr));
@@ -74,6 +79,7 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
     manualOpenings: await loadManualOpenings(header.id, conn),
     purchaseLinks,
     stockOptions,
+    lateInvoices,
     waste: waste.map((w) => ({
       id: w.id,
       productName: w.productName,
