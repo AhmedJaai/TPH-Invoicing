@@ -21,6 +21,13 @@ import { isStoredUnit } from "@/lib/unit-conversion";
 export const runtime = "nodejs";
 
 /* الرمزُ يُفحص بنوعه لا يُسكَت بـ`as` — والسببُ نفسُه نصٌّ حرّ في الإبطال، فلا يكون z.enum */
+/** إعادةُ الحساب تعثّرت: الهدرُ كُتب والأرقامُ على الشاشة قد تكون قديمة — يُقال ولا يُبتلع. */
+const STALE_NOTE = " لكن تعذّر تحديث أرقام الجرد الآن، فحدّث الصفحة.";
+async function refreshCount(countId: string | null | undefined): Promise<boolean> {
+  if (!countId) return true;
+  try { await recomputeCount(countId); return true; } catch { return false; }
+}
+
 const isWasteReason = (v: string | undefined): v is WasteReason => v !== undefined && Object.hasOwn(WASTE_REASON_LABEL, v);
 const isMovementKind = (v: string | undefined): v is MovementKind => v !== undefined && Object.hasOwn(MOVEMENT_KIND_LABEL, v);
 
@@ -66,8 +73,8 @@ export async function POST(request: Request) {
     if (!body.wasteId) return NextResponse.json({ error: "لم تحدّد سطر الهدر" }, { status: 400 });
     try {
       await voidWaste(body.wasteId, body.reason ?? "", user.id);
-      if (body.countId) await recomputeCount(body.countId).catch(() => undefined);
-      return NextResponse.json({ ok: true, message: "أُبطل الهدر، وعادت كميته إلى «الفرق غير المفسَّر»." });
+      const fresh = await refreshCount(body.countId);
+      return NextResponse.json({ ok: true, message: `أُبطل الهدر، وعادت كميته إلى «الفرق غير المفسَّر».${fresh ? "" : STALE_NOTE}` });
     } catch (e) {
       if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });
       return failWith(e, "inventory-waste");
@@ -115,11 +122,11 @@ export async function POST(request: Request) {
     }
 
     /* الجردُ المفتوح يُعاد حسابُه فوراً — فالرقمُ الذي على الشاشة يتبع ما كُتب */
-    if (body.countId) await recomputeCount(body.countId).catch(() => undefined);
+    const fresh = await refreshCount(body.countId);
 
     return NextResponse.json({
       ok: true,
-      message: body.action === "movement" ? "سُجّلت الحركة." : "سُجّل الهدر، وخرج من «الفرق غير المفسَّر».",
+      message: (body.action === "movement" ? "سُجّلت الحركة." : "سُجّل الهدر، وخرج من «الفرق غير المفسَّر».") + (fresh ? "" : STALE_NOTE),
     });
   } catch (e) {
     if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });

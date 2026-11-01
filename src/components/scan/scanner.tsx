@@ -17,7 +17,7 @@ function isIOS(): boolean {
 }
 import { buttonClass } from "@/components/ui-tokens";
 import { readResponse } from "@/lib/http-client";
-import { countNoun, PAGE, timeAgo } from "@/lib/arabic";
+import { countNoun, PAGE, SECOND, timeAgo } from "@/lib/arabic";
 import type { ClarityVerdict } from "@/lib/capture-clarity";
 import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { enhanceScan, type ScanMode } from "@/lib/scan/enhance";
@@ -599,7 +599,7 @@ function Busy({ text, startedAt }: { text: string; startedAt?: number }) {
       <p className="mt-4 text-sm font-bold">{text}</p>
       {startedAt && (
         <p className="mt-1 text-xs text-muted">
-          <span className="nums">{seconds.toLocaleString("ar-SA-u-nu-latn")}</span> ثانية{seconds > 20 ? " — قد تأخذ نصف دقيقة" : ""}
+          <span className="nums">{countNoun(seconds, SECOND)}</span>{seconds > 20 ? " — قد تأخذ نصف دقيقة" : ""}
         </p>
       )}
     </section>
