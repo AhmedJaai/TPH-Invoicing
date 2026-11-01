@@ -44,6 +44,7 @@ export async function POST(request: Request) {
   try {
     if (body.action === "unmap") {
       const n = await unmapPosProducts(ids, user.id);
+      if (n === 0) return NextResponse.json({ error: "لم يكن شيء من المختار مربوطاً، فربما فُكّ من نافذة أخرى. حدّث الصفحة." }, { status: 409 });
       return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(n, PRODUCT)}` });
     }
 

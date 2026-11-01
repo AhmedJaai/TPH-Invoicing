@@ -12,7 +12,7 @@
  * وفريدٌ بـ(المصدر، المعرّف) في القاعدة. واسمُ الصنف يُحدَّث مع كلّ
  * استيراد، والربطُ لا يُمَسّ.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { posProducts, products } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -118,16 +118,19 @@ export async function unmapPosProducts(posProductIds: string[], actorId: string,
     const rows = await tx
       .update(posProducts)
       .set({ productId: null })
-      .where(inArray(posProducts.id, [...posProductIds]))
+      .where(and(inArray(posProducts.id, [...posProductIds]), isNotNull(posProducts.productId)))
       .returning({ id: posProducts.id });
 
-    await recordAudit({
-      actorId,
-      action: "POS_PRODUCT_UNMAPPED",
-      entityType: "pos_product",
-      entityId: posProductIds[0],
-      after: { عدد: rows.length },
-    }, tx);
+    /* لا أثرَ لفكٍّ لم يقع، ولا «فُكّ ربط عشرة» وهي غيرُ مربوطة أصلاً */
+    if (rows.length > 0) {
+      await recordAudit({
+        actorId,
+        action: "POS_PRODUCT_UNMAPPED",
+        entityType: "pos_product",
+        entityId: rows[0].id,
+        after: { عدد: rows.length, الأصناف: rows.map((r) => r.id) },
+      }, tx);
+    }
 
     return rows.length;
   });
