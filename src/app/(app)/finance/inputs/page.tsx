@@ -13,6 +13,8 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, MONTH } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadDeclarations, loadSpreadCandidates } from "@/services/profit.service";
+import { closedMonthsAmong } from "@/services/month-guard";
+import { db } from "@/db";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,8 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
   const canEdit = can(user.role, "month:close");
 
   const [declarations, ...lists] = await Promise.all([loadDeclarations(), ...CATEGORIES.map((c) => loadSpreadCandidates(c))]);
+  /* ما يغطّي شهراً مقفلاً لا يُسحب (٠٩٦) — يُقال قبل الضغط لا بعده */
+  const closed = await closedMonthsAmong(db, declarations.flatMap((d) => monthsBetween(d.fromMonth, d.toMonth)));
   const candidates: Record<string, SpreadCandidate[]> = {};
   CATEGORIES.forEach((c, i) => {
     candidates[c] = lists[i].map((t) => ({ id: t.id, day: t.day, dayLabel: formatDay(t.day), amountText: formatRiyalsDisplay(t.amountMinor), label: t.label, spread: t.spread }));
@@ -98,7 +102,9 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
                     </p>
                   </div>
                   {canEdit && (
-                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحبت الإضافة">اسحبها</PostAction>
+                    monthsBetween(d.fromMonth, d.toMonth).some((m) => closed.has(m))
+                      ? <span className="text-[11px] leading-relaxed text-muted"><T s="تغطّي شهراً مقفلاً، فأعد فتحه لتسحبها" /></span>
+                      : <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحبت الإضافة">اسحبها</PostAction>
                   )}
                 </li>
               );
