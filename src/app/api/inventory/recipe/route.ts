@@ -23,10 +23,11 @@ export const runtime = "nodejs";
 const IngredientBody = z.object({
   productId: z.string().trim().min(1).max(64).optional(),
   /** الكمّيّة كما كتبها الإنسان: «18». */
-  quantity: z.union([z.string().max(30), z.number()]).optional(),
+  /* نصّاً لا عدداً عائماً (القيد ٣) — الشاشةُ ترسله نصّاً، والعددُ كان باباً لـ0.1 العائمة */
+  quantity: z.string().max(30).optional(),
   unit: z.string().max(10).optional(),
   /** فاقدُ التجهيز نسبةً مئويّة: «2.5». */
-  prepLossPercent: z.union([z.string().max(10), z.number()]).nullable().optional(),
+  prepLossPercent: z.string().max(10).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
 });
 type IngredientBody = z.infer<typeof IngredientBody>;
@@ -36,7 +37,7 @@ const Body = z.object({
   versionId: z.string().trim().min(1).max(64).optional(),
   menuProductId: z.string().trim().min(1).max(64).optional(),
   effectiveFrom: z.string().max(10).optional(),
-  yieldQuantity: z.union([z.string().max(30), z.number()]).nullable().optional(),
+  yieldQuantity: z.string().max(30).nullable().optional(),
   yieldUnit: z.string().max(10).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   activate: z.boolean().optional(),
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       if (!isStoredUnit(raw.unit)) {
         return NextResponse.json({ error: "وحدة أحد المكوّنات غير معروفة" }, { status: 400 });
       }
-      const quantityMilli = decimalToMilli(typeof raw.quantity === "number" ? raw.quantity : String(raw.quantity ?? "").trim());
+      const quantityMilli = decimalToMilli((raw.quantity ?? "").trim());
       if (quantityMilli === null || quantityMilli <= 0) {
         return NextResponse.json({ error: `تعذّرت قراءة كمية أحد المكوّنات: «${String(raw.quantity ?? "")}»` }, { status: 400 });
       }

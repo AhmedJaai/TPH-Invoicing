@@ -225,3 +225,25 @@ describe("لا مسار يترجم أخطاء حارسه وحده", () => {
     expect(GUARD_ONLY_TRY.test("  const user = await guard(\"x\", \"y\");")).toBe(false);
   });
 });
+
+/*
+  ── الكمّيّةُ والمبلغُ نصّاً في الطلب ──
+
+  القيد ٣: «الطلبُ يحملها نصّاً لا عدداً عائماً». وكانت واجهتا الهدر والوصفة تقبلان
+  `z.union([z.string(), z.number()])` في الكمّيّة وفاقد التجهيز والناتج — فيصل 0.1 عائماً.
+  والمستثنى خلايا ما قرأه النموذجُ في الأرشفة: تُحفظ نصّاً كما جاءت ولا يُحسب منها.
+*/
+const FLOAT_QUANTITY = /\b(quantity|amount|qty|yieldQuantity|prepLossPercent|price\w*|\w*Amount)\s*:\s*z\.union\(\[\s*z\.string\(\)[^\]]*z\.number\(\)/;
+
+describe("لا كمّيّة ولا مبلغ عدداً عائماً في طلب", () => {
+  it("لا حقلَ كمّيّةٍ أو مبلغٍ يقبل z.number() في واجهة", () => {
+    const hits = SRC.filter((f) => f.startsWith(path.join("src", "app", "api")) && f.endsWith("route.ts"))
+      .filter((f) => FLOAT_QUANTITY.test(readFileSync(f, "utf8")));
+    expect(hits).toEqual([]);
+  });
+
+  it("والحارس يمسك الشكل الخاطئ", () => {
+    expect(FLOAT_QUANTITY.test("quantity: z.union([z.string().max(30), z.number()]).optional(),")).toBe(true);
+    expect(FLOAT_QUANTITY.test("quantity: z.string().max(30).optional(),")).toBe(false);
+  });
+});

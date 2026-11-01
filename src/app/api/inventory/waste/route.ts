@@ -20,6 +20,10 @@ import { isStoredUnit } from "@/lib/unit-conversion";
 
 export const runtime = "nodejs";
 
+/* الرمزُ يُفحص بنوعه لا يُسكَت بـ`as` — والسببُ نفسُه نصٌّ حرّ في الإبطال، فلا يكون z.enum */
+const isWasteReason = (v: string | undefined): v is WasteReason => v !== undefined && Object.hasOwn(WASTE_REASON_LABEL, v);
+const isMovementKind = (v: string | undefined): v is MovementKind => v !== undefined && Object.hasOwn(MOVEMENT_KIND_LABEL, v);
+
 const Body = z.object({
   action: z.enum(["waste", "movement", "void"]).optional(),
   /** للإبطال: معرّفُ سطر الهدر. */
@@ -27,7 +31,8 @@ const Body = z.object({
   /** مفتاحُ الطلب من المتصفّح — ضغطتان سطرٌ واحد. */
   clientRequestId: z.string().trim().min(8).max(64).optional(),
   productId: z.string().trim().min(1).max(64).optional(),
-  quantity: z.union([z.string().max(30), z.number()]).optional(),
+  /** الكمّيّةُ نصّاً لا عدداً عائماً (القيد ٣) — «0.1» تُقرأ مِلّياتٍ صحيحة في الخادم */
+  quantity: z.string().max(30).optional(),
   unit: z.string().max(10).optional(),
   occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب التاريخ بصيغة YYYY-MM-DD").optional(),
   reason: z.string().max(40).optional(),
@@ -73,18 +78,18 @@ export async function POST(request: Request) {
   if (!isStoredUnit(body.unit)) return NextResponse.json({ error: "وحدة غير معروفة" }, { status: 400 });
 
   /* «5,200» لا تُخمَّن — فرقٌ بألف ضعف في هدرٍ يُطرَح من الفرق */
-  if (typeof body.quantity === "string" && isAmbiguousThousands(body.quantity)) {
+  if (body.quantity !== undefined && isAmbiguousThousands(body.quantity)) {
     return NextResponse.json({ error: ambiguousThousandsMessage(body.quantity) }, { status: 400 });
   }
-  const quantityMilli = decimalToMilli(typeof body.quantity === "number" ? body.quantity : String(body.quantity ?? "").trim());
+  const quantityMilli = decimalToMilli((body.quantity ?? "").trim());
   if (quantityMilli === null || quantityMilli <= 0) {
     return NextResponse.json({ error: "اكتب كمية أكبر من صفر" }, { status: 400 });
   }
 
   try {
     if (body.action === "movement") {
-      const kind = body.kind as MovementKind;
-      if (!(kind in MOVEMENT_KIND_LABEL)) {
+      const kind = body.kind;
+      if (!isMovementKind(kind)) {
         return NextResponse.json({ error: "نوع الحركة غير معروف" }, { status: 400 });
       }
       await recordMovement({
@@ -93,8 +98,8 @@ export async function POST(request: Request) {
         branchId: body.branchId ?? null, countId: body.countId ?? null, actorId: user.id,
       });
     } else {
-      const reason = body.reason as WasteReason;
-      if (!(reason in WASTE_REASON_LABEL)) {
+      const reason = body.reason;
+      if (!isWasteReason(reason)) {
         return NextResponse.json({ error: "سبب الهدر غير معروف" }, { status: 400 });
       }
       const r = await recordWaste({
