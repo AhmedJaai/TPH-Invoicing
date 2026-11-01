@@ -33,40 +33,63 @@ export interface RepeatDelivery {
   silenced: boolean;
 }
 
-export async function loadRepeatDeliveries(options: { includeSilenced?: boolean } = {}): Promise<RepeatDelivery[]> {
-  const today = todayInRiyadh();
-  const since = addDays(today, -REPEAT_LOOKBACK_DAYS);
-  const [lineRows, decisions] = await Promise.all([
-    db.execute<{
-      id: string; supplier_id: string; name: string; slug: string; number: string; day: string; total: number; paid: string;
-      line_key: string | null; qty_milli: string | null;
-    }>(sql`
+type LoadedInvoice = DeliveryInvoice & { name: string; slug: string; paidMinor: number };
+type Building = Omit<LoadedInvoice, "lines"> & { lines: DeliveryInvoice["lines"][number][] };
+
+/**
+ * فواتيرُ النافذة وبنودُها — باستعلامين لا بربطٍ واحد.
+ *
+ * كان الربطُ يكرّر رأسَ الفاتورة (معرّفَها ومورّدَها واسمَه ورقمَها ومجموعَها) مع
+ * كلّ بند، ويحسب «المدفوع» بسؤالٍ فرعيّ لكلّ بند — ٧٣٨ صفّاً و٢١١ ك.ب في كلّ رسمٍ
+ * للقشرة. والرأسُ مرّةً لكلّ فاتورة، والبندُ معرّفُها ومفتاحُه وكمّيّتُه وحدها.
+ */
+export async function loadDeliveryInvoices(since: string): Promise<LoadedInvoice[]> {
+  const [heads, lines] = await Promise.all([
+    db.execute<{ id: string; supplier_id: string; name: string; slug: string; number: string; day: string; total: number; paid: string }>(sql`
       select i.id, i.supplier_id, s.name_ar as name, s.slug, i.invoice_number as number,
              to_char(i.invoice_date at time zone 'UTC', 'YYYY-MM-DD') as day, i.total_minor as total,
-             coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = i.id), 0)::bigint as paid,
-             coalesce(sp.product_id, l.normalized_description) as line_key,
-             round(l.qty * 1000)::bigint as qty_milli
+             coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = i.id), 0)::bigint as paid
         from invoices i
         join suppliers s on s.id = i.supplier_id
-        left join invoice_lines l on l.invoice_id = i.id
-        left join supplier_products sp on sp.supplier_id = i.supplier_id and sp.normalized_description = l.normalized_description
        where i.invoice_date >= ${since}::date
        order by i.id
     `),
+    db.execute<{ id: string; line_key: string | null; qty_milli: string | null }>(sql`
+      select l.invoice_id as id,
+             coalesce(sp.product_id, l.normalized_description) as line_key,
+             round(l.qty * 1000)::bigint as qty_milli
+        from invoice_lines l
+        join invoices i on i.id = l.invoice_id
+        left join supplier_products sp on sp.supplier_id = i.supplier_id and sp.normalized_description = l.normalized_description
+       where i.invoice_date >= ${since}::date
+         and coalesce(sp.product_id, l.normalized_description) is not null
+       order by l.invoice_id
+    `),
+  ]);
+  const byId = new Map<string, Building>();
+  for (const r of heads.rows) {
+    byId.set(r.id, {
+      id: r.id, supplierId: r.supplier_id, number: r.number, day: r.day, totalMinor: Number(r.total), lines: [],
+      name: r.name, slug: r.slug, paidMinor: Number(r.paid),
+    });
+  }
+  for (const r of lines.rows) {
+    const inv = byId.get(r.id);
+    if (inv && r.line_key !== null) inv.lines.push({ key: r.line_key, qtyMilli: r.qty_milli === null ? null : Number(r.qty_milli) });
+  }
+  return [...byId.values()];
+}
+
+export async function loadRepeatDeliveries(options: { includeSilenced?: boolean } = {}): Promise<RepeatDelivery[]> {
+  const today = todayInRiyadh();
+  const since = addDays(today, -REPEAT_LOOKBACK_DAYS);
+  const [invoices, decisions] = await Promise.all([
+    loadDeliveryInvoices(since),
     db.execute<{ key: string; decision: string }>(sql`select key, decision from alert_resolutions where key like 'repeat-delivery:%'`),
   ]);
 
-  const byId = new Map<string, DeliveryInvoice & { name: string; slug: string; paidMinor: number }>();
-  for (const r of lineRows.rows) {
-    const inv = byId.get(r.id) ?? {
-      id: r.id, supplierId: r.supplier_id, number: r.number, day: r.day, totalMinor: Number(r.total), lines: [],
-      name: r.name, slug: r.slug, paidMinor: Number(r.paid),
-    };
-    if (r.line_key !== null) inv.lines = [...inv.lines, { key: r.line_key, qtyMilli: r.qty_milli === null ? null : Number(r.qty_milli) }];
-    byId.set(r.id, inv);
-  }
-
-  const pairs = findRepeatDeliveries([...byId.values()]);
+  const byId = new Map(invoices.map((i) => [i.id, i]));
+  const pairs = findRepeatDeliveries(invoices);
   if (pairs.length === 0) return [];
   const silenced = silencedKeys(decisions.rows, today);
 

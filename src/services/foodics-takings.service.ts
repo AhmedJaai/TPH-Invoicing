@@ -11,7 +11,7 @@ import {
 } from "@/lib/foodics/takings";
 import { silencedKeys } from "@/lib/signal-decisions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
-import { loadPosWatch } from "./pos-watch.service";
+import { loadSettlementDays } from "./pos-watch.service";
 
 /** مفتاحُ قرار الإنسان في دفعةٍ فرقُها ظاهر — يُشتقّ من تاريخها ولا يُولَّد. */
 export function cardGapKey(day: string): string {
@@ -50,7 +50,7 @@ const SETTLED = sql`o.status in (${ORDER_STATUS.CLOSED}, ${ORDER_STATUS.RETURNED
 export async function loadCardComparison(sinceDay: string | null = null): Promise<{ card: CardComparison; lastBankDay: string | null; untimed: number }> {
   const since = sinceDay ? sql`and p.added_at >= ${sinceDay}::date - interval '2 days'` : sql.empty();
   const [pos, rows, until] = await Promise.all([
-    loadPosWatch(),
+    loadSettlementDays(sinceDay),
     db.execute<{ at_ms: string | null; amount_minor: number }>(sql`
       select (extract(epoch from p.added_at) * 1000)::bigint as at_ms, p.amount_minor
         from foodics_order_payments p join foodics_orders o on o.id = p.order_id

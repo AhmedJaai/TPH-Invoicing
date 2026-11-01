@@ -200,6 +200,16 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                amount_minor, source, bank_transaction_id
           from expenses
          where occurred_on >= to_char(now() - interval '120 days', 'YYYY-MM-DD')
+           /*
+             لا يتكرّر حدثٌ إلّا بصنفه ويومه ومبلغه (ومفتاحُ الحدث يزيد عليها الاسم):
+             فما لا نظيرَ له فيها لا يدخل مجموعةً — كان يُجلب ١٣٠٢ مصروفاً في كلّ
+             رسمٍ للقشرة ليُرمى أكثرُها. والكشفُ نفسُه في findDuplicateExpenses.
+           */
+           and (category, occurred_on, amount_minor) in (
+             select category, occurred_on, amount_minor from expenses
+              where occurred_on >= to_char(now() - interval '120 days', 'YYYY-MM-DD')
+              group by 1, 2, 3 having count(*) > 1
+           )
       `),
     db.execute<{
         id: string; amount_minor: number; lifecycle: string; match_status: string;
