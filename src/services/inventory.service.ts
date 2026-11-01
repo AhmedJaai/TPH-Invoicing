@@ -1787,6 +1787,8 @@ export interface ItemHistoryRow {
   periodStart: string;
   periodEnd: string;
   status: "DRAFT" | "FINALISED";
+  /** تقريرُ هذا الجرد جزئيّ — نقصُ الصنف فيه مشوب. */
+  partial: boolean;
   baseUnit: StoredUnit;
   inScope: boolean;
   openingMilli: number | null;
@@ -1813,7 +1815,7 @@ export interface ItemHistoryRow {
  */
 export async function itemHistory(productId: string, limit = 12, conn: Conn = db): Promise<ItemHistoryRow[]> {
   const rows = await conn.execute<Record<string, unknown>>(sql`
-    select c.id as count_id, c.period_start, c.period_end, c.status,
+    select c.id as count_id, c.period_start, c.period_end, c.status, c.readiness::text as readiness,
            l.base_unit, l.in_scope, l.opening_milli, l.opening_source, l.purchases_milli,
            l.manual_receipts_milli, l.theoretical_consumption_milli, l.recorded_waste_milli,
            l.theoretical_closing_milli, l.actual_milli, l.variance_milli,
@@ -1830,6 +1832,7 @@ export async function itemHistory(productId: string, limit = 12, conn: Conn = db
     periodStart: String(r.period_start),
     periodEnd: String(r.period_end),
     status: r.status as "DRAFT" | "FINALISED",
+    partial: r.readiness !== null && r.readiness !== undefined && r.readiness !== "READY",
     baseUnit: (isStoredUnit(r.base_unit) ? r.base_unit : "PIECE") as StoredUnit,
     inScope: r.in_scope !== false,
     openingMilli: num(r.opening_milli),

@@ -16,6 +16,8 @@ import {
 import { Money } from "@/components/money";
 import { DIRECTION, VarianceSplit, directionOf, formatWeek } from "@/components/inventory-ui";
 import { itemHistory, type ItemHistoryRow } from "@/services/inventory.service";
+import { judgeTrend, toPoint } from "@/lib/inventory/waste-trend";
+import { LossBars, PartialNote, TrendBadge, TrendSentence } from "@/components/loss-trend";
 import { itemMovements, itemUsage, type ItemMovement } from "@/services/inventory-item.service";
 import { OPENING_SOURCE_LABEL } from "@/lib/inventory/engine";
 import { formatQuantity, formatSignedQuantity, milliToDecimal } from "@/lib/inventory/units";
@@ -81,11 +83,22 @@ export async function ItemView({
   }
 
   const showAmounts = can(user.role, "amounts:view");
-  const [history, movements, usage] = await Promise.all([
-    itemHistory(id, 12),
+  const [fullHistory, movements, usage] = await Promise.all([
+    itemHistory(id, 60),
     itemMovements(id),
     itemUsage(id),
   ]);
+  /* السجلُّ المعروض آخرُ اثني عشر؛ والرسمُ يأخذ كلَّ الجرود المقفلة */
+  const history = fullHistory.slice(0, 12);
+  const lossPoints = fullHistory
+    .filter((h) => h.status === "FINALISED" && h.inScope)
+    .map((h) => toPoint({
+      productId: id, productName: product.nameAr, category: product.category, baseUnit: h.baseUnit, countId: h.countId, periodEnd: h.periodEnd,
+      varianceMilli: h.varianceMilli, varianceConsumptionBp: h.varianceConsumptionBp, varianceCostMinor: h.varianceCostMinor, recordedWasteMilli: h.recordedWasteMilli,
+      partial: h.partial,
+    }))
+    .sort((a, b) => (a.periodEnd < b.periodEnd ? -1 : 1));
+  const lossJudgement = judgeTrend(lossPoints);
   const finalised = history.filter((h) => h.status === "FINALISED" && h.varianceMilli !== null);
 
   const negatives = finalised.filter((h) => (h.varianceMilli ?? 0) < 0).length;
@@ -123,6 +136,18 @@ export async function ItemView({
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 @4xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-10">
+          {/* ── الفاقدُ جرداً جرداً وهل يتحسّن ── */}
+          {lossPoints.length > 0 && (
+            <Section title="الفاقد عبر الجرود" className="mt-0!" hint="نقصُ الصنف من استهلاكه المتوقَّع في كلّ جردٍ مقفل. الزيادةُ لا تُعدّ فاقداً.">
+              <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
+                <TrendBadge verdict={lossJudgement.verdict} />
+                <p className="min-w-0 flex-1 basis-64 text-[13px] leading-relaxed"><TrendSentence j={lossJudgement} subject="هذا الصنف" /></p>
+              </div>
+              <LossBars points={lossPoints} label={`نقص ${product.nameAr} من استهلاكه المتوقع، جرداً جرداً`} />
+              <PartialNote points={lossPoints} />
+            </Section>
+          )}
+
           {/* ── الفرقُ عبر الجرودات: جهتان لا صافٍ ── */}
           <Section title="الفرق في الجرود المقفلة" className="mt-0!" hint={finalised.length > 0 ? `حُسب فرقه في آخر ${finalised.length === 1 ? "جرد واحد" : finalised.length === 2 ? "جردين" : `${finalised.length} جردات`}.` : undefined}>
             {finalised.length === 0 ? (

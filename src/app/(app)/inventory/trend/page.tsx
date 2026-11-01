@@ -11,9 +11,13 @@ import { READINESS_LABEL } from "@/lib/inventory/coverage";
 import { countNoun } from "@/lib/arabic";
 import { Money } from "@/components/money";
 import { listCounts, recurringVariances, type RecurringItem } from "@/services/inventory.service";
+import { loadProductTrends } from "@/services/inventory-trend.service";
+import { judgeTrend, type ProductTrend, type TrendPoint } from "@/lib/inventory/waste-trend";
+import { LossBars, PartialNote, TrendBadge, TrendSentence, TrendSpark, share } from "@/components/loss-trend";
 import { formatBp } from "@/lib/inventory/equation";
 import { combineSummaries } from "@/lib/inventory/variance-summary";
-import { formatSignedQuantity } from "@/lib/inventory/units";
+import { formatQuantity, formatSignedQuantity } from "@/lib/inventory/units";
+import { storedUnitLabel } from "@/lib/unit-conversion";
 import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
 
@@ -31,12 +35,22 @@ const WINDOWS = [
   { key: "8", label: "آخر 8 أسابيع", weeks: 8 },
   { key: "13", label: "آخر 3 أشهر", weeks: 13 },
   { key: "26", label: "آخر 6 أشهر", weeks: 26 },
+  { key: "all", label: "كل الجرود", weeks: 520 },
 ];
+
+/** تصفيةُ جدول الأصناف بحكمها. */
+const SHOWS = [
+  { key: "all", label: "كلها" },
+  { key: "WORSENING", label: "تسوء" },
+  { key: "IMPROVING", label: "تتحسّن" },
+  { key: "STEADY", label: "ثابتة" },
+  { key: "TOO_FEW", label: "لا يكفي للحكم" },
+] as const;
 
 export default async function InventoryTrendPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ window?: string; show?: string }>;
 }) {
   const params = await searchParams;
   const user = await currentUser();
@@ -49,13 +63,15 @@ export default async function InventoryTrendPage({
     );
   }
 
-  const chosen = WINDOWS.find((w) => w.key === params.window) ?? WINDOWS[0];
+  /* الاتجاهُ يحتاج جروداً كثيرة: الافتراضيُّ كلُّها، لا آخرُ أربعة أسابيع */
+  const chosen = WINDOWS.find((w) => w.key === params.window) ?? WINDOWS[WINDOWS.length - 1];
+  const show = SHOWS.find((x) => x.key === params.show)?.key ?? "all";
   const since = addDays(todayInRiyadh(), -chosen.weeks * 7);
 
   const all = await listCounts(80);
   const finalisedAll = all.filter((c) => c.status === "FINALISED").length;
   const inWindow = all.filter((c) => c.status === "FINALISED" && c.periodEnd >= since);
-  const recurring = await recurringVariances(since);
+  const [recurring, productTrends] = await Promise.all([recurringVariances(since), loadProductTrends(since)]);
 
   /*
     ── المقاديرُ تُجمَع، لا الصافي ──
@@ -70,6 +86,17 @@ export default async function InventoryTrendPage({
   const maxWeek = Math.max(1, ...inWindow.map((c) => Math.max(c.summary.shortageCostMinor, c.summary.overageCostMinor)));
   const chrono = [...inWindow].reverse();
 
+  /* حكمُ المقهى كلِّه: نسبةُ نقص كلّ جردٍ من استهلاكه، بالقاعدة نفسها التي تحكم كلَّ صنف */
+  const overallPoints: TrendPoint[] = chrono.map((c) => ({
+    countId: c.id, periodEnd: c.periodEnd, shortageBp: c.summary.linesMeasured === 0 ? null : c.summary.shortageRateBp,
+    shortageMilli: 0, shortageCostMinor: c.summary.shortageCostMinor, recordedWasteMilli: 0,
+    partial: Boolean(c.readiness && c.readiness !== "READY"),
+  }));
+  const overall = judgeTrend(overallPoints);
+  const shown = show === "all" ? productTrends : productTrends.filter((t) => t.judgement.verdict === show);
+  const countOf = (v: string) => (v === "all" ? productTrends.length : productTrends.filter((t) => t.judgement.verdict === v).length);
+  const tabHref = (w: string, sh: string) => `/inventory/trend?window=${w}${sh === "all" ? "" : `&show=${sh}`}`;
+
   return (
     <PageShell
       user={user}
@@ -82,7 +109,7 @@ export default async function InventoryTrendPage({
       {finalisedAll > 0 && (
         <LinkTabs
           label="مدة التحليل"
-          items={WINDOWS.map((w) => ({ href: `/inventory/trend?window=${w.key}`, label: w.label, active: w.key === chosen.key }))}
+          items={WINDOWS.map((w) => ({ href: tabHref(w.key, show), label: w.label, active: w.key === chosen.key }))}
         />
       )}
 
@@ -132,6 +159,35 @@ export default async function InventoryTrendPage({
               }
             />
           </div>
+
+          <Section title="هل يتحسّن الفاقد؟" hint="نقصُ كلّ جردٍ من استهلاكه المتوقَّع، جرداً جرداً، والحكمُ بمقارنة نصف الجرود الأوّل بنصفها الأخير.">
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
+              <TrendBadge verdict={overall.verdict} />
+              <p className="min-w-0 flex-1 basis-64 text-[13px] leading-relaxed"><TrendSentence j={overall} subject="الفاقد في المقهى" /></p>
+            </div>
+            <LossBars points={overallPoints} label="نقص المقهى من استهلاكه المتوقع، جرداً جرداً" />
+            <PartialNote points={overallPoints} />
+          </Section>
+
+          <Section
+            title="فاقد كل صنف عبر الجرود"
+            count={shown.length}
+            hint="كلُّ صنفٍ قيس فرقُه في جردٍ مقفل، ويسوء أوّلاً. الهدرُ المسجَّل مخصومٌ من المتوقَّع أصلاً فيُعرض بجانب النقص ولا يُجمع إليه. افتح صنفاً ليظهر رسمُه جرداً جرداً."
+          >
+            <LinkTabs
+              label="تصفية الأصناف بحكمها"
+              items={SHOWS.map((x) => ({ href: tabHref(chosen.key, x.key), label: `${x.label} (${countOf(x.key)})`, active: x.key === show }))}
+            />
+            <div className="mt-3">
+              <DataTable
+                columns={productColumns}
+                rows={shown}
+                keyOf={(r) => r.productId}
+                hrefOf={(r) => `/inventory/items/${r.productId}`}
+                empty={<EmptyState compact icon={TrendingUp} title="لا أصناف بهذا الحكم في هذه المدة." />}
+              />
+            </div>
+          </Section>
 
           <Section
             title="أسبوعاً بأسبوع"
@@ -206,4 +262,24 @@ const recurringColumns: readonly Column<RecurringItem>[] = [
     key: "overage", header: "الزيادة", numeric: true, secondary: true,
     cell: (r) => r.overageCostMinor > 0 ? <span className="text-info"><Money minor={r.overageCostMinor} /></span> : <span className="text-muted">—</span>,
   },
+];
+
+const productColumns: readonly Column<ProductTrend>[] = [
+  { key: "name", header: "الصنف", primary: true, cell: (r) => <span className="font-bold">{r.productName}</span> },
+  { key: "verdict", header: "الاتجاه", cell: (r) => <TrendBadge verdict={r.judgement.verdict} /> },
+  { key: "spark", header: "جرداً جرداً", secondary: true, cell: (r) => <TrendSpark points={r.points} verdict={r.judgement.verdict} /> },
+  {
+    key: "move", header: "الأوّل ← الأخير", numeric: true,
+    cell: (r) => r.judgement.earlierBp === null || r.judgement.recentBp === null
+      ? <span className="text-muted">—</span>
+      : <span className="nums text-ink-soft">{share(r.judgement.earlierBp)} ← {share(r.judgement.recentBp)}</span>,
+  },
+  { key: "avg", header: "متوسط النقص", numeric: true, secondary: true, cell: (r) => <span className="nums text-muted">{r.averageBp === null ? "—" : share(r.averageBp)}</span> },
+  { key: "last", header: "آخر جرد", numeric: true, cell: (r) => <span className="nums">{r.lastBp === null ? "—" : share(r.lastBp)}</span> },
+  { key: "qty", header: "النقص بالكمية", numeric: true, secondary: true, cell: (r) => <span className="nums">{r.totalShortageMilli === 0 ? "—" : formatSignedQuantity(-r.totalShortageMilli, r.baseUnit)}</span> },
+  {
+    key: "cost", header: "كلفة النقص", numeric: true,
+    cell: (r) => r.totalShortageCostMinor === null ? <span className="text-[11px] text-muted">غير معروفة</span> : <Money minor={r.totalShortageCostMinor} tone={r.totalShortageCostMinor > 0 ? "danger" : undefined} />,
+  },
+  { key: "waste", header: "هدرٌ مسجَّل", numeric: true, secondary: true, cell: (r) => <span className="nums text-muted">{r.totalRecordedWasteMilli === 0 ? "—" : `${formatQuantity(r.totalRecordedWasteMilli, r.baseUnit)} ${storedUnitLabel(r.baseUnit)}`}</span> },
 ];
