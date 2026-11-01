@@ -43,6 +43,7 @@ import { SupplierEdit } from "@/components/supplier-edit";
 import { SUPPLIER_CATEGORY_LABEL, pastDueOf, whatsappHref } from "@/lib/supplier-edit";
 import { formatRiyals } from "@/lib/money";
 import { AccountReview } from "@/components/account-review";
+import { SupplierSettleCredit } from "@/components/supplier-settle-credit";
 import { SupplierHandDuplicates } from "@/components/hand-duplicate";
 import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
@@ -471,6 +472,12 @@ export async function SupplierView({
                   <T s="{0} دفعتها دون ربطها بفاتورة، وتوجد فاتورة مفتوحة بالمبلغ نفسه." a={[<Money key="0" minor={Math.min(unapplied, bal?.openMinor ?? 0)} />]} /></span>
                 <AccountReview size="sm" />
               </div>
+            )}
+            {/* دفعةٌ زادت واستُردّت بخصمها من لاحقة: التسويةُ هنا حيث يُرى «متوازن على الورق»، لا في بندٍ يمكن إخفاؤه */}
+            {unapplied > 0 && (bal?.openMinor ?? 0) > 0 && can(user.role, "payment:approve") && (
+              <Suspense fallback={null}>
+                <SupplierSettleCredit supplierId={s.id} />
+              </Suspense>
             )}
 
             {balance > 0 && (

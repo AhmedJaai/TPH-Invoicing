@@ -248,5 +248,6 @@
   "بالراتب المكتوب، قبل أي خصم أو إضافة": "At the written salary, before any deduction or addition",
   "لا كشف بنك يكفي للتقدير": "No bank statement long enough to estimate",
   "المتوقع شهرياً": "Expected monthly",
-  "مطابق للمتوقع": "Matches what was expected"
+  "مطابق للمتوقع": "Matches what was expected",
+  "في كشف المورّد سطرٌ دائن بالمبلغ نفسه: {0}. هذا ما يشرح الخصم.": "The supplier's own statement has a credit line for the same amount: {0}. That explains the deduction."
 }
