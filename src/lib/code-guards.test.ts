@@ -207,7 +207,10 @@ describe("لا نصّ ثانويّاً مبهّتاً دون حدّ التباي
   القاعدة أو التوأمُ يخرج ٥٠٠ بلا نصّ، وكلٌّ منها خطأُ عملٍ له جملتُه في `respondTo`.
   فمسارٌ يكتب `let user;` قبل الحارس يحتاج مترجماً ثانياً على الأقلّ لما بعده.
 */
-const GUARD_ONLY_TRY = /let user;\n\s+try \{\n(?:\s+\/\*.*\*\/\n)?\s+user = await guard\(/;
+const GUARD_ONLY_TRY = /(?:let user;\n\s+)?try \{\n(?:\s+\/\*.*\*\/\n)?\s+(?:user = )?await guard\([^;]*\);\n\s+\} catch/;
+
+/** ما بعد حارسه كلُّه في `try` له جملتُه — لا نداءَ قاعدةٍ ولا مزوّدٍ خارجه. */
+const GUARD_ONLY_EXEMPT = new Set([path.join("src", "app", "api", "upload", "blob", "route.ts")]);
 
 describe("لا مسار يترجم أخطاء حارسه وحده", () => {
   it("كلُّ مسارٍ بـ`let user; try { guard }` يترجم ما بعده كذلك", () => {
@@ -215,13 +218,14 @@ describe("لا مسار يترجم أخطاء حارسه وحده", () => {
       .filter((f) => {
         const s = readFileSync(f, "utf8");
         const mappers = (s.match(/respondTo\(e\)|answer\(|failWith\(/g) ?? []).length;
-        return GUARD_ONLY_TRY.test(s) && mappers <= 1;
+        return GUARD_ONLY_TRY.test(s) && mappers <= 1 && !GUARD_ONLY_EXEMPT.has(f);
       });
     expect(hits).toEqual([]);
   });
 
   it("والحارس يمسك الشكل الخاطئ", () => {
-    expect(GUARD_ONLY_TRY.test("  let user;\n  try {\n    user = await guard(\"x\", \"y\");")).toBe(true);
+    expect(GUARD_ONLY_TRY.test("  let user;\n  try {\n    user = await guard(\"x\", \"y\");\n  } catch (e) {")).toBe(true);
+    expect(GUARD_ONLY_TRY.test("  try {\n    await guard(\"x\", \"y\");\n  } catch (e) {")).toBe(true);
     expect(GUARD_ONLY_TRY.test("  const user = await guard(\"x\", \"y\");")).toBe(false);
   });
 });

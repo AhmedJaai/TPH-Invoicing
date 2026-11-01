@@ -12,13 +12,18 @@ import { answerQuestion } from "@/services/ask.service";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  /* الطلبُ كلُّه لا الحارسُ وحده: عطلُ القاعدة يُقال بنصّه لا ٥٠٠ */
   try {
-    await guard("ask", "amounts:view");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  await guard("ask", "amounts:view");
   const raw = (new URL(request.url).searchParams.get("q") ?? "").slice(0, 200);
   const question = parseQuestion(raw, currentMonthRiyadh());
   if (!question) return NextResponse.json({ ok: true, answer: null });

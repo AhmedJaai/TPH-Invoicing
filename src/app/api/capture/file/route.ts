@@ -16,13 +16,18 @@ import { MAX_IMAGE_PIXELS } from "@/lib/file-signature";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  /* الطلبُ كلُّه لا الحارسُ وحده: عطلُ القاعدة يُقال بنصّه لا ٥٠٠ */
   try {
-    await guard("capture-file", "document:upload");
+    return await handle(request);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle(request: Request) {
+  await guard("capture-file", "document:upload");
   const id = new URL(request.url).searchParams.get("id") ?? "";
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return NextResponse.json({ error: "معرّف الصورة غير صالح" }, { status: 400 });
   const file = await loadCaptureFile(id);

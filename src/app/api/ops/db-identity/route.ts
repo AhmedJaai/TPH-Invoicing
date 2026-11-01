@@ -22,13 +22,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  /* الطلبُ كلُّه لا الحارسُ وحده: عطلُ القاعدة يُقال بنصّه لا ٥٠٠ */
   try {
-    await guard("ops-db-identity", "audit:view");
+    return await handle();
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
+}
+
+async function handle() {
+  await guard("ops-db-identity", "audit:view");
 
   const conn = parseConnection(process.env.DATABASE_URL);
   const [row] = (
