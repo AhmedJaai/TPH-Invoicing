@@ -40,6 +40,7 @@ import { INVOICE, ITEM, TRANSACTION, countNoun } from "@/lib/arabic";
 import { collapseSalaryRows, HIDDEN_SALARY_LABEL } from "@/lib/payroll/visibility";
 import type { Role } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { microToMinor } from "@/lib/sales/values";
 import { catalogCosts, latestInvoiceUnitCosts, loadSoldForReport, loadWaste } from "./inventory.service";
 import { loadRecipeVersions } from "./recipe.service";
 import { payrollReclass } from "./payroll.service";
@@ -598,9 +599,9 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
       purchasesGrossOnly: inMonth.reduce((s, p) => s + p.grossOnly, 0),
       theoreticalMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.minor) : null,
       stock: stock.cogs, stockMissing: stock.missing,
-      /* شاهدُ فودكس يُقال للشهر الذي قُرئ صرفُه كلُّه وحده */
+      /* شاهدُ فودكس يُقال للشهر الذي قُرئ صرفُه كلُّه وحده — `cost_micro` جزءٌ من مئة ألف من الريال */
       foodicsMinor: foodics.rows[0]?.cost != null && Number(foodics.rows[0].days) >= expected && expected > 0
-        ? Math.round(Number(foodics.rows[0].cost) / 1000) : null,
+        ? microToMinor(Number(foodics.rows[0].cost)) : null,
       wasteMinor,
       staffMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.staffMinor) : null,
       returnedMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.returnedMinor) : null,

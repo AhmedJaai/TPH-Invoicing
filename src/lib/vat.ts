@@ -14,29 +14,41 @@
 /** نسبةُ الضريبة في المملكة: ١٥٪ — فالضريبةُ من المبلغ الشامل ١٥ من ١١٥. */
 export const VAT_PERCENT = 15;
 
+/**
+ * ‏`بسط ÷ مقام` إلى أقرب هللة، **والنصفُ بعيداً عن الصفر في الجهتين** وبلا «سالب صفر».
+ *
+ * ‏`Math.round` يقرّب ‎−١٫٥ إلى ‎−١ و١٫٥ إلى ٢: فصافي ١٠ هللات ضريبتُه ٢ ومرتجعُه
+ * ‎−١، ولا تتقاصّ فاتورةٌ وإشعارُها الدائن إلى صفر. كشفه `vat.property.test.ts`،
+ * وهي قاعدةُ `milliMinorToMinor` نفسُها.
+ */
+function roundRatio(numerator: number, denominator: number): number {
+  const rounded = Math.round(Math.abs(numerator) / denominator);
+  return numerator < 0 && rounded !== 0 ? -rounded : rounded;
+}
+
 /** ضريبةٌ داخل مبلغٍ شاملها، بالهللات وبتقريبٍ واحد. */
 export function vatInsideGross(grossMinor: number): number {
-  return Math.round((grossMinor * VAT_PERCENT) / (100 + VAT_PERCENT));
+  return roundRatio(grossMinor * VAT_PERCENT, 100 + VAT_PERCENT);
 }
 
 /** ضريبةُ صافٍ قبلها: ١٥٪ منه، بالهللات وبتقريبٍ واحد — ضربٌ صحيح لا `× 0.15` عائماً. */
 export function vatOnNet(netMinor: number): number {
-  return Math.round((netMinor * VAT_PERCENT) / 100);
+  return roundRatio(netMinor * VAT_PERCENT, 100);
 }
 
 /** الصافي داخل مبلغٍ شاملٍ الضريبة: ١٠٠ من ١١٥، بتقريبٍ واحد. */
 export function netInsideGross(grossMinor: number): number {
-  return Math.round((grossMinor * 100) / (100 + VAT_PERCENT));
+  return roundRatio(grossMinor * 100, 100 + VAT_PERCENT);
 }
 
 /** وعاءُ ضريبةٍ معلومة: ١٠٠ من ١٥ منها، بتقريبٍ واحد. */
 export function netOfVat(vatMinor: number): number {
-  return Math.round((vatMinor * 100) / VAT_PERCENT);
+  return roundRatio(vatMinor * 100, VAT_PERCENT);
 }
 
 /** المبلغُ الشامل الذي فيه هذه الضريبة: ١١٥ من ١٥ منها، بتقريبٍ واحد. */
 export function grossOfVat(vatMinor: number): number {
-  return Math.round((vatMinor * (100 + VAT_PERCENT)) / VAT_PERCENT);
+  return roundRatio(vatMinor * (100 + VAT_PERCENT), VAT_PERCENT);
 }
 
 /**
