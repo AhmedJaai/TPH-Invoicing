@@ -19,7 +19,7 @@ import { canonicalToQuantity, formatSignedQuantity, milliToDecimal, unitChoices 
 import { formatBp } from "@/lib/inventory/equation";
 import { describeCoverage, READINESS_LABEL, type CoverageGap, type Readiness } from "@/lib/inventory/coverage";
 import {
-  FLAG_LABEL, OPENING_SOURCE_LABEL, VALUATION_LABEL, topVariances, type EngineReport,
+  FLAG_LABEL, OPENING_SOURCE_LABEL, VALUATION_LABEL, allVariances, restOfScope, type EngineReport,
 } from "@/lib/inventory/engine";
 import { LINE, PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
@@ -137,7 +137,9 @@ export function InventoryWorkspace({
   }));
 
   /* والترتيبُ بالكلفة يبقى صحيحاً وإن لم تُعرَض — من يعدّ يرى الأثقل أوّلاً */
-  const top = topVariances(report, 8);
+  /* كلُّ الفروق لا أعلاها ثمانية — والباقي أدناه قابلاً للطيّ */
+  const top = allVariances(report);
+  const rest = restOfScope(report);
   const measured = summary.linesMeasured > 0;
 
   /* الاستلامُ يُقترَح في يومه إن وقع في الأسبوع، وإلّا آخرَ يومٍ فيه */
@@ -191,9 +193,10 @@ export function InventoryWorkspace({
       />
 
       <Section
-        title="أكبر الفروق"
+        title="الفروق"
+        count={top.length > 0 ? top.length : undefined}
         className="mt-0!"
-        hint={anyCost ? "مرتّبة بالتكلفة لا بالكمية، فكيلو البن أغلى بكثير من لتر الحليب، وهذا لا يظهر من الكميات وحدها." : undefined}
+        hint={anyCost ? "كلها، الأكبر أولاً. مرتّبة بالتكلفة لا بالكمية، فكيلو البن أغلى بكثير من لتر الحليب، وهذا لا يظهر من الكميات وحدها." : "كلها، الأكبر نسبةً أولاً."}
       >
         {top.length === 0 ? (
           <EmptyState
@@ -243,6 +246,24 @@ export function InventoryWorkspace({
               );
             })}
           </ul>
+        )}
+        {rest.length > 0 && (
+          <details className="group mt-3 rounded-xl border border-line bg-raised shadow-raised">
+            <summary className="flex min-h-11 cursor-pointer select-none items-center justify-between gap-2 px-4 text-xs font-bold text-ink-soft hover:text-ink">
+              <span><T s="باقي أصناف الجرد بلا فرق يُعرض ({0})" a={[<span key="0" className="nums">{rest.length}</span>]} /></span>
+            </summary>
+            <ul className="divide-y divide-line-soft border-t border-line-soft text-xs">
+              {rest.map(({ line, why }) => (
+                <li key={line.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+                  <Link href={`/inventory/items/${line.productId}`} className="min-w-0 flex-1 basis-40 truncate font-bold hover:text-accent hover:underline">{line.productName}</Link>
+                  <span className={why === "MATCHED" ? "text-ok" : "text-muted"}>
+                    {why === "MATCHED" ? "مطابق لما كان متوقعاً" : why === "NOT_COUNTED" ? "لم يُعدّ" : "عُدّ ولم يُحسب فرقه: لا وصفة تعدّ استهلاكه"}
+                  </span>
+                  {line.actualMilli !== null && <span className="nums text-muted">{q(line.actualMilli, line.baseUnit)} {storedUnitLabel(line.baseUnit)}</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
         {top.length > 0 && (
           <p className="mt-2 text-[11px] leading-relaxed text-muted">

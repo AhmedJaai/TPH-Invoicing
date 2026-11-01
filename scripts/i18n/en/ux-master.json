@@ -134,5 +134,12 @@
 "الأصناف المهدرة": "Wasted items",
 "كلّها، الأعلى تكلفةً أولاً. وما لا سعر لوحدته يأتي في آخرها بلا رقم.": "All of them, highest cost first. Items with no unit price come last with no figure.",
 "لا أصناف مهدرة في هذه الأسابيع.": "No wasted items in these weeks.",
-"تكلفته غير معروفة": "Cost unknown"
+"تكلفته غير معروفة": "Cost unknown",
+"الفروق": "Variances",
+"كلها، الأكبر أولاً. مرتّبة بالتكلفة لا بالكمية، فكيلو البن أغلى بكثير من لتر الحليب، وهذا لا يظهر من الكميات وحدها.": "All of them, biggest first. Sorted by cost, not quantity: a kilo of coffee costs far more than a litre of milk, and quantities alone don't show that.",
+"كلها، الأكبر نسبةً أولاً.": "All of them, biggest percentage first.",
+"باقي أصناف الجرد بلا فرق يُعرض ({0})": "Other counted items with no variance to show ({0})",
+"مطابق لما كان متوقعاً": "Matches what was expected",
+"لم يُعدّ": "Not counted",
+"عُدّ ولم يُحسب فرقه: لا وصفة تعدّ استهلاكه": "Counted, variance not computed: no recipe accounts for its usage"
 }

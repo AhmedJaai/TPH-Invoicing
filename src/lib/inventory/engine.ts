@@ -535,6 +535,14 @@ export function reconcile(input: EngineInput): EngineReport {
  * بأربعة أضعاف، والعينُ لا تقرأ ذلك من الكمّيّتين.
  */
 export function topVariances(report: EngineReport, limit = 5): ReportLine[] {
+  return allVariances(report).slice(0, limit);
+}
+
+/**
+ * كلُّ الفروق بالترتيب نفسه — لا أعلاها وحسب (أحمد، ١ نوفمبر ٢٠٢٦: «المفترض يظهر كلُّ المواد أو
+ * الأسطر»). وهي ما تعرضه شاشةُ الجرد؛ و`topVariances` لمن يريد قصّاً (الإشعارات والملخّصات).
+ */
+export function allVariances(report: EngineReport): ReportLine[] {
   return report.lines
     .filter((l) => l.inScope && l.varianceMilli !== null && l.varianceMilli !== 0)
     .sort((a, b) => {
@@ -542,8 +550,18 @@ export function topVariances(report: EngineReport, limit = 5): ReportLine[] {
       const bc = b.varianceCostMinor === null ? -1 : Math.abs(b.varianceCostMinor);
       if (ac !== bc) return bc - ac;
       return Math.abs(b.varianceBp ?? 0) - Math.abs(a.varianceBp ?? 0);
-    })
-    .slice(0, limit);
+    });
+}
+
+/** أصنافُ النطاق التي لا فرقَ يُعرض لها — مطابقةٌ، أو لم تُعدّ، أو لا معادلةَ لها — فلا يغيب سطرٌ. */
+export function restOfScope(report: EngineReport): { line: ReportLine; why: "MATCHED" | "NOT_COUNTED" | "NOT_MEASURED" }[] {
+  return report.lines
+    .filter((l) => l.inScope && (l.varianceMilli === null || l.varianceMilli === 0))
+    .map((line) => ({
+      line,
+      why: line.varianceMilli === 0 ? "MATCHED" as const : line.actualMilli === null ? "NOT_COUNTED" as const : "NOT_MEASURED" as const,
+    }))
+    .sort((a, b) => a.line.productName.localeCompare(b.line.productName, "ar"));
 }
 
 /** ما بِيع مجاناً في الفترة — عدداً ووحداتٍ، وكلفتُه من أسطر المكوّنات. */

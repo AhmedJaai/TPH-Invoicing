@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENGINE_VERSION, reconcile, topVariances, type EngineInput } from "./engine";
+import { allVariances, ENGINE_VERSION, reconcile, restOfScope, topVariances, type EngineInput } from "./engine";
 import { canonicalToQuantity, toCanonical } from "./units";
 import type { RecipeVersionInput } from "./recipe";
 import type { SoldLineInput } from "./consumption";
@@ -187,6 +187,18 @@ describe("المجموع يقول ما سقط منه", () => {
     const top = topVariances(r, 5);
     expect(top[0].productId).toBe(COFFEE);
     expect(Math.abs(top[0].varianceCostMinor!)).toBeGreaterThan(Math.abs(top[1].varianceCostMinor!));
+  });
+});
+
+describe("كلُّ الأصناف تظهر: الفروقُ كلُّها والباقي", () => {
+  it("allVariances لا تقتصّ، وrestOfScope تحمل ما سواها فلا يغيب سطرٌ من النطاق", () => {
+    const r = reconcile(input());
+    const inScope = r.lines.filter((l) => l.inScope).length;
+    expect(allVariances(r).length + restOfScope(r).length).toBe(inScope);
+    expect(allVariances(r).length).toBeGreaterThanOrEqual(topVariances(r, 1).length);
+    expect(topVariances(r, 1)).toHaveLength(1);
+    const ids = new Set([...allVariances(r), ...restOfScope(r).map((x) => x.line)].map((l) => l.productId));
+    expect(ids.size).toBe(inScope);
   });
 });
 
