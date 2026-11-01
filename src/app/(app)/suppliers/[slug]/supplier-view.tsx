@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { isUntaxedInvoice, UNTAXED_HINT, UNTAXED_LABEL } from "@/lib/invoice-tax-display";
 import { SupplierQrLine } from "@/components/supplier-qr";
 import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
@@ -227,6 +228,8 @@ export async function SupplierView({
             date: invoices.invoiceDate,
             total: invoices.totalMinor,
             taxStatus: invoices.taxStatus,
+            vatMinor: invoices.vatMinor,
+            sellerVat: invoices.sellerVat,
             /* `${invoices}.id` لا `${invoices.id}` — الثاني يصمت في الاستعلام الفرعيّ */
             allocated: sql<number>`coalesce((
               select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id
@@ -701,11 +704,13 @@ export async function SupplierView({
                     key: "tax",
                     header: "الضريبة",
                     secondary: true,
-                    cell: (r) => (
-                      <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : undefined} dot>
-                        {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تُقرأ" : "لا تقيّد"}
-                      </Badge>
-                    ),
+                    cell: (r) => isUntaxedInvoice({ vatMinor: r.vatMinor, sellerVat: r.sellerVat, supplierVat: s.vatNumber })
+                      ? <span title={UNTAXED_HINT}><Badge tone="muted">{UNTAXED_LABEL}</Badge></span>
+                      : (
+                        <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : undefined} dot>
+                          {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تُقرأ" : "لا تقيّد"}
+                        </Badge>
+                      ),
                   },
                   ...(showAmounts
                     ? [

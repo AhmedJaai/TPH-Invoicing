@@ -177,3 +177,48 @@ describe("readingBalances — قراءةٌ لا يستقيم حسابها لا �
     expect(readingBalances([{ debitMinor: 100, creditMinor: 0 }], 0, null)).toBeNull();
   });
 });
+
+/**
+ * أوراق الزيتون، كشف ٣١ أكتوبر ٢٠٢٦ (٧٦ سطراً): النموذجُ وضع الرصيدَ الجاريَ في «مدين» ومبلغَ الفاتورة في «الرصيد»،
+ * وفيه سدادٌ **جزئيّ** يبقى بعده رصيد. فصارت ٦٧ فاتورةً «متنازَعاً عليها» بمبالغ مضخَّمة (مجموعُ المدين ١٨٤ ألفاً).
+ */
+describe("الرصيدُ الجاريّ في «مدين» مع سدادٍ جزئيّ — الشاهدُ هو «الرصيد» المطبوع", () => {
+  const row = (date: string, ref: string, debit: string, credit: string, balance: string) => ({ date, ref, description: credit ? "تحويل بنكي" : "فاتورة", debit, credit, balance });
+  const reading = (rows: ReturnType<typeof row>[], closing: string) => ({ openingBalance: "", closingBalance: closing, statementLines: rows });
+  const sample = [
+    row("2026-05-14", "1", "420", "", "420"),
+    row("2026-05-15", "2", "585", "", "165"),
+    row("2026-05-20", "3", "865", "", "280"),
+    row("2026-06-01", "", "", "600", "265"),   // سدادٌ جزئيّ: ٨٦٥ − ٦٠٠
+    row("2026-06-02", "4", "545", "", "280"),
+  ];
+
+  it("يُعيد الأرصدةَ إلى مبالغها ويُبقي السدادَ الجزئيّ سداداً", () => {
+    const r = parseStatementExtras(reading(sample, "545"));
+    expect(r.columnsRepaired).toBe(true);
+    expect(r.lines.map((l) => [l.debitMinor / 100, l.creditMinor / 100])).toEqual([[420, 0], [165, 0], [280, 0], [0, 600], [280, 0]]);
+    expect(readingBalances(r.lines, r.openingBalanceMinor, r.closingBalanceMinor)).toBe(true);
+  });
+
+  it("سطرٌ سقط من القراءة يكسر الشهادةَ فلا يُدمج فاتورتان صامتتين: يبقى الكشفُ كما قُرئ", () => {
+    const dropped = sample.filter((_, i) => i !== 2);
+    const r = parseStatementExtras(reading(dropped, "545"));
+    expect(r.columnsRepaired).toBe(false);
+  });
+
+  it("وشاهدٌ يخالف الحساب (رصيدٌ مطبوعٌ مغلوط) لا يُصلَح به", () => {
+    const wrong = sample.map((l, i) => (i === 1 ? { ...l, balance: "170" } : l));
+    expect(parseStatementExtras(reading(wrong, "545")).columnsRepaired).toBe(false);
+  });
+
+  it("وكشفٌ عاديّ (مبالغ في «مدين» وأرصدةٌ حقيقيّة) لا يُمسّ", () => {
+    const normal = [
+      row("2026-05-14", "1", "420", "", "420"),
+      row("2026-05-15", "2", "165", "", "585"),
+      row("2026-05-20", "3", "280", "", "865"),
+    ];
+    const r = parseStatementExtras(reading(normal, "865"));
+    expect(r.columnsRepaired).toBe(false);
+    expect(r.lines.map((l) => l.debitMinor / 100)).toEqual([420, 165, 280]);
+  });
+});

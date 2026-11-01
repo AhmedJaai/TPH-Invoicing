@@ -56,6 +56,8 @@ export interface InvoiceProfile {
     slug: string;
     issuesInvoices: boolean;
     contractOnFile: boolean;
+    /** رقمُه الضريبيّ — فارغٌ لمورّدٍ بلا شهادةٍ ضريبيّة (`invoice-tax-display.ts`). */
+    vatNumber: string | null;
   };
   document: {
     id: string;
@@ -124,6 +126,7 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
         slug: suppliers.slug,
         issuesInvoices: suppliers.issuesInvoices,
         contractOnFile: suppliers.contractOnFile,
+        vatNumber: suppliers.vatNumber,
       },
       document: {
         id: documents.id,

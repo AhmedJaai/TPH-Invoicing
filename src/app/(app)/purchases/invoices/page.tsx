@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isUntaxedInvoice, UNTAXED_HINT, UNTAXED_LABEL } from "@/lib/invoice-tax-display";
 import { redirect } from "next/navigation";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { ArrowLeft, ArrowRight, CircleCheck, FileText, Receipt, Scale, Upload, Wallet } from "lucide-react";
@@ -128,6 +129,7 @@ export default async function InvoicesPage({
         chargesMinor: invoices.chargesMinor,
         issuesInvoices: suppliers.issuesInvoices,
         contractOnFile: suppliers.contractOnFile,
+        supplierVat: suppliers.vatNumber,
       })
       .from(invoices)
       .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
@@ -342,6 +344,10 @@ export default async function InvoicesPage({
                   header: "الضريبة",
                   /* الشارةُ بابٌ إلى سببها: من ضغطها رأى أيّ ركنٍ ينقص وصحّحه */
                   cell: (r) => {
+                    /* مورّدٌ بلا شهادة ضريبيّة: لا «ناقصة» ولا «ينقصها» — `invoice-tax-display.ts` */
+                    if (isUntaxedInvoice({ vatMinor: r.vatMinor, sellerVat: r.sellerVat, supplierVat: r.supplierVat })) {
+                      return <span title={UNTAXED_HINT}><Badge tone="muted">{UNTAXED_LABEL}</Badge></span>;
+                    }
                     const badge = (
                       <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : "muted"} dot>
                         {TAX_LABEL[r.taxStatus as keyof typeof TAX_LABEL] ?? r.taxStatus}

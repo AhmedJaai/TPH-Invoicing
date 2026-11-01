@@ -55,6 +55,8 @@ export function parseStatementExtras(raw: unknown): StatementExtras {
 
   const rawLines = Array.isArray(rec.statementLines) ? rec.statementLines : [];
   const lines: RawStatementLine[] = [];
+  /** ما طبعه الكشفُ في خانة «الرصيد» لكلّ سطرٍ حُفظ — شاهدٌ للإصلاح لا قيمةٌ تُخزَّن. */
+  const printed: (number | null)[] = [];
   const unreadLines: StatementExtras["unreadLines"] = [];
 
   for (const item of rawLines) {
@@ -85,11 +87,13 @@ export function parseStatementExtras(raw: unknown): StatementExtras {
       debitMinor: Math.abs(debitMinor),
       creditMinor: Math.abs(creditMinor),
     });
+    const printedText = asText(l.balance);
+    printed.push(printedText ? parseRiyals(printedText) : null);
   }
 
   const openingBalanceMinor = parseRiyals(asText(rec.openingBalance));
   const closingBalanceMinor = parseRiyals(asText(rec.closingBalance));
-  const repaired = repairRunningBalance(lines, openingBalanceMinor, closingBalanceMinor);
+  const repaired = repairRunningBalance(lines, openingBalanceMinor, closingBalanceMinor, printed);
   const fixed = repaired ? null : repairStatementArithmetic(lines, openingBalanceMinor, closingBalanceMinor);
   return {
     openingBalanceMinor: fixed ? fixed.openingMinor : openingBalanceMinor,
@@ -160,6 +164,8 @@ export function repairRunningBalance(
   lines: readonly RawStatementLine[],
   openingMinor: number | null,
   closingMinor: number | null,
+  /** «الرصيد» المطبوع لكلّ سطر بالموضع نفسه — شاهدٌ لما لا يقوم بالحساب وحده (سدادٌ جزئيّ). */
+  printed?: readonly (number | null)[],
 ): RawStatementLine[] | null {
   if (lines.length < 2) return null;
   const TOL = 1;
@@ -183,7 +189,7 @@ export function repairRunningBalance(
     if (closingMinor !== null && Math.abs(prev - closingMinor) > TOL) continue;
     return out;
   }
-  return balanceOnly(lines, openingMinor, closingMinor, TOL);
+  return balanceOnly(lines, openingMinor, closingMinor, TOL) ?? witnessedBalanceOnly(lines, openingMinor, closingMinor, printed, TOL);
 }
 
 /**
@@ -216,6 +222,48 @@ function balanceOnly(
       if (l.debitMinor === 0 && Math.abs(prev - l.creditMinor) > TOL) return null;
       out.push({ ...l, debitMinor: 0 });
       prev -= l.creditMinor;
+    }
+  }
+  if (charges < 2 || Math.abs(prev - closingMinor) > TOL) return null;
+  return out;
+}
+
+/**
+ * الصورةُ الثالثة: كالثانية **وفيها سدادٌ جزئيّ** — أوراق الزيتون (كشف ٣١ أكتوبر، ٧٦ سطراً): «٤٢٠ · ٥٨٥ · ٨٦٥…»
+ * أرصدةٌ في «مدين»، ثمّ سدادٌ ٦٬٢٣٥ من رصيد ٧٬٠٠٠ يبقى بعده ٧٦٥. فلا يُصفّي السدادُ الحسابَ، ولا يقوم الحسابُ
+ * وحده بنفي سطرٍ سقط (فاتورتان مدمجتان).
+ *
+ * فالشاهدُ ما طبعه النموذجُ في خانة «الرصيد» لكلّ سطرٍ: مبلغُ الفاتورة في أسطر الفواتير، والرصيدُ بعد السداد في
+ * السدادات. ولا يُقبل الإصلاحُ إلّا إن **شهد على كلّ سطرٍ بلا استثناء** (بريالٍ تسامحاً) وطابق آخرُ رصيدٍ الختاميَّ.
+ * فسطرٌ ساقط أو مبلغٌ مخمَّن يكسر الشهادةَ في موضعه فيُترك الكشفُ كما قُرئ ومُعلَناً.
+ */
+function witnessedBalanceOnly(
+  lines: readonly RawStatementLine[],
+  openingMinor: number | null,
+  closingMinor: number | null,
+  printed: readonly (number | null)[] | undefined,
+  TOL: number,
+): RawStatementLine[] | null {
+  if (closingMinor === null || !printed || printed.length !== lines.length || lines.length === 0) return null;
+  let prev = openingMinor === null || openingMinor === lines[0].debitMinor ? 0 : openingMinor;
+  const out: RawStatementLine[] = [];
+  let charges = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const witness = printed[i];
+    if (witness === null) return null;
+    if (l.creditMinor === 0) {
+      const step = l.debitMinor - prev;
+      if (step <= 0 || Math.abs(witness - step) > TOL) return null;
+      out.push({ ...l, debitMinor: step, creditMinor: 0 });
+      charges++;
+      prev = l.debitMinor;
+    } else {
+      const after = prev - l.creditMinor;
+      if (after < -TOL || Math.abs(witness - after) > TOL) return null;
+      if (l.debitMinor !== 0 && Math.abs(l.debitMinor - after) > TOL) return null;
+      out.push({ ...l, debitMinor: 0 });
+      prev = Math.max(0, after);
     }
   }
   if (charges < 2 || Math.abs(prev - closingMinor) > TOL) return null;

@@ -35,6 +35,7 @@ import { firstClosedMonth } from "@/services/month-guard";
 import { ISSUE } from "@/lib/issue-codes";
 import { FIELD_LABEL, LOW_CONFIDENCE, amountsAddUp, invoiceHref, weakFields } from "@/lib/invoice-profile";
 import { TAX_LABEL } from "@/lib/invoice-filter";
+import { isUntaxedInvoice, UNTAXED_LABEL } from "@/lib/invoice-tax-display";
 import { companyConfig } from "@/config/drive";
 import { formatRiyals, formatRiyalsDisplay, TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
@@ -151,7 +152,9 @@ export async function InvoiceView({
     ? [{ code: "FUTURE_DATE", severity: "WARN" as const, what: `تاريخها ${formatDay(todayInRiyadh(inv.date))} بعد اليوم`, fix: "الأرجح أن القراءة أخطأت اليوم والشهر. صحّحه كما على الورقة." }, ...reasons]
     : reasons;
   /* الركنُ الناقص باسمه — يُقال بجانب «غير صالحة» */
-  const gaps = verdict.taxStatus === "VALID" ? [] : missingPillars(reasons);
+  /* مورّدٌ بلا شهادةٍ ضريبيّة: لا يُسمّى ما ليس عنده «ناقصاً» (`invoice-tax-display.ts`) */
+  const untaxed = isUntaxedInvoice({ vatMinor: inv.vatMinor, sellerVat: inv.sellerVat, supplierVat: p.supplier.vatNumber });
+  const gaps = verdict.taxStatus === "VALID" || untaxed ? [] : missingPillars(reasons);
   /*
     الحالُ المحفوظة قديمة: حُسبت على قراءةٍ غيرِ ما في الصفّ اليوم. كانت الصفحةُ تقول
     «غير صالحة» وقائمةُ ما ينقص فارغة — تناقضٌ لا يُفهم. فيُقال، ويُعاد الحكمُ بضغطة.
@@ -171,7 +174,7 @@ export async function InvoiceView({
   const cancellable = canEdit && p.allocations.length === 0 && p.statementLines.length === 0;
   const partial = !p.settled && p.paidMinor > 0;
 
-  const taxTone: Tone = inv.taxStatus === "VALID" ? "ok" : inv.taxStatus === "INVALID" ? "danger" : "muted";
+  const taxTone: Tone = untaxed ? "muted" : inv.taxStatus === "VALID" ? "ok" : inv.taxStatus === "INVALID" ? "danger" : "muted";
   const payBadge = p.settled
     ? { tone: "ok" as Tone, text: "مسدّدة" }
     : partial
@@ -248,7 +251,7 @@ export async function InvoiceView({
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={payBadge.tone} dot>{payBadge.text}</Badge>
             <Link href="#tax" className="rounded-full">
-              <Badge tone={taxTone} dot>{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}</Badge>
+              <Badge tone={taxTone} dot={!untaxed}>{untaxed ? UNTAXED_LABEL : (TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus)}</Badge>
             </Link>
             {inv.taxStatus !== "VALID" && gaps.length > 0 && (
               <span className="text-xs text-ink-soft"><T s="ينقصها: {0}" a={[<b key="0" className="text-ink">{gaps.join("، ")}</b>]} /></span>
