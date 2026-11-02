@@ -133,6 +133,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   SUPPLIER_REQUEST_SENT: "مطالبة مورّد بفواتيره",
   DOCUMENT_EXPIRY_SAVED: "حفظ وثيقة بتاريخ انتهائها",
   DOCUMENT_EXPIRY_CLOSED: "أرشفة وثيقة أو إعادتها",
+  TASK_SAVED: "حفظ مهمّة أو تذكير",
+  TASK_CLOSED: "إنجاز مهمّة أو إسقاطها أو إعادتها",
   PAYMENT_CASH_FLOOR_SET: "ضبط حدّ الرصيد الأدنى",
   CASH_CUSTODY_SET: "أين نقد الصندوق",
   BANK_HELD_ROW_RESOLVED: "قرار في سطر كشف غير واضح",

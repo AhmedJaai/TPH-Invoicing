@@ -34,6 +34,7 @@ import { groupIban } from "./bank/iban-guard";
 import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
 import { loadRecurringAnomalies } from "@/services/recurring-watch.service";
 import { loadDueObligations } from "@/services/obligation.service";
+import { loadDueTasks } from "@/services/task.service";
 import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service";
 import { loadFinanceAttentionFacts } from "@/services/finance-attention.service";
 import { loadOrphanProformas } from "@/services/proforma-watch.service";
@@ -50,12 +51,13 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
     /* فحوصُ الصباح تُقرأ ولا تُعاد: آخرُ ما وجده `/api/cron/daily` */
     loadSealDrift(), loadLowAiBalance(),
+    loadDueTasks(),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -79,6 +81,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     stockRecurringGaps: finance.recurring.map((g) => ({ productId: g.productId, name: g.name, kind: g.kind, months: g.months.length, totalMinor: g.totalMinor, byWitness: g.byWitness })),
     recurringAnomalies,
     expiringObligations: dueDocs.map((o) => ({ title: o.title, kindLabel: OBLIGATION_KIND_LABEL[o.kind], expiresOn: o.expiresOn, daysLeft: o.daysLeft })),
+    dueTasks: dueTasks.flatMap((t) => (t.level === "OVERDUE" || t.level === "TODAY" || t.level === "REMINDER" ? [{ title: t.title, level: t.level, dueOn: t.dueOn, high: t.priority === "HIGH" }] : [])),
     ibanAlerts: iban.map((a) => ({
       label: a.supplierName.slice(0, 45),
       sub: `إلى ${groupIban(a.seenIban)}، والمعروف ${a.knownIbans.map(groupIban).join(" أو ")}`,

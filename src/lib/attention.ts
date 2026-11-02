@@ -12,6 +12,7 @@ import { driftLine, driftMagnitude } from "./month-seal";
 const FIGURE: NounForms = { one: "رقم واحد", two: "رقمان", few: "أرقام", many: "رقماً" };
 
 /** «وثيقة» لما له تاريخُ انتهاء — غيرُ «مستند» الفواتير والكشوف. */
+const TASK: NounForms = { one: "مهمّة", two: "مهمّتان", few: "مهامّ", many: "مهمّةً" };
 const PAPER: NounForms = { one: "وثيقة", two: "وثيقتان", few: "وثائق", many: "وثيقةً" };
 
 /** بعد كم يوماً من آخر كشفٍ يصير وقوفُه بنداً — الكشفُ يُستورَد أسبوعيّاً. */
@@ -273,6 +274,8 @@ export interface AttentionFacts {
    * `daysLeft` سالبٌ بعد الانتهاء.
    */
   expiringObligations?: { title: string; kindLabel: string; expiresOn: string; daysLeft: number }[];
+  /** مهامُّ القائمة التي فات موعدها أو حلّ اليوم أو حلّ تذكيرُها (`lib/tasks.ts`) — يكتبها الفريقُ بيده. */
+  dueTasks?: { title: string; level: "OVERDUE" | "TODAY" | "REMINDER"; dueOn: string | null; high: boolean }[];
   /** خصمٌ متكرّر تكرّر في شهره أو ارتفع عن عادته (`lib/recurring-detect.ts`) — والمبلغُ الزائد. */
   recurringAnomalies?: { key?: string; label: string; kind: "TWICE" | "ROSE"; amountMinor: number; day: string }[];
   bouncedPayments?: AttentionEvidence[];
@@ -1190,6 +1193,37 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       evidence: list.slice(0, 6).map((o) => ({
         label: o.title.slice(0, 45),
         sub: `${o.kindLabel} · ${o.daysLeft < 0 ? "انتهت" : "تنتهي"} ${formatDay(o.expiresOn)}`,
+      })),
+    });
+  }
+
+  /*
+    مهامُّ كتبها الفريقُ بيده: ما فات موعدُه أو حلّ اليوم أو حلّ تذكيرُه. ليس مالاً ولا خطراً
+    على المال، فلا يعلو على بنودٍ ماليّة: المتأخّر «عالٍ» وما سواه «متوسّط».
+  */
+  if ((f.dueTasks?.length ?? 0) > 0) {
+    const list = f.dueTasks!;
+    const late = list.filter((t) => t.level === "OVERDUE").length;
+    out.push({
+      id: "tasks-due",
+      area: "DATA",
+      severity: late > 0 ? "HIGH" : "MEDIUM",
+      title: list.length === 1
+        ? `مهمّة «${list[0].title.slice(0, 50)}» ${list[0].level === "OVERDUE" ? "فات موعدها" : list[0].level === "TODAY" ? "موعدها اليوم" : "حلّ تذكيرها"}`
+        : late > 0
+          ? `${countNoun(list.length, TASK)} بانتظارك، منها ${late} متأخّرة`
+          : `${countNoun(list.length, TASK)} بانتظارك اليوم`,
+      detail: "مهامّ كتبتها في قائمة المهام: فات موعدها، أو موعدها اليوم، أو حلّ يوم تذكيرها.",
+      action: "أنجزها من القائمة، أو غيّر موعدها، أو أسقطها إن لم تعد لازمة.",
+      actionLabel: "افتح المهام",
+      href: "/tasks",
+      needs: "task:view",
+      count: list.length,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: list.slice(0, 6).map((t) => ({
+        label: t.title.slice(0, 45),
+        sub: t.level === "OVERDUE" ? `فات موعدها ${t.dueOn ? formatDay(t.dueOn) : ""}`.trim() : t.level === "TODAY" ? "موعدها اليوم" : "حلّ تذكيرها",
+        href: "/tasks",
       })),
     });
   }

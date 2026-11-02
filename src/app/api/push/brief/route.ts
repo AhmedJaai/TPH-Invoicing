@@ -14,6 +14,7 @@ import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
+import { loadDueTasks } from "@/services/task.service";
 
 export const runtime = "nodejs";
 
@@ -31,11 +32,12 @@ export async function GET() {
 async function handle() {
   const user = await guard("push-brief", "amounts:view");
   const canPay = can(user.role, "payment:approve");
-  const [pending, start, run] = await Promise.all([
+  const [pending, start, run, tasksDue] = await Promise.all([
     workCount(user.role),
     loadStartState(),
     canPay ? loadPaymentRun(previousMonth(currentMonthRiyadh())) : Promise.resolve(null),
+    can(user.role, "task:view") ? loadDueTasks().then((t) => t.length) : Promise.resolve(0),
   ]);
-  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0 });
+  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0, tasksDue });
   return NextResponse.json({ ...text, url: "/" }, { headers: { "cache-control": "no-store" } });
 }

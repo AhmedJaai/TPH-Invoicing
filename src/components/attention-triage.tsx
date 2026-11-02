@@ -85,6 +85,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "duplicate-hand-payments": CopyX,
   "recurring-anomalies": RotateCcw,
   "obligations-expiring": FileClock,
+  "tasks-due": ListChecks,
   "missing-statements": FileClock,
   "statement-ledger-gap": Scale,
   "statement-invoice-missing": FileQuestion,

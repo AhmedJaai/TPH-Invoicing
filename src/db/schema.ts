@@ -2669,3 +2669,26 @@ export const advisorPlanItems = pgTable("advisor_plan_items", {
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("advisor_plan_status_idx").on(t.status, t.createdAt)]);
+
+/**
+ * قائمةُ المهام والتذكيرات (097) — يكتبها الفريقُ بيده، ويظهر ما حلّ منها في «يحتاج قرارك»
+ * وإشعار الصباح (`lib/tasks.ts`). تُغلَق ولا تُحذف: `outcome` أُنجزت أو أُسقطت،
+ * والمكرَّرةُ تلد تاليتَها عند الإنجاز (`successorId`). لا مالَ فيها.
+ */
+export const tasks = pgTable("tasks", {
+  id: id(),
+  title: text("title").notNull(),
+  note: text("note"),
+  priority: text("priority").notNull().default("NORMAL"),
+  /** YYYY-MM-DD بتوقيت الرياض. */
+  dueOn: text("due_on"),
+  remindOn: text("remind_on"),
+  repeat: text("repeat").notNull().default("NONE"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  closedById: text("closed_by_id").references(() => users.id),
+  outcome: text("outcome"),
+  successorId: text("successor_id").references((): AnyPgColumn => tasks.id, { onDelete: "set null" }),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("tasks_open_due_idx").on(t.dueOn).where(sql`closed_at is null`)]);

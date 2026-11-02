@@ -28,7 +28,7 @@ export type NavGroup = "today" | "money" | "ops";
 /** مفتاحُ الأيقونة — يُرسَم في `components/icons.tsx`. */
 export type NavIcon =
   | "today" | "decisions" | "documents" | "suppliers" | "payments"
-  | "bank" | "close" | "inventory" | "settings" | "audit" | "finance" | "team";
+  | "bank" | "close" | "inventory" | "settings" | "audit" | "finance" | "team" | "tasks";
 
 export interface NavArea extends NavLink {
   /** الاسم القصير لشريط الجوّال. */
@@ -94,6 +94,22 @@ export const AREAS: readonly NavArea[] = [
       { href: "/upload", label: "ارفع مستنداً", needs: "document:upload" },
       { href: "/documents/drive", label: "الدرايف", needs: "document:upload" },
     ],
+  },
+  /*
+    المهام والتذكيرات (أحمد، ٢ نوفمبر ٢٠٢٦): ما على الفريق فعلُه ومتى، يكتبه بيده ويحلّ في
+    «يحتاج قرارك» وإشعار الصباح. لكلّ دورٍ يعمل — مدير المشتريات لا يرى المبالغ فيبقى له هذا.
+  */
+  {
+    href: "/tasks",
+    label: "المهام",
+    short: "المهام",
+    icon: "tasks",
+    group: "today",
+    question: "ما عليّ فعله اليوم وما فات موعده",
+    chord: "t",
+    needs: "task:view",
+    owns: [],
+    children: [],
   },
   /*
     «المالية» أوّلُ المال: باقي المجموعة يجيب «ماذا دفعتُ ولمن؟»، وهذه تجيب «هل المقهى

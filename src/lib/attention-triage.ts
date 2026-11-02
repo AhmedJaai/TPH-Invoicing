@@ -48,6 +48,7 @@ export const ATTENTION_IDS = [
   "duplicate-hand-payments",
   "recurring-anomalies",
   "obligations-expiring",
+  "tasks-due",
   "missing-statements",
   "statement-ledger-gap",
   "statement-invoice-missing",

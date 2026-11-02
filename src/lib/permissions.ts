@@ -80,7 +80,10 @@ export type Capability =
    * تُوسّع الأذن بلا قصد.
    */
   | "inventory:reopen"
-  | "recipe:edit";
+  | "recipe:edit"
+  /** قائمةُ المهام والتذكيرات: يراها كلُّ دور، ويكتبها من يعمل (لا المراجع). */
+  | "task:view"
+  | "task:edit";
 
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
@@ -88,6 +91,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view", "payroll:edit",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
+    "task:view", "task:edit",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
@@ -95,13 +99,14 @@ const MATRIX: Record<Role, readonly Capability[]> = {
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit",
     "expense:edit", "month:close", "audit:view",
     "inventory:view", "inventory:count", "recipe:edit",
+    "task:view", "task:edit",
   ],
   // مدير المشتريات يرفع ويتابع الناقص فقط — لا أرقام مالية ولا بنك ولا رواتب
-  PURCHASING: ["document:upload", "document:view", "supplier:view", "inventory:view", "inventory:count"],
+  PURCHASING: ["document:upload", "document:view", "supplier:view", "inventory:view", "inventory:count", "task:view", "task:edit"],
   // المراجع يقرأ المالية كلَّها وينزّل حزمة المحاسب — ولا يكتب شيئاً، ولا يرى الرواتب
   AUDITOR: [
     "document:view", "supplier:view", "amounts:view", "reports:view", "reports:export",
-    "bank:view", "audit:view", "inventory:view",
+    "bank:view", "audit:view", "inventory:view", "task:view",
   ],
 };
 
@@ -111,7 +116,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
  */
 export const READ_CAPABILITIES: readonly Capability[] = [
   "document:view", "supplier:view", "amounts:view", "reports:view", "reports:export",
-  "bank:view", "payroll:view", "audit:view", "inventory:view",
+  "bank:view", "payroll:view", "audit:view", "inventory:view", "task:view",
 ];
 
 export function can(role: Role | undefined | null, capability: Capability): boolean {
@@ -149,6 +154,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "inventory:count": "إدخال الجرد وإقفاله",
   "inventory:reopen": "إعادة فتح جرد مقفل",
   "recipe:edit": "تعديل الوصفات",
+  "task:view": "عرض المهام والتذكيرات",
+  "task:edit": "كتابة المهام والتذكيرات",
 };
 
 /** يُرمى داخل الواجهات البرمجية ليُترجم إلى 403. */

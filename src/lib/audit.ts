@@ -107,6 +107,8 @@ export type AuditAction =
   /* وثيقةٌ لها تاريخُ انتهاء (رخصة · إقامة · عقد) — أُضيفت أو عُدّلت أو أُرشفت */
   | "DOCUMENT_EXPIRY_SAVED"
   | "DOCUMENT_EXPIRY_CLOSED"
+  | "TASK_SAVED"
+  | "TASK_CLOSED"
   /* حدُّ الرصيد الأدنى الذي يُنبَّه تحته «النقد القادم» */
   | "PAYMENT_CASH_FLOOR_SET"
   | "CASH_CUSTODY_SET"

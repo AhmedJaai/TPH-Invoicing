@@ -8,7 +8,7 @@
  * مكوّناتٌ بلا حالة تصلح للخادم والمتصفّح معاً.
  */
 import {
-  Bell, Boxes, CalendarCheck, ChartNoAxesCombined, FileText, Inbox, Landmark, ScrollText, Settings, Store, Sun, Users, Wallet,
+  Bell, Boxes, CalendarCheck, ChartNoAxesCombined, FileText, Inbox, Landmark, ListChecks, ScrollText, Settings, Store, Sun, Users, Wallet,
   type LucideIcon,
 } from "lucide-react";
 import type { NavIcon } from "@/lib/nav";
@@ -26,6 +26,7 @@ export const NAV_ICON: Record<NavIcon, LucideIcon> = {
   audit: ScrollText,
   finance: ChartNoAxesCombined,
   team: Users,
+  tasks: ListChecks,
 };
 
 export function NavGlyph({ icon, className = "h-[18px] w-[18px]" }: { icon: NavIcon; className?: string }) {

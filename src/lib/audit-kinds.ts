@@ -7,7 +7,7 @@
  * وإلّا غرق فعلُ الإنسان في سطوره.
  */
 
-export type AuditKind = "money" | "documents" | "bank" | "suppliers" | "inventory" | "payroll" | "learned" | "other";
+export type AuditKind = "money" | "documents" | "bank" | "suppliers" | "inventory" | "payroll" | "tasks" | "learned" | "other";
 
 export const AUDIT_KIND_LABEL: Record<AuditKind, string> = {
   money: "المال والسداد",
@@ -16,6 +16,7 @@ export const AUDIT_KIND_LABEL: Record<AuditKind, string> = {
   suppliers: "المورّدون",
   inventory: "الجرد",
   payroll: "الموظفون والرواتب",
+  tasks: "المهام والتذكيرات",
   learned: "ما تعلّمه النظام",
   other: "أخرى",
 };
@@ -31,6 +32,7 @@ export const KIND_PATTERN: readonly (readonly [Exclude<AuditKind, "learned" | "o
   ["suppliers", "^(SUPPLIER_|AI_|PRODUCT_)"],
   ["inventory", "^(SALES_|CATALOG_|POS_|RECIPE_|STOCK_|INVENTORY_|WASTE_)"],
   ["payroll", "^(EMPLOYEE_|PAYROLL_|ATTENDANCE_)"],
+  ["tasks", "^TASK_"],
 ];
 
 export function auditKind(action: string): AuditKind {

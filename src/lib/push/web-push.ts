@@ -106,13 +106,15 @@ export function pushOutcome(status: number): "sent" | "gone" | "failed" {
  * نصُّ الإشعار — **بلا مبالغ**: يظهر على شاشة القفل، ويراه من يمسك الجوّال.
  * فيقول ما ينتظر ويدعو إلى «اليوم»؛ والأرقامُ هناك بعد الدخول.
  */
-export function pushBriefText(f: { knowsNothing: boolean; pending: number; runReady: boolean }): { title: string; body: string } {
+export function pushBriefText(f: { knowsNothing: boolean; pending: number; runReady: boolean; tasksDue?: number }): { title: string; body: string } {
   const title = "إحاطة الصباح";
   if (f.knowsNothing) return { title, body: "لم يقرأ النظام بعد أي مستند أو كشف. افتح التطبيق لتبدأ." };
   const parts = [
     /* الجملةُ نفسُها التي على «اليوم» */
     f.pending === 0 ? "لا شيء يحتاج قرارك اليوم." : `${countNoun(f.pending, ITEM)} بانتظار قرارك.`,
     f.runReady ? "ودفعة المورّدين جاهزة للتحويل." : null,
+    /* بند المهامّ واحدٌ في العدد أعلاه؛ هذا السطرُ يقول كم مهمّةً فيه */
+    f.tasksDue ? `وفي قائمة مهامّك ${countNoun(f.tasksDue, { one: "مهمّة", two: "مهمّتان", few: "مهامّ", many: "مهمّةً" })} تنتظر.` : null,
   ];
   return { title, body: parts.filter(Boolean).join(" ") };
 }

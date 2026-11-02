@@ -79,7 +79,7 @@
 | `src/lib/supplier-suggest.ts` · `src/components/supplier-picker.tsx` | «لعلّه هذا المورّد» من نصّ البنك: اقتراحٌ لا قرار، ومنتقٍ واحد لطابور البنك ومراجعة الحركات |
 | `src/lib/preview-mode.ts` | وضع المعاينة — لا يعمل في الإنتاج مهما فُعِّل المتغيّر |
 | `src/lib/canonical-name.ts` | الاسم القياسيّ من المقيَّد — ولا يُمَسّ اسمٌ يُقرأ |
-| `src/lib/nav.ts` | **عشرُ مساحاتٍ في ثلاث مجموعات** (اليوم · المال · التشغيل)، ولكلٍّ أيقونتُها وحرفُ `G` وسؤالُها. `entryHref` يفتح أوّلَ لسانٍ يملكه الدور، و`chordsFor` اختصاراتُ لوحة المفاتيح. الإعدادات في `ACCOUNT_LINKS` |
+| `src/lib/nav.ts` | **إحدى عشرة مساحةً في ثلاث مجموعات** (اليوم · المال · التشغيل)، ولكلٍّ أيقونتُها وحرفُ `G` وسؤالُها. `entryHref` يفتح أوّلَ لسانٍ يملكه الدور، و`chordsFor` اختصاراتُ لوحة المفاتيح. الإعدادات في `ACCOUNT_LINKS` |
 | `src/components/page-shell.tsx` · `nav.tsx` · `topbar.tsx` | القشرة: إطارٌ داكن، وشريطٌ علويّ (موضعك · بحث · إشعارات · رفع)، وشريطُ جوّالٍ بزرّ التقاطٍ في الوسط، و`DropAnywhere` للإفلات في أيّ صفحة |
 | `src/lib/capture-queue.ts` | يحمل الملفّ من زرّ الكاميرا أو الإفلات في أيّ صفحة إلى القارئ في `/upload` |
 | `src/components/keyboard.tsx` · `src/lib/ui-events.ts` | ⌘K · `G` ثمّ حرف · J/K/Enter · U · ? — وأحداثُ فتح اللوحة والقائمة بلا استيرادٍ دائريّ |
@@ -90,6 +90,7 @@
 | `src/lib/bank/pos-watch.ts` · `pos-watch.service.ts` | **تسوياتُ الشبكة** (`/money/pos`): الرسمُ الفعليّ شهراً بشهر، وأيّامُ بيعٍ لم تصل تسويتُها — تستدعي `groupBatches` |
 | `src/lib/recurring-detect.ts` · `recurring-watch.service.ts` | **الاشتراكات والمتكرّر** (`/money/recurring`): سلاسلُ الخصم الشهريّ من الكشف، وما تكرّر أو ارتفع أو غاب — اقتراحٌ لا قيد |
 | `src/lib/owner-account.ts` · `owner-account.service.ts` | **بينك وبين المقهى** (`/money/owner`): دفعاتُ `OWNER_ACCOUNT` وحركاتُ `PERSONAL` برصيدٍ جارٍ |
+| `src/lib/tasks.ts` · `task.service.ts` · `/tasks` · `/api/task` | **المهامّ والتذكيرات**: موعدٌ وتذكيرٌ (يومٌ لا ساعة) وتكرار؛ تُغلَق ولا تُحذف؛ ما حلّ منها بندُ `tasks-due` في «يحتاج قرارك» وسطرٌ في إشعار الصباح |
 | `src/lib/obligations.ts` · `obligation.service.ts` | **الوثائق والتراخيص** (`/settings/obligations`): تواريخُ الانتهاء ومهلةُ التذكير |
 | `src/lib/commitments.ts` | **تقويمُ الالتزامات** (`/cash/calendar`): من وقائع «النقد القادم» والوثائق يوماً بيوم |
 | `src/lib/signal-decisions.ts` · `/api/signal` | إسكاتُ ملاحظةٍ محسوبة أو تأجيلُها — بمفتاحٍ من الحدث |
