@@ -7,7 +7,7 @@ import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, saveEmployee, saveShift, setDayShift, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, setInventoryAccess, saveEmployee, saveShift, setDayShift, setRate,
 } from "@/services/payroll.service";
 import { shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 
@@ -44,6 +44,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rate-remove"), rateId: Id }).strict(),
   z.object({ action: z.literal("link-issue"), id: Id }).strict(),
   z.object({ action: z.literal("link-revoke"), id: Id }).strict(),
+  z.object({ action: z.literal("inventory-access"), id: Id, on: z.boolean() }).strict(),
   z.object({ action: z.literal("delete"), id: Id }).strict(),
   /* جدولُ الدوام: من كم إلى كم، والسماح، وأيّامُ الراحة — لموظّفٍ واحد */
   z.object({
@@ -100,6 +101,10 @@ export async function POST(request: Request) {
     if (b.action === "delete") {
       const done = await deleteEmployee(b.id, user.id);
       return NextResponse.json({ ok: true, message: done ? "حُذف الموظف" : "حُذف من قبل" });
+    }
+    if (b.action === "inventory-access") {
+      const done = await setInventoryAccess(b.id, b.on, user.id);
+      return NextResponse.json({ ok: true, message: !done ? "لا تغيير" : b.on ? "صار يدخل جرد السبت من رابطه" : "سُحب منه جرد السبت" });
     }
     if (b.action === "link-revoke") {
       const done = await revokeCheckinLink(b.id, user.id);

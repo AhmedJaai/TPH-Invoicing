@@ -331,6 +331,8 @@ html {
   --fab-overhang: 1.25rem;
   --above-tabbar: calc(var(--tabbar) + var(--fab-overhang) + 0.5rem);
   --content-end: calc(var(--tabbar) + var(--fab-overhang) + 2.5rem);
+  /* شريطُ «TPH Team» السفليّ (`min-h-16`) — ثابتٌ على كلّ عرض، فلا يُصفَّر على الشاشة الكبيرة */
+  --team-nav: calc(4rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 1024px) {
   :root {

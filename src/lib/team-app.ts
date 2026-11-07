@@ -5,19 +5,27 @@
 
 export const TEAM_APP_NAME = "TPH Team";
 
-export type TeamTab = "attend" | "board" | "invoices" | "requests";
+export type TeamTab = "attend" | "board" | "count" | "invoices" | "requests";
 
 export const TEAM_TABS: readonly { id: TeamTab; label: string }[] = [
   { id: "attend", label: "الحضور" },
   { id: "board", label: "المرجع" },
+  /* لمن أذن له المالك وحده (`employees.can_count_inventory`) */
+  { id: "count", label: "الجرد" },
   { id: "invoices", label: "الفواتير" },
   { id: "requests", label: "طلباتي" },
 ];
 
-/** و«message» اسمُها القديم — رابطٌ محفوظ يفتح «طلباتي». */
-export function asTeamTab(v: unknown): TeamTab {
+/** و«message» اسمُها القديم — رابطٌ محفوظ يفتح «طلباتي». و«الجرد» لا يُفتح لمن لا إذنَ له. */
+export function asTeamTab(v: unknown, canCount = false): TeamTab {
   if (v === "message") return "requests";
+  if (v === "count") return canCount ? "count" : "attend";
   return v === "invoices" || v === "board" || v === "requests" ? v : "attend";
+}
+
+/** صفحاتُ هذا الموظّف — «الجرد» لمن أذن له المالك. */
+export function teamTabsFor(canCount: boolean): readonly { id: TeamTab; label: string }[] {
+  return TEAM_TABS.filter((t) => t.id !== "count" || canCount);
 }
 
 /** مسارُ التطبيق لرمز — هو `start_url` و`scope` في بيان تثبيته. */

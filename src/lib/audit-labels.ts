@@ -192,6 +192,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PAYROLL_PENALTY_RESTORED: "إعادة جزاء بعد العفو",
   EMPLOYEE_CHECKIN_LINK_ISSUED: "إنشاء رابط حضور لموظف",
   EMPLOYEE_CHECKIN_LINK_REVOKED: "إلغاء رابط حضور موظف",
+  EMPLOYEE_INVENTORY_ACCESS_CHANGED: "إذن جرد السبت لموظف",
   ATTENDANCE_SETTINGS_SET: "ضبط موقع المقهى أو شبكته للحضور",
   ATTENDANCE_CHECKIN_REVIEWED: "قبول أو رد تسجيل حضور",
   FINANCE_DECLARATION_CREATED: "إضافة مصروف خارج الكشف أو توزيعه",

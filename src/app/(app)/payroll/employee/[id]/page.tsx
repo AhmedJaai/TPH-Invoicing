@@ -1,3 +1,4 @@
+import { TEAM_APP_NAME } from "@/lib/team-app";
 import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -365,6 +366,19 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           </details>
         )}
         {canEdit ? <CheckinLinkPanel employeeId={id} name={employee.name} phone={employee.phone} hasLink={employee.hasCheckinLink} /> : <Badge tone={employee.hasCheckinLink ? "ok" : "muted"}>{employee.hasCheckinLink ? "مفعّل" : "لا رابط"}</Badge>}
+        {/* جردُ السبت من رابطه — بدل ملفّ إكسل يُعاد كتابتُه (`team-count.service.ts`) */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3">
+          <div className="min-w-0 flex-1 basis-56">
+            <p className="flex items-center gap-2 text-sm font-bold">جرد السبت من رابطه {employee.canCountInventory ? <Badge tone="ok">مسموح</Badge> : <Badge tone="muted">غير مسموح</Badge>}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">يُدخل عدّ الرف لجرد الأسبوع يوم السبت (والأحد بعده) من صفحة «الجرد» في {TEAM_APP_NAME}. لا يرى المتوقع ولا الفرق ولا التكلفة، ولا يعدّل جرداً قديماً، والإقفال لك.</p>
+          </div>
+          {canEdit && (
+            <PostAction url="/api/payroll/employee" body={{ action: "inventory-access", id, on: !employee.canCountInventory }} variant={employee.canCountInventory ? "quiet" : "secondary"}
+              done={employee.canCountInventory ? "سُحب منه جرد السبت" : "صار يدخل جرد السبت من رابطه"}>
+              {employee.canCountInventory ? "اسحب الإذن" : "اسمح له بالجرد"}
+            </PostAction>
+          )}
+        </div>
       </Section>
 
       <Section id="docs" title="الوثائق" icon={FileBadge} count={docs.length} hint="الإقامة والشهادة الصحية وغيرها، ويُذكّرك النظام قبل انتهائها." action={canEdit ? <ObligationForm preset={{ kind: "HEALTH_CERTIFICATE", holder: employee.name, employeeId: id }} /> : undefined}>

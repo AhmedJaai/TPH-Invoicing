@@ -1481,6 +1481,8 @@ export const inventoryCounts = pgTable("inventory_counts", {
   coverage: jsonb("coverage"),
   note: text("note"),
   startedById: text("started_by_id").references(() => users.id),
+  /** أو موظّفٌ بدأه من «TPH Team» يومَ السبت (102). */
+  startedByEmployeeId: text("started_by_employee_id").references(() => employees.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finalisedById: text("finalised_by_id").references(() => users.id),
   finalisedAt: timestamp("finalised_at", { withTimezone: true }),
@@ -1551,6 +1553,8 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
   manualReceiptsMilli: milli("manual_receipts_milli").notNull().default(0),
   note: text("note"),
   countedById: text("counted_by_id").references(() => users.id),
+  /** أو موظّفٌ عدّه من «TPH Team» (102). */
+  countedByEmployeeId: text("counted_by_employee_id").references(() => employees.id, { onDelete: "set null" }),
   countedAt: timestamp("counted_at", { withTimezone: true }),
   createdAt: now(),
 }, (t) => [
@@ -2517,6 +2521,8 @@ export const employees = pgTable("employees", {
   lateGraceMinutes: integer("late_grace_minutes").notNull().default(0),
   daysOff: text("days_off").notNull().default(""),
   checkinTokenHash: text("checkin_token_hash"),
+  /** يُدخل جردَ السبت من رابطه (102) — عدٌّ لا تعديلُ جردٍ قديم. */
+  canCountInventory: boolean("can_count_inventory").notNull().default(false),
   note: text("note"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),

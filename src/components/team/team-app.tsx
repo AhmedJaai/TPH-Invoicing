@@ -9,9 +9,11 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
-import { BookOpen, Clock, Inbox, Megaphone, ScanLine, Share, SquarePlus, X } from "lucide-react";
+import { BookOpen, ClipboardList, Clock, Inbox, Megaphone, ScanLine, Share, SquarePlus, X } from "lucide-react";
 import { BrandMark } from "@/components/icons";
-import { TEAM_APP_NAME, TEAM_TABS, type TeamTab } from "@/lib/team-app";
+import { TEAM_APP_NAME, teamTabsFor, type TeamTab } from "@/lib/team-app";
+import type { TeamCountView } from "@/services/team-count.service";
+import { CountPanel } from "./count-panel";
 import { AttendPanel, type AttendPanelProps } from "./attend-panel";
 import type { MyMessageView } from "./message-panel";
 import { BoardPanel, type BoardCard } from "./board-panel";
@@ -23,7 +25,7 @@ const Scanner = dynamic(() => import("@/components/scan/scanner").then((m) => m.
   loading: () => <p className="py-10 text-center text-sm text-muted" role="status">يُفتح الماسح…</p>,
 });
 
-const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, board: BookOpen, invoices: ScanLine, requests: Inbox };
+const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, board: BookOpen, count: ClipboardList, invoices: ScanLine, requests: Inbox };
 
 export interface TeamAppProps {
   token: string;
@@ -39,6 +41,8 @@ export interface TeamAppProps {
   mates: { id: string; name: string; daysOff: string }[];
   myDaysOff: string;
   stock: StockOption[];
+  /** جردُ السبت — لمن أذن له المالك وحده، وإلّا `null` فلا تظهر الصفحة. */
+  count: TeamCountView | null;
 }
 
 const SEEN_KEY = "tph-team.seen-replies";
@@ -53,7 +57,8 @@ function writeSeen(v: string) {
   try { window.localStorage.setItem(SEEN_KEY, v); } catch { /* تخزينٌ ممنوع: تبقى النقطة */ }
 }
 
-export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff }: TeamAppProps) {
+export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, count }: TeamAppProps) {
+  const tabs = teamTabsFor(count !== null);
   const announcements = board.filter((c) => c.kind === "ANNOUNCEMENT");
   const [tab, setTab] = useState<TeamTab>(initialTab);
   const latestReply = messages.reduce<string>((m, x) => (x.repliedAt && x.repliedAt > m ? x.repliedAt : m), "");
@@ -98,13 +103,14 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
           </>
         )}
         {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}
+        {tab === "count" && count && <CountPanel token={token} view={count} />}
         {tab === "invoices" && <Scanner token={token} label={name} recent={captures} embedded />}
         {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} myDaysOff={myDaysOff} />}
       </main>
 
       <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className="mx-auto grid max-w-lg grid-cols-4">
-          {TEAM_TABS.map((t) => {
+        <ul className={`mx-auto grid max-w-lg ${tabs.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
+          {tabs.map((t) => {
             const Icon = ICON[t.id];
             const active = tab === t.id;
             return (

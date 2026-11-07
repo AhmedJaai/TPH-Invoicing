@@ -9,6 +9,7 @@ import { loadEmployees, myPeriod, mySlip, recentCheckins, resolveCheckinToken, w
 import { myMessages } from "@/services/team.service";
 import { loadBoard, myRequests } from "@/services/team-board.service";
 import { loadStockOptions } from "@/services/team-stock.service";
+import { loadTeamCount } from "@/services/team-count.service";
 import { activeIn } from "@/lib/payroll/calc";
 import { formatQuantity } from "@/lib/team-units";
 
@@ -60,7 +61,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   /* دوامُ اليوم نفسه — يومُ الأسبوع أو اليومُ بعينه يغلب المعتاد */
   const todayShift = shiftOn(today, employee, employee.shiftRules);
   const counted = employee.kind === "MONTHLY" && employee.shiftStart !== null;
-  const [recent, captures, messages, period, { tab }, board, requests, everyone, stock, slip] = await Promise.all([
+  const [recent, captures, messages, period, { tab }, board, requests, everyone, stock, slip, count] = await Promise.all([
     recentCheckins(employee.id, 6),
     recentForEmployee(employee.id),
     myMessages(employee.id),
@@ -71,13 +72,14 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
     loadEmployees(),
     loadStockOptions(),
     mySlip(employee.id),
+    employee.canCountInventory ? loadTeamCount(today) : Promise.resolve(null),
   ]);
   const mates = everyone.filter((e) => e.id !== employee.id && activeIn(e, today.slice(0, 7)) && (!e.leftOn || e.leftOn >= today)).map((e) => ({ id: e.id, name: e.name, daysOff: e.daysOff }));
   return (
     <TeamApp
       token={token}
       name={employee.name}
-      initialTab={asTeamTab(tab)}
+      initialTab={asTeamTab(tab, employee.canCountInventory)}
       attend={{
         recent: recent.map((r) => ({ id: r.id, kind: r.kind, at: r.at.toISOString(), day: r.day, verdict: r.verdict })),
         today,
@@ -100,6 +102,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
       mates={mates}
       myDaysOff={employee.daysOff}
       stock={stock}
+      count={count}
       captures={captures.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
       messages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString(), repliedAt: m.repliedAt?.toISOString() ?? null }))}
     />
