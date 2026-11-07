@@ -77,10 +77,12 @@ function StartCount({ token, week }: { token: string; week: { start: string; end
 }
 
 type Line = Extract<TeamCountView, { state: "open" }>["lines"][number];
-interface Draft { quantity: string; unit: string }
+/** خاناتُ صنفٍ لم تُحفظ: مفتاحُ الخانة ← ما كُتب فيها. */
+type Draft = Record<string, string>;
 
 const noSubscribe = () => () => {};
-const draftKey = (countId: string) => `tph-team.count.${countId}`;
+/* «count2»: شكلُ المسوّدة تغيّر إلى خانات — القديمةُ لا تُقرأ بالشكل الجديد */
+const draftKey = (countId: string) => `tph-team.count2.${countId}`;
 function readDrafts(countId: string): string {
   try { return window.localStorage.getItem(draftKey(countId)) ?? "{}"; } catch { return "{}"; }
 }
@@ -91,10 +93,19 @@ function parseDrafts(raw: string | null): Record<string, Draft> {
     const out: Record<string, Draft> = {};
     if (!v || typeof v !== "object") return out;
     for (const [id, d] of Object.entries(v)) {
-      if (d && typeof d === "object" && "quantity" in d && "unit" in d && typeof d.quantity === "string" && typeof d.unit === "string") out[id] = { quantity: d.quantity, unit: d.unit };
+      if (!d || typeof d !== "object") continue;
+      const fields: Draft = {};
+      for (const [k, q] of Object.entries(d)) if (typeof q === "string") fields[k] = q;
+      out[id] = fields;
     }
     return out;
   } catch { return {}; }
+}
+
+/** ما في الخانة الآن: المسوّدةُ، وإلّا ما حُفظ آخرَ مرّة. */
+function boxValue(line: Line, draft: Draft | undefined, key: string): string {
+  if (draft && key in draft) return draft[key];
+  return line.parts?.find((p) => p.key === key)?.quantity ?? "";
 }
 
 type Sent = Extract<TeamCountView, { state: "open" }>["sent"];
@@ -124,16 +135,20 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty.length]);
 
-  function edit(line: Line, patch: Partial<Draft>) {
+  function edit(line: Line, key: string, value: string) {
     setSaved(null);
-    const cur = drafts[line.productId] ?? { quantity: "", unit: line.baseUnit };
-    setEdits({ ...drafts, [line.productId]: { ...cur, ...patch } });
+    /* أوّلُ تعديلٍ يبدأ ممّا حُفظ — فيُغيّر خانةً ويبقى غيرُها */
+    const cur: Draft = drafts[line.productId] ?? Object.fromEntries(line.fields.map((f) => [f.key, boxValue(line, undefined, f.key)]));
+    setEdits({ ...drafts, [line.productId]: { ...cur, [key]: value } });
   }
 
   async function save() {
     if (busy || dirty.length === 0) return;
     setBusy(true); setError(null); setSaved(null);
-    const entries = dirty.map((productId) => ({ productId, quantity: drafts[productId].quantity.trim(), unit: drafts[productId].unit }));
+    const entries = dirty.map((productId) => ({
+      productId,
+      parts: Object.entries(drafts[productId]).map(([key, quantity]) => ({ key, quantity: quantity.trim() })),
+    }));
     const r = await postJson<{ message?: string }>("/api/team/count", { action: "save", token, countId, entries });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
@@ -183,25 +198,25 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
             {shown.filter((l) => l.categoryLabel === g).map((l) => {
               const d = drafts[l.productId];
               return (
-                <li key={l.productId} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-                  <div className="min-w-0 flex-1 basis-32">
-                    <p className="text-sm font-bold">{l.name}</p>
-                    <p className="text-[11px] text-muted">
+                <li key={l.productId} className="px-3 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="min-w-0 text-sm font-bold">{l.name}</p>
+                    <p className="shrink-0 text-[11px] text-muted">
                       {d ? <span className="font-bold text-warn">لم يُحفظ بعد</span>
-                        : l.counted !== null ? <span className="inline-flex items-center gap-1 text-ok"><CheckCircle2 className="h-3 w-3" aria-hidden />سُجّل {l.counted}</span>
+                        : l.counted !== null ? <span className="inline-flex items-center gap-1 text-ok"><CheckCircle2 className="h-3 w-3" aria-hidden />المجموع {l.counted}</span>
                           : "لم يُعَدّ"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <input inputMode="decimal" dir="ltr" value={d?.quantity ?? ""} onChange={(e) => edit(l, { quantity: e.target.value })}
-                      aria-label={`كمية ${l.name}`} placeholder={l.counted === null ? "الكمية" : "تعديل"}
-                      className="min-h-11 w-24 rounded-lg border border-line-input bg-surface px-2 text-center text-base focus:border-accent focus:outline-none" />
-                    {l.units.length > 1 ? (
-                      <select value={d?.unit ?? l.baseUnit} onChange={(e) => edit(l, { unit: e.target.value })} aria-label={`وحدة ${l.name}`}
-                        className="min-h-11 rounded-lg border border-line-input bg-surface px-1.5 text-sm">
-                        {l.units.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                      </select>
-                    ) : <span className="min-w-10 text-center text-xs text-muted">{l.units[0]?.label}</span>}
+                  {/* خانةٌ لكلّ وحدة — كورقة الجرد: كرتون · حبّة · كيلو · جرام — ويجمعها الخادم */}
+                  <div className={`mt-2 grid gap-2 ${l.fields.length >= 3 ? "grid-cols-3" : l.fields.length === 2 ? "grid-cols-2" : "grid-cols-2"}`}>
+                    {l.fields.map((f) => (
+                      <label key={f.key} className="block min-w-0">
+                        <span className="block truncate text-[11px] font-bold text-ink-soft">{f.label}</span>
+                        <input inputMode="decimal" dir="ltr" value={boxValue(l, d, f.key)} onChange={(e) => edit(l, f.key, e.target.value)}
+                          aria-label={`${l.name} — ${f.label}`}
+                          className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-surface px-2 text-center text-base focus:border-accent focus:outline-none" />
+                      </label>
+                    ))}
                   </div>
                 </li>
               );

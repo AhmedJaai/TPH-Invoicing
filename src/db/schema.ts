@@ -1558,6 +1558,8 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
   countedById: text("counted_by_id").references(() => users.id),
   /** أو موظّفٌ عدّه من «TPH Team» (102). */
   countedByEmployeeId: text("counted_by_employee_id").references(() => employees.id, { onDelete: "set null" }),
+  /** ما كتبه الموظّف بخاناته («١٩ كرتون + ٨٩٧ حبّة») بجانب مجموعه (104) — يُمسح إن عدّله غيرُه. */
+  countParts: jsonb("count_parts"),
   countedAt: timestamp("counted_at", { withTimezone: true }),
   createdAt: now(),
 }, (t) => [

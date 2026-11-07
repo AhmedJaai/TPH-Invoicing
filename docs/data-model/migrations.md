@@ -146,6 +146,7 @@
 | `101_swap_permanent.sql` | `team_requests.permanent` — تبديلُ الراحة دائماً (يتبادلان يومَي الراحة الأسبوعيّين) أو لمرّة — إضافةٌ خالصة |
 | `102_team_inventory_count.sql` | `employees.can_count_inventory` · `inventory_count_lines.counted_by_employee_id` · `inventory_counts.started_by_employee_id` — جردُ السبت من «TPH Team» — إضافةٌ خالصة |
 | `103_team_count_sent.sql` | `inventory_counts.team_sent_at` · `team_sent_by_employee_id` — متى أُرسل تقريرُ جرد السبت واتساب ومَن أرسله — إضافةٌ خالصة |
+| `104_count_parts.sql` | `inventory_count_lines.count_parts` — العدُّ بخاناته (كرتون · حبّة · كيلو · جرام) كما كُتب، بجانب مجموعه — إضافةٌ خالصة |
 | `100_team_board.sql` | «TPH Team»: `team_board` (مرجعُ النظافة والطحنات والوصفات والبن والإعلانات — لا مهامّ) و`team_requests` (اقتراحُ تعديل · إجازة · تبديل · تالف، لا يُنفَّذ إلّا بإقرار) — إضافةٌ خالصة |
 | `099_employee_shifts.sql` | `employee_shifts` — الدوامُ المخصَّص: وقتٌ لكلّ يومٍ من الأسبوع، أو ليومٍ بعينه أو راحتُه؛ اليومُ بعينه يغلب يومَ الأسبوع ويغلب الأصل — إضافةٌ خالصة |
 | `098_team_app.sql` | «TPH Team»: `capture_links.employee_id` (صورُ فواتير الموظّف تُنسب إليه برابطٍ واحدٍ قائم، بلا رمزٍ خاصّ — يُفتح برمز حضوره، فصار `token_hash` يُترك فارغاً لهذه وحدها)، و`team_messages` (اقتراحٌ أو شكوى؛ المرسَلةُ بلا اسم بلا `employee_id` أصلاً، وتُغلَق ولا تُحذف) — إضافةٌ خالصة |

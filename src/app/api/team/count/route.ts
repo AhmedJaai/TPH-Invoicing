@@ -2,18 +2,17 @@
  * جردُ السبت من «TPH Team» — بلا جلسة، ورمزُ الموظّف إذنُه، ولا يعمل إلّا لمن أذن له المالك.
  *
  *   POST { token, action: "start" }                         → يبدأ جردَ هذا السبت إن لم يُبدأ
- *   POST { token, action: "save", countId, entries: [{productId, quantity, unit}] }
+ *   POST { token, action: "save", countId, entries: [{productId, parts: [{key, quantity}]}] }
  *   POST { token, action: "send", countId }                → { text, phone } يفتحه في واتساب
  *
- * الكمّيّةُ تصل نصّاً وتُقرأ مِلّيّاتٍ هنا، والتحويلُ إلى وحدة الصنف في الخادم. والأسبوعُ يُشتقّ
+ * الخاناتُ (كرتون · حبّة · كيلو · جرام…) تصل نصّاً، ويجمعها الخادمُ بوحدة الصنف ووحدة تخزينه. والأسبوعُ يُشتقّ
  * من يوم الرياض لا من المتصفّح (`team-count.service.ts`).
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
-import { parseQuantityMilli } from "@/lib/sales/values";
-import { isAmbiguousThousands, ambiguousThousandsMessage } from "@/lib/inventory/units";
-import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
+import { isStoredUnit } from "@/lib/unit-conversion";
+import type { PartKey } from "@/lib/inventory/count-parts";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { failWith, respondTo } from "@/services/guard";
 import { consume } from "@/services/rate-limit.service";
@@ -31,9 +30,11 @@ const Body = z.discriminatedUnion("action", [
     action: z.literal("save"), token: Token, countId: z.string().min(1).max(64),
     entries: z.array(z.object({
       productId: z.string().min(1).max(64),
-      /** الفراغُ يمسح العدّ فيعود «لم يُعَدّ» — لا صفراً. */
-      quantity: z.string().trim().max(20),
-      unit: z.custom<StoredUnit>(isStoredUnit, "وحدة غير معروفة"),
+      /** كلُّ الخانات فارغةً تمسح العدّ فيعود «لم يُعَدّ» — لا صفراً. */
+      parts: z.array(z.object({
+        key: z.custom<PartKey>((v) => v === "STORAGE" || isStoredUnit(v), "وحدة غير معروفة"),
+        quantity: z.string().trim().max(20),
+      }).strict()).max(4),
     }).strict()).min(1).max(500),
   }).strict(),
 ]);
@@ -60,14 +61,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, text, phone });
     }
 
-    const entries = [];
-    for (const e of b.entries) {
-      if (e.quantity !== "" && isAmbiguousThousands(e.quantity)) return NextResponse.json({ error: ambiguousThousandsMessage(e.quantity) }, { status: 400 });
-      const milli = e.quantity === "" ? null : parseQuantityMilli(e.quantity);
-      if (e.quantity !== "" && (milli === null || milli < 0)) return NextResponse.json({ error: `«${e.quantity}» ليس رقماً. اكتب مثل 2 أو 0.5` }, { status: 400 });
-      entries.push({ productId: e.productId, milli, unit: e.unit });
-    }
-    const saved = await saveTeamCount(today, b.countId, entries, by);
+    const saved = await saveTeamCount(today, b.countId, b.entries, by);
     return NextResponse.json({ ok: true, saved, message: saved === 1 ? "حُفظ عدّ صنف واحد" : `حُفظ عدّ ${saved} أصناف` });
   } catch (e) {
     const mapped = respondTo(e);

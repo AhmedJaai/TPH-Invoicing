@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { teamCountReport, whatsappNumber } from "./team-report";
+import { countedText, teamCountReport, whatsappNumber } from "./team-report";
 
 describe("teamCountReport", () => {
   const text = teamCountReport({
@@ -35,5 +35,13 @@ describe("whatsappNumber", () => {
     expect(whatsappNumber("123")).toBeNull();
     expect(whatsappNumber("")).toBeNull();
     expect(whatsappNumber(null)).toBeNull();
+  });
+});
+
+describe("countedText", () => {
+  it("يقول ما كُتب ومجموعَه، ولا يكرّر تفصيلاً يساويه", () => {
+    expect(countedText({ name: "اكواب", categoryLabel: "التغليف", counted: "10397 حبّة", entered: "19 كرتون + 897 حبّة" })).toBe("19 كرتون + 897 حبّة = 10397 حبّة");
+    expect(countedText({ name: "سكر", categoryLabel: "أخرى", counted: "500 جرام", entered: "500 جرام" })).toBe("500 جرام");
+    expect(countedText({ name: "سكر", categoryLabel: "أخرى", counted: null, entered: null })).toBeNull();
   });
 });

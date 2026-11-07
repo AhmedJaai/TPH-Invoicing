@@ -96,7 +96,9 @@ export async function teamCountReportPdf(input: TeamReportPdfInput): Promise<Buf
   const doc = new PDFDocument({ title: `جرد السبت ${input.week.start} – ${input.week.end}`, author: input.by, creator: "TPH Team" });
   const right = W - M;
   const left = M;
-  const qtyX = left + 150;
+  /* ثلاثةُ أعمدة: الصنف (يمين) · ما كُتب بخاناته (وسط) · المجموع (يسار) */
+  const enteredRight = left + 330;
+  const nameMin = enteredRight + 16;
 
   pages.forEach((page, p) => {
     const ctx = doc.beginPage(W, H);
@@ -159,8 +161,9 @@ export async function teamCountReportPdf(input: TeamReportPdfInput): Promise<Buf
     ctx.font = "11px TPHSansBold";
     ctx.textAlign = "right";
     ctx.fillText("الصنف", right - 10, ry);
+    ctx.fillText("ما كُتب", enteredRight, ry);
     ctx.textAlign = "left";
-    ctx.fillText("الكمية المعدودة", left + 10, ry);
+    ctx.fillText("المجموع", left + 10, ry);
     ry += ROW;
 
     for (const r of page) {
@@ -183,7 +186,13 @@ export async function teamCountReportPdf(input: TeamReportPdfInput): Promise<Buf
         ctx.textAlign = "right";
         ctx.fillStyle = INK;
         ctx.font = "12px TPHSans";
-        ctx.fillText(fit(ctx, r.line.name, right - qtyX - 20), right - 10, ry);
+        ctx.fillText(fit(ctx, r.line.name, right - 10 - nameMin), right - 10, ry);
+        if (r.line.counted !== null && r.line.entered && r.line.entered !== r.line.counted) {
+          ctx.fillStyle = MUTED;
+          ctx.font = "11px TPHSans";
+          ctx.fillText(fit(ctx, r.line.entered, enteredRight - left - 120), enteredRight, ry);
+          ctx.fillStyle = INK;
+        }
         ctx.textAlign = "left";
         if (r.line.counted !== null) {
           ctx.font = "12px TPHSansBold";

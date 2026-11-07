@@ -14,6 +14,7 @@
  * عداه يُشتقّ هنا: الدرسُ نفسه من `confirm.ts` و«الإقرار الجماعيّ
  * يُعيد الحساب».
  */
+import type { CountPart } from "@/lib/inventory/count-parts";
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -734,6 +735,8 @@ export interface ActualInput {
   productId: string;
   /** بالمِلّي المعياريّ، و`null` «لم يُعَدّ بعد». */
   actualMilli: number | null;
+  /** الخاناتُ كما كُتبت («١٩ كرتون + ٨٩٧ حبّة») — من «TPH Team». وغيابُها يمسح ما سبق فلا يخالف المجموع. */
+  parts?: readonly CountPart[] | null;
 }
 
 /** يجمع كلَّ ما يحتاجه المحرّك لفترةٍ وفرع. */
@@ -1433,7 +1436,7 @@ export async function saveActualCounts(
       */
       const written = await tx
         .update(inventoryCountLines)
-        .set({ actualMilli: e.actualMilli, countedById: actorId, countedByEmployeeId: employeeId, countedAt: new Date() })
+        .set({ actualMilli: e.actualMilli, countedById: actorId, countedByEmployeeId: employeeId, countParts: e.parts && e.parts.length > 0 ? e.parts : null, countedAt: new Date() })
         .where(and(eq(inventoryCountLines.countId, countId), eq(inventoryCountLines.productId, e.productId)))
         .returning({ id: inventoryCountLines.id });
 

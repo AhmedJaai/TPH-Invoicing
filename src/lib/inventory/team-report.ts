@@ -8,8 +8,16 @@ import { PRODUCT, countNoun } from "../arabic";
 export interface ReportLine {
   name: string;
   categoryLabel: string;
-  /** المسجَّلُ نصّاً بوحدته، أو `null` لم يُعَدّ. */
+  /** المجموعُ نصّاً بوحدة الصنف، أو `null` لم يُعَدّ. */
   counted: string | null;
+  /** ما كتبه بخاناته («١٩ كرتون + ٨٩٧ حبّة»)، أو `null` لا تفصيل. */
+  entered?: string | null;
+}
+
+/** «١٩ كرتون + ٨٩٧ حبّة = ١٠٣٩٧ حبّة» — والتفصيلُ الذي يساوي مجموعَه لا يُكرَّر. */
+export function countedText(l: ReportLine): string | null {
+  if (l.counted === null) return null;
+  return l.entered && l.entered !== l.counted ? `${l.entered} = ${l.counted}` : l.counted;
 }
 
 /** «السبت ٧ نوفمبر» — بلا `toLocaleDateString` كي يطابق الخادمُ والاختبار. */
@@ -30,7 +38,7 @@ export function teamCountReport(input: { week: { start: string; end: string }; b
   let group: string | null = null;
   for (const l of counted) {
     if (l.categoryLabel !== group) { group = l.categoryLabel; out.push("", `*${group}*`); }
-    out.push(`• ${l.name}: ${l.counted}`);
+    out.push(`• ${l.name}: ${countedText(l)}`);
   }
   if (missing.length > 0) {
     out.push("", `*لم يُعَدّ (${missing.length})*`, ...missing.map((l) => `• ${l.name}`));

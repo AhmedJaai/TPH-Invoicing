@@ -14,11 +14,12 @@ import { recordAudit } from "@/lib/audit";
 import { teamCountReport, whatsappNumber } from "@/lib/inventory/team-report";
 import { addDays } from "@/lib/riyadh-time";
 import { dayOfWeek, weekOf, type Week } from "@/lib/inventory/week";
-import { formatQuantity, unitChoices } from "@/lib/inventory/units";
-import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
-import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
+import { formatQuantity } from "@/lib/inventory/units";
+import { partFields, partsText, readParts, storagePack, sumParts, type CountPart, type PartField, type PartKey, type StoragePack } from "@/lib/inventory/count-parts";
+import type { StoredUnit } from "@/lib/unit-conversion";
+import { CATEGORY_LABEL } from "@/lib/products";
 import { DomainError } from "@/lib/domain-error";
-import { canonicalCounts, recomputeCount, saveActualCounts, startCount, type TeamCounter } from "./inventory.service";
+import { recomputeCount, saveActualCounts, startCount, type ActualInput, type TeamCounter } from "./inventory.service";
 
 /** يومُ السبت ٦، والأحدُ ٠. */
 const SATURDAY = 6;
@@ -47,7 +48,10 @@ export interface TeamCountLine {
   name: string;
   categoryLabel: string;
   baseUnit: StoredUnit;
-  units: { value: StoredUnit; label: string }[];
+  /** خاناتُ العدّ: وحدةُ التخزين من الكتالوج إن عُرف ما فيها، ثمّ وحدتا العائلة. */
+  fields: PartField[];
+  /** ما كتبه بخاناته آخرَ مرّة — يُعرض ويُعاد إليه. و`null` لا تفصيل (أو عدّله المالك). */
+  parts: CountPart[] | null;
   /** ما سُجّل لهذا الصنف في هذا الجرد نصّاً بوحدته، أو `null` لم يُعَدّ. */
   counted: string | null;
 }
@@ -70,25 +74,31 @@ async function countFor(week: Week): Promise<{ id: string; status: string; sentA
   return row ? { id: row.id, status: String(row.status), sentAt: row.sentAt } : null;
 }
 
-async function linesOf(countId: string): Promise<TeamCountLine[]> {
+async function linesOf(countId: string): Promise<(TeamCountLine & { pack: StoragePack | null })[]> {
   const rows = await db.select({
-    productId: inventoryCountLines.productId, actual: inventoryCountLines.actualMilli,
+    productId: inventoryCountLines.productId, actual: inventoryCountLines.actualMilli, parts: inventoryCountLines.countParts,
     name: products.nameAr, category: products.category, baseUnit: products.baseUnit,
+    packUnit: products.catalogPackUnit, packMilli: products.catalogPackMilli,
   }).from(inventoryCountLines)
     .innerJoin(products, eq(products.id, inventoryCountLines.productId))
     .where(and(eq(inventoryCountLines.countId, countId), eq(inventoryCountLines.inScope, true)))
     .orderBy(asc(products.category), asc(products.nameAr));
   return rows.map((r) => {
-    const unit = r.baseUnit as StoredUnit;
+    const pack = storagePack(r.baseUnit, r.packUnit, r.packMilli);
     return {
       productId: r.productId, name: r.name,
-      categoryLabel: CATEGORY_LABEL[r.category as ProductCategory] ?? String(r.category),
-      baseUnit: unit,
-      units: unitChoices(unit).map((u) => ({ value: u, label: storedUnitLabel(u) })),
-      counted: r.actual === null ? null : formatQuantity(r.actual, unit),
+      categoryLabel: CATEGORY_LABEL[r.category] ?? String(r.category),
+      baseUnit: r.baseUnit,
+      fields: partFields(r.baseUnit, pack),
+      parts: r.actual === null ? null : readParts(r.parts),
+      counted: r.actual === null ? null : formatQuantity(r.actual, r.baseUnit),
+      pack,
     };
   });
 }
+
+/** سطرُ التقرير: المجموع وما كُتب بخاناته. */
+const reportLine = (l: TeamCountLine) => ({ name: l.name, categoryLabel: l.categoryLabel, counted: l.counted, entered: l.parts ? partsText(l.parts) : null });
 
 /** ما يراه الموظّفُ في صفحة الجرد اليوم. */
 export async function loadTeamCount(today: string): Promise<TeamCountView> {
@@ -136,7 +146,7 @@ export async function startTeamCount(today: string, by: TeamCounter): Promise<st
 export async function saveTeamCount(
   today: string,
   countId: string,
-  entries: readonly { productId: string; milli: number | null; unit: StoredUnit }[],
+  entries: readonly { productId: string; parts: readonly { key: PartKey; quantity: string }[] }[],
   by: TeamCounter,
 ): Promise<number> {
   const w = teamCountWindow(today);
@@ -144,12 +154,18 @@ export async function saveTeamCount(
   const count = await countFor(w.week);
   if (!count || count.id !== countId) throw new TeamCountRefused("هذا ليس جرد هذا الأسبوع. حدّث الصفحة.");
   if (count.status === "FINALISED") throw new TeamCountRefused("أُقفل جرد هذا الأسبوع، فلا يُعدَّل من هنا.");
-  const inScope = new Set((await linesOf(countId)).map((l) => l.productId));
-  const outside = entries.find((e) => !inScope.has(e.productId));
-  if (outside) throw new TeamCountRefused("صنفٌ ليس في هذا الجرد. حدّث الصفحة.");
-  const canonical = await canonicalCounts(entries);
-  await saveActualCounts(countId, canonical, by);
-  return canonical.length;
+  const lines = new Map((await linesOf(countId)).map((l) => [l.productId, l]));
+  /* المجموعُ يُحسب هنا من وحدة الصنف ووحدة تخزينه في القاعدة — لا يُؤخذ من المتصفّح */
+  const actuals: ActualInput[] = [];
+  for (const e of entries) {
+    const line = lines.get(e.productId);
+    if (!line) throw new TeamCountRefused("صنفٌ ليس في هذا الجرد. حدّث الصفحة.");
+    const sum = sumParts(e.parts, line.baseUnit, line.pack);
+    if (!sum.ok) throw new TeamCountRefused(`${line.name}: ${sum.error}`);
+    actuals.push({ productId: e.productId, actualMilli: sum.canonical, parts: sum.parts });
+  }
+  await saveActualCounts(countId, actuals, by);
+  return actuals.length;
 }
 
 const WHATSAPP_KEY = "team.count_whatsapp";
@@ -188,7 +204,7 @@ export async function sendTeamCount(today: string, countId: string, by: TeamCoun
     await t.update(inventoryCounts).set({ teamSentAt: new Date(), teamSentByEmployeeId: by.employeeId }).where(eq(inventoryCounts.id, countId));
     await recordAudit({ action: "INVENTORY_COUNT_TEAM_SENT", entityType: "inventory_count", entityId: countId, after: { أرسله: by.name, عُدّ: lines.filter((l) => l.counted !== null).length, من: lines.length } }, t);
   });
-  return { text: teamCountReport({ week: w.week, by: by.name, lines }), phone: await loadCountWhatsapp() };
+  return { text: teamCountReport({ week: w.week, by: by.name, lines: lines.map(reportLine) }), phone: await loadCountWhatsapp() };
 }
 
 /**
@@ -203,7 +219,7 @@ export async function teamCountPdf(today: string, by: TeamCounter): Promise<{ pd
   const lines = await linesOf(count.id);
   const preparedAt = new Date().toLocaleString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
   const { teamCountReportPdf } = await import("@/lib/inventory/team-report-pdf");
-  const pdf = await teamCountReportPdf({ week: w.week, by: by.name, lines, preparedAt });
+  const pdf = await teamCountReportPdf({ week: w.week, by: by.name, lines: lines.map(reportLine), preparedAt });
   return { pdf, fileName: `جرد-السبت-${w.week.end}.pdf` };
 }
 
