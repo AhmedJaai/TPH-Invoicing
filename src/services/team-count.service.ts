@@ -191,6 +191,22 @@ export async function sendTeamCount(today: string, countId: string, by: TeamCoun
   return { text: teamCountReport({ week: w.week, by: by.name, lines }), phone: await loadCountWhatsapp() };
 }
 
+/**
+ * تقريرُ جرد هذا السبت ملفَّ PDF — ممّا حُفظ لا ممّا في الشاشة. لجرد هذا الأسبوع وحده، مفتوحاً أو
+ * أقفلته الإدارة، وفي وقته (السبت والأحد).
+ */
+export async function teamCountPdf(today: string, by: TeamCounter): Promise<{ pdf: Buffer; fileName: string }> {
+  const w = teamCountWindow(today);
+  if (!w.open) throw new TeamCountRefused("تقرير الجرد يُعدّ يوم السبت والأحد بعده.");
+  const count = await countFor(w.week);
+  if (!count) throw new TeamCountRefused("لم يبدأ جرد هذا الأسبوع بعد.");
+  const lines = await linesOf(count.id);
+  const preparedAt = new Date().toLocaleString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
+  const { teamCountReportPdf } = await import("@/lib/inventory/team-report-pdf");
+  const pdf = await teamCountReportPdf({ week: w.week, by: by.name, lines, preparedAt });
+  return { pdf, fileName: `جرد-السبت-${w.week.end}.pdf` };
+}
+
 export interface TeamCountWaiting {
   countId: string;
   week: Week;

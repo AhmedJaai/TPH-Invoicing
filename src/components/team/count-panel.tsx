@@ -9,8 +9,10 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CheckCircle2, ClipboardList, Copy, Lock, MessageCircle, Search, Send } from "lucide-react";
-import { postJson } from "@/lib/http-client";
+import { CalendarClock, CheckCircle2, ClipboardList, FileText, Lock, MessageCircle, Search, Send } from "lucide-react";
+import { NETWORK_ERROR, postJson, readResponse } from "@/lib/http-client";
+import { teamAppPath } from "@/lib/team-app";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import type { TeamCountView } from "@/services/team-count.service";
 
@@ -226,53 +228,103 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
 }
 
 /**
- * «أنهِ الجرد وأرسله» — يسجّل الخادمُ الإرسال ويبني التقريرَ ممّا حُفظ، ثمّ يُفتح واتساب برقم الإدارة
- * والنصُّ جاهز. وما لم يُحفظ يمنع الإرسال: التقريرُ يقول ما في الجرد، لا ما في الشاشة.
+ * «أنهِ الجرد وأرسله» — خطوتان لأنّ الجوال لا يشارك ملفّاً إلّا من ضغطةٍ مباشرة:
+ *   ١. «جهّز تقرير PDF»: يرسمه الخادمُ ممّا حُفظ (`/a/<رمز>/count-pdf`).
+ *   ٢. «أرسله واتساب»: لوحُ المشاركة في الجوال والملفُّ فيه، فيختار محادثةَ الإدارة. وحين يتمّ
+ *      يُسجَّل الإرسال. وفي متصفّحٍ لا يشارك الملفّات: يُنزَّل الملفّ ويُفتح واتساب على رقم الإدارة.
+ * وما لم يُحفظ يمنع: التقريرُ يقول ما في الجرد، لا ما في الشاشة.
  */
 function SendReport({ token, countId, counted, total, unsaved, sent }: { token: string; countId: string; counted: number; total: number; unsaved: number; sent: Sent }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"prepare" | "send" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<{ text: string; href: string; phone: boolean } | null>(null);
+  const [file, setFile] = useState<{ file: File; url: string } | null>(null);
+  const [fallback, setFallback] = useState<string | null>(null);
 
-  async function send() {
+  useEffect(() => () => { if (file) URL.revokeObjectURL(file.url); }, [file]);
+
+  async function prepare() {
     if (busy) return;
-    setBusy(true); setError(null);
+    setBusy("prepare"); setError(null); setFallback(null);
+    try {
+      const res = await fetch(`${teamAppPath(token)}/count-pdf`, { cache: "no-store" });
+      if (!res.ok) { const r = await readResponse(res); setError(r.ok ? "تعذّر تجهيز التقرير." : r.error); return; }
+      const blob = await res.blob();
+      const f = new File([blob], `جرد-السبت-${todayInRiyadh()}.pdf`, { type: "application/pdf" });
+      setFile({ file: f, url: URL.createObjectURL(f) });
+    } catch {
+      setError(NETWORK_ERROR);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** يُسجَّل الإرسال، ويعود رقمُ الإدارة لمن لا يشارك متصفّحُه الملفّات. */
+  async function record(): Promise<{ phone: string | null; text: string } | null> {
     const r = await postJson<{ text: string; phone: string | null }>("/api/team/count", { action: "send", token, countId });
-    setBusy(false);
-    if (!r.ok) { setError(r.error); return; }
-    const href = `https://wa.me/${r.data.phone ?? ""}?text=${encodeURIComponent(r.data.text)}`;
-    setReport({ text: r.data.text, href, phone: r.data.phone !== null });
+    if (!r.ok) { setError(r.error); return null; }
     router.refresh();
-    window.location.href = href;
+    return r.data;
+  }
+
+  async function share() {
+    if (!file || busy) return;
+    setError(null);
+    const data: ShareData = { files: [file.file], title: "تقرير جرد السبت" };
+    if (typeof navigator.canShare === "function" && navigator.canShare(data)) {
+      try {
+        /* لا انتظارَ قبلها: المشاركةُ تحتاج الضغطةَ نفسها */
+        await navigator.share(data);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return; // أغلق اللوح — لم يُرسَل
+        setError("تعذّرت المشاركة. نزّل الملف وأرسله من واتساب بنفسك.");
+        return;
+      }
+      setBusy("send");
+      await record();
+      setBusy(null);
+      return;
+    }
+    /* متصفّحٌ لا يشارك الملفّات: يُنزَّل الملفّ، ويُفتح واتساب على رقم الإدارة ليُرفق فيه */
+    setBusy("send");
+    const r = await record();
+    setBusy(null);
+    if (!r) return;
+    const a = document.createElement("a");
+    a.href = file.url; a.download = file.file.name; a.click();
+    setFallback(`https://wa.me/${r.phone ?? ""}?text=${encodeURIComponent("تقرير جرد السبت مرفق (PDF).")}`);
   }
 
   const done = sent && !sent.stale;
+  const sentAt = sent ? new Date(sent.at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" }) : null;
   return (
     <section aria-labelledby="send-title" className="space-y-3 rounded-2xl border border-accent-line bg-raised p-4">
       <h3 id="send-title" className="flex items-center gap-2 text-base font-bold"><MessageCircle className="h-5 w-5 text-accent" aria-hidden />أرسل الجرد للإدارة</h3>
       <p className="text-sm leading-relaxed text-ink-soft">
-        {done ? `أُرسل ${new Date(sent.at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" })}. إن عدّلت شيئاً فأرسله مرة أخرى.`
-          : `بعد أن تحفظ كل الأصناف، يفتح واتساب برسالة فيها الجرد كاملاً، فاضغط إرسال. عُدّ ${counted} من ${countNoun(total, PRODUCT)}.`}
+        {done ? `أُرسل ${sentAt}. إن عدّلت شيئاً فأرسله مرة أخرى.`
+          : `بعد أن تحفظ كل الأصناف، جهّز التقرير PDF ثم أرسله في واتساب لمحادثة الإدارة. عُدّ ${counted} من ${countNoun(total, PRODUCT)}.`}
       </p>
       {unsaved > 0 && <p className="text-sm font-bold text-warn">احفظ ما كتبته أولاً ({unsaved}) ثم أرسل.</p>}
-      <button type="button" onClick={() => void send()} disabled={busy || unsaved > 0 || counted === 0} aria-busy={busy}
-        className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-bold disabled:opacity-50 ${done ? "border border-line bg-surface text-ink" : "bg-accent text-accent-ink"}`}>
-        <Send className="h-4 w-4" aria-hidden />{busy ? "يُجهَّز التقرير…" : done ? "أرسله مرة أخرى" : "أنهِ الجرد وأرسله"}
-      </button>
-      <ErrorLine error={error} />
-      {report && (
+      {!file ? (
+        <button type="button" onClick={() => void prepare()} disabled={busy !== null || unsaved > 0 || counted === 0} aria-busy={busy === "prepare"}
+          className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-bold disabled:opacity-50 ${done ? "border border-line bg-surface text-ink" : "bg-accent text-accent-ink"}`}>
+          <FileText className="h-4 w-4" aria-hidden />{busy === "prepare" ? "يُجهَّز التقرير…" : done ? "جهّز التقرير وأرسله مرة أخرى" : "أنهِ الجرد وجهّز تقرير PDF"}
+        </button>
+      ) : (
         <div className="space-y-2">
-          {!report.phone && <p className="text-xs font-bold text-warn">لم تكتب الإدارة رقمها بعد، فاختر المحادثة بنفسك في واتساب.</p>}
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-sunken p-3 text-xs leading-relaxed">{report.text}</pre>
-          <div className="grid grid-cols-2 gap-2">
-            <a href={report.href} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-sm font-bold"><MessageCircle className="h-4 w-4" aria-hidden />افتح واتساب</a>
-            <button type="button" className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-sm font-bold"
-              onClick={() => { navigator.clipboard.writeText(report.text).then(() => setError(null), () => setError("تعذّر النسخ. حدّد النص بنفسك وانسخه.")); }}>
-              <Copy className="h-4 w-4" aria-hidden />انسخ التقرير
-            </button>
-          </div>
+          <a href={file.url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-bold">
+            <FileText className="h-5 w-5 shrink-0 text-accent" aria-hidden /><span className="min-w-0 flex-1 truncate" dir="ltr">{file.file.name}</span><span className="text-xs text-muted">اعرضه</span>
+          </a>
+          <button type="button" onClick={() => void share()} disabled={busy !== null || unsaved > 0} aria-busy={busy === "send"}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-base font-bold text-accent-ink disabled:opacity-50">
+            <Send className="h-4 w-4" aria-hidden />{busy === "send" ? "يُسجَّل الإرسال…" : "أرسله واتساب"}
+          </button>
+          <p className="text-xs text-muted">يفتح لوح المشاركة: اختر واتساب ثم محادثة الإدارة.</p>
         </div>
+      )}
+      <ErrorLine error={error} />
+      {fallback && (
+        <p className="text-sm">نُزّل الملف. <a href={fallback} className="font-bold text-accent underline">افتح واتساب</a> وأرفقه في المحادثة.</p>
       )}
     </section>
   );

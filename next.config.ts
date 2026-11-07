@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
   /* وكذا لوحةُ رسم الصفحة (`@napi-rs/canvas`): ثنائيٌّ لكلّ منصّة — يُحمَّل ولا يُحزَم */
   serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
 
+  /* تقريرُ جرد السبت PDF يُرسم بخطّ التطبيق وشعاره من القرص — فيُنسخان مع دالّته، وإلّا رُسم بلا عربيّة */
+  outputFileTracingIncludes: {
+    "/a/\\[token\\]/count-pdf": ["./src/fonts/thmanyahsans-Regular.woff2", "./src/fonts/thmanyahsans-Bold.woff2", "./public/icons/icon-192.png"],
+  },
+
   /*
     ترويساتُ الأمان — لم يكن منها شيء.
 
