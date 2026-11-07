@@ -68,6 +68,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "capture-submit": { limit: 40, windowSeconds: 3600 },
   /* رابطُ الحضور: تسجيلان في اليوم عادةً — والعشرون سقفٌ لمن يعبث بالرابط */
   "attend": { limit: 20, windowSeconds: 3600 },
+  /* رسائلُ «TPH Team»: اقتراحٌ أو شكوى — عشرٌ في الساعة سقفٌ لمن يعبث بالرابط */
+  "team-message": { limit: 10, windowSeconds: 3600 },
   "capture-file": { limit: 300, windowSeconds: 3600 },
   /* ورقةُ المستند من الدرايف: تنزيلٌ لا نموذج — ومن يراجع مئةً في جلسة لا يقف عند الأربعين */
   "document-file": { limit: 300, windowSeconds: 3600 },

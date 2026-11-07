@@ -1,5 +1,5 @@
 import {
-  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms, EMPLOYEE, MONTH,
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms, EMPLOYEE, MONTH, COMPLAINT, MESSAGE,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import type { Capability } from "./permissions";
@@ -257,7 +257,12 @@ export interface AttentionFacts {
   financeRentLumps?: { day: string; amountMinor: number }[];
   financeLastMonthMissing?: { month: string; rent: boolean; salary: boolean } | null;
   /** الموظّفون (084): حوالاتُ رواتب لم تُوزَّع، وحضورٌ بلا شاهد، وموظّفٌ بلا راتب. */
-  payroll?: { unlinkedSalary: { count: number; amountMinor: number }; unreviewedCheckins: number; missingRates: string[]; owed?: { month: string; remainingMinor: number; people: number } | null };
+  payroll?: {
+    unlinkedSalary: { count: number; amountMinor: number }; unreviewedCheckins: number; missingRates: string[];
+    owed?: { month: string; remainingMinor: number; people: number } | null;
+    /** رسائلُ «TPH Team» لم تُقرأ، ومنها الشكاوى. */
+    unreadMessages?: { count: number; complaints: number };
+  };
   stockLinksReady?: { count: number; valueMinor: number };
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
   foodicsStaleHours?: number | null;
@@ -1049,6 +1054,26 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       actionLabel: "راجع الحضور",
       href: "/payroll/attendance#review",
       count: pay.unreviewedCheckins,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+      needs: "payroll:view",
+    });
+  }
+  /* ما أرسله الفريقُ من «TPH Team» — يُقرأ ليُعرف، والشكوى قبل الاقتراح */
+  const msgs = pay?.unreadMessages;
+  if (msgs && msgs.count > 0) {
+    out.push({
+      id: "team-messages",
+      area: "DATA",
+      severity: msgs.complaints > 0 ? "HIGH" : "MEDIUM",
+      title: msgs.count === 1
+        ? (msgs.complaints === 1 ? "شكوى جديدة من الفريق" : "رسالة جديدة من الفريق")
+        : `${msgs.count === 2 ? "رسالتان جديدتان" : `${countNoun(msgs.count, MESSAGE)} جديدة`} من الفريق${msgs.complaints > 0 ? `، منها ${countNoun(msgs.complaints, COMPLAINT)}` : ""}`,
+      detail: "أرسلها موظف من تطبيق TPH Team: اقتراح أو شكوى أو طلب.",
+      action: "اقرأها، ورُدّ على صاحبها فيراه في تطبيقه، وأغلقها حين تُعالَج.",
+      actionLabel: "اقرأ الرسائل",
+      href: "/payroll/messages",
+      count: msgs.count,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
       needs: "payroll:view",

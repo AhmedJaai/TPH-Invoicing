@@ -170,3 +170,14 @@ describe("ما دُفع خارج الكشف", () => {
     expect(s.remainingMinor).toBe(71_600);
   });
 });
+
+describe("طولُ الدوام كما يُقرأ", () => {
+  it("بالعدد الصحيح والكسر", async () => {
+    const { hoursLabel } = await import("./calc");
+    expect(hoursLabel(60)).toBe("ساعة واحدة");
+    expect(hoursLabel(120)).toBe("ساعتان");
+    expect(hoursLabel(480)).toBe("8 ساعات");
+    expect(hoursLabel(720)).toBe("12 ساعة");
+    expect(hoursLabel(450)).toBe("7:30 ساعة");
+  });
+});

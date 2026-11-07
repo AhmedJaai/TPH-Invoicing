@@ -698,3 +698,19 @@ describe("فاتورةٌ تاريخُها بعد اليوم", () => {
     expect(ids({ futureInvoices: [] })).not.toContain("future-invoices");
   });
 });
+
+describe("رسائل الفريق من TPH Team", () => {
+  const pay = { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [] as string[], owed: null };
+  it("لا بند بلا رسائل جديدة", () => {
+    expect(ids({ payroll: { ...pay, unreadMessages: { count: 0, complaints: 0 } } })).not.toContain("team-messages");
+  });
+  it("رسالةٌ جديدة تفتح صفحة الرسائل، والشكوى أعلى", () => {
+    const [one] = buildAttention({ ...quiet, payroll: { ...pay, unreadMessages: { count: 1, complaints: 0 } } }).filter((i) => i.id === "team-messages");
+    expect(one.href).toBe("/payroll/messages");
+    expect(one.severity).toBe("MEDIUM");
+    expect(one.needs).toBe("payroll:view");
+    const [many] = buildAttention({ ...quiet, payroll: { ...pay, unreadMessages: { count: 3, complaints: 2 } } }).filter((i) => i.id === "team-messages");
+    expect(many.severity).toBe("HIGH");
+    expect(many.title).toBe("3 رسائل جديدة من الفريق، منها شكويان");
+  });
+});

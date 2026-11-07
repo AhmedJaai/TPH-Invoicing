@@ -31,7 +31,7 @@ export const KIND_PATTERN: readonly (readonly [Exclude<AuditKind, "learned" | "o
   ["bank", "^(BANK_|COUNTERPARTY_|STATEMENT_|DELETE_DUPLICATE_TRANSACTION)"],
   ["suppliers", "^(SUPPLIER_|AI_|PRODUCT_)"],
   ["inventory", "^(SALES_|CATALOG_|POS_|RECIPE_|STOCK_|INVENTORY_|WASTE_)"],
-  ["payroll", "^(EMPLOYEE_|PAYROLL_|ATTENDANCE_)"],
+  ["payroll", "^(EMPLOYEE_|PAYROLL_|ATTENDANCE_|TEAM_)"],
   ["tasks", "^TASK_"],
 ];
 

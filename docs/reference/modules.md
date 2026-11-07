@@ -4,7 +4,8 @@
 
 | الملف | مسؤوليّته |
 |---|---|
-| `src/services/capture.service.ts` | صورُ الفريق: روابطُ التصوير (بصمةُ الرمز) · فحصُ الوضوح بالقراءة · الانتظار والرفض · `settleCapture` داخل معاملة الأرشفة |
+| `src/services/capture.service.ts` | صورُ الفريق: روابطُ التصوير (بصمةُ الرمز، أو رمزُ حضور الموظّف في «TPH Team» برابطٍ واحدٍ له) · فحصُ الوضوح بالقراءة · الانتظار والرفض · `settleCapture` داخل معاملة الأرشفة |
+| `src/lib/team-app.ts` · `src/components/team/` · `src/services/team.service.ts` · `/a/[token]` · `/payroll/messages` | **TPH Team**: تطبيقُ الموظّف (الحضور · الفواتير · رسالة للإدارة) وبيانُ تثبيته برمزه، ورسائلُ الفريق وردُّ المالك عليها (`team_messages`) |
 | `src/lib/scan/` | الماسحُ على الجهاز، دوالُّ خالصة: `region` (الرقعةُ البيضاء — الأوّل) · `refine` (تدقيقُ الأضلاع) · `stability` (متى يُلتقط وحده) · `edges` (حوافُّ الورقة من خطوطها — هَف، وأبعدُ الخطوط، ولا حبرَ وراء الطرف) · `detect` (الخطوطُ ثمّ اللون) · `geometry` (التقويم المنظوريّ) · `enhance` (ورقٌ أبيض بلا ظلّ) · `quality` (مهزوزة · مظلمة · لمعة · بعيدة) |
 | `src/lib/scan/corner-model.ts` · `src/components/scan/detector.ts` | نموذجُ زوايا الورقة (مُدخلُه ومُخرجُه، خالص) · المكتشِفُ المشترك (عاملٌ واحد، ومهلة) — و`pickBest` في `detect.ts` يختار بشهادة الحافّة |
 | `src/components/scan/live-scanner.tsx` · `detect.worker.ts` | الماسحُ الحيّ: الكاميرا في الصفحة، والاكتشافُ في عامل، والالتقاطُ حين تثبت |
@@ -184,7 +185,7 @@
 | `sales-analysis.service.ts` · `/finance/sales` | **المبيعات**: يوماً وساعةً وصنفاً بهامشه، ما صعد وما هبط، وما خرج من الإيراد — بإيراد قائمة الدخل نفسِه |
 | `finance-position.service.ts` · `/finance/position` | **الوضع الآن**: رصيدُ البنك، المستحقُّ للمورّدين، ضريبةُ الإقرار، النقدُ والصندوق — كلٌّ من مصدره القائم |
 | `src/lib/finance/reading.ts` · `finance-reading.service.ts` | **القراءةُ الذكيّة**: حقائقُ مرقَّمة يحسبها الخادم، ويُتحقَّق أنّ كلَّ رقمٍ ذكره النموذج منها؛ تُحفَظ بمدخلاتها (`npm run finance:reading-eval`) |
-| `src/lib/payroll/calc.ts` · `attendance.ts` · `saudi-rules.ts` · `payroll.service.ts` · `/payroll` · `/a/[token]` | **الموظّفون**: الراتبُ بشهره، المسيّرُ محسوباً (`payslip`)، حاسبةُ التأخير وجزاءاتُ لائحة تنظيم العمل بحدود نظام العمل (`saudi-rules.ts`)، توزيعُ الحوالة بغرضها وأثرُه في قائمة الدخل (`payrollReclass`)، الحضورُ برابطٍ وموقعٍ وشبكة، قسيمةُ الراتب، ملفُّ CSV (`/api/payroll/export`) |
+| `src/lib/payroll/calc.ts` · `attendance.ts` · `saudi-rules.ts` · `deductions.ts` · `payroll.service.ts` · `/payroll` · `/a/[token]` | **الموظّفون**: الراتبُ بشهره، المسيّرُ محسوباً (`payslip`)، حاسبةُ التأخير وجزاءاتُ لائحة تنظيم العمل بحدود نظام العمل (`saudi-rules.ts`)، توزيعُ الحوالة بغرضها وأثرُه في قائمة الدخل (`payrollReclass`)، الحضورُ برابطٍ وموقعٍ وشبكة، قسيمةُ الراتب، ملفُّ CSV (`/api/payroll/export`) |
 | `src/lib/finance/stock-gaps.ts` · `finance-attention.service.ts` | بنودُ المالية في «يحتاج قرارك»: إيجارٌ لم يُوزَّع، ربطٌ جاهز، صندوقٌ فرقُه ظاهر، مزامنةٌ وقفت، صنفٌ تكرّر فرقُه |
 | `src/lib/foodics/stock.ts` | شاهدُ المخزون من فودكس: عدُّ الرفّ، وصرفُ الأصناف مجموعاً يوماً بصنف (`foodics:sync -- --moves`) |
 | `src/lib/sales/witness.ts` · `sales-witness.service.ts` | ملفُّ فودكس **شاهداً** على ضريبة مبيعات الإقرار والنقد المكتوب بيد — يُعرض الفرقُ والتغطية ولا يدخل الحساب |

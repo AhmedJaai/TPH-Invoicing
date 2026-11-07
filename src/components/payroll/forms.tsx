@@ -5,18 +5,20 @@
  * والحاسبةُ هنا معاينةٌ للعين فقط: الخصمُ الذي يُحسب في المسيّر يحسبه الخادم من الدقائق.
  */
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calculator, Copy, Link2, MessageCircle, Plus, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { formatRiyals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 import { countNoun, EMPLOYEE } from "@/lib/arabic";
 import {
-  ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
+  ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, hoursLabel, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
-import { WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { clockMinutes, shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from "@/lib/payroll/saudi-rules";
 import type { PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
+import { TEAM_APP_NAME, teamAppPath, teamInvite } from "@/lib/team-app";
 import { buttonClass, fieldClass } from "../ui-tokens";
 import { ConfirmAction, ReadySubmit, toast } from "../ui-client";
 
@@ -64,7 +66,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
       ...(isNew ? {} : { id: initial.id }),
       name: v.name, kind: v.kind, jobTitle: v.jobTitle, phone: v.phone, nationalId: v.nationalId,
       bankBeneficiaryId: v.bankBeneficiaryId, iban: v.iban, hiredOn: v.hiredOn, leftOn: v.leftOn || null,
-      shiftStart: v.shiftStart || null, shiftHours: v.shiftHours, lateGraceMinutes: Number.isInteger(grace) ? grace : 0,
+      shiftStart: v.shiftStart || null, shiftEnd: v.shiftStart ? v.shiftEnd || null : null, lateGraceMinutes: Number.isInteger(grace) ? grace : 0,
       daysOff: v.daysOff, note: v.note,
       ...(isNew ? { salary: v.salary ?? "" } : {}),
     });
@@ -72,7 +74,8 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
     if (r?.id && isNew) router.push(`/payroll/employee/${r.id}`);
   }
 
-  const ready = v.name.trim().length >= 2 && /^\d{4}-\d{2}-\d{2}$/.test(v.hiredOn);
+  const shiftOk = !v.shiftStart || (v.shiftEnd !== "" && shiftLength(v.shiftStart, v.shiftEnd) !== null);
+  const ready = v.name.trim().length >= 2 && /^\d{4}-\d{2}-\d{2}$/.test(v.hiredOn) && shiftOk;
   return (
     <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -96,8 +99,11 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
         <label className={label}>الآيبان <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" value={v.iban} onChange={(e) => set("iban", e.target.value)} placeholder="SA…" /></label>
         <label className={label}>الجوال <span className="font-normal text-muted">(لإرسال رابط الحضور)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="tel" value={v.phone} onChange={(e) => set("phone", e.target.value)} placeholder="9665…" /></label>
         <label className={label}>رقم الهوية أو الإقامة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="numeric" value={v.nationalId} onChange={(e) => set("nationalId", e.target.value.replace(/\D/g, ""))} /></label>
-        <label className={label}>بداية الدوام <span className="font-normal text-muted">(لحساب التأخير من الحضور)</span><input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftStart} onChange={(e) => set("shiftStart", e.target.value)} /></label>
-        <label className={label}>طول الدوام (ساعات)<input className={`${field} nums mt-1.5 text-end`} dir="ltr" value={v.shiftHours} onChange={(e) => set("shiftHours", e.target.value)} placeholder="8" /></label>
+        <label className={label}>الدوام من الساعة <span className="font-normal text-muted">(لحساب التأخير)</span><input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftStart} onChange={(e) => set("shiftStart", e.target.value)} /></label>
+        <label className={label}>إلى الساعة
+          <input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftEnd} onChange={(e) => set("shiftEnd", e.target.value)} disabled={!v.shiftStart} />
+          <ShiftLengthNote start={v.shiftStart} end={v.shiftEnd} />
+        </label>
         <label className={label}>دقائق سماح التأخير<input className={`${field} nums mt-1.5 text-end`} dir="ltr" inputMode="numeric" value={v.lateGraceMinutes} onChange={(e) => set("lateGraceMinutes", e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="0" /></label>
       </div>
       <fieldset className="mt-4">
@@ -113,10 +119,94 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
       <label className={`${label} mt-4`}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><textarea className={`${field} mt-1.5 min-h-16 py-2`} value={v.note} onChange={(e) => set("note", e.target.value)} maxLength={300} /></label>
       <ErrorLine error={error} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <ReadySubmit ready={ready} busy={busy} missing={v.name.trim().length < 2 ? "اكتب اسم الموظف (حرفان على الأقل)." : "اختر تاريخ مباشرته العمل."}>{isNew ? "أضف الموظف" : "احفظ التعديل"}</ReadySubmit>
+        <ReadySubmit ready={ready} busy={busy} missing={v.name.trim().length < 2 ? "اكتب اسم الموظف (حرفان على الأقل)." : !shiftOk ? "اكتب نهاية الدوام: بعد بدايته بساعة على الأقل و16 ساعة على الأكثر." : "اختر تاريخ مباشرته العمل."}>{isNew ? "أضف الموظف" : "احفظ التعديل"}</ReadySubmit>
         <p className="min-w-0 flex-1 basis-60 text-[11px] leading-relaxed text-muted">رقم المستفيد هو ما يظهر بعد «BEN ID» في وصف الحوالة. به تُقترح حوالاته تلقائياً.</p>
       </div>
     </form>
+  );
+}
+
+/** «٨ ساعات» تحت نهاية الدوام — أو لماذا لا تُقبل. */
+function ShiftLengthNote({ start, end }: { start: string; end: string }) {
+  if (!start) return <span className="mt-1 block text-[11px] font-normal text-muted">اكتب البداية أولاً.</span>;
+  if (!end) return <span className="mt-1 block text-[11px] font-normal text-muted">مثلاً 00:00 لمن ينتهي دوامه منتصف الليل.</span>;
+  const minutes = shiftLength(start, end);
+  if (minutes === null) return <span className="mt-1 block text-[11px] font-bold text-danger">بين ساعة و16 ساعة بعد البداية.</span>;
+  return <span className="mt-1 block text-[11px] font-normal text-muted">{hoursLabel(minutes)}{(clockMinutes(end) ?? 0) <= (clockMinutes(start) ?? 0) ? "، ينتهي بعد منتصف الليل" : ""}</span>;
+}
+
+/* ─────────────── جدولُ الدوام: كلُّ الموظّفين في مكانٍ واحد ─────────────── */
+
+export interface ShiftRow {
+  id: string;
+  name: string;
+  kind: "MONTHLY" | "PART_TIME";
+  shiftStart: string;
+  shiftEnd: string;
+  lateGraceMinutes: number;
+  daysOff: string;
+}
+
+/**
+ * من الساعة كم إلى كم، وأيّامُ الراحة، والسماح — لكلّ موظّفٍ سطرٌ يُحفظ وحده. منه يُحسب التأخيرُ
+ * والانصرافُ المبكّر من تسجيل الحضور. والجزئيُّ يُدفع بساعاته فلا يُحسب عليه تأخير.
+ */
+export function ShiftSchedule({ rows }: { rows: readonly ShiftRow[] }) {
+  return (
+    <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
+      {rows.map((r) => <ShiftLine key={r.id} row={r} />)}
+    </ul>
+  );
+}
+
+function ShiftLine({ row }: { row: ShiftRow }) {
+  const [start, setStart] = useState(row.shiftStart);
+  const [end, setEnd] = useState(row.shiftEnd);
+  const [grace, setGrace] = useState(String(row.lateGraceMinutes));
+  const [daysOff, setDaysOff] = useState(row.daysOff);
+  const { busy, error, send } = useSend();
+  const minutes = start && end ? shiftLength(start, end) : null;
+  const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff;
+  const valid = (!start && !end) || minutes !== null;
+  const toggle = (d: number) => setDaysOff((x) => (x.includes(String(d)) ? x.replace(String(d), "") : [...x, String(d)].sort().join("")));
+  return (
+    <li className="px-4 py-3">
+      <form className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_5.5rem_auto]" onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) return;
+        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff });
+      }}>
+        <p className="col-span-2 min-w-0 self-center text-sm font-bold sm:col-span-1">
+          <Link href={`/payroll/employee/${row.id}`} className="hover:underline">{row.name}</Link>
+          <span className="block text-[11px] font-normal text-muted">
+            {row.kind === "PART_TIME" ? "جزئي، بالساعة" : minutes !== null ? `${hoursLabel(minutes)}${(clockMinutes(end) ?? 0) <= (clockMinutes(start) ?? 0) ? "، حتى بعد منتصف الليل" : ""}` : start || end ? "—" : "لم يُحدَّد"}
+          </span>
+        </p>
+        <label className={label}>من<input type="time" dir="ltr" className={`${field} mt-1`} value={start} onChange={(e) => setStart(e.target.value)} aria-label={`بداية دوام ${row.name}`} /></label>
+        <label className={label}>إلى<input type="time" dir="ltr" className={`${field} mt-1 ${start && end && minutes === null ? "border-danger" : ""}`} value={end} onChange={(e) => setEnd(e.target.value)} aria-label={`نهاية دوام ${row.name}`} /></label>
+        <label className={label}>سماح (د)<input className={`${field} nums mt-1 text-end`} dir="ltr" inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value.replace(/\D/g, "").slice(0, 3))} aria-label={`دقائق سماح ${row.name}`} /></label>
+        <span className="flex flex-col items-stretch gap-1 sm:order-none">
+          <ReadySubmit ready={dirty && valid} busy={busy} size="sm" variant={dirty ? "primary" : "secondary"}
+            missing={!valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
+            {busy ? "يُحفظ…" : dirty ? "احفظ" : "محفوظ"}
+          </ReadySubmit>
+        </span>
+        <fieldset className="col-span-2 min-w-0 sm:col-span-5">
+          <legend className={`${label} mb-1`}>أيام الراحة</legend>
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAY_LABEL.map((d, i) => (
+              <button key={d} type="button" aria-pressed={daysOff.includes(String(i))} onClick={() => toggle(i)}
+                className={`min-h-11 min-w-14 rounded-lg border px-2.5 text-xs font-bold sm:min-h-9 ${daysOff.includes(String(i)) ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:bg-hover"}`}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </form>
+      {start && end && minutes === null && <p className="mt-1.5 text-[11px] font-bold text-danger">النهاية بين ساعة و16 ساعة بعد البداية.</p>}
+      {Boolean(start) !== Boolean(end) && <p className="mt-1.5 text-[11px] font-bold text-warn">اكتب البداية والنهاية معاً.</p>}
+      <ErrorLine error={error} />
+    </li>
   );
 }
 
@@ -438,14 +528,15 @@ export function CheckinLinkPanel({ employeeId, name, phone, hasLink }: { employe
   const { busy, error, send } = useSend();
   const issue = async () => {
     const r = await send<{ token?: string; message?: string }>("/api/payroll/employee", { action: "link-issue", id: employeeId });
-    if (r?.token) setUrl(`${window.location.origin}/a/${r.token}`);
+    if (r?.token) setUrl(`${window.location.origin}${teamAppPath(r.token)}`);
   };
-  const wa = url ? `https://wa.me/${(phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(`أهلاً ${name}، هذا رابط تسجيل حضورك في ذا بوبليك هاوس. افتحه من جوالك عند وصولك وعند انصرافك، واسمح له بقراءة الموقع:\n${url}`)}` : null;
+  const wa = url ? `https://wa.me/${(phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(teamInvite(name, url))}` : null;
   return (
     <div className="space-y-2">
       {url ? (
         <div className="rounded-xl border border-accent-line bg-accent-soft/40 p-3">
-          <p className="text-xs font-bold">الرابط الجديد — يظهر الآن مرة واحدة فقط</p>
+          <p className="text-xs font-bold">رابط {TEAM_APP_NAME} الجديد — يظهر الآن مرة واحدة فقط</p>
+          <p className="mt-0.5 text-[11px] text-ink-soft">فيه الحضور وتصوير الفواتير والرسائل. يفتحه من سفاري ويضيفه إلى الشاشة الرئيسية، ولا يطلب تسجيل دخول.</p>
           <p className="nums mt-1 break-all text-[11px] text-ink-soft" dir="ltr">{url}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass("secondary", "sm")} onClick={() => {
@@ -461,7 +552,7 @@ export function CheckinLinkPanel({ employeeId, name, phone, hasLink }: { employe
       ) : (
         <div className="flex flex-wrap gap-2">
           <button type="button" className={buttonClass(hasLink ? "secondary" : "primary", "sm")} disabled={busy} aria-busy={busy} onClick={() => void issue()}>
-            <Link2 className="h-3.5 w-3.5" aria-hidden />{hasLink ? "أنشئ رابطاً جديداً (يلغي القديم)" : "أنشئ رابط الحضور"}
+            <Link2 className="h-3.5 w-3.5" aria-hidden />{hasLink ? "أنشئ رابطاً جديداً (يلغي القديم)" : `أنشئ رابط ${TEAM_APP_NAME}`}
           </button>
           {hasLink && (
             <button type="button" className={buttonClass("danger", "sm")} disabled={busy} onClick={() => void send("/api/payroll/employee", { action: "link-revoke", id: employeeId })}>ألغِ الرابط</button>

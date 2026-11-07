@@ -104,6 +104,56 @@ export function dayForOut(outAt: Date, lastIn: { at: Date; day: string } | null)
   return riyadhDay(outAt);
 }
 
+/* ─────────────── الدوام: من الساعة كم إلى كم ─────────────── */
+
+const CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
+/** أطولُ دوامٍ يُقبل — ستّ عشرة ساعة. */
+export const MAX_SHIFT_MINUTES = 960;
+
+/** «HH:MM» → دقائق من منتصف الليل، أو `null`. */
+export function clockMinutes(hhmm: string): number | null {
+  const m = CLOCK.exec(hhmm.trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** نهايةُ الدوام «HH:MM» من بدايته وطوله — ما بعد منتصف الليل يلتفّ: ١٦:٠٠ + ٨ ساعات = ٠٠:٠٠. */
+export function shiftEndOf(start: string, minutes: number): string {
+  const s = clockMinutes(start) ?? 0;
+  const end = (s + minutes) % (24 * 60);
+  return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
+}
+
+/**
+ * طولُ الدوام بالدقائق من بدايته ونهايته — نهايةٌ قبل البداية تعبر منتصف الليل (١٦:٠٠ ← ٠٢:٠٠ عشرُ ساعات).
+ * `null`: وقتٌ غير مفهوم، أو نهايةٌ تساوي البداية، أو أقلُّ من ساعة، أو فوق ستّ عشرة.
+ */
+export function shiftLength(start: string, end: string): number | null {
+  const s = clockMinutes(start), e = clockMinutes(end);
+  if (s === null || e === null) return null;
+  const minutes = (e - s + 24 * 60) % (24 * 60);
+  return minutes >= 60 && minutes <= MAX_SHIFT_MINUTES ? minutes : null;
+}
+
+/** «4:00 م» · «12:30 ص» — للموظّف، بلا ساعةٍ من أربعٍ وعشرين. */
+export function clock12(hhmm: string): string {
+  const total = clockMinutes(hhmm);
+  if (total === null) return hhmm;
+  const h = Math.floor(total / 60), m = total % 60;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "ص" : "م"}`;
+}
+
+/** «4:00 م – 12:00 ص» — الدوامُ كما يُقرأ، أو `null` بلا بداية. */
+export function shiftRange(shiftStart: string | null, shiftMinutes: number): string | null {
+  return shiftStart ? `${clock12(shiftStart)} – ${clock12(shiftEndOf(shiftStart, shiftMinutes))}` : null;
+}
+
+/** «الجمعة والسبت» — أيّامُ الراحة كما تُقرأ، أو `null` بلا راحة. */
+export function daysOffLabel(daysOff: string): string | null {
+  const days = [...new Set(daysOff.split(""))].filter((d) => /^[0-6]$/.test(d)).sort().map((d) => WEEKDAY_LABEL[Number(d)]);
+  return days.length === 0 ? null : days.join(" و");
+}
+
 /** يومُ عمل؟ — أيّامُ الراحة أرقامٌ (٠ الأحد … ٦ السبت). */
 export function isWorkday(day: string, daysOff: string): boolean {
   const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();

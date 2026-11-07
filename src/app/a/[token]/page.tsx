@@ -1,25 +1,46 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { BrandMark } from "@/components/icons";
-import { CheckinPad } from "@/components/payroll/checkin-pad";
-import { nextKind } from "@/lib/payroll/attendance";
-import { recentCheckins, resolveCheckinToken } from "@/services/payroll.service";
+import { TeamApp } from "@/components/team/team-app";
+import { daysOffLabel, isWorkday, shiftRange } from "@/lib/payroll/attendance";
+import { asTeamTab, TEAM_APP_NAME, teamAppPath } from "@/lib/team-app";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { recentForEmployee } from "@/services/capture.service";
+import { myPeriod, recentCheckins, resolveCheckinToken } from "@/services/payroll.service";
+import { myMessages } from "@/services/team.service";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
+/*
+  بيانُ تثبيتٍ لكلّ رابطٍ برمزه — بلاه ترث الصفحةُ بيانَ التطبيق العامّ فتفتح الأيقونةُ المثبَّتة
+  صفحةَ الدخول بجوجل. واسمُه على الشاشة «TPH Team». ولا يُفهرَس — الرابطُ إذن.
+*/
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
   return {
-    title: "الحضور · ذا بوبليك هاوس",
+    title: TEAM_APP_NAME,
+    applicationName: TEAM_APP_NAME,
     robots: { index: false, follow: false },
     referrer: "no-referrer",
-    appleWebApp: { capable: true, title: "الحضور", statusBarStyle: "default" },
+    manifest: `${teamAppPath(token)}/manifest.webmanifest`,
+    appleWebApp: { capable: true, title: TEAM_APP_NAME, statusBarStyle: "default" },
   };
 }
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f4ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0d0b" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 /**
- * صفحةُ حضور الموظّف — بلا دخول: الرابطُ الشخصيّ إذنُه، ولا يملك إلّا تسجيلَ حضور صاحبه
- * وانصرافه. لا يرى راتباً ولا خصماً.
+ * «TPH Team» — تطبيقُ الموظّف بلا دخول: الرابطُ الشخصيّ إذنُه، ولا يملك إلّا تسجيلَ حضور صاحبه
+ * وانصرافه، ووضعَ صورة فاتورةٍ في الانتظار، وإرسالَ رسالةٍ للإدارة. لا يرى راتباً ولا خصماً بمال.
  */
-export default async function AttendPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function TeamPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { token } = await params;
   const employee = await resolveCheckinToken(token);
   if (!employee) {
@@ -31,15 +52,31 @@ export default async function AttendPage({ params }: { params: Promise<{ token: 
       </main>
     );
   }
-  const recent = await recentCheckins(employee.id, 6);
-  const suggested = nextKind(recent[0] ?? null, new Date());
+  const today = todayInRiyadh();
+  const counted = employee.kind === "MONTHLY" && employee.shiftStart !== null;
+  const [recent, captures, messages, period, { tab }] = await Promise.all([
+    recentCheckins(employee.id, 6),
+    recentForEmployee(employee.id),
+    myMessages(employee.id),
+    counted ? myPeriod(employee, today) : Promise.resolve(null),
+    searchParams,
+  ]);
   return (
-    <CheckinPad
+    <TeamApp
       token={token}
       name={employee.name}
-      shiftStart={employee.shiftStart}
-      recent={recent.map((r) => ({ id: r.id, kind: r.kind, at: r.at.toISOString(), verdict: r.verdict }))}
-      suggested={suggested}
+      initialTab={asTeamTab(tab)}
+      attend={{
+        recent: recent.map((r) => ({ id: r.id, kind: r.kind, at: r.at.toISOString(), day: r.day, verdict: r.verdict })),
+        today,
+        shiftRange: shiftRange(employee.shiftStart, employee.shiftMinutes),
+        shiftStart: employee.shiftStart,
+        dayOff: employee.kind === "MONTHLY" && !isWorkday(today, employee.daysOff),
+        daysOffLabel: daysOffLabel(employee.daysOff),
+        period,
+      }}
+      captures={captures.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
+      messages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString(), repliedAt: m.repliedAt?.toISOString() ?? null }))}
     />
   );
 }

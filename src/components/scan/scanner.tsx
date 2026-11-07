@@ -41,7 +41,7 @@ const OUTPUT_SIDE = 2000;
 const JPEG_QUALITY = 0.82;
 const MAX_SEND_BYTES = 3.8 * 1024 * 1024;
 
-interface SentItem {
+export interface SentItem {
   id: string;
   createdAt: string;
   status: "PENDING" | "ARCHIVED" | "REJECTED";
@@ -141,7 +141,10 @@ function buildFile(pages: readonly ScanPage[]): File {
 
 /* ─────────────────────── الشاشة ─────────────────────── */
 
-export function Scanner({ token, label, recent }: { token: string; label: string; recent: SentItem[] }) {
+/**
+ * `embedded`: داخل «TPH Team» — الصفحةُ وترويستُها للتطبيق، فلا يُرسم هنا إلّا ما يخصّ التصوير.
+ */
+export function Scanner({ token, label, recent, embedded = false }: { token: string; label: string; recent: SentItem[]; embedded?: boolean }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ kind: "home" });
   const [pages, setPages] = useState<ScanPage[]>([]);
@@ -448,15 +451,21 @@ export function Scanner({ token, label, recent }: { token: string; label: string
   }, [fileForSending, note, router, stage, token]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-surface px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className="flex items-center gap-3 py-2">
-        <BrandMark className="h-8 w-auto text-accent" />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">أهلاً {label}</p>
-          <p className="text-xs text-muted">صوّر الفاتورة الورقية حين تستلمها</p>
-        </div>
+    <Shell embedded={embedded}>
+      <header className={`flex items-center gap-3 ${embedded ? "min-h-11" : "py-2"}`}>
+        {embedded ? (
+          <p className="min-w-0 text-sm text-ink-soft">صوّر الفاتورة الورقية حين تستلمها، وتصل للإدارة مباشرة.</p>
+        ) : (
+          <>
+            <BrandMark className="h-8 w-auto text-accent" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">أهلاً {label}</p>
+              <p className="text-xs text-muted">صوّر الفاتورة الورقية حين تستلمها</p>
+            </div>
+          </>
+        )}
         {pages.length > 0 && stage.kind !== "sending" && stage.kind !== "checking" && stage.kind !== "preparing" && (
-          <button type="button" onClick={startOver} className={`${buttonClass("quiet", "sm")} ms-auto`}>
+          <button type="button" onClick={startOver} className={`${buttonClass("quiet", "sm")} ms-auto shrink-0`}>
             <X className="h-4 w-4" aria-hidden /> ألغِ
           </button>
         )}
@@ -580,11 +589,18 @@ export function Scanner({ token, label, recent }: { token: string; label: string
           </button>
         </section>
       )}
-    </main>
+    </Shell>
   );
 }
 
 /* ─────────────────────── الأجزاء ─────────────────────── */
+
+/** صفحةٌ كاملة للرابط المشترك (`/c/`)، أو قسمٌ داخل «TPH Team». */
+function Shell({ embedded, children }: { embedded: boolean; children: React.ReactNode }) {
+  return embedded
+    ? <div className="flex w-full flex-col">{children}</div>
+    : <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-surface px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">{children}</main>;
+}
 
 function Busy({ text, startedAt }: { text: string; startedAt?: number }) {
   const [seconds, setSeconds] = useState(0);

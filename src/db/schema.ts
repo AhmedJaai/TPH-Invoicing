@@ -2463,7 +2463,10 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 export const captureLinks = pgTable("capture_links", {
   id: id(),
   label: text("label").notNull(),
-  tokenHash: text("token_hash").notNull().unique(),
+  /** بصمةُ رمز الرابط — فارغةٌ لرابط الموظّف: رمزُه رمزُ حضوره (098). */
+  tokenHash: text("token_hash").unique(),
+  /** رابطُ «TPH Team» لموظّف — صورُه تُنسب إليه (098). */
+  employeeId: text("employee_id").references((): AnyPgColumn => employees.id, { onDelete: "set null" }),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -2628,6 +2631,30 @@ export const attendanceCheckins = pgTable("attendance_checkins", {
   reviewedById: text("reviewed_by_id").references(() => users.id),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
 });
+
+export type TeamMessageKind = "SUGGESTION" | "COMPLAINT" | "OTHER";
+
+/**
+ * اقتراحٌ أو شكوى من الفريق عبر «TPH Team» (098). المرسَلةُ بلا اسمٍ لا يُحفظ معها الموظّف
+ * (`employeeId` فارغ). ويُغلَق ولا يُحذف.
+ */
+export const teamMessages = pgTable("team_messages", {
+  id: id(),
+  employeeId: text("employee_id").references(() => employees.id, { onDelete: "set null" }),
+  kind: text("kind").$type<TeamMessageKind>().notNull(),
+  body: text("body").notNull(),
+  createdAt: now(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  readById: text("read_by_id").references(() => users.id),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at", { withTimezone: true }),
+  repliedById: text("replied_by_id").references(() => users.id),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  closedById: text("closed_by_id").references(() => users.id),
+}, (t) => [
+  index("team_messages_unread_idx").on(t.createdAt).where(sql`read_at is null`),
+  index("team_messages_employee_idx").on(t.employeeId, t.createdAt).where(sql`employee_id is not null`),
+]);
 
 /* ──────────────────── المستشار (094) ──────────────────── */
 

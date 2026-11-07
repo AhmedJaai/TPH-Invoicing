@@ -11,7 +11,8 @@ export interface EmployeeFormValues {
   hiredOn: string;
   leftOn: string;
   shiftStart: string;
-  shiftHours: string;
+  /** نهايةُ الدوام «HH:MM» — والطولُ يحسبه الخادم منها ومن البداية. */
+  shiftEnd: string;
   lateGraceMinutes: string;
   daysOff: string;
   note: string;
@@ -20,5 +21,5 @@ export interface EmployeeFormValues {
 
 export const BLANK_EMPLOYEE: EmployeeFormValues = {
   name: "", kind: "MONTHLY", jobTitle: "", phone: "", nationalId: "", bankBeneficiaryId: "", iban: "",
-  hiredOn: "", leftOn: "", shiftStart: "", shiftHours: "8", lateGraceMinutes: "0", daysOff: "", note: "", salary: "",
+  hiredOn: "", leftOn: "", shiftStart: "", shiftEnd: "", lateGraceMinutes: "0", daysOff: "", note: "", salary: "",
 };

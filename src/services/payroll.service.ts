@@ -9,7 +9,7 @@
  * وليس كلُّ ما حوّله المالكُ لنفسه شخصيّاً (بعضُه رواتب دفعها منه). والحوالةُ الواحدة تُقسَم.
  * والمبلغُ يُحسب في الخادم من الحوالة، والقاعدةُ ترفض ما يتجاوزها (084).
  */
-import { deductionPeriod, PAYDAY } from "@/lib/payroll/period";
+import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -24,7 +24,7 @@ import {
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
 } from "@/lib/payroll/calc";
 import {
-  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhDay, type CafePlace,
+  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, type CafePlace,
 } from "@/lib/payroll/attendance";
 import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
@@ -33,6 +33,7 @@ import {
 } from "@/lib/payroll/saudi-rules";
 import { pgErrorCode } from "@/lib/pg-error";
 import { assertMonthsOpen } from "./month-guard";
+import { unreadTeamMessages } from "./team.service";
 import type { Conn, Tx } from "./types";
 
 export class PayrollRefused extends Error {
@@ -415,6 +416,7 @@ export async function saveEmployee(id: string | null, input: EmployeeInput, firs
       const { checkinTokenHash: _hidden, ...shown } = before;
       void _hidden;
       await recordAudit({ actorId, action: "EMPLOYEE_SAVED", entityType: "employee", entityId: id, before: shown, after: input }, t);
+      if (!before.shiftStart && input.shiftStart) await backfillFromCheckins(t, id);
       return id;
     }
     const [row] = await t.insert(employees).values({ ...input, createdById: actorId }).returning({ id: employees.id });
@@ -551,6 +553,88 @@ export async function clearAttendance(id: string, actorId: string): Promise<bool
     await recordAudit({ actorId, action: "PAYROLL_ATTENDANCE_CLEARED", entityType: "payroll_attendance", entityId: id, before: done[0], after: null }, t);
     return true;
   });
+}
+
+/**
+ * تراجعٌ عن إلغاء خصم يوم — يعود البندُ كما كان، ما لم يُسجَّل لليوم بعده ما يحلّ محلّه
+ * (النوعُ نفسُه، أو غيابٌ أو إجازة تنفيه).
+ */
+export async function restoreAttendance(id: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const [row] = await t.select().from(payrollAttendance).where(eq(payrollAttendance.id, id)).for("update");
+    if (!row || row.voidedAt === null) return false;
+    const clash: AttendanceKind[] = row.kind === "ABSENT" || row.kind === "LEAVE" ? ["LATE", "EARLY", "ABSENT", "LEAVE"] : [row.kind, "ABSENT", "LEAVE"];
+    const [taken] = await t.select({ id: payrollAttendance.id }).from(payrollAttendance)
+      .where(and(eq(payrollAttendance.employeeId, row.employeeId), eq(payrollAttendance.day, row.day), inArray(payrollAttendance.kind, clash), isNull(payrollAttendance.voidedAt))).limit(1);
+    if (taken) throw new PayrollRefused("سُجّل لهذا اليوم بعده ما يحلّ محلّه. عدّله من بنود الشهر.");
+    await t.update(payrollAttendance).set({ voidedAt: null }).where(eq(payrollAttendance.id, id));
+    await recordAudit({ actorId, action: "PAYROLL_ATTENDANCE_RESTORED", entityType: "payroll_attendance", entityId: id, before: null, after: { day: row.day, kind: row.kind, minutes: row.minutes } }, t);
+    return true;
+  });
+}
+
+export interface ShiftInput {
+  shiftStart: string | null;
+  shiftMinutes: number;
+  lateGraceMinutes: number;
+  daysOff: string;
+}
+
+/**
+ * الدوامُ وحده: من الساعة كم وإلى كم، والسماحُ، وأيّامُ الراحة — لجدول الدوام في «الموظفون».
+ * التغييرُ يسري على ما يُسجَّل من الآن. وأوّلُ ضبطٍ لبداية الدوام يحسب تأخيرَ ما سُجّل في فترة
+ * الخصم الجارية ولم يُحسب (`backfillFromCheckins`) — فلا يضيع ما حضره الموظّفُ قبل أن يُكتب دوامُه.
+ */
+export async function saveShift(employeeId: string, input: ShiftInput, actorId: string): Promise<{ late: number; early: number }> {
+  return db.transaction(async (t) => {
+    const [before] = await t.select().from(employees).where(eq(employees.id, employeeId)).for("update");
+    if (!before) throw new PayrollRefused("الموظف غير موجود. حدّث الصفحة.");
+    await t.update(employees).set({ ...input, updatedAt: new Date() }).where(eq(employees.id, employeeId));
+    await recordAudit({
+      actorId, action: "EMPLOYEE_SHIFT_SAVED", entityType: "employee", entityId: employeeId,
+      before: { shiftStart: before.shiftStart, shiftMinutes: before.shiftMinutes, lateGraceMinutes: before.lateGraceMinutes, daysOff: before.daysOff },
+      after: input,
+    }, t);
+    return !before.shiftStart && input.shiftStart ? backfillFromCheckins(t, employeeId) : { late: 0, early: 0 };
+  });
+}
+
+/**
+ * يحسب التأخيرَ والانصرافَ المبكّر من تسجيلات فترة الخصم الجارية — للأيّام التي لم يُكتب لها شيءٌ
+ * قطّ من نوعها. ما ألغاه صاحبُ المقهى (بندٌ ملغى) أو كتبه بيده أو ردّه لا يُعاد: يومٌ له أيُّ بندٍ
+ * من النوع — قائمٍ أو ملغى — يُترك كما هو. ويُعطي النتيجةَ نفسَها إن شُغِّل مرّتين.
+ */
+export async function backfillFromCheckins(t: Conn, employeeId: string, today = todayInRiyadh()): Promise<{ late: number; early: number }> {
+  const [emp] = await t.select().from(employees).where(eq(employees.id, employeeId)).limit(1);
+  if (!emp || !emp.shiftStart || emp.kind !== "MONTHLY") return { late: 0, early: 0 };
+  const period = deductionPeriod(deductionMonthOf(today));
+  const from = emp.hiredOn > period.from ? emp.hiredOn : period.from;
+  const to = today < period.to ? today : period.to;
+  if (from > to) return { late: 0, early: 0 };
+  const [checks, rows] = await Promise.all([
+    t.select().from(attendanceCheckins).where(and(eq(attendanceCheckins.employeeId, employeeId), gte(attendanceCheckins.day, from), lte(attendanceCheckins.day, to))).orderBy(attendanceCheckins.at),
+    t.select({ day: payrollAttendance.day, kind: payrollAttendance.kind, voidedAt: payrollAttendance.voidedAt, source: payrollAttendance.source }).from(payrollAttendance)
+      .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, from), lte(payrollAttendance.day, to))),
+  ]);
+  const touched = new Set(rows.map((r) => `${r.day}:${r.kind}`));
+  const excused = new Set(rows.filter((r) => r.voidedAt === null && (r.kind === "ABSENT" || r.kind === "LEAVE")).map((r) => r.day));
+  const counted = checks.filter((c) => c.review !== "REJECTED");
+  const days = [...new Set(counted.map((c) => c.day))];
+  let late = 0, early = 0;
+  for (const day of days) {
+    if (!isWorkday(day, emp.daysOff) || excused.has(day)) continue;
+    const ins = counted.filter((c) => c.day === day && c.kind === "IN");
+    const outs = counted.filter((c) => c.day === day && c.kind === "OUT");
+    if (ins.length > 0 && !touched.has(`${day}:LATE`)) {
+      const minutes = lateMinutesAt(ins[0].at, day, emp.shiftStart);
+      if (minutes > 0) { await insertDerived(t, employeeId, day, "LATE", minutes, emp.shiftMinutes); late++; }
+    }
+    if (outs.length > 0 && !touched.has(`${day}:EARLY`)) {
+      const minutes = earlyMinutesAt(outs[outs.length - 1].at, day, emp.shiftStart, emp.shiftMinutes);
+      if (minutes > 0) { await insertDerived(t, employeeId, day, "EARLY", minutes, emp.shiftMinutes); early++; }
+    }
+  }
+  return { late, early };
 }
 
 /**
@@ -821,8 +905,11 @@ export async function revokeCheckinLink(employeeId: string, actorId: string): Pr
 export interface CheckinEmployee {
   id: string;
   name: string;
+  kind: "MONTHLY" | "PART_TIME";
   shiftStart: string | null;
   shiftMinutes: number;
+  lateGraceMinutes: number;
+  daysOff: string;
 }
 
 /** الموظّفُ لهذا الرمز — ما دام لم يخرج ورابطُه لم يُلغَ. */
@@ -831,7 +918,40 @@ export async function resolveCheckinToken(token: string | null | undefined): Pro
   const [row] = await db.select().from(employees).where(eq(employees.checkinTokenHash, hashToken(token))).limit(1);
   if (!row) return null;
   if (row.leftOn && row.leftOn < riyadhDay(new Date())) return null;
-  return { id: row.id, name: row.name, shiftStart: row.shiftStart, shiftMinutes: row.shiftMinutes };
+  return {
+    id: row.id, name: row.name, kind: row.kind, shiftStart: row.shiftStart, shiftMinutes: row.shiftMinutes,
+    lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff,
+  };
+}
+
+export interface MyPeriod {
+  /** فترةُ الخصم الجارية — من ٢٧ السابق إلى ٢٦ منه. */
+  from: string;
+  to: string;
+  /** تأخيرٌ فوق السماح: أيّامُه ودقائقُه. */
+  lateDays: number;
+  lateMinutes: number;
+  earlyDays: number;
+  earlyMinutes: number;
+  absentDays: number;
+}
+
+/**
+ * ما يراه الموظّفُ عن نفسه في «TPH Team»: تأخيرُه وغيابُه في فترة الخصم الجارية — أيّاماً ودقائق،
+ * بلا مالٍ ولا جزاء. ما ألغاه صاحبُ المقهى لا يظهر.
+ */
+export async function myPeriod(employee: CheckinEmployee, today = todayInRiyadh()): Promise<MyPeriod> {
+  const period = deductionPeriod(deductionMonthOf(today));
+  const rows = await db.select({ kind: payrollAttendance.kind, minutes: payrollAttendance.minutes }).from(payrollAttendance)
+    .where(and(eq(payrollAttendance.employeeId, employee.id), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to), isNull(payrollAttendance.voidedAt)));
+  const late = rows.filter((r) => r.kind === "LATE" && (r.minutes ?? 0) > employee.lateGraceMinutes);
+  const early = rows.filter((r) => r.kind === "EARLY");
+  return {
+    from: period.from, to: period.to,
+    lateDays: late.length, lateMinutes: late.reduce((s, r) => s + (r.minutes ?? 0), 0),
+    earlyDays: early.length, earlyMinutes: early.reduce((s, r) => s + (r.minutes ?? 0), 0),
+    absentDays: rows.filter((r) => r.kind === "ABSENT").length,
+  };
 }
 
 export interface CheckinView {
@@ -919,14 +1039,14 @@ export async function recordCheckin(input: {
           .where(and(eq(attendanceCheckins.employeeId, emp.id), eq(attendanceCheckins.day, day), eq(attendanceCheckins.kind, "IN"), sql`${attendanceCheckins.id} <> ${row.id}`)).limit(1);
         lateMinutes = lateMinutesAt(now, day, emp.shiftStart);
         if (!earlier && !handled && !manualKinds.has("LATE") && lateMinutes > 0) {
-          await writeDerived(t, emp.id, day, "LATE", lateMinutes);
+          await writeDerived(t, emp.id, day, "LATE", lateMinutes, emp.shiftMinutes);
         }
       } else {
         earlyMinutes = earlyMinutesAt(now, day, emp.shiftStart, emp.shiftMinutes);
         if (!handled && !manualKinds.has("EARLY")) {
           await t.update(payrollAttendance).set({ voidedAt: now })
             .where(and(eq(payrollAttendance.employeeId, emp.id), eq(payrollAttendance.day, day), eq(payrollAttendance.kind, "EARLY"), eq(payrollAttendance.source, "CHECKIN"), isNull(payrollAttendance.voidedAt)));
-          if (earlyMinutes > 0) await writeDerived(t, emp.id, day, "EARLY", earlyMinutes);
+          if (earlyMinutes > 0) await writeDerived(t, emp.id, day, "EARLY", earlyMinutes, emp.shiftMinutes);
         }
       }
     }
@@ -934,10 +1054,19 @@ export async function recordCheckin(input: {
   });
 }
 
-async function writeDerived(t: Conn, employeeId: string, day: string, kind: "LATE" | "EARLY", minutes: number): Promise<void> {
+async function writeDerived(t: Conn, employeeId: string, day: string, kind: "LATE" | "EARLY", minutes: number, shiftMinutes: number): Promise<void> {
   await t.update(payrollAttendance).set({ voidedAt: new Date() })
     .where(and(eq(payrollAttendance.employeeId, employeeId), eq(payrollAttendance.day, day), eq(payrollAttendance.kind, kind), eq(payrollAttendance.source, "CHECKIN"), isNull(payrollAttendance.voidedAt)));
-  await t.insert(payrollAttendance).values({ employeeId, day, kind, minutes: Math.min(960, minutes), source: "CHECKIN", note: "من تسجيل الحضور" });
+  await insertDerived(t, employeeId, day, kind, minutes, shiftMinutes);
+}
+
+/**
+ * التأخيرُ المحسوب لا يزيد على طول الدوام: من حضر بعد انقضاء دوامه لم يعمل يومَه، وأجرُ تأخيره لا
+ * يتجاوز أجرَ اليوم (حضورٌ في ١٨:١٦ لدوامٍ من ٧ إلى ١٧ كان يُحسب ٦٧٦ دقيقة: ١٣١٫٤٤ وأجرُ اليوم ١١٦٫٦٧).
+ */
+async function insertDerived(t: Conn, employeeId: string, day: string, kind: "LATE" | "EARLY", minutes: number, shiftMinutes: number): Promise<void> {
+  const capped = Math.min(shiftMinutes, MAX_SHIFT_MINUTES, minutes);
+  await t.insert(payrollAttendance).values({ employeeId, day, kind, minutes: capped, source: "CHECKIN", note: "من تسجيل الحضور" });
 }
 
 /**
@@ -984,15 +1113,18 @@ export interface PayrollAttentionFacts {
    * `null`: لا شيء باقٍ.
    */
   owed: { month: string; remainingMinor: number; people: number } | null;
+  /** رسائلُ من الفريق (TPH Team) لم تُقرأ، ومنها الشكاوى. */
+  unreadMessages: { count: number; complaints: number };
 }
 
 export async function loadPayrollAttentionFacts(today: string, conn: Conn = db): Promise<PayrollAttentionFacts> {
   try {
     const month = today.slice(0, 7);
-    const [open, unreviewed, list] = await Promise.all([
+    const [open, unreviewed, list, unreadMessages] = await Promise.all([
       loadOpenTransfers(addDays(today, -60), conn, addDays(today, -60)),
       conn.execute<{ n: number }>(sql`select count(*)::int as n from attendance_checkins where verdict in ('FAR', 'NO_LOCATION') and review is null`),
       loadEmployees(conn),
+      unreadTeamMessages(conn),
     ]);
     const salary = open.filter((o) => !o.viaOwner);
     /* من يوم الصرف (٢٧) يُسأل عن رواتب الشهر الجاري، وقبله عن الماضي */
@@ -1009,11 +1141,12 @@ export async function loadPayrollAttentionFacts(today: string, conn: Conn = db):
       unreviewedCheckins: unreviewed.rows[0]?.n ?? 0,
       missingRates: list.filter((e) => activeIn(e, month) && rateFor(e.rates, month) === null).map((e) => e.name),
       owed,
+      unreadMessages,
     };
   } catch (e) {
     /* جدولٌ لم تُطبَّق هجرتُه بعد لا يُسقط «يحتاج قرارك» */
     if (pgErrorCode(e) === "42P01") {
-      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [], owed: null };
+      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [], owed: null, unreadMessages: { count: 0, complaints: 0 } };
     }
     throw e;
   }

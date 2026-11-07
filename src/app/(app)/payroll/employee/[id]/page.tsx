@@ -1,7 +1,7 @@
 import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, CalendarClock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -15,8 +15,10 @@ import {
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, endOfService, formatMinutes, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
-import { WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
+import { ADJUSTMENT_LABEL, endOfService, formatMinutes, hoursLabel, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
+import { daysOffLabel, shiftEndOf, shiftRange, workedMinutes } from "@/lib/payroll/attendance";
+import { deductionItems } from "@/lib/payroll/deductions";
+import { DeductionList } from "@/components/payroll/deduction-list";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
@@ -28,7 +30,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
-const ATT_LABEL = { LATE: "تأخر", EARLY: "انصرف مبكراً", ABSENT: "غاب", LEAVE: "إجازة" } as const;
 
 function Line({ label, minor, sign, strong, note }: { label: string; minor: number | null; sign?: "+" | "−"; strong?: boolean; note?: string }) {
   return (
@@ -69,6 +70,12 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const row = sheet.rows.find((r) => r.employee.id === id);
   const slip = row?.slip;
   const rate = rateFor(employee.rates, month);
+  /* كلُّ يومٍ بخصمه — مجموعُه يساوي القسيمة هللةً بهللة (`deductions.ts`) */
+  const manualViolations = row?.violations.filter((v) => v.source === "MANUAL") ?? [];
+  const deductions = row ? deductionItems({
+    kind: employee.kind, rateMinor: rate, shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes,
+    attendance: row.attendance, violations: row.violations,
+  }).map((d) => ({ ...d, employeeId: id })) : [];
   /* حوالاتُه هو (برقم المستفيد) في كلّ الأشهر، وتحويلاتُك لحسابك حول هذا الشهر وحده */
   const windowEnd = addDays(monthEndDay(month), 10);
   const mine = open.filter((o) => o.suggestion?.employeeId === id || (o.viaOwner && o.day >= `${month}-01` && o.day <= windowEnd));
@@ -105,8 +112,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     >
       <MonthTabs base={`/payroll/employee/${id}`} months={workMonths.slice(0, 12)} active={month} />
       <nav aria-label="أقسام الصفحة" className="sticky top-(--app-header) z-10 -mx-1 mt-3 flex gap-1 overflow-x-auto bg-surface/90 px-1 py-2 backdrop-blur">
-        {[["#month", "الشهر"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "الحضور"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
-          .filter(([href]) => employee.kind === "MONTHLY" || href !== "#violations")
+        {[["#month", "الشهر"], ["#deductions", "التأخير"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "TPH Team"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
+          .filter(([href]) => (employee.kind === "MONTHLY" || href !== "#violations") && (href !== "#deductions" || deductions.length > 0))
           .map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-hover">{label}</a>)}
       </nav>
       {closedMonths.length > 0 && (
@@ -198,23 +205,24 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </div>
       )}
 
-      {row && (row.adjustments.length > 0 || row.attendance.length > 0 || row.weeks.length > 0) && (
-        <Section title="بنود الشهر" icon={CalendarClock} count={row.adjustments.length + row.attendance.length + row.weeks.length} hint={`الحضور والمخالفات من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}، فالراتب يُصرف يوم ${PAYDAY} وما بعده يُحسم من الشهر القادم.`}>
+      {row && deductions.length > 0 && (
+        <Section id="deductions" title="التأخير والغياب وخصمه" icon={Clock} count={deductions.length}
+          hint={`كل يوم بما يُحسم عنه: أجر الوقت الذي لم يُعمل، وفوقه جزاء اللائحة. عدّل الدقائق، أو اعفُ عن الجزاء ويبقى أجر الوقت، أو ألغِ خصم اليوم كله. من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}>
+          <DeductionList items={deductions} canEdit={canEdit} salaryKnown={rate !== null} />
+          {slip && slip.penaltiesDroppedMinor > 0 && (
+            <p className="mt-2 text-[11px] font-bold text-warn">زادت جزاءات الشهر على أجر خمسة أيام، فلا يُحسم منها {formatRiyalsDisplay(slip.penaltiesDroppedMinor)} ريال — القسيمة تحسب الحد.</p>
+          )}
+        </Section>
+      )}
+
+      {row && (row.adjustments.length > 0 || row.weeks.length > 0) && (
+        <Section title="بنود الشهر" icon={CalendarClock} count={row.adjustments.length + row.weeks.length}>
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
             {row.adjustments.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                 <span className="min-w-0 flex-1 basis-48 text-sm">{ADJUSTMENT_LABEL[a.kind]}{a.note && <span className="block text-[11px] text-muted">{a.note}</span>}</span>
                 <Money minor={a.amountMinor} />
                 {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "adjust-void", id: a.id }} variant="quiet" done="سُحب">اسحب</PostAction>}
-              </li>
-            ))}
-            {row.attendance.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1 basis-48 text-sm">
-                  {ATT_LABEL[a.kind]} {a.minutes !== null && <span className="nums">{a.minutes} دقيقة</span>} · {formatDay(a.day)}
-                  <span className="block text-[11px] text-muted">{a.source === "CHECKIN" ? "من تسجيل الحضور" : "سجّلته بيدك"}{a.disrupted ? " · عطّل زملاءه" : ""}{a.note && a.source === "MANUAL" ? ` · ${a.note}` : ""}</span>
-                </span>
-                {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "day-clear", id: a.id }} variant="quiet" done="مُسح">امسح</PostAction>}
               </li>
             ))}
             {row.weeks.map((w) => (
@@ -229,16 +237,16 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       )}
 
       {row && employee.kind === "MONTHLY" && (
-        <Section id="violations" title="المخالفات والجزاءات" icon={Scale} count={row.violations.length}
-          hint="من جدول المخالفات في لائحة تنظيم العمل النموذجية: الجزاء بنوع المخالفة ومرتها خلال 180 يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
+        <Section id="violations" title="مخالفات أخرى من اللائحة" icon={Scale} count={manualViolations.length}
+          hint="ما سجّلته بيدك من جدول المخالفات في لائحة تنظيم العمل النموذجية (وجزاء التأخير والغياب مع كل يوم أعلاه): الجزاء بنوع المخالفة ومرتها خلال 180 يوماً، نسبةً من أجر اليوم، ولا يزيد جزاء المخالفة ولا مجموع الشهر على أجر خمسة أيام. لك أن تعفو عن أي جزاء.">
           {row.article80.map((a) => (
             <Callout key={a.start} tone="danger" icon={TriangleAlert} className="mb-3" title={`غاب ${countNoun(a.days, DAY)} متصلة من ${formatDay(a.start)}`}>
               الغياب أكثر من عشرة أيام متصلة يجيز الفصل دون مكافأة بشرط إنذاره كتابةً بعد خمسة أيام غياب (نظام العمل، م 80). هذا قرارك، ولا يُحسم له مبلغ هنا غير أجر أيام الغياب.
             </Callout>
           ))}
-          {row.violations.length === 0 ? <EmptyState compact icon={Scale} title="لا مخالفات هذا الشهر." /> : (
+          {manualViolations.length === 0 ? <EmptyState compact icon={Scale} title="لا مخالفات أخرى هذا الشهر." /> : (
             <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
-              {row.violations.map((v) => (
+              {manualViolations.map((v) => (
                 <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                   <span className="min-w-0 flex-1 basis-56 text-sm">
                     {v.detail} · {formatDay(v.day)}
@@ -327,10 +335,10 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         {canEdit && <RateForm employeeId={id} kind={employee.kind} month={month} />}
       </Section>
 
-      <Section id="checkin" title="رابط الحضور" icon={CalendarClock} hint="رابط خاص به يفتحه من جواله عند وصوله وانصرافه. يُقرأ موقعه ليُعرف أنه في المقهى، ويُحسب التأخير وحده من بداية دوامه.">
+      <Section id="checkin" title="تطبيق TPH Team" icon={CalendarClock} hint="رابط خاص به يثبّته على شاشة جواله: منه يسجّل حضوره وانصرافه (ويُقرأ موقعه ليُعرف أنه في المقهى)، ويصوّر الفواتير، ويرسل لك اقتراحاته أو شكواه.">
         <p className="mb-3 text-xs text-ink-soft">
-          {employee.shiftStart ? <>دوامه يبدأ <span className="nums font-bold" dir="ltr">{employee.shiftStart}</span> لمدة {formatMinutes(employee.shiftMinutes)} ساعة</> : "لم تُحدَّد بداية دوامه، فلا يُحسب التأخير من الحضور. حدّدها من «تعديل البيانات»."}
-          {employee.daysOff && <> · راحته {employee.daysOff.split("").map((d) => WEEKDAY_LABEL[Number(d)]).join(" و")}</>}
+          {employee.shiftStart ? <>دوامه <span className="nums font-bold">{shiftRange(employee.shiftStart, employee.shiftMinutes)}</span> ({hoursLabel(employee.shiftMinutes)})</> : <>لم يُحدَّد وقت دوامه، فلا يُحسب التأخير من الحضور. <Link href="/payroll/employees#shifts" className="font-bold text-accent hover:underline">حدّده من جدول الدوام</Link></>}
+          {daysOffLabel(employee.daysOff) && <> · راحته {daysOffLabel(employee.daysOff)}</>}
         </p>
         {canEdit ? <CheckinLinkPanel employeeId={id} name={employee.name} phone={employee.phone} hasLink={employee.hasCheckinLink} /> : <Badge tone={employee.hasCheckinLink ? "ok" : "muted"}>{employee.hasCheckinLink ? "مفعّل" : "لا رابط"}</Badge>}
       </Section>
@@ -388,7 +396,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 id, name: employee.name, kind: employee.kind, jobTitle: employee.jobTitle ?? "", phone: employee.phone ?? "",
                 nationalId: employee.nationalId ?? "", bankBeneficiaryId: employee.bankBeneficiaryId ?? "", iban: employee.iban ?? "",
                 hiredOn: employee.hiredOn, leftOn: employee.leftOn ?? "", shiftStart: employee.shiftStart ?? "",
-                shiftHours: formatMinutes(employee.shiftMinutes), lateGraceMinutes: String(employee.lateGraceMinutes), daysOff: employee.daysOff, note: employee.note ?? "",
+                shiftEnd: employee.shiftStart ? shiftEndOf(employee.shiftStart, employee.shiftMinutes) : "", lateGraceMinutes: String(employee.lateGraceMinutes), daysOff: employee.daysOff, note: employee.note ?? "",
               }} />
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[11px] text-muted">
                 أضفته خطأً؟ <DeleteEmployeeButton employeeId={id} name={employee.name} />

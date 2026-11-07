@@ -333,6 +333,20 @@ export const REASON: NounForms = {
 
 /* ── الزمنُ النسبيّ في الإشعارات: «قبل ٥ دقائق» لا «قبل 5 د» ── */
 
+export const MESSAGE: NounForms = {
+  one: "رسالة",
+  two: "رسالتان",
+  few: "رسائل",
+  many: "رسالة",
+};
+
+export const COMPLAINT: NounForms = {
+  one: "شكوى",
+  two: "شكويان",
+  few: "شكاوى",
+  many: "شكوى",
+};
+
 export const MINUTE: NounForms = {
   one: "دقيقة",
   two: "دقيقتين",

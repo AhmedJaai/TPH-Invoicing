@@ -7,11 +7,15 @@ import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, saveEmployee, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, saveEmployee, saveShift, setRate,
 } from "@/services/payroll.service";
+import { shiftLength } from "@/lib/payroll/attendance";
 
 export const runtime = "nodejs";
 
+const Clock = z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "اكتب الوقت مثل 16:00");
+const DaysOff = z.string().regex(/^[0-6]{0,7}$/).default("");
+const Grace = z.number().int().min(0).max(120).default(0);
 const optionalText = (max: number) => z.string().trim().max(max).optional().transform((v) => (v ? v : null));
 const Fields = z.object({
   name: z.string().trim().min(2, "اكتب الاسم").max(120),
@@ -23,10 +27,13 @@ const Fields = z.object({
   iban: optionalText(34).transform((v) => (v ? v.replace(/\s+/g, "").toUpperCase() : null)).refine((v) => v === null || /^SA[0-9]{22}$/.test(v), "الآيبان يبدأ بـ SA ثم 22 رقماً"),
   hiredOn: Day,
   leftOn: Day.nullable().optional().transform((v) => v ?? null),
-  shiftStart: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "اكتب الوقت مثل 16:00").nullable().optional().transform((v) => v ?? null),
+  shiftStart: Clock.nullable().optional().transform((v) => v ?? null),
+  /** نهايةُ الدوام «HH:MM» — والطولُ يُحسب منها ومن البداية (`shiftLength`). */
+  shiftEnd: Clock.nullable().optional(),
+  /** الطولُ بالساعات — للنموذج القديم في نافذة النشر. */
   shiftHours: z.string().trim().max(5).optional(),
-  lateGraceMinutes: z.number().int().min(0).max(120).default(0),
-  daysOff: z.string().regex(/^[0-6]{0,7}$/).default(""),
+  lateGraceMinutes: Grace,
+  daysOff: DaysOff,
   note: optionalText(300),
 });
 
@@ -38,7 +45,21 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("link-issue"), id: Id }).strict(),
   z.object({ action: z.literal("link-revoke"), id: Id }).strict(),
   z.object({ action: z.literal("delete"), id: Id }).strict(),
+  /* جدولُ الدوام: من كم إلى كم، والسماح، وأيّامُ الراحة — لموظّفٍ واحد */
+  z.object({ action: z.literal("shift"), id: Id, shiftStart: Clock.nullable(), shiftEnd: Clock.nullable(), lateGraceMinutes: Grace, daysOff: DaysOff }).strict(),
 ]);
+
+/** «HH:MM» → «HH:MM»: طولُ الدوام بالدقائق، أو رسالةٌ تقول لماذا. بلا بدايةٍ يبقى الطولُ الافتراضيّ. */
+function shiftFrom(start: string | null, end: string | null | undefined, hours: string | undefined): { ok: true; minutes: number } | { ok: false; error: string } {
+  if (start && end) {
+    const minutes = shiftLength(start, end);
+    return minutes === null ? { ok: false, error: "نهاية الدوام يجب أن تكون بعد بدايته بساعة على الأقل و16 ساعة على الأكثر." } : { ok: true, minutes };
+  }
+  const minutes = shiftMinutes(hours);
+  return minutes === null ? { ok: false, error: "طول الدوام بالساعات بين 1 و16، مثل 8 أو 7:30" } : { ok: true, minutes };
+}
+
+const normDaysOff = (d: string) => [...new Set(d.split(""))].sort().join("");
 
 function shiftMinutes(text: string | undefined): number | null {
   if (!text) return 480;
@@ -67,7 +88,7 @@ export async function POST(request: Request) {
     }
     if (b.action === "link-issue") {
       const token = await issueCheckinLink(b.id, user.id);
-      return NextResponse.json({ ok: true, token, message: "أُنشئ رابط الحضور. أرسله للموظف، والرابط القديم لم يعد يعمل" });
+      return NextResponse.json({ ok: true, token, message: "أُنشئ رابط TPH Team. أرسله للموظف، والرابط القديم لم يعد يعمل" });
     }
     if (b.action === "delete") {
       const done = await deleteEmployee(b.id, user.id);
@@ -78,13 +99,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, message: done ? "أُلغي رابط الحضور" : "لا رابط له" });
     }
 
-    const minutes = shiftMinutes(b.shiftHours);
-    if (minutes === null) return NextResponse.json({ error: "طول الدوام بالساعات بين 1 و16، مثل 8 أو 7:30" }, { status: 400 });
+    if (b.action === "shift") {
+      if (Boolean(b.shiftStart) !== Boolean(b.shiftEnd)) return NextResponse.json({ error: b.shiftStart ? "اكتب نهاية الدوام مع بدايته." : "اكتب بداية الدوام مع نهايته." }, { status: 400 });
+      const shift = shiftFrom(b.shiftStart, b.shiftEnd, undefined);
+      if (!shift.ok) return NextResponse.json({ error: shift.error }, { status: 400 });
+      const backfilled = await saveShift(b.id, { shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes, daysOff: normDaysOff(b.daysOff) }, user.id);
+      const found = [backfilled.late > 0 ? `تأخير ${backfilled.late} ${backfilled.late === 1 ? "يوم" : "أيام"}` : null, backfilled.early > 0 ? `انصراف مبكر ${backfilled.early} ${backfilled.early === 1 ? "يوم" : "أيام"}` : null].filter(Boolean);
+      return NextResponse.json({
+        ok: true,
+        message: found.length > 0 ? `حُفظ الدوام، وحُسب من تسجيلات هذه الفترة: ${found.join(" و")}` : "حُفظ الدوام، ويُحسب التأخير من أول تسجيل قادم",
+      });
+    }
+
+    const shift = shiftFrom(b.shiftStart, b.shiftEnd, b.shiftHours);
+    if (!shift.ok) return NextResponse.json({ error: shift.error }, { status: 400 });
     const input = {
       name: b.name, kind: b.kind, jobTitle: b.jobTitle, phone: b.phone, nationalId: b.nationalId,
       bankBeneficiaryId: b.bankBeneficiaryId, iban: b.iban, hiredOn: b.hiredOn, leftOn: b.leftOn,
-      shiftStart: b.shiftStart, shiftMinutes: minutes, lateGraceMinutes: b.lateGraceMinutes,
-      daysOff: [...new Set(b.daysOff.split(""))].sort().join(""), note: b.note,
+      shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes,
+      daysOff: normDaysOff(b.daysOff), note: b.note,
     };
     if (b.action === "create") {
       let rate: number | null = null;

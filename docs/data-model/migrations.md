@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٩٨
+## الجداول — ٩٩
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -20,7 +20,7 @@
 `finance_declarations` `finance_snapshots` `finance_readings`
 `capture_links` `captures`
 `employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
-`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks`
+`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages`
 
 التعريف في `src/db/schema.ts`.
 
@@ -143,6 +143,7 @@
 | `093_foodics_kitchen_times.sql` | `foodics_orders.kitchen_received_at` · `kitchen_done_at` (وقتا شاشة التحضير) · `wasted_lines` (أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت) — مرآةٌ لا مال، والفارغ «لم يُقرأ» |
 | `094_advisor.sql` | `advisor_threads` · `advisor_messages` · `advisor_plan_items` — محادثاتُ المستشار وخطّتُه؛ نصٌّ لا مال، والأرقامُ تُحسَب من الدفاتر لحظةَ السؤال |
 | `095_advisor_jobs.sql` | `advisor_messages.status` (`PENDING`·`DONE`·`FAILED`) · `steps` · `error` — الجوابُ يُكمَل في الخلفية ولو أُغلقت الصفحة |
+| `098_team_app.sql` | «TPH Team»: `capture_links.employee_id` (صورُ فواتير الموظّف تُنسب إليه برابطٍ واحدٍ قائم، بلا رمزٍ خاصّ — يُفتح برمز حضوره، فصار `token_hash` يُترك فارغاً لهذه وحدها)، و`team_messages` (اقتراحٌ أو شكوى؛ المرسَلةُ بلا اسم بلا `employee_id` أصلاً، وتُغلَق ولا تُحذف) — إضافةٌ خالصة |
 | `097_tasks.sql` | `tasks` — قائمةُ المهامّ والتذكيرات يكتبها الفريق: موعدٌ وتذكيرٌ (يومٌ لا ساعة) وتكرارٌ؛ تُغلَق بسببها (`outcome`) ولا تُحذف، والمكرَّرةُ تلد تاليتَها (`successor_id`) — لا مال، إضافةٌ خالصة |
 | `096_declaration_month_lock.sql` | مؤثِّرُ `finance_declarations`: «ما لا يظهر في الكشف» لا يُضاف ولا يُسحب على شهرٍ مقفل في مدّته — كما ٠٢٨ للفاتورة والمصروف |
 

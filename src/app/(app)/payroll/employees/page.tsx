@@ -1,15 +1,16 @@
 import { redirect } from "next/navigation";
-import { Landmark, UserPlus, Users } from "lucide-react";
+import { CalendarClock, Landmark, UserPlus, Users } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
-import { EmployeeForm } from "@/components/payroll/forms";
+import { EmployeeForm, ShiftSchedule } from "@/components/payroll/forms";
+import { daysOffLabel, shiftEndOf, shiftRange } from "@/lib/payroll/attendance";
 import { BLANK_EMPLOYEE } from "@/lib/payroll/form-defaults";
-import { Badge, DataTable, EmptyState, NoAccess, Section, type Column } from "@/components/ui";
+import { Badge, Callout, DataTable, EmptyState, NoAccess, Section, type Column } from "@/components/ui";
 import { formatRiyals } from "@/lib/money";
-import { countNoun, TRANSFER } from "@/lib/arabic";
+import { countNoun, EMPLOYEE, TRANSFER } from "@/lib/arabic";
 import { activeIn, rateFor } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadBankPayees, loadEmployees, type EmployeeView } from "@/services/payroll.service";
@@ -28,6 +29,7 @@ export default async function EmployeesPage() {
   const [list, payees] = await Promise.all([loadEmployees(), loadBankPayees()]);
   const working = list.filter((e) => activeIn(e, month) || e.hiredOn.slice(0, 7) > month);
   const left = list.filter((e) => !working.includes(e));
+  const unset = working.filter((e) => e.kind === "MONTHLY" && !e.shiftStart).map((e) => e.name);
 
   const columns: Column<EmployeeView>[] = [
     {
@@ -44,8 +46,13 @@ export default async function EmployeesPage() {
       },
     },
     { key: "hired", header: "المباشرة", secondary: true, cell: (e) => formatDay(e.hiredOn) },
-    { key: "shift", header: "الدوام", secondary: true, cell: (e) => (e.shiftStart ? <span className="nums" dir="ltr">{e.shiftStart}</span> : <span className="text-muted">—</span>) },
-    { key: "link", header: "رابط الحضور", cell: (e) => (e.hasCheckinLink ? <Badge tone="ok">مفعّل</Badge> : <Badge tone="muted">لا رابط</Badge>) },
+    {
+      key: "shift", header: "الدوام", secondary: true,
+      cell: (e) => (e.shiftStart
+        ? <span><span className="nums">{shiftRange(e.shiftStart, e.shiftMinutes)}</span>{daysOffLabel(e.daysOff) && <span className="block text-[11px] text-muted">راحته {daysOffLabel(e.daysOff)}</span>}</span>
+        : <span className="text-muted">{e.kind === "PART_TIME" ? "بالساعة" : "لم يُحدَّد"}</span>),
+    },
+    { key: "link", header: "TPH Team", cell: (e) => (e.hasCheckinLink ? <Badge tone="ok">مفعّل</Badge> : <Badge tone="muted">لا رابط</Badge>) },
   ];
 
   return (
@@ -57,6 +64,21 @@ export default async function EmployeesPage() {
           <DataTable columns={columns} rows={working} keyOf={(e) => e.id} hrefOf={(e) => `/payroll/employee/${e.id}`} />
         )}
       </Section>
+
+      {canEdit && working.length > 0 && (
+        <Section id="shifts" title="جدول الدوام" icon={CalendarClock}
+          hint="لكل موظف: من الساعة كم إلى كم، ودقائق السماح، وأيام راحته. منه يُحسب التأخير والانصراف المبكر من تسجيل الحضور في TPH Team. التغيير يسري من الآن، وأول ضبط يحسب ما سُجّل منذ بداية فترة الخصم.">
+          {unset.length > 0 && (
+            <Callout tone="warn" icon={CalendarClock} className="mb-3" title={`${unset.length === 1 ? unset[0] : countNoun(unset.length, EMPLOYEE)} بلا وقت دوام`}>
+              بلا وقت دوام لا يُعرف التأخير، ولا يُقال من لم يحضر. اكتبه هنا واحفظ كل سطر.
+            </Callout>
+          )}
+          <ShiftSchedule rows={working.map((e) => ({
+            id: e.id, name: e.name, kind: e.kind, shiftStart: e.shiftStart ?? "",
+            shiftEnd: e.shiftStart ? shiftEndOf(e.shiftStart, e.shiftMinutes) : "", lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
+          }))} />
+        </Section>
+      )}
 
       {canEdit && payees.length > 0 && (
         <Section title="في كشف البنك ولم يُسجَّلوا موظفين" icon={Landmark} count={payees.length} hint="أشخاص حُوّلت لهم «رواتب» أو تحويلات. أضف من كان موظفاً، والباقي اتركه. يُملأ الاسم ورقم المستفيد وأول تحويل، وراجع الراتب قبل الحفظ.">

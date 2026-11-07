@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, CalendarX, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon, FileQuestion } from "lucide-react";
+  Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, CalendarX, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon, FileQuestion, MessageSquareText } from "lucide-react";
 import { Money, Prose } from "./money";
 import { SignalControls } from "./signal-controls";
 import { IssueWaive } from "./issue-waive";
@@ -76,6 +76,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "finance-incomplete": HandCoins,
   "payroll-owed": HandCoins,
   "payroll-checkins": CalendarClock,
+  "team-messages": MessageSquareText,
   "payroll-open": Users,
   "stock-links-ready": Link2,
   "stock-gap-shortage": Boxes,

@@ -78,6 +78,24 @@ describe("رابطُ تصوير الباريستا", () => {
   });
 });
 
+describe("TPH Team — تطبيقُ الموظّف المثبَّت", () => {
+  it("صفحتُه وبيانُ تثبيته بلا جلسة — وإلّا فتحت الأيقونةُ المثبَّتة صفحةَ الدخول بجوجل", () => {
+    expect(proxy(new NextRequest("https://app.example.com/a/abcdefghijklmnopqrstuvwxyz12")).status).toBe(200);
+    expect(proxy(new NextRequest("https://app.example.com/a/abcdefghijklmnopqrstuvwxyz12/manifest.webmanifest")).status).toBe(200);
+    expect(proxy(new NextRequest("https://app.example.com/a/abcdefghijklmnopqrstuvwxyz12?tab=invoices")).status).toBe(200);
+  });
+
+  it("رسالتُه للإدارة بلا جلسة، ومن موقعٍ آخر تُردّ", () => {
+    expect(proxy(post({ origin: "https://app.example.com", "content-type": "application/json" }, "/api/team/message")).status).toBe(200);
+    expect(proxy(post({ origin: "https://evil.example", "content-type": "application/json" }, "/api/team/message")).status).toBe(403);
+  });
+
+  it("ولا يفتح صفحةَ الرسائل عند المالك ولا الردَّ عليها", () => {
+    expect(proxy(new NextRequest("https://app.example.com/payroll/messages")).status).toBe(307);
+    expect(proxy(post({ origin: "https://app.example.com", "content-type": "application/json" }, "/api/payroll/messages")).status).toBe(401);
+  });
+});
+
 describe("الخروج يمسح خزين المتصفّح", () => {
   it("صفحة الدخول تحمل Clear-Site-Data، وصفحات التطبيق لا تحملها", () => {
     const login = proxy(new NextRequest("https://app.example.com/login"));

@@ -11,7 +11,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { captureLinks, captures, documents, extractionCache, invoices, suppliers as suppliers_ } from "@/db/schema";
+import { captureLinks, captures, documents, employees, extractionCache, invoices, suppliers as suppliers_ } from "@/db/schema";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { labelRecorded, type RecordedLabel } from "@/lib/capture-recorded";
 import type { ExtractionResult } from "@/lib/extraction/schema";
 import { companyConfig } from "@/config/drive";
@@ -47,15 +48,54 @@ export const hashToken = (token: string) => createHash("sha256").update(token).d
 
 export interface CaptureLink { id: string; label: string; createdById: string | null }
 
-/** الرابطُ القائم لهذا الرمز — أو `null`: لا وجود له أو أُلغي. */
+/**
+ * الرابطُ القائم لهذا الرمز — أو `null`: لا وجود له أو أُلغي.
+ *
+ * والرمزُ إمّا رمزُ رابط تصوير (للجوال المشترك عند الكاشير)، وإمّا رمزُ موظّفٍ في «TPH Team»
+ * (`employees.checkin_token_hash`): صورُه تُنسب إليه برابطٍ واحد له (`employeeCaptureLink`).
+ */
 export async function resolveLink(token: string | null | undefined): Promise<CaptureLink | null> {
   if (!token || !TOKEN_SHAPE.test(token)) return null;
+  const hash = hashToken(token);
   const [row] = await db
     .select({ id: captureLinks.id, label: captureLinks.label, createdById: captureLinks.createdById })
     .from(captureLinks)
-    .where(and(eq(captureLinks.tokenHash, hashToken(token)), isNull(captureLinks.revokedAt)))
+    .where(and(eq(captureLinks.tokenHash, hash), isNull(captureLinks.revokedAt)))
     .limit(1);
-  return row ?? null;
+  if (row) return row;
+  const [employee] = await db
+    .select({ id: employees.id, name: employees.name, leftOn: employees.leftOn, createdById: employees.createdById })
+    .from(employees)
+    .where(eq(employees.checkinTokenHash, hash))
+    .limit(1);
+  if (!employee || (employee.leftOn && employee.leftOn < todayInRiyadh())) return null;
+  return employeeCaptureLink(employee);
+}
+
+/**
+ * رابطُ تصوير الموظّف — واحدٌ قائم له، يُنشأ أوّلَ مرّة. لا رمزَ له: يُفتح برمز حضوره، فيُلغى
+ * بإلغائه ويتجدّد بتجدّده وتبقى صورُه منسوبةً إليه. واسمُه يتبع اسمَ الموظّف.
+ */
+async function employeeCaptureLink(employee: { id: string; name: string; createdById: string | null }): Promise<CaptureLink> {
+  const live = () => db
+    .select({ id: captureLinks.id, label: captureLinks.label, createdById: captureLinks.createdById })
+    .from(captureLinks)
+    .where(and(eq(captureLinks.employeeId, employee.id), isNull(captureLinks.revokedAt)))
+    .limit(1);
+  let [link] = await live();
+  if (!link) {
+    /* ضغطتان متزامنتان: الفهرسُ الفريد يردّ الثانية، فتقرأ ما كتبته الأولى */
+    await db.insert(captureLinks)
+      .values({ label: employee.name, tokenHash: null, employeeId: employee.id, createdById: employee.createdById })
+      .onConflictDoNothing();
+    [link] = await live();
+    if (!link) throw new Error("تعذّر إنشاء رابط تصوير الموظف");
+  }
+  if (link.label !== employee.name) {
+    await db.update(captureLinks).set({ label: employee.name }).where(eq(captureLinks.id, link.id));
+    link = { ...link, label: employee.name };
+  }
+  return link;
 }
 
 /** يُنشئ رابطاً ويُرجع رمزه — مرّةً واحدة: لا يُحفظ إلّا بصمتُه. */
@@ -104,7 +144,8 @@ export async function listLinks(): Promise<CaptureLinkRow[]> {
       waiting: sql<number>`(select count(*)::int from ${captures} where ${captures}.link_id = ${captureLinks}.id and ${captures}.status = 'PENDING')`,
     })
     .from(captureLinks)
-    .where(isNull(captureLinks.revokedAt))
+    /* روابطُ الموظّفين تُدار من رابط حضورهم (TPH Team) — لا تُلغى من هنا */
+    .where(and(isNull(captureLinks.revokedAt), isNull(captureLinks.employeeId)))
     .orderBy(captureLinks.label);
   return rows.map((r) => ({ ...r, sent: Number(r.sent), waiting: Number(r.waiting) }));
 }
@@ -344,6 +385,18 @@ export async function recentForLink(linkId: string, limit = 15): Promise<SentCap
     .select({ id: captures.id, createdAt: captures.createdAt, status: captures.status, note: captures.note, decisionNote: captures.decisionNote })
     .from(captures)
     .where(and(eq(captures.linkId, linkId), ne(captures.status, "DRAFT")))
+    .orderBy(desc(captures.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, status: asStatus(r.status) }));
+}
+
+/** صورُ الموظّف من «TPH Team» — بلا إنشاء رابطٍ له إن لم يصوّر بعد (قراءةُ الصفحة لا تكتب). */
+export async function recentForEmployee(employeeId: string, limit = 15): Promise<SentCapture[]> {
+  const rows = await db
+    .select({ id: captures.id, createdAt: captures.createdAt, status: captures.status, note: captures.note, decisionNote: captures.decisionNote })
+    .from(captures)
+    .innerJoin(captureLinks, eq(captureLinks.id, captures.linkId))
+    .where(and(eq(captureLinks.employeeId, employeeId), ne(captures.status, "DRAFT")))
     .orderBy(desc(captures.createdAt))
     .limit(limit);
   return rows.map((r) => ({ ...r, status: asStatus(r.status) }));

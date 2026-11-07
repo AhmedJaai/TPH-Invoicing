@@ -13,7 +13,7 @@ import { formatMonth } from "@/lib/riyadh-time";
 import { deductionMonthOf } from "@/lib/payroll/period";
 import { failWith, guard } from "@/services/guard";
 import {
-  addAdjustment, addViolation, clearAttendance, clearWeek, PayrollRefused, setAttendance, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
+  addAdjustment, addViolation, clearAttendance, clearWeek, PayrollRefused, restoreAttendance, setAttendance, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -26,6 +26,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("violation-void"), id: Id }).strict(),
   z.object({ action: z.literal("waive"), id: Id, waived: z.boolean() }).strict(),
   z.object({ action: z.literal("day-clear"), id: Id }).strict(),
+  z.object({ action: z.literal("day-restore"), id: Id }).strict(),
   z.object({ action: z.literal("week"), employeeId: Id, day: Day, hours: z.string().trim().max(8).optional(), amount: z.string().trim().max(20).optional(), note: Note }).strict(),
   z.object({ action: z.literal("week-clear"), id: Id }).strict(),
 ]);
@@ -66,7 +67,11 @@ export async function POST(request: Request) {
       }
       case "day-clear": {
         const done = await clearAttendance(b.id, user.id);
-        return NextResponse.json({ ok: true, message: done ? "مُسح اليوم" : "مُسح من قبل" });
+        return NextResponse.json({ ok: true, message: done ? "أُلغي خصم اليوم، ولا يُحسم شيء عنه" : "أُلغي من قبل" });
+      }
+      case "day-restore": {
+        const done = await restoreAttendance(b.id, user.id);
+        return NextResponse.json({ ok: true, message: done ? "عاد خصم اليوم كما كان" : "لم يكن ملغى" });
       }
       case "week": {
         let minutes: number | null = null;

@@ -166,6 +166,15 @@ export function parseHours(input: string): number | null {
   return total > 0 ? total : null;
 }
 
+/** «٨ ساعات» · «ساعتان» · «7:30 ساعة» — طولُ دوامٍ أو عملٍ كما يُقرأ. */
+export function hoursLabel(minutes: number): string {
+  if (minutes % 60 !== 0) return `${formatMinutes(minutes)} ساعة`;
+  const h = minutes / 60;
+  if (h === 1) return "ساعة واحدة";
+  if (h === 2) return "ساعتان";
+  return h <= 10 ? `${h} ساعات` : `${h} ساعة`;
+}
+
 /** «7:30» من دقائق. */
 export function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);

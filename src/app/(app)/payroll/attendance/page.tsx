@@ -1,7 +1,7 @@
 import { EMPLOYEE, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-react";
+import { CalendarClock, CalendarDays, Clock, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -10,7 +10,10 @@ import { PostAction } from "@/components/post-action";
 import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/forms";
 import { Badge, Callout, Card, DataTable, EmptyState, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { activeIn } from "@/lib/payroll/calc";
-import { isWorkday, riyadhClock, trusted, VERDICT_LABEL, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { isWorkday, riyadhClock, shiftRange, trusted, VERDICT_LABEL, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { deductionItems } from "@/lib/payroll/deductions";
+import { DeductionList, type DeductionRow } from "@/components/payroll/deduction-list";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { addDays, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { deductionMonthOf, deductionPeriod } from "@/lib/payroll/period";
 import {
@@ -82,7 +85,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
 
   const columns: Column<BoardRow>[] = [
-    { key: "name", header: "الموظف", primary: true, cell: (b) => <span><span className="font-bold">{b.employee.name}</span><span className="block text-[11px] text-muted">{b.employee.kind === "PART_TIME" ? "جزئي" : b.employee.shiftStart ? <>يبدأ <span className="nums" dir="ltr">{b.employee.shiftStart}</span></> : "بلا وقت دوام"}{!b.workday && b.employee.kind === "MONTHLY" && " · يوم راحته"}</span></span> },
+    { key: "name", header: "الموظف", primary: true, cell: (b) => <span><span className="font-bold">{b.employee.name}</span><span className="block text-[11px] text-muted">{b.employee.kind === "PART_TIME" ? "جزئي" : b.employee.shiftStart ? <span className="nums">{shiftRange(b.employee.shiftStart, b.employee.shiftMinutes)}</span> : "بلا وقت دوام"}{!b.workday && b.employee.kind === "MONTHLY" && " · يوم راحته"}</span></span> },
     {
       key: "in", header: "الحضور",
       cell: (b) => b.ins.length === 0 ? <span className="text-muted">—</span> : (
@@ -119,9 +122,18 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   ];
 
   const monthRows = sheet.rows.filter((r) => r.employee.kind === "MONTHLY");
+  /* كلُّ خصومِ الفترة في مكانٍ واحد — الأحدثُ أوّلاً — ليُعدَّل أو يُلغى بلا فتح كلّ موظّف */
+  const deductions: DeductionRow[] = monthRows.flatMap((r) => deductionItems({
+    kind: r.employee.kind, rateMinor: r.rateMinor, shiftMinutes: r.employee.shiftMinutes, graceMinutes: r.employee.lateGraceMinutes,
+    attendance: r.attendance, violations: r.violations,
+  }).map((d) => ({ ...d, employeeId: r.employee.id, employeeName: r.employee.name })))
+    .filter((d) => d.kind !== "LEAVE")
+    .sort((a, b) => b.day.localeCompare(a.day) || (a.employeeName ?? "").localeCompare(b.employeeName ?? ""));
+  const deductedMinor = deductions.reduce<number | null>((sum, d) => (sum === null || d.wageMinor === null ? null : sum + d.wageMinor + (d.penalty?.amountMinor ?? 0)), 0);
+  const noShift = working.filter((e) => e.kind === "MONTHLY" && !e.shiftStart).length;
 
   return (
-    <PageShell user={user} title="الحضور" intro="يسجّل كل موظف حضوره وانصرافه من رابطه على جواله. يُتحقق من موقعه عند المقهى أو من شبكته، ويُحسب التأخير وحده.">
+    <PageShell user={user} title="الحضور" intro="يسجّل كل موظف حضوره وانصرافه من تطبيق TPH Team على جواله. يُتحقق من موقعه عند المقهى أو من شبكته، ويُحسب التأخير وخصمه وحده من وقت دوامه.">
       {!settings.place && !settings.networkIp && (
         <Callout tone="warn" icon={MapPin} title="لم يُضبط موقع المقهى ولا شبكته بعد">
           بدونهما تُسجَّل كل الحضورات «بعيدة عن المقهى» وتنتظر مراجعتك. اضبطهما من الأسفل وأنت في المقهى.
@@ -163,6 +175,20 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         )}
       </Section>
 
+      {noShift > 0 && (
+        <Callout tone="warn" icon={CalendarClock} className="mt-4" title={`${countNoun(noShift, EMPLOYEE)} بلا وقت دوام`}>
+          بلا وقت دوام لا يُحسب التأخير من الحضور. <Link href="/payroll/employees#shifts" className="font-bold underline">اكتبه من جدول الدوام</Link>
+        </Callout>
+      )}
+
+      {monthRows.length > 0 && (
+        <Section id="deductions" title={`خصومات راتب ${formatMonth(month)}`} icon={Clock} count={deductions.length}
+          hint={`كل تأخير وانصراف مبكر وغياب من ${formatDay(period.from)} إلى ${formatDay(period.to)} بما يُحسم عنه${deductedMinor !== null && deductedMinor > 0 ? ` (المجموع ${formatRiyalsDisplay(deductedMinor)} ريال قبل حد الجزاءات)` : ""}. عدّل الدقائق، أو اعفُ عن الجزاء، أو ألغِ خصم اليوم.`}>
+          {deductions.length === 0 ? <EmptyState compact icon={Clock} title="لا تأخير ولا غياب في هذه الفترة." />
+            : <DeductionList items={deductions} canEdit={canEdit} />}
+        </Section>
+      )}
+
       {monthRows.length > 0 && (
         <Section title={`فترة خصم راتب ${formatMonth(month)} حتى الآن`} icon={CalendarDays} hint={`ما وقع من ${formatDay(period.from)} إلى ${formatDay(period.to)} ويُحسم من راتب ${formatMonth(month)} يوم ${formatDay(addDays(period.to, 1))}.`}>
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
@@ -178,7 +204,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         </Section>
       )}
 
-      <Section title="روابط الموظفين" icon={Link2} hint="لكل موظف رابط خاص. أرسله له مرة واحدة، ويحفظه على شاشة جواله. إن ضاع جواله فأنشئ رابطاً جديداً فيبطل القديم.">
+      <Section title="روابط TPH Team" icon={Link2} hint="لكل موظف رابط خاص: يسجّل منه حضوره، ويصوّر الفواتير، ويرسل لك رسائله. أرسله له مرة واحدة فيضيفه إلى شاشة جواله باسم TPH Team. إن ضاع جواله فأنشئ رابطاً جديداً فيبطل القديم.">
         {working.length === 0 ? <EmptyState compact icon={Users} title="أضف الموظفين أولاً." /> : (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2">
             {working.map((e) => (

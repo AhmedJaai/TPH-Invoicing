@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  dayForOut, distanceMeters, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhClock, riyadhDay, toMicro, workedMinutes,
+  clock12, clockMinutes, dayForOut, daysOffLabel, distanceMeters, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhClock, riyadhDay,
+  shiftEndOf, shiftLength, shiftRange, toMicro, workedMinutes,
 } from "./attendance";
 
 const cafe = { latMicro: toMicro(21.6136), lngMicro: toMicro(39.1567), radiusM: 120 };
@@ -48,5 +49,35 @@ describe("الوقت بتوقيت الرياض", () => {
       { kind: "IN", at: at("2026-10-22T13:00:00Z"), rejected: true }, { kind: "OUT", at: at("2026-10-22T15:00:00Z"), rejected: true },
     ]);
     expect(r).toEqual({ minutes: 270, open: 1 });
+  });
+});
+
+describe("الدوام من الساعة كم إلى كم", () => {
+  it("الطول من البداية والنهاية — والنهاية بعد منتصف الليل تلتفّ", () => {
+    expect(shiftLength("08:00", "16:00")).toBe(480);
+    expect(shiftLength("16:00", "00:00")).toBe(480);
+    expect(shiftLength("18:00", "02:30")).toBe(510);
+  });
+  it("لا يُقبل صفرٌ ولا أقلّ من ساعة ولا فوق ستّ عشرة ولا وقتٌ غير مفهوم", () => {
+    expect(shiftLength("08:00", "08:00")).toBeNull();
+    expect(shiftLength("08:00", "08:30")).toBeNull();
+    expect(shiftLength("06:00", "23:00")).toBeNull();
+    expect(shiftLength("8:00", "16:00")).toBeNull();
+    expect(shiftLength("24:00", "08:00")).toBeNull();
+  });
+  it("النهاية من البداية والطول — ذهاباً وإياباً", () => {
+    expect(shiftEndOf("16:00", 480)).toBe("00:00");
+    expect(shiftEndOf("18:00", 510)).toBe("02:30");
+    expect(shiftLength("18:00", shiftEndOf("18:00", 510))).toBe(510);
+    expect(clockMinutes("07:45")).toBe(465);
+  });
+  it("الساعة كما يقرؤها الموظّف، والراحة بأسمائها", () => {
+    expect(clock12("00:00")).toBe("12:00 ص");
+    expect(clock12("12:30")).toBe("12:30 م");
+    expect(clock12("16:05")).toBe("4:05 م");
+    expect(shiftRange("16:00", 480)).toBe("4:00 م – 12:00 ص");
+    expect(shiftRange(null, 480)).toBeNull();
+    expect(daysOffLabel("65")).toBe("الجمعة والسبت");
+    expect(daysOffLabel("")).toBeNull();
   });
 });
