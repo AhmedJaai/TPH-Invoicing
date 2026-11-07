@@ -14,7 +14,7 @@ import { countNoun, EMPLOYEE } from "@/lib/arabic";
 import {
   ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, hoursLabel, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
-import { clockMinutes, shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { clockMinutes, shiftLength, shiftRange, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from "@/lib/payroll/saudi-rules";
 import type { PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
@@ -172,6 +172,8 @@ function ShiftLine({ row }: { row: ShiftRow }) {
   const initialWeek: WeekDraft = Object.fromEntries(row.week.map((w) => [w.weekday, { start: w.shiftStart, end: w.shiftEnd }]));
   const [week, setWeek] = useState<WeekDraft>(initialWeek);
   const [custom, setCustom] = useState(row.week.length > 0);
+  /* المحرّرُ مفتوحٌ حين يُكتب وحده — بعد الحفظ يُطوى إلى سطرٍ يلخّص الأيّام */
+  const [editingWeek, setEditingWeek] = useState(false);
   const { busy, error, send } = useSend();
   const minutes = start && end ? shiftLength(start, end) : null;
   /* يومٌ مخصَّص مكتوبٌ نصفُه، أو بطولٍ لا يُقبل */
@@ -192,7 +194,8 @@ function ShiftLine({ row }: { row: ShiftRow }) {
         const days = custom
           ? Object.entries(week).filter(([i, v]) => v.start && v.end && !daysOff.includes(i)).map(([i, v]) => ({ weekday: Number(i), shiftStart: v.start, shiftEnd: v.end }))
           : [];
-        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff, ...(start ? { week: days } : {}) });
+        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff, ...(start ? { week: days } : {}) })
+          .then((r) => { if (r) setEditingWeek(false); });
       }}>
         <p className="col-span-2 min-w-0 self-center text-sm font-bold sm:col-span-1">
           <Link href={`/payroll/employee/${row.id}`} className="hover:underline">{row.name}</Link>
@@ -223,10 +226,19 @@ function ShiftLine({ row }: { row: ShiftRow }) {
         {row.kind === "MONTHLY" && (
           <div className="col-span-2 min-w-0 sm:col-span-5">
             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft sm:min-h-9">
-              <input type="checkbox" checked={custom} onChange={(e) => setCustom(e.target.checked)} />
+              <input type="checkbox" checked={custom} onChange={(e) => { setCustom(e.target.checked); setEditingWeek(e.target.checked && weekKey(week) === "[]"); }} />
               وقت مختلف لبعض الأيام (جدول مخصّص)
             </label>
-            {custom && (
+            {custom && !editingWeek && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
+                {Object.entries(week).filter(([i, v]) => v.start && v.end && !daysOff.includes(i)).sort(([a], [b]) => Number(a) - Number(b)).map(([i, v]) => (
+                  <span key={i}><strong className="text-ink">{WEEKDAY_LABEL[Number(i)]}</strong> <span className="nums">{shiftRange(v.start, shiftLength(v.start, v.end) ?? 0)}</span></span>
+                ))}
+                {weekKey(week) === "[]" && <span className="text-muted">كل الأيام بالوقت المعتاد</span>}
+                <button type="button" className="font-bold text-accent hover:underline" onClick={() => setEditingWeek(true)}>عدّل الأيام</button>
+              </div>
+            )}
+            {custom && editingWeek && (
               <div className="mt-2 rounded-xl border border-line bg-sunken/40 p-3">
                 <p className="mb-2 text-[11px] text-muted">اكتب وقت اليوم الذي يختلف عن المعتاد{start && end ? ` (${start}–${end})` : ""}، واترك الباقي فارغاً.</p>
                 <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
@@ -236,12 +248,12 @@ function ShiftLine({ row }: { row: ShiftRow }) {
                     const len = w.start && w.end ? shiftLength(w.start, w.end) : null;
                     return (
                       <li key={d} className="flex flex-wrap items-center gap-2">
-                        <span className="w-16 shrink-0 text-xs font-bold">{d}</span>
+                        <span className="w-14 shrink-0 text-xs font-bold">{d}</span>
                         {off ? <span className="text-[11px] text-muted">راحة</span> : (
                           <>
-                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28`} value={w.start} onChange={(e) => setDay(i, { start: e.target.value })} aria-label={`بداية دوام ${row.name} يوم ${d}`} />
+                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28! shrink-0`} value={w.start} onChange={(e) => setDay(i, { start: e.target.value })} aria-label={`بداية دوام ${row.name} يوم ${d}`} />
                             <span className="text-[11px] text-muted">إلى</span>
-                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28 ${badDays.includes(i) ? "border-danger" : ""}`} value={w.end} onChange={(e) => setDay(i, { end: e.target.value })} aria-label={`نهاية دوام ${row.name} يوم ${d}`} />
+                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28! shrink-0 ${badDays.includes(i) ? "border-danger" : ""}`} value={w.end} onChange={(e) => setDay(i, { end: e.target.value })} aria-label={`نهاية دوام ${row.name} يوم ${d}`} />
                             {len !== null ? <span className="text-[11px] text-muted">{hoursLabel(len)}</span> : !w.start && !w.end ? <span className="text-[11px] text-muted">المعتاد</span> : null}
                             {(w.start || w.end) && <button type="button" className="text-[11px] font-bold text-accent hover:underline" onClick={() => setWeek((x) => { const n = { ...x }; delete n[i]; return n; })}>المعتاد</button>}
                           </>
@@ -250,6 +262,7 @@ function ShiftLine({ row }: { row: ShiftRow }) {
                     );
                   })}
                 </ul>
+                <button type="button" className={`${buttonClass("quiet", "sm")} mt-2`} onClick={() => setEditingWeek(false)}>اطوِ</button>
               </div>
             )}
           </div>
