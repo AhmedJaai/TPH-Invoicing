@@ -10,7 +10,7 @@ import { PostAction } from "@/components/post-action";
 import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/forms";
 import { Badge, Callout, Card, DataTable, EmptyState, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { activeIn } from "@/lib/payroll/calc";
-import { isWorkday, riyadhClock, shiftRange, trusted, VERDICT_LABEL, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { dayShiftRange, riyadhClock, shiftOn, trusted, VERDICT_LABEL, WEEKDAY_LABEL, type DayShift } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList, type DeductionRow } from "@/components/payroll/deduction-list";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -30,6 +30,8 @@ interface BoardRow {
   outs: CheckinView[];
   status: { kind: "LATE" | "EARLY" | "ABSENT" | "LEAVE"; minutes: number | null; source: string }[];
   workday: boolean;
+  /** دوامُه في هذا اليوم بعينه. */
+  shift: DayShift;
 }
 
 /**
@@ -69,7 +71,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       outs: mine.filter((c) => c.kind === "OUT"),
       status: (row?.attendance ?? []).filter((a) => a.day === day).map((a) => ({ kind: a.kind, minutes: a.minutes, source: a.source })),
       /* الجزئيُّ بلا جدولٍ ثابت: غيابُه عن يومٍ ليس غياباً */
-      workday: employee.kind === "MONTHLY" && isWorkday(day, employee.daysOff),
+      workday: employee.kind === "MONTHLY" && !shiftOn(day, employee, employee.shiftRules).off,
+      shift: shiftOn(day, employee, employee.shiftRules),
     };
   });
   /* اليومَ لا يُعدّ غائباً من لم يبدأ دوامُه بعد */
@@ -79,13 +82,14 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     «لم يسجّلا حضوراً في يوم عملهم» وبجانبه «غائب» يخصم اليوم. فاليومُ لا يُحكم فيه على من لا
     وقتَ له حتى ينقضي، والأيّامُ الماضية كما كانت.
   */
-  const started = (b: BoardRow) => (b.employee.shiftStart ? b.employee.shiftStart <= clock : day !== today);
+  const startOf = (b: BoardRow) => (b.shift.off ? null : b.shift.start);
+  const started = (b: BoardRow) => { const s = startOf(b); return s ? s <= clock : day !== today; };
   /* «لم يسجّل» لمن معه رابطُ حضور — ومن لا رابطَ له لم يُطلب منه التسجيل، فغيابُ تسجيله ليس غياباً */
   const missing = board.filter((b) => b.workday && started(b) && b.employee.hasCheckinLink && b.ins.length === 0 && !b.status.some((s) => s.kind === "ABSENT" || s.kind === "LEAVE"));
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
 
   const columns: Column<BoardRow>[] = [
-    { key: "name", header: "الموظف", primary: true, cell: (b) => <span><span className="font-bold">{b.employee.name}</span><span className="block text-[11px] text-muted">{b.employee.kind === "PART_TIME" ? "جزئي" : b.employee.shiftStart ? <span className="nums">{shiftRange(b.employee.shiftStart, b.employee.shiftMinutes)}</span> : "بلا وقت دوام"}{!b.workday && b.employee.kind === "MONTHLY" && " · يوم راحته"}</span></span> },
+    { key: "name", header: "الموظف", primary: true, cell: (b) => <span><span className="font-bold">{b.employee.name}</span><span className="block text-[11px] text-muted">{b.employee.kind === "PART_TIME" ? "جزئي" : dayShiftRange(b.shift) ? <span className="nums">{dayShiftRange(b.shift)}</span> : b.shift.off ? "" : "بلا وقت دوام"}{!b.workday && b.employee.kind === "MONTHLY" && " · يوم راحته"}</span></span> },
     {
       key: "in", header: "الحضور",
       cell: (b) => b.ins.length === 0 ? <span className="text-muted">—</span> : (
@@ -101,7 +105,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     {
       key: "status", header: "الحال",
       cell: (b) => b.status.length === 0 ? (b.workday && b.ins.length === 0
-        ? (!b.employee.hasCheckinLink ? <Badge tone="muted">بلا رابط حضور</Badge> : started(b) ? <Badge tone="warn">لم يسجّل</Badge> : <Badge tone="muted">{b.employee.shiftStart ? "لم يبدأ دوامه" : "لم يسجّل بعد"}</Badge>)
+        ? (!b.employee.hasCheckinLink ? <Badge tone="muted">بلا رابط حضور</Badge> : started(b) ? <Badge tone="warn">لم يسجّل</Badge> : <Badge tone="muted">{startOf(b) ? "لم يبدأ دوامه" : "لم يسجّل بعد"}</Badge>)
         : <span className="text-muted">—</span>) : (
         <span className="flex flex-wrap gap-1">{b.status.map((s, i) => (
           <Badge key={i} tone={s.kind === "LEAVE" ? "muted" : "danger"}>

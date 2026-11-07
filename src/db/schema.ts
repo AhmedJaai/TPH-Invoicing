@@ -7,7 +7,7 @@
  */
 import {
   pgTable, pgEnum, text, integer, bigint, boolean, timestamp, jsonb, date,
-  doublePrecision, numeric, uniqueIndex, index, primaryKey,
+  doublePrecision, numeric, uniqueIndex, index, primaryKey, smallint,
   type AnyPgColumn, customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -2522,6 +2522,26 @@ export const employees = pgTable("employees", {
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * الدوامُ المخصَّص (099): وقتٌ ليومٍ من الأسبوع، أو ليومٍ بعينه (أو راحتُه). يغلب دوامَ الموظّف
+ * الأصليّ — `shiftOn` في `lib/payroll/attendance.ts`.
+ */
+export const employeeShifts = pgTable("employee_shifts", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  weekday: smallint("weekday"),
+  day: text("day"),
+  shiftStart: text("shift_start"),
+  shiftMinutes: integer("shift_minutes"),
+  off: boolean("off").notNull().default(false),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("employee_shifts_weekday_idx").on(t.employeeId, t.weekday).where(sql`weekday is not null`),
+  uniqueIndex("employee_shifts_day_idx").on(t.employeeId, t.day).where(sql`day is not null`),
+]);
 
 /** الراتبُ من شهرٍ يبدأ منه — للشهريّ راتبُ الشهر، وللجزئيّ أجرُ الساعة. */
 export const employeeRates = pgTable("employee_rates", {

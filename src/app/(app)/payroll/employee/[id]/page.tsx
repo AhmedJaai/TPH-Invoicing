@@ -10,13 +10,13 @@ import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { ObligationForm } from "@/components/obligation-form";
 import {
-  AdjustmentForm, CheckinLinkPanel, DayForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
+  AdjustmentForm, CheckinLinkPanel, DayForm, DayShiftForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
 } from "@/components/payroll/forms";
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { ADJUSTMENT_LABEL, endOfService, formatMinutes, hoursLabel, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
-import { daysOffLabel, shiftEndOf, shiftRange, workedMinutes } from "@/lib/payroll/attendance";
+import { daysOffLabel, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
@@ -71,6 +71,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const slip = row?.slip;
   const rate = rateFor(employee.rates, month);
   /* كلُّ يومٍ بخصمه — مجموعُه يساوي القسيمة هللةً بهللة (`deductions.ts`) */
+  const weekRules = employee.shiftRules.filter((r) => r.weekday !== null && r.shiftStart).sort((a, b) => a.weekday! - b.weekday!);
+  /* تغييراتُ أيّامٍ بعينها من بداية فترة الخصم — ما قبلها لا يغيّر شيئاً */
+  const dayRules = employee.shiftRules.filter((r) => r.day !== null && r.day >= deductionPeriod(deductionMonthOf(today)).from).sort((a, b) => a.day!.localeCompare(b.day!));
   const manualViolations = row?.violations.filter((v) => v.source === "MANUAL") ?? [];
   const deductions = row ? deductionItems({
     kind: employee.kind, rateMinor: rate, shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes,
@@ -340,6 +343,27 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           {employee.shiftStart ? <>دوامه <span className="nums font-bold">{shiftRange(employee.shiftStart, employee.shiftMinutes)}</span> ({hoursLabel(employee.shiftMinutes)})</> : <>لم يُحدَّد وقت دوامه، فلا يُحسب التأخير من الحضور. <Link href="/payroll/employees#shifts" className="font-bold text-accent hover:underline">حدّده من جدول الدوام</Link></>}
           {daysOffLabel(employee.daysOff) && <> · راحته {daysOffLabel(employee.daysOff)}</>}
         </p>
+        {weekRules.length > 0 && (
+          <p className="mb-3 text-xs text-ink-soft">
+            وبوقت مخصّص: {weekRules.map((r) => <span key={r.weekday} className="me-2 inline-block">{WEEKDAY_LABEL[r.weekday!]} <span className="nums font-bold">{shiftRange(r.shiftStart, r.shiftMinutes!)}</span></span>)}
+          </p>
+        )}
+        {dayRules.length > 0 && (
+          <ul className="mb-3 divide-y divide-line rounded-xl border border-line bg-raised">
+            {dayRules.map((r) => (
+              <li key={r.day} className="flex flex-wrap items-center gap-3 px-4 py-2 text-sm">
+                <span className="min-w-0 flex-1">{formatDay(r.day!)} · {r.off ? "راحة" : <span className="nums">{shiftRange(r.shiftStart, r.shiftMinutes!)}</span>}</span>
+                {canEdit && <PostAction url="/api/payroll/employee" body={{ action: "shift-day-remove", id, day: r.day }} variant="quiet" done="عاد اليوم لجدوله">أعده للمعتاد</PostAction>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEdit && employee.kind === "MONTHLY" && employee.shiftStart && (
+          <details className="mb-3 rounded-xl border border-line bg-raised">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">غيّر دوام يوم بعينه</summary>
+            <div className="border-t border-line p-4"><DayShiftForm employeeId={id} defaultDay={today} /></div>
+          </details>
+        )}
         {canEdit ? <CheckinLinkPanel employeeId={id} name={employee.name} phone={employee.phone} hasLink={employee.hasCheckinLink} /> : <Badge tone={employee.hasCheckinLink ? "ok" : "muted"}>{employee.hasCheckinLink ? "مفعّل" : "لا رابط"}</Badge>}
       </Section>
 

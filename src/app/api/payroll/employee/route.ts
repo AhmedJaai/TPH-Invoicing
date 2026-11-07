@@ -7,9 +7,9 @@ import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, saveEmployee, saveShift, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, saveEmployee, saveShift, setDayShift, setRate,
 } from "@/services/payroll.service";
-import { shiftLength } from "@/lib/payroll/attendance";
+import { shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 
 export const runtime = "nodejs";
 
@@ -46,7 +46,14 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("link-revoke"), id: Id }).strict(),
   z.object({ action: z.literal("delete"), id: Id }).strict(),
   /* جدولُ الدوام: من كم إلى كم، والسماح، وأيّامُ الراحة — لموظّفٍ واحد */
-  z.object({ action: z.literal("shift"), id: Id, shiftStart: Clock.nullable(), shiftEnd: Clock.nullable(), lateGraceMinutes: Grace, daysOff: DaysOff }).strict(),
+  z.object({
+    action: z.literal("shift"), id: Id, shiftStart: Clock.nullable(), shiftEnd: Clock.nullable(), lateGraceMinutes: Grace, daysOff: DaysOff,
+    /* وقتٌ مخصَّص لأيّامٍ من الأسبوع — يحلّ محلّ ما قبله */
+    week: z.array(z.object({ weekday: z.number().int().min(0).max(6), shiftStart: Clock, shiftEnd: Clock }).strict()).max(7).optional(),
+  }).strict(),
+  /* يومٌ بعينه: وقتٌ غيرُ المعتاد أو راحة */
+  z.object({ action: z.literal("shift-day"), id: Id, day: Day, off: z.boolean(), shiftStart: Clock.nullable().optional(), shiftEnd: Clock.nullable().optional(), note: z.string().trim().max(200).optional() }).strict(),
+  z.object({ action: z.literal("shift-day-remove"), id: Id, day: Day }).strict(),
 ]);
 
 /** «HH:MM» → «HH:MM»: طولُ الدوام بالدقائق، أو رسالةٌ تقول لماذا. بلا بدايةٍ يبقى الطولُ الافتراضيّ. */
@@ -103,12 +110,37 @@ export async function POST(request: Request) {
       if (Boolean(b.shiftStart) !== Boolean(b.shiftEnd)) return NextResponse.json({ error: b.shiftStart ? "اكتب نهاية الدوام مع بدايته." : "اكتب بداية الدوام مع نهايته." }, { status: 400 });
       const shift = shiftFrom(b.shiftStart, b.shiftEnd, undefined);
       if (!shift.ok) return NextResponse.json({ error: shift.error }, { status: 400 });
-      const backfilled = await saveShift(b.id, { shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes, daysOff: normDaysOff(b.daysOff) }, user.id);
+      let week: { weekday: number; shiftStart: string; shiftMinutes: number }[] | undefined;
+      if (b.week) {
+        if (!b.shiftStart) return NextResponse.json({ error: "اكتب الدوام المعتاد أولاً، ثم خصّص الأيام." }, { status: 400 });
+        week = [];
+        for (const w of b.week) {
+          const minutes = shiftLength(w.shiftStart, w.shiftEnd);
+          if (minutes === null) return NextResponse.json({ error: `دوام يوم ${WEEKDAY_LABEL[w.weekday]}: النهاية بعد البداية بساعة إلى 16 ساعة.` }, { status: 400 });
+          week.push({ weekday: w.weekday, shiftStart: w.shiftStart, shiftMinutes: minutes });
+        }
+      }
+      const backfilled = await saveShift(b.id, { shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes, daysOff: normDaysOff(b.daysOff), week }, user.id);
       const found = [backfilled.late > 0 ? `تأخير ${backfilled.late} ${backfilled.late === 1 ? "يوم" : "أيام"}` : null, backfilled.early > 0 ? `انصراف مبكر ${backfilled.early} ${backfilled.early === 1 ? "يوم" : "أيام"}` : null].filter(Boolean);
       return NextResponse.json({
         ok: true,
         message: found.length > 0 ? `حُفظ الدوام، وحُسب من تسجيلات هذه الفترة: ${found.join(" و")}` : "حُفظ الدوام، ويُحسب التأخير من أول تسجيل قادم",
       });
+    }
+
+    if (b.action === "shift-day") {
+      let minutes: number | null = null;
+      if (!b.off) {
+        if (!b.shiftStart || !b.shiftEnd) return NextResponse.json({ error: "اكتب بداية الدوام ونهايته لهذا اليوم، أو اجعله راحة." }, { status: 400 });
+        minutes = shiftLength(b.shiftStart, b.shiftEnd);
+        if (minutes === null) return NextResponse.json({ error: "النهاية بعد البداية بساعة إلى 16 ساعة." }, { status: 400 });
+      }
+      await setDayShift(b.id, { day: b.day, off: b.off, shiftStart: b.off ? null : b.shiftStart ?? null, shiftMinutes: minutes, note: b.note || null }, user.id);
+      return NextResponse.json({ ok: true, message: b.off ? "صار هذا اليوم راحة له" : "حُفظ دوام هذا اليوم" });
+    }
+    if (b.action === "shift-day-remove") {
+      const done = await removeDayShift(b.id, b.day, user.id);
+      return NextResponse.json({ ok: true, message: done ? "عاد اليوم إلى جدوله المعتاد" : "لا تغيير" });
     }
 
     const shift = shiftFrom(b.shiftStart, b.shiftEnd, b.shiftHours);

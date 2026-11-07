@@ -89,3 +89,34 @@ describe("يومُ التجربة لا يُخصم منه", () => {
     expect(checkinCounts("2026-11-08")).toBe(true);
   });
 });
+
+describe("الدوامُ المخصَّص لكلّ يوم", () => {
+  // 2026-11-08 الأحد · 09 الاثنين · 13 الجمعة
+  const base = { shiftStart: "16:00", shiftMinutes: 480, daysOff: "5" };
+  const rules = [
+    { weekday: 0, day: null, shiftStart: "15:00", shiftMinutes: 480, off: false },
+    { weekday: null, day: "2026-11-10", shiftStart: "15:30", shiftMinutes: 420, off: false },
+    { weekday: null, day: "2026-11-11", shiftStart: null, shiftMinutes: null, off: true },
+    { weekday: null, day: "2026-11-13", shiftStart: "12:00", shiftMinutes: 300, off: false },
+  ];
+  it("يومُ الأسبوع يغلب الأصل", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-11-08", base, rules)).toEqual({ off: false, start: "15:00", minutes: 480, source: "WEEKDAY" });
+    expect(shiftOn("2026-11-09", base, rules)).toEqual({ off: false, start: "16:00", minutes: 480, source: "BASE" });
+  });
+  it("واليومُ بعينه يغلبهما: وقتاً، أو راحةً، أو دواماً في يوم الراحة", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-11-10", base, rules)).toEqual({ off: false, start: "15:30", minutes: 420, source: "DAY" });
+    expect(shiftOn("2026-11-11", base, rules)).toEqual({ off: true });
+    expect(shiftOn("2026-11-13", base, rules)).toEqual({ off: false, start: "12:00", minutes: 300, source: "DAY" });
+    expect(shiftOn("2026-11-20", base, rules)).toEqual({ off: true });
+  });
+});
+
+describe("سجلُّ أحمد يُحسب من أوّل يوم للتجربة", () => {
+  it("ويبقى غيرُه من الغد", async () => {
+    const { checkinCounts } = await import("./attendance");
+    expect(checkinCounts("2026-11-07", "0bf0a8be-8804-47ed-b0e7-627fdbabe537")).toBe(true);
+    expect(checkinCounts("2026-11-07", "someone-else")).toBe(false);
+  });
+});

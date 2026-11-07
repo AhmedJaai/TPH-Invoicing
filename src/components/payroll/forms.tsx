@@ -145,7 +145,12 @@ export interface ShiftRow {
   shiftEnd: string;
   lateGraceMinutes: number;
   daysOff: string;
+  /** وقتٌ مخصَّص لأيّامٍ من الأسبوع — «HH:MM» بدايةً ونهاية. */
+  week: readonly { weekday: number; shiftStart: string; shiftEnd: string }[];
 }
+
+type WeekDraft = Record<number, { start: string; end: string }>;
+const weekKey = (w: WeekDraft) => JSON.stringify(Object.entries(w).filter(([, v]) => v.start || v.end).sort());
 
 /**
  * من الساعة كم إلى كم، وأيّامُ الراحة، والسماح — لكلّ موظّفٍ سطرٌ يُحفظ وحده. منه يُحسب التأخيرُ
@@ -164,17 +169,30 @@ function ShiftLine({ row }: { row: ShiftRow }) {
   const [end, setEnd] = useState(row.shiftEnd);
   const [grace, setGrace] = useState(String(row.lateGraceMinutes));
   const [daysOff, setDaysOff] = useState(row.daysOff);
+  const initialWeek: WeekDraft = Object.fromEntries(row.week.map((w) => [w.weekday, { start: w.shiftStart, end: w.shiftEnd }]));
+  const [week, setWeek] = useState<WeekDraft>(initialWeek);
+  const [custom, setCustom] = useState(row.week.length > 0);
   const { busy, error, send } = useSend();
   const minutes = start && end ? shiftLength(start, end) : null;
-  const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff;
-  const valid = (!start && !end) || minutes !== null;
+  /* يومٌ مخصَّص مكتوبٌ نصفُه، أو بطولٍ لا يُقبل */
+  const badDays = WEEKDAY_LABEL.map((_, i) => i).filter((i) => {
+    const w = week[i];
+    if (!w || (!w.start && !w.end) || daysOff.includes(String(i))) return false;
+    return !w.start || !w.end || shiftLength(w.start, w.end) === null;
+  });
+  const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff || weekKey(week) !== weekKey(initialWeek);
+  const valid = ((!start && !end) || minutes !== null) && badDays.length === 0 && (!custom || Boolean(start) || weekKey(week) === "[]");
+  const setDay = (i: number, patch: Partial<{ start: string; end: string }>) => setWeek((w) => ({ ...w, [i]: { ...(w[i] ?? { start: "", end: "" }), ...patch } }));
   const toggle = (d: number) => setDaysOff((x) => (x.includes(String(d)) ? x.replace(String(d), "") : [...x, String(d)].sort().join("")));
   return (
     <li className="px-4 py-3">
       <form className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_5.5rem_auto]" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
-        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff });
+        const days = custom
+          ? Object.entries(week).filter(([i, v]) => v.start && v.end && !daysOff.includes(i)).map(([i, v]) => ({ weekday: Number(i), shiftStart: v.start, shiftEnd: v.end }))
+          : [];
+        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff, ...(start ? { week: days } : {}) });
       }}>
         <p className="col-span-2 min-w-0 self-center text-sm font-bold sm:col-span-1">
           <Link href={`/payroll/employee/${row.id}`} className="hover:underline">{row.name}</Link>
@@ -182,12 +200,12 @@ function ShiftLine({ row }: { row: ShiftRow }) {
             {row.kind === "PART_TIME" ? "جزئي، بالساعة" : minutes !== null ? `${hoursLabel(minutes)}${(clockMinutes(end) ?? 0) <= (clockMinutes(start) ?? 0) ? "، حتى بعد منتصف الليل" : ""}` : start || end ? "—" : "لم يُحدَّد"}
           </span>
         </p>
-        <label className={label}>من<input type="time" dir="ltr" className={`${field} mt-1`} value={start} onChange={(e) => setStart(e.target.value)} aria-label={`بداية دوام ${row.name}`} /></label>
+        <label className={label}>{custom ? "المعتاد من" : "من"}<input type="time" dir="ltr" className={`${field} mt-1`} value={start} onChange={(e) => setStart(e.target.value)} aria-label={`بداية دوام ${row.name}`} /></label>
         <label className={label}>إلى<input type="time" dir="ltr" className={`${field} mt-1 ${start && end && minutes === null ? "border-danger" : ""}`} value={end} onChange={(e) => setEnd(e.target.value)} aria-label={`نهاية دوام ${row.name}`} /></label>
         <label className={label}>سماح (د)<input className={`${field} nums mt-1 text-end`} dir="ltr" inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value.replace(/\D/g, "").slice(0, 3))} aria-label={`دقائق سماح ${row.name}`} /></label>
         <span className="flex flex-col items-stretch gap-1 sm:order-none">
           <ReadySubmit ready={dirty && valid} busy={busy} size="sm" variant={dirty ? "primary" : "secondary"}
-            missing={!valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
+            missing={badDays.length > 0 ? "أكمل وقت الأيام المخصّصة أو امسحه." : !valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
             {busy ? "يُحفظ…" : dirty ? "احفظ" : "محفوظ"}
           </ReadySubmit>
         </span>
@@ -202,11 +220,83 @@ function ShiftLine({ row }: { row: ShiftRow }) {
             ))}
           </div>
         </fieldset>
+        {row.kind === "MONTHLY" && (
+          <div className="col-span-2 min-w-0 sm:col-span-5">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft sm:min-h-9">
+              <input type="checkbox" checked={custom} onChange={(e) => setCustom(e.target.checked)} />
+              وقت مختلف لبعض الأيام (جدول مخصّص)
+            </label>
+            {custom && (
+              <div className="mt-2 rounded-xl border border-line bg-sunken/40 p-3">
+                <p className="mb-2 text-[11px] text-muted">اكتب وقت اليوم الذي يختلف عن المعتاد{start && end ? ` (${start}–${end})` : ""}، واترك الباقي فارغاً.</p>
+                <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+                  {WEEKDAY_LABEL.map((d, i) => {
+                    const off = daysOff.includes(String(i));
+                    const w = week[i] ?? { start: "", end: "" };
+                    const len = w.start && w.end ? shiftLength(w.start, w.end) : null;
+                    return (
+                      <li key={d} className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 shrink-0 text-xs font-bold">{d}</span>
+                        {off ? <span className="text-[11px] text-muted">راحة</span> : (
+                          <>
+                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28`} value={w.start} onChange={(e) => setDay(i, { start: e.target.value })} aria-label={`بداية دوام ${row.name} يوم ${d}`} />
+                            <span className="text-[11px] text-muted">إلى</span>
+                            <input type="time" dir="ltr" className={`${fieldClass("sm", false)} w-28 ${badDays.includes(i) ? "border-danger" : ""}`} value={w.end} onChange={(e) => setDay(i, { end: e.target.value })} aria-label={`نهاية دوام ${row.name} يوم ${d}`} />
+                            {len !== null ? <span className="text-[11px] text-muted">{hoursLabel(len)}</span> : !w.start && !w.end ? <span className="text-[11px] text-muted">المعتاد</span> : null}
+                            {(w.start || w.end) && <button type="button" className="text-[11px] font-bold text-accent hover:underline" onClick={() => setWeek((x) => { const n = { ...x }; delete n[i]; return n; })}>المعتاد</button>}
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </form>
+      {badDays.length > 0 && <p className="mt-1.5 text-[11px] font-bold text-danger">دوام {badDays.map((i) => WEEKDAY_LABEL[i]).join(" و")}: اكتب البداية والنهاية، والنهاية بعد البداية بساعة إلى 16 ساعة.</p>}
+      {custom && !start && weekKey(week) !== "[]" && <p className="mt-1.5 text-[11px] font-bold text-warn">اكتب الدوام المعتاد أولاً، ثم الأيام المختلفة.</p>}
       {start && end && minutes === null && <p className="mt-1.5 text-[11px] font-bold text-danger">النهاية بين ساعة و16 ساعة بعد البداية.</p>}
       {Boolean(start) !== Boolean(end) && <p className="mt-1.5 text-[11px] font-bold text-warn">اكتب البداية والنهاية معاً.</p>}
       <ErrorLine error={error} />
     </li>
+  );
+}
+
+/* ─────────────── دوامُ يومٍ بعينه ─────────────── */
+
+/** يومٌ واحد بوقتٍ غيرِ المعتاد، أو راحة، أو دوامٌ في يوم راحته — حين يتبدّل الجدول. */
+export function DayShiftForm({ employeeId, defaultDay }: { employeeId: string; defaultDay: string }) {
+  const [day, setDay] = useState(defaultDay);
+  const [off, setOff] = useState(false);
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [note, setNote] = useState("");
+  const { busy, error, send } = useSend();
+  const len = start && end ? shiftLength(start, end) : null;
+  const ready = /^\d{4}-\d{2}-\d{2}$/.test(day) && (off || len !== null);
+  return (
+    <form className="space-y-3" onSubmit={async (e) => {
+      e.preventDefault();
+      if (!ready) return;
+      if (await send("/api/payroll/employee", { action: "shift-day", id: employeeId, day, off, ...(off ? {} : { shiftStart: start, shiftEnd: end }), note })) { setNote(""); }
+    }}>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="نوع التغيير">
+        {([[false, "وقت مختلف"], [true, "راحة"]] as const).map(([v, l]) => (
+          <button key={l} type="button" role="radio" aria-checked={off === v} onClick={() => setOff(v)}
+            className={`min-h-11 rounded-lg border px-3 text-xs font-bold sm:min-h-10 ${off === v ? "border-accent bg-accent text-accent-ink" : "border-line bg-raised text-ink-soft hover:bg-hover"}`}>{l}</button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <label className={`${label} col-span-2 sm:col-span-1`}>اليوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={day} onChange={(e) => setDay(e.target.value)} required /></label>
+        {!off && <label className={label}>من<input type="time" dir="ltr" className={`${field} mt-1.5`} value={start} onChange={(e) => setStart(e.target.value)} /></label>}
+        {!off && <label className={label}>إلى<input type="time" dir="ltr" className={`${field} mt-1.5`} value={end} onChange={(e) => setEnd(e.target.value)} />{len !== null && <span className="mt-1 block text-[11px] font-normal text-muted">{hoursLabel(len)}</span>}</label>}
+        <label className={`${label} col-span-2 sm:col-span-1`}>السبب <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="تبديل مع زميل" /></label>
+      </div>
+      <ErrorLine error={error} />
+      <ReadySubmit ready={ready} busy={busy} size="sm" missing={off ? "اختر اليوم." : "اكتب بداية الدوام ونهايته (بين ساعة و16 ساعة)."}>احفظ هذا اليوم</ReadySubmit>
+    </form>
   );
 }
 

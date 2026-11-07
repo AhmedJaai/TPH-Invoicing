@@ -102,9 +102,15 @@ export function earlyMinutesAt(outAt: Date, day: string, shiftStart: string, shi
  */
 export const CHECKIN_COUNTS_FROM = "2026-11-08";
 
+/**
+ * سجلُّ أحمد الجعيدي نفسِه (موظّفٌ في المسيّر) يُحسب من أوّل يوم — يجرّب به ما يراه الموظّفون
+ * («خلّي صفحتي مفتوحاً فيها الخصم من أوّل»، ٧ نوفمبر ٢٠٢٦).
+ */
+export const COUNTS_FROM_START: ReadonlySet<string> = new Set(["0bf0a8be-8804-47ed-b0e7-627fdbabe537"]);
+
 /** يُحسب من تسجيل هذا اليوم تأخيرٌ أو انصراف؟ */
-export function checkinCounts(day: string): boolean {
-  return day >= CHECKIN_COUNTS_FROM;
+export function checkinCounts(day: string, employeeId?: string): boolean {
+  return day >= CHECKIN_COUNTS_FROM || (employeeId !== undefined && COUNTS_FROM_START.has(employeeId));
 }
 
 /** الانصرافُ يُنسب إلى يوم آخر حضورٍ قبله بعشرين ساعةٍ على الأكثر — دوامُ الليل يعبر منتصفه. */
@@ -163,6 +169,51 @@ export function shiftRange(shiftStart: string | null, shiftMinutes: number): str
 export function daysOffLabel(daysOff: string): string | null {
   const days = [...new Set(daysOff.split(""))].filter((d) => /^[0-6]$/.test(d)).sort().map((d) => WEEKDAY_LABEL[Number(d)]);
   return days.length === 0 ? null : days.join(" و");
+}
+
+/* ─────────────── الدوامُ المخصَّص: لكلّ يوم وقتُه ─────────────── */
+
+/** سطرُ دوامٍ مخصَّص (099): ليومٍ من الأسبوع أو ليومٍ بعينه. */
+export interface ShiftRule {
+  id?: string;
+  weekday: number | null;
+  day: string | null;
+  shiftStart: string | null;
+  shiftMinutes: number | null;
+  off: boolean;
+}
+
+export interface BaseShift {
+  shiftStart: string | null;
+  shiftMinutes: number;
+  daysOff: string;
+}
+
+/** دوامُ اليوم: راحة، أو من «start» بطوله. `start` فارغٌ: لم يُكتب له وقت (لا يُحسب تأخير). */
+export type DayShift = { off: true } | { off: false; start: string | null; minutes: number; source: "DAY" | "WEEKDAY" | "BASE" };
+
+/**
+ * أيُّ دوامٍ في هذا اليوم؟ اليومُ بعينه يغلب يومَ الأسبوع، ويومُ الأسبوع يغلب الدوامَ الأصليّ.
+ * وراحةُ الأسبوع من `daysOff` — ويومٌ بعينه يجعلها دواماً أو يجعل يومَ العمل راحة.
+ */
+export function shiftOn(day: string, base: BaseShift, rules: readonly ShiftRule[]): DayShift {
+  const exact = rules.find((r) => r.day === day);
+  if (exact) return exact.off || !exact.shiftStart || !exact.shiftMinutes ? { off: true } : { off: false, start: exact.shiftStart, minutes: exact.shiftMinutes, source: "DAY" };
+  if (!isWorkday(day, base.daysOff)) return { off: true };
+  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+  const week = rules.find((r) => r.weekday === weekday && !r.off && r.shiftStart && r.shiftMinutes);
+  if (week) return { off: false, start: week.shiftStart, minutes: week.shiftMinutes!, source: "WEEKDAY" };
+  return { off: false, start: base.shiftStart, minutes: base.shiftMinutes, source: "BASE" };
+}
+
+/** «4:00 م – 12:00 ص» لدوام اليوم، أو `null` (راحة أو بلا وقت). */
+export function dayShiftRange(s: DayShift): string | null {
+  return s.off ? null : shiftRange(s.start, s.minutes);
+}
+
+/** في الجدول وقتٌ مخصَّص لأيّ يوم؟ */
+export function hasCustomWeek(rules: readonly ShiftRule[]): boolean {
+  return rules.some((r) => r.weekday !== null);
 }
 
 /** يومُ عمل؟ — أيّامُ الراحة أرقامٌ (٠ الأحد … ٦ السبت). */

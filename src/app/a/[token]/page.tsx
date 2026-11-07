@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { BrandMark } from "@/components/icons";
 import { TeamApp } from "@/components/team/team-app";
-import { daysOffLabel, isWorkday, shiftRange } from "@/lib/payroll/attendance";
+import { dayShiftRange, daysOffLabel, shiftOn } from "@/lib/payroll/attendance";
 import { asTeamTab, TEAM_APP_NAME, teamAppPath } from "@/lib/team-app";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { recentForEmployee } from "@/services/capture.service";
@@ -53,6 +53,8 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
     );
   }
   const today = todayInRiyadh();
+  /* دوامُ اليوم نفسه — يومُ الأسبوع أو اليومُ بعينه يغلب المعتاد */
+  const todayShift = shiftOn(today, employee, employee.shiftRules);
   const counted = employee.kind === "MONTHLY" && employee.shiftStart !== null;
   const [recent, captures, messages, period, { tab }] = await Promise.all([
     recentCheckins(employee.id, 6),
@@ -69,9 +71,9 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
       attend={{
         recent: recent.map((r) => ({ id: r.id, kind: r.kind, at: r.at.toISOString(), day: r.day, verdict: r.verdict })),
         today,
-        shiftRange: shiftRange(employee.shiftStart, employee.shiftMinutes),
-        shiftStart: employee.shiftStart,
-        dayOff: employee.kind === "MONTHLY" && !isWorkday(today, employee.daysOff),
+        shiftRange: dayShiftRange(todayShift),
+        shiftStart: todayShift.off ? null : todayShift.start,
+        dayOff: employee.kind === "MONTHLY" && todayShift.off,
         daysOffLabel: daysOffLabel(employee.daysOff),
         period,
       }}

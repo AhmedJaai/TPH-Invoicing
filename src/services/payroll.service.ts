@@ -14,7 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  appSettings, attendanceCheckins, employeeRates, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
+  appSettings, attendanceCheckins, employeeRates, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
   type AttendanceKind, type CheckinVerdict, type PayrollAdjustmentKind, type PayrollLinkPurpose,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -24,7 +24,7 @@ import {
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
 } from "@/lib/payroll/calc";
 import {
-  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, type CafePlace,
+  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, COUNTS_FROM_START, shiftOn, type CafePlace, type ShiftRule,
 } from "@/lib/payroll/attendance";
 import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
@@ -63,33 +63,43 @@ export interface EmployeeView {
   hasCheckinLink: boolean;
   note: string | null;
   rates: { id: string; fromMonth: string; amountMinor: number }[];
+  /** الدوامُ المخصَّص لأيّام الأسبوع ولأيّامٍ بعينها (099). */
+  shiftRules: ShiftRule[];
 }
 
 type EmployeeRow = typeof employees.$inferSelect;
 
-function toView(e: EmployeeRow, rates: readonly (typeof employeeRates.$inferSelect)[]): EmployeeView {
+type ShiftRow = typeof employeeShifts.$inferSelect;
+const toRule = (r: ShiftRow): ShiftRule => ({ id: r.id, weekday: r.weekday, day: r.day, shiftStart: r.shiftStart, shiftMinutes: r.shiftMinutes, off: r.off });
+
+function toView(e: EmployeeRow, rates: readonly (typeof employeeRates.$inferSelect)[], shifts: readonly ShiftRow[] = []): EmployeeView {
   return {
     id: e.id, name: e.name, kind: e.kind, jobTitle: e.jobTitle, phone: e.phone, nationalId: e.nationalId,
     bankBeneficiaryId: e.bankBeneficiaryId, iban: e.iban, hiredOn: e.hiredOn, leftOn: e.leftOn,
     shiftStart: e.shiftStart, shiftMinutes: e.shiftMinutes, lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
     hasCheckinLink: e.checkinTokenHash !== null, note: e.note,
     rates: rates.filter((r) => r.employeeId === e.id).map((r) => ({ id: r.id, fromMonth: r.fromMonth, amountMinor: r.amountMinor })),
+    shiftRules: shifts.filter((r) => r.employeeId === e.id).map(toRule),
   };
 }
 
 export async function loadEmployees(conn: Conn = db): Promise<EmployeeView[]> {
-  const [rows, rates] = await Promise.all([
+  const [rows, rates, shifts] = await Promise.all([
     conn.select().from(employees).orderBy(employees.name),
     conn.select().from(employeeRates).orderBy(employeeRates.fromMonth),
+    conn.select().from(employeeShifts).orderBy(employeeShifts.day),
   ]);
-  return rows.map((e) => toView(e, rates));
+  return rows.map((e) => toView(e, rates, shifts));
 }
 
 export async function loadEmployee(id: string, conn: Conn = db): Promise<EmployeeView | null> {
   const [row] = await conn.select().from(employees).where(eq(employees.id, id)).limit(1);
   if (!row) return null;
-  const rates = await conn.select().from(employeeRates).where(eq(employeeRates.employeeId, id)).orderBy(employeeRates.fromMonth);
-  return toView(row, rates);
+  const [rates, shifts] = await Promise.all([
+    conn.select().from(employeeRates).where(eq(employeeRates.employeeId, id)).orderBy(employeeRates.fromMonth),
+    conn.select().from(employeeShifts).where(eq(employeeShifts.employeeId, id)).orderBy(employeeShifts.day),
+  ]);
+  return toView(row, rates, shifts);
 }
 
 /* ─────────────────────────── المسيّر ─────────────────────────── */
@@ -578,6 +588,8 @@ export interface ShiftInput {
   shiftMinutes: number;
   lateGraceMinutes: number;
   daysOff: string;
+  /** وقتٌ مخصَّص لأيّامٍ من الأسبوع — يحلّ محلّ ما قبله كلّه. `undefined`: لا يُمسّ. */
+  week?: readonly { weekday: number; shiftStart: string; shiftMinutes: number }[];
 }
 
 /**
@@ -589,13 +601,48 @@ export async function saveShift(employeeId: string, input: ShiftInput, actorId: 
   return db.transaction(async (t) => {
     const [before] = await t.select().from(employees).where(eq(employees.id, employeeId)).for("update");
     if (!before) throw new PayrollRefused("الموظف غير موجود. حدّث الصفحة.");
-    await t.update(employees).set({ ...input, updatedAt: new Date() }).where(eq(employees.id, employeeId));
+    const { week, ...fields } = input;
+    await t.update(employees).set({ ...fields, updatedAt: new Date() }).where(eq(employees.id, employeeId));
+    if (week) {
+      await t.delete(employeeShifts).where(and(eq(employeeShifts.employeeId, employeeId), sql`${employeeShifts}.weekday is not null`));
+      /* يومُ الراحة لا وقتَ له، ووقتٌ يساوي الأصل لا يُكتب */
+      const rows = week.filter((w) => !input.daysOff.includes(String(w.weekday)) && !(w.shiftStart === input.shiftStart && w.shiftMinutes === input.shiftMinutes));
+      if (rows.length > 0) {
+        await t.insert(employeeShifts).values(rows.map((w) => ({ employeeId, weekday: w.weekday, shiftStart: w.shiftStart, shiftMinutes: w.shiftMinutes, createdById: actorId })));
+      }
+    }
     await recordAudit({
       actorId, action: "EMPLOYEE_SHIFT_SAVED", entityType: "employee", entityId: employeeId,
       before: { shiftStart: before.shiftStart, shiftMinutes: before.shiftMinutes, lateGraceMinutes: before.lateGraceMinutes, daysOff: before.daysOff },
       after: input,
     }, t);
     return !before.shiftStart && input.shiftStart ? backfillFromCheckins(t, employeeId) : { late: 0, early: 0 };
+  });
+}
+
+/**
+ * دوامُ يومٍ بعينه — وقتٌ غيرُ المعتاد، أو راحة، أو دوامٌ في يوم راحته. يستبدل ما كُتب لليوم.
+ * ما سُجّل لليوم من حضورٍ يُحسب بالدوام الجديد من تسجيلاته التالية، وما حُسب قبله يبقى ويُعدَّل من قائمة الخصم.
+ */
+export async function setDayShift(employeeId: string, input: { day: string; off: boolean; shiftStart: string | null; shiftMinutes: number | null; note: string | null }, actorId: string): Promise<void> {
+  if (!input.off && (!input.shiftStart || !input.shiftMinutes)) throw new PayrollRefused("اكتب وقت الدوام لهذا اليوم، أو اجعله راحة.");
+  await db.transaction(async (t) => {
+    await assertEmployee(t, employeeId);
+    const before = await t.delete(employeeShifts).where(and(eq(employeeShifts.employeeId, employeeId), eq(employeeShifts.day, input.day))).returning();
+    await t.insert(employeeShifts).values({
+      employeeId, day: input.day, off: input.off, shiftStart: input.off ? null : input.shiftStart, shiftMinutes: input.off ? null : input.shiftMinutes,
+      note: input.note, createdById: actorId,
+    });
+    await recordAudit({ actorId, action: "EMPLOYEE_SHIFT_SAVED", entityType: "employee", entityId: employeeId, before: before.length > 0 ? before : null, after: input }, t);
+  });
+}
+
+export async function removeDayShift(employeeId: string, day: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const done = await t.delete(employeeShifts).where(and(eq(employeeShifts.employeeId, employeeId), eq(employeeShifts.day, day))).returning();
+    if (done.length === 0) return false;
+    await recordAudit({ actorId, action: "EMPLOYEE_SHIFT_SAVED", entityType: "employee", entityId: employeeId, before: done, after: null }, t);
+    return true;
   });
 }
 
@@ -607,8 +654,9 @@ export async function saveShift(employeeId: string, input: ShiftInput, actorId: 
 export async function backfillFromCheckins(t: Conn, employeeId: string, today = todayInRiyadh()): Promise<{ late: number; early: number }> {
   const [emp] = await t.select().from(employees).where(eq(employees.id, employeeId)).limit(1);
   if (!emp || !emp.shiftStart || emp.kind !== "MONTHLY") return { late: 0, early: 0 };
+  const rules = (await t.select().from(employeeShifts).where(eq(employeeShifts.employeeId, employeeId))).map(toRule);
   const period = deductionPeriod(deductionMonthOf(today));
-  const from = [emp.hiredOn, period.from, CHECKIN_COUNTS_FROM].sort()[2];
+  const from = [emp.hiredOn, period.from, COUNTS_FROM_START.has(emp.id) ? period.from : CHECKIN_COUNTS_FROM].sort()[2];
   const to = today < period.to ? today : period.to;
   if (from > to) return { late: 0, early: 0 };
   const [checks, rows] = await Promise.all([
@@ -622,16 +670,17 @@ export async function backfillFromCheckins(t: Conn, employeeId: string, today = 
   const days = [...new Set(counted.map((c) => c.day))];
   let late = 0, early = 0;
   for (const day of days) {
-    if (!isWorkday(day, emp.daysOff) || excused.has(day)) continue;
+    const shift = shiftOn(day, emp, rules);
+    if (shift.off || !shift.start || excused.has(day)) continue;
     const ins = counted.filter((c) => c.day === day && c.kind === "IN");
     const outs = counted.filter((c) => c.day === day && c.kind === "OUT");
     if (ins.length > 0 && !touched.has(`${day}:LATE`)) {
-      const minutes = lateMinutesAt(ins[0].at, day, emp.shiftStart);
-      if (minutes > 0) { await insertDerived(t, employeeId, day, "LATE", minutes, emp.shiftMinutes); late++; }
+      const minutes = lateMinutesAt(ins[0].at, day, shift.start);
+      if (minutes > 0) { await insertDerived(t, employeeId, day, "LATE", minutes, shift.minutes); late++; }
     }
     if (outs.length > 0 && !touched.has(`${day}:EARLY`)) {
-      const minutes = earlyMinutesAt(outs[outs.length - 1].at, day, emp.shiftStart, emp.shiftMinutes);
-      if (minutes > 0) { await insertDerived(t, employeeId, day, "EARLY", minutes, emp.shiftMinutes); early++; }
+      const minutes = earlyMinutesAt(outs[outs.length - 1].at, day, shift.start, shift.minutes);
+      if (minutes > 0) { await insertDerived(t, employeeId, day, "EARLY", minutes, shift.minutes); early++; }
     }
   }
   return { late, early };
@@ -910,6 +959,7 @@ export interface CheckinEmployee {
   shiftMinutes: number;
   lateGraceMinutes: number;
   daysOff: string;
+  shiftRules: ShiftRule[];
 }
 
 /** الموظّفُ لهذا الرمز — ما دام لم يخرج ورابطُه لم يُلغَ. */
@@ -918,9 +968,10 @@ export async function resolveCheckinToken(token: string | null | undefined): Pro
   const [row] = await db.select().from(employees).where(eq(employees.checkinTokenHash, hashToken(token))).limit(1);
   if (!row) return null;
   if (row.leftOn && row.leftOn < riyadhDay(new Date())) return null;
+  const rules = await db.select().from(employeeShifts).where(eq(employeeShifts.employeeId, row.id));
   return {
     id: row.id, name: row.name, kind: row.kind, shiftStart: row.shiftStart, shiftMinutes: row.shiftMinutes,
-    lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff,
+    lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff, shiftRules: rules.map(toRule),
   };
 }
 
@@ -1029,7 +1080,9 @@ export async function recordCheckin(input: {
     }).returning({ id: attendanceCheckins.id });
 
     let lateMinutes = 0, earlyMinutes = 0;
-    if (emp.shiftStart && isWorkday(day, emp.daysOff) && emp.kind === "MONTHLY" && checkinCounts(day)) {
+    const rules = (await t.select().from(employeeShifts).where(eq(employeeShifts.employeeId, emp.id))).map(toRule);
+    const shift = emp.shiftStart ? shiftOn(day, emp, rules) : ({ off: true } as const);
+    if (!shift.off && shift.start && emp.kind === "MONTHLY" && checkinCounts(day, emp.id)) {
       const manual = await t.select({ kind: payrollAttendance.kind }).from(payrollAttendance)
         .where(and(eq(payrollAttendance.employeeId, emp.id), eq(payrollAttendance.day, day), eq(payrollAttendance.source, "MANUAL"), isNull(payrollAttendance.voidedAt)));
       const manualKinds = new Set(manual.map((m) => m.kind));
@@ -1037,16 +1090,16 @@ export async function recordCheckin(input: {
       if (input.kind === "IN") {
         const [earlier] = await t.select({ id: attendanceCheckins.id }).from(attendanceCheckins)
           .where(and(eq(attendanceCheckins.employeeId, emp.id), eq(attendanceCheckins.day, day), eq(attendanceCheckins.kind, "IN"), sql`${attendanceCheckins.id} <> ${row.id}`)).limit(1);
-        lateMinutes = lateMinutesAt(now, day, emp.shiftStart);
+        lateMinutes = lateMinutesAt(now, day, shift.start);
         if (!earlier && !handled && !manualKinds.has("LATE") && lateMinutes > 0) {
-          await writeDerived(t, emp.id, day, "LATE", lateMinutes, emp.shiftMinutes);
+          await writeDerived(t, emp.id, day, "LATE", lateMinutes, shift.minutes);
         }
       } else {
-        earlyMinutes = earlyMinutesAt(now, day, emp.shiftStart, emp.shiftMinutes);
+        earlyMinutes = earlyMinutesAt(now, day, shift.start, shift.minutes);
         if (!handled && !manualKinds.has("EARLY")) {
           await t.update(payrollAttendance).set({ voidedAt: now })
             .where(and(eq(payrollAttendance.employeeId, emp.id), eq(payrollAttendance.day, day), eq(payrollAttendance.kind, "EARLY"), eq(payrollAttendance.source, "CHECKIN"), isNull(payrollAttendance.voidedAt)));
-          if (earlyMinutes > 0) await writeDerived(t, emp.id, day, "EARLY", earlyMinutes, emp.shiftMinutes);
+          if (earlyMinutes > 0) await writeDerived(t, emp.id, day, "EARLY", earlyMinutes, shift.minutes);
         }
       }
     }

@@ -6,7 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { EmployeeForm, ShiftSchedule } from "@/components/payroll/forms";
-import { daysOffLabel, shiftEndOf, shiftRange } from "@/lib/payroll/attendance";
+import { daysOffLabel, hasCustomWeek, shiftEndOf, shiftRange } from "@/lib/payroll/attendance";
 import { BLANK_EMPLOYEE } from "@/lib/payroll/form-defaults";
 import { Badge, Callout, DataTable, EmptyState, NoAccess, Section, type Column } from "@/components/ui";
 import { formatRiyals } from "@/lib/money";
@@ -49,7 +49,7 @@ export default async function EmployeesPage() {
     {
       key: "shift", header: "الدوام", secondary: true,
       cell: (e) => (e.shiftStart
-        ? <span><span className="nums">{shiftRange(e.shiftStart, e.shiftMinutes)}</span>{daysOffLabel(e.daysOff) && <span className="block text-[11px] text-muted">راحته {daysOffLabel(e.daysOff)}</span>}</span>
+        ? <span><span className="nums">{shiftRange(e.shiftStart, e.shiftMinutes)}</span>{hasCustomWeek(e.shiftRules) && <span className="block text-[11px] text-muted">وأيام بوقت مخصّص</span>}{daysOffLabel(e.daysOff) && <span className="block text-[11px] text-muted">راحته {daysOffLabel(e.daysOff)}</span>}</span>
         : <span className="text-muted">{e.kind === "PART_TIME" ? "بالساعة" : "لم يُحدَّد"}</span>),
     },
     { key: "link", header: "TPH Team", cell: (e) => (e.hasCheckinLink ? <Badge tone="ok">مفعّل</Badge> : <Badge tone="muted">لا رابط</Badge>) },
@@ -76,6 +76,8 @@ export default async function EmployeesPage() {
           <ShiftSchedule rows={working.map((e) => ({
             id: e.id, name: e.name, kind: e.kind, shiftStart: e.shiftStart ?? "",
             shiftEnd: e.shiftStart ? shiftEndOf(e.shiftStart, e.shiftMinutes) : "", lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
+            week: e.shiftRules.filter((r) => r.weekday !== null && r.shiftStart && r.shiftMinutes)
+              .map((r) => ({ weekday: r.weekday!, shiftStart: r.shiftStart!, shiftEnd: shiftEndOf(r.shiftStart!, r.shiftMinutes!) })),
           }))} />
         </Section>
       )}
