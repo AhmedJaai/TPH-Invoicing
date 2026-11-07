@@ -5,8 +5,12 @@ import { dayShiftRange, daysOffLabel, shiftOn } from "@/lib/payroll/attendance";
 import { asTeamTab, TEAM_APP_NAME, teamAppPath } from "@/lib/team-app";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { recentForEmployee } from "@/services/capture.service";
-import { myPeriod, recentCheckins, resolveCheckinToken } from "@/services/payroll.service";
+import { loadEmployees, myPeriod, mySlip, recentCheckins, resolveCheckinToken, weekAhead } from "@/services/payroll.service";
 import { myMessages } from "@/services/team.service";
+import { loadBoard, myRequests } from "@/services/team-board.service";
+import { loadStockOptions } from "@/services/team-stock.service";
+import { activeIn } from "@/lib/payroll/calc";
+import { formatQuantity } from "@/lib/team-units";
 
 export const dynamic = "force-dynamic";
 
@@ -56,13 +60,19 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   /* دوامُ اليوم نفسه — يومُ الأسبوع أو اليومُ بعينه يغلب المعتاد */
   const todayShift = shiftOn(today, employee, employee.shiftRules);
   const counted = employee.kind === "MONTHLY" && employee.shiftStart !== null;
-  const [recent, captures, messages, period, { tab }] = await Promise.all([
+  const [recent, captures, messages, period, { tab }, board, requests, everyone, stock, slip] = await Promise.all([
     recentCheckins(employee.id, 6),
     recentForEmployee(employee.id),
     myMessages(employee.id),
     counted ? myPeriod(employee, today) : Promise.resolve(null),
     searchParams,
+    loadBoard(),
+    myRequests(employee.id),
+    loadEmployees(),
+    loadStockOptions(),
+    mySlip(employee.id),
   ]);
+  const mates = everyone.filter((e) => e.id !== employee.id && activeIn(e, today.slice(0, 7)) && (!e.leftOn || e.leftOn >= today)).map((e) => ({ id: e.id, name: e.name }));
   return (
     <TeamApp
       token={token}
@@ -76,7 +86,19 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
         dayOff: employee.kind === "MONTHLY" && todayShift.off,
         daysOffLabel: daysOffLabel(employee.daysOff),
         period,
+        week: employee.kind === "MONTHLY" ? weekAhead(employee, today).map((d) => ({ day: d.day, range: d.shift.off ? null : dayShiftRange(d.shift), off: d.shift.off })) : [],
+        slip,
       }}
+      board={board.map((c) => ({ id: c.id, kind: c.kind, title: c.title, body: c.body, weekday: c.weekday }))}
+      pendingBoardIds={requests.filter((r) => r.kind === "BOARD_EDIT" && r.status === "PENDING" && r.boardId).map((r) => r.boardId!)}
+      todayWeekday={new Date(`${today}T00:00:00Z`).getUTCDay()}
+      requests={requests.map((r) => ({
+        id: r.id, kind: r.kind, status: r.status, boardTitle: r.boardTitle, fromDay: r.fromDay, toDay: r.toDay, withEmployeeName: r.withEmployeeName,
+        productName: r.productName, quantity: r.quantityMilli !== null && r.unit ? formatQuantity(r.quantityMilli, r.unit) : null,
+        decisionNote: r.decisionNote, createdAt: r.createdAt.toISOString(),
+      }))}
+      mates={mates}
+      stock={stock}
       captures={captures.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
       messages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString(), repliedAt: m.repliedAt?.toISOString() ?? null }))}
     />

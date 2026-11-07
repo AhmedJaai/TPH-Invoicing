@@ -106,7 +106,7 @@ export function pushOutcome(status: number): "sent" | "gone" | "failed" {
  * نصُّ الإشعار — **بلا مبالغ**: يظهر على شاشة القفل، ويراه من يمسك الجوّال.
  * فيقول ما ينتظر ويدعو إلى «اليوم»؛ والأرقامُ هناك بعد الدخول.
  */
-export function pushBriefText(f: { knowsNothing: boolean; pending: number; runReady: boolean; tasksDue?: number }): { title: string; body: string } {
+export function pushBriefText(f: { knowsNothing: boolean; pending: number; runReady: boolean; tasksDue?: number; attendanceWeek?: { late: number; early: number; absent: number } | null }): { title: string; body: string } {
   const title = "إحاطة الصباح";
   if (f.knowsNothing) return { title, body: "لم يقرأ النظام بعد أي مستند أو كشف. افتح التطبيق لتبدأ." };
   const parts = [
@@ -115,6 +115,20 @@ export function pushBriefText(f: { knowsNothing: boolean; pending: number; runRe
     f.runReady ? "ودفعة المورّدين جاهزة للتحويل." : null,
     /* بند المهامّ واحدٌ في العدد أعلاه؛ هذا السطرُ يقول كم مهمّةً فيه */
     f.tasksDue ? `وفي قائمة مهامّك ${countNoun(f.tasksDue, { one: "مهمّة", two: "مهمّتان", few: "مهامّ", many: "مهمّةً" })} تنتظر.` : null,
+    /* ملخّصُ حضور الأسبوع الماضي — صباحَ الأحد وحده، بلا أسماءٍ ولا مبالغ على شاشة القفل */
+    f.attendanceWeek ? attendanceLine(f.attendanceWeek) : null,
   ];
   return { title, body: parts.filter(Boolean).join(" ") };
+}
+
+const TIMES = { one: "مرّة", two: "مرّتين", few: "مرّات", many: "مرّة" } as const;
+
+/** «حضور الأسبوع الماضي: تأخير ٣ مرّات، وغياب يوم.» — أو «بلا تأخير ولا غياب». */
+export function attendanceLine(w: { late: number; early: number; absent: number }): string {
+  const bits = [
+    w.late > 0 ? `تأخير ${countNoun(w.late, TIMES)}` : null,
+    w.early > 0 ? `انصراف مبكر ${countNoun(w.early, TIMES)}` : null,
+    w.absent > 0 ? `غياب ${countNoun(w.absent, { one: "يوم", two: "يومين", few: "أيام", many: "يوماً" })}` : null,
+  ].filter(Boolean);
+  return bits.length === 0 ? "وحضور الأسبوع الماضي بلا تأخير ولا غياب." : `وحضور الأسبوع الماضي: ${bits.join("، و")}.`;
 }

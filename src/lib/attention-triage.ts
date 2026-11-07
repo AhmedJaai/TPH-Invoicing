@@ -40,6 +40,7 @@ export const ATTENTION_IDS = [
   "payroll-owed",
   "payroll-checkins",
   "team-messages",
+  "team-requests",
   "payroll-open",
   "stock-links-ready",
   "stock-gap-shortage",

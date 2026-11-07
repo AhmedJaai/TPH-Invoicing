@@ -11,6 +11,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, CheckCircle2, ChevronUp, Coffee, Info, LogIn, LogOut, MapPin, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, DAY_AGO, MINUTE } from "@/lib/arabic";
 import { clock12, nextKind, riyadhClock, trusted, VERDICT_LABEL } from "@/lib/payroll/attendance";
 import type { CheckinVerdict } from "@/db/schema";
@@ -32,6 +33,10 @@ export interface AttendPanelProps {
   daysOffLabel: string | null;
   /** تأخيرُه في فترة الخصم — `null`: لا يُحسب له (جزئيّ أو بلا دوام). */
   period: { from: string; lateDays: number; lateMinutes: number; earlyDays: number; earlyMinutes: number; absentDays: number } | null;
+  /** دوامُ الأيّام السبعة القادمة بيومها. */
+  week: { day: string; range: string | null; off: boolean }[];
+  /** قسيمةُ آخر شهرٍ نشرته الإدارة — `null` لا منشور. */
+  slip: { month: string; baseMinor: number | null; additionsMinor: number; deductionsMinor: number | null; advancesMinor: number; dueMinor: number | null; paidMinor: number; remainingMinor: number | null } | null;
 }
 
 function position(): Promise<GeolocationPosition | null> {
@@ -50,7 +55,7 @@ const currentMinute = () => Math.floor(Date.now() / 60_000);
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Riyadh" });
 const dayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" });
 
-export function AttendPanel({ token, recent: fromServer, today, shiftRange, shiftStart, dayOff, daysOffLabel, period }: AttendPanelProps) {
+export function AttendPanel({ token, recent: fromServer, today, shiftRange, shiftStart, dayOff, daysOffLabel, period, week, slip }: AttendPanelProps) {
   const router = useRouter();
   /* ما سُجّل الآن يظهر فوراً، ثمّ يحلّ محلَّه ما يعيده الخادم بعد التحديث */
   const [optimistic, setOptimistic] = useState<RecentCheckin[]>([]);
@@ -58,6 +63,7 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "danger"; text: string } | null>(null);
   /* سجلُّه وتأخيرُه لا يُعرضان كلّما فتح التطبيق — يُطلبان بزرٍّ صغير (أحمد: «شعور غير جميل») */
   const [details, setDetails] = useState(false);
+  const [showWeek, setShowWeek] = useState(false);
   /* الساعةُ بالدقيقة — في الخادم لا ساعة، فلا تختلف الصفحتان عند التحميل */
   const minute = useSyncExternalStore(everyFewSeconds, currentMinute, () => null);
   const now = minute === null ? null : new Date(minute * 60_000);
@@ -152,6 +158,25 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
         يُقرأ موقع جوالك لحظة الضغط فقط، للتأكد أنك في المقهى. لا يُتتبَّع بعدها.
       </p>
 
+      {week.length > 0 && (
+        <section className="rounded-2xl border border-line bg-raised">
+          <button type="button" onClick={() => setShowWeek((x) => !x)} aria-expanded={showWeek} className="flex min-h-12 w-full items-center justify-between gap-2 px-4 text-sm font-bold">
+            دوامي هذا الأسبوع
+            <ChevronUp className={`h-4 w-4 text-muted transition-transform motion-reduce:transition-none ${showWeek ? "" : "rotate-180"}`} aria-hidden />
+          </button>
+          {showWeek && (
+            <ul className="divide-y divide-line border-t border-line">
+              {week.map((d) => (
+                <li key={d.day} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-sm ${d.day === today ? "font-bold" : ""}`}>
+                  <span>{d.day === today ? "اليوم" : weekdayLabel(d.day)}</span>
+                  <span className={d.off ? "text-accent" : "nums"}>{d.off ? "راحة" : d.range ?? "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <div>
         <button type="button" onClick={() => setDetails((x) => !x)} aria-expanded={details}
           className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-bold text-ink-soft hover:bg-hover">
@@ -190,10 +215,36 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
           </ul>
         </section>
       )}
-            {!period && recent.length === 0 && <p className="text-sm text-muted">لا تسجيلات بعد.</p>}
+            {slip && (
+              <section className="rounded-2xl border border-line bg-raised p-4" aria-label="قسيمة الراتب">
+                <h2 className="text-xs font-bold text-ink-soft">قسيمة راتب {monthLabel(slip.month)}</h2>
+                <dl className="mt-2 space-y-1.5 text-sm">
+                  <Row label="الراتب" minor={slip.baseMinor} />
+                  {slip.additionsMinor > 0 && <Row label="إضافات" minor={slip.additionsMinor} />}
+                  <Row label="خصومات" minor={slip.deductionsMinor} minus />
+                  {slip.advancesMinor > 0 && <Row label="سلف" minor={slip.advancesMinor} minus />}
+                  <Row label="المستحق" minor={slip.dueMinor} strong />
+                  <Row label="حُوّل لك" minor={slip.paidMinor} />
+                  {slip.remainingMinor !== null && slip.remainingMinor > 0 && <Row label="الباقي لك" minor={slip.remainingMinor} strong />}
+                </dl>
+              </section>
+            )}
+            {!period && recent.length === 0 && !slip && <p className="text-sm text-muted">لا تسجيلات بعد.</p>}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const weekdayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const monthLabel = (month: string) => new Date(`${month}-15T12:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { month: "long", year: "numeric", timeZone: "UTC" });
+
+function Row({ label, minor, minus, strong }: { label: string; minor: number | null; minus?: boolean; strong?: boolean }) {
+  return (
+    <div className={`flex items-baseline justify-between gap-3 ${strong ? "border-t border-line pt-1.5 font-bold" : ""}`}>
+      <dt>{label}</dt>
+      <dd className="nums">{minor === null ? <span className="text-muted">غير معروف</span> : <>{minus && minor > 0 ? "− " : ""}{formatRiyalsDisplay(minor)} ريال</>}</dd>
     </div>
   );
 }

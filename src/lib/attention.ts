@@ -262,6 +262,8 @@ export interface AttentionFacts {
     owed?: { month: string; remainingMinor: number; people: number } | null;
     /** رسائلُ «TPH Team» لم تُقرأ، ومنها الشكاوى. */
     unreadMessages?: { count: number; complaints: number };
+    /** طلباتُ الفريق تنتظر القرار. */
+    pendingRequests?: number;
   };
   stockLinksReady?: { count: number; valueMinor: number };
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
@@ -1074,6 +1076,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       actionLabel: "اقرأ الرسائل",
       href: "/payroll/messages",
       count: msgs.count,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+      needs: "payroll:view",
+    });
+  }
+  if (pay?.pendingRequests && pay.pendingRequests > 0) {
+    const n = pay.pendingRequests;
+    out.push({
+      id: "team-requests",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: n === 1 ? "طلب من الفريق ينتظر قرارك" : n === 2 ? "طلبان من الفريق ينتظران قرارك" : `${n} طلبات من الفريق تنتظر قرارك`,
+      detail: "إجازة، أو تبديل دوام مع زميل، أو تالف، أو تعديل على الوصفات والطحنات — من TPH Team.",
+      action: "اعتمده فيُنفَّذ، أو ارفضه بسبب يراه صاحبه.",
+      actionLabel: "افتح الطلبات",
+      href: "/payroll/team#requests",
+      count: n,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
       needs: "payroll:view",

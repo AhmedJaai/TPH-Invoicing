@@ -2676,6 +2676,51 @@ export const teamMessages = pgTable("team_messages", {
   index("team_messages_employee_idx").on(t.employeeId, t.createdAt).where(sql`employee_id is not null`),
 ]);
 
+export type TeamBoardKind = "CLEANING_DAILY" | "CLEANING_WEEKLY" | "GRIND" | "RECIPE" | "BEAN" | "ANNOUNCEMENT";
+
+/** مرجعُ الفريق (100): يكتبه صاحبُ المقهى ويقرؤه الموظّف في «TPH Team» — لا مهامّ ولا متابعة. */
+export const teamBoard = pgTable("team_board", {
+  id: id(),
+  kind: text("kind").$type<TeamBoardKind>().notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  weekday: smallint("weekday"),
+  sort: integer("sort").notNull().default(0),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("team_board_live_idx").on(t.kind, t.sort).where(sql`archived_at is null`)]);
+
+export type TeamRequestKind = "BOARD_EDIT" | "LEAVE" | "SWAP" | "WASTE";
+export type TeamRequestStatus = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+
+/** طلبُ الموظّف (100): اقتراحُ تعديلٍ · إجازة · تبديلُ وردية · تالف — لا يُنفَّذ إلّا بإقرار صاحب المقهى. */
+export const teamRequests = pgTable("team_requests", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  kind: text("kind").$type<TeamRequestKind>().notNull(),
+  boardId: text("board_id").references(() => teamBoard.id, { onDelete: "set null" }),
+  proposedTitle: text("proposed_title"),
+  proposedBody: text("proposed_body"),
+  fromDay: text("from_day"),
+  toDay: text("to_day"),
+  withEmployeeId: text("with_employee_id").references((): AnyPgColumn => employees.id, { onDelete: "set null" }),
+  productId: text("product_id").references(() => products.id),
+  quantityMilli: bigint("quantity_milli", { mode: "number" }),
+  unit: text("unit"),
+  wasteReason: text("waste_reason"),
+  note: text("note"),
+  status: text("status").$type<TeamRequestStatus>().notNull().default("PENDING"),
+  decidedById: text("decided_by_id").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decisionNote: text("decision_note"),
+  createdAt: now(),
+}, (t) => [
+  index("team_requests_pending_idx").on(t.createdAt).where(sql`status = 'PENDING'`),
+  index("team_requests_employee_idx").on(t.employeeId, t.createdAt),
+]);
+
 /* ──────────────────── المستشار (094) ──────────────────── */
 
 /** محادثةٌ مع المستشار — تُحفَظ ليتذكّر ما قيل. */

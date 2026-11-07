@@ -10,7 +10,8 @@ describe("TPH Team", () => {
   });
   it("صفحةٌ غير معروفة تعود إلى الحضور", () => {
     expect(asTeamTab("invoices")).toBe("invoices");
-    expect(asTeamTab("message")).toBe("message");
+    expect(asTeamTab("message")).toBe("requests");
+    expect(asTeamTab("board")).toBe("board");
     expect(asTeamTab("payroll")).toBe("attend");
     expect(asTeamTab(undefined)).toBe("attend");
   });

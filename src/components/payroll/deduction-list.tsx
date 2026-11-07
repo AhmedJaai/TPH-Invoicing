@@ -105,7 +105,7 @@ function Line({ item: i, canEdit, salaryKnown }: { item: DeductionRow; canEdit: 
             <input id={`m-${i.id}`} className={`${fieldClass("sm", false)} nums w-24 text-end`} dir="ltr" inputMode="numeric" autoFocus
               value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/\D/g, "").slice(0, 3))} />
             <button type="submit" className={buttonClass("primary", "sm")} disabled={busy} aria-busy={busy}><Check className="h-3.5 w-3.5" aria-hidden />احفظ</button>
-            <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setEditing(false); setMinutes(String(i.minutes ?? "")); setError(null); }}><X className="h-3.5 w-3.5" aria-hidden />تراجع</button>
+            <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setEditing(false); setMinutes(String(i.minutes ?? "")); setError(null); }}><X className="h-3.5 w-3.5" aria-hidden />ألغِ</button>
             {error && <span role="alert" className="basis-full text-[11px] font-bold text-danger">{error}</span>}
           </form>
         ) : (

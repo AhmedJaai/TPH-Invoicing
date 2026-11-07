@@ -5,16 +5,19 @@
 
 export const TEAM_APP_NAME = "TPH Team";
 
-export type TeamTab = "attend" | "invoices" | "message";
+export type TeamTab = "attend" | "board" | "invoices" | "requests";
 
 export const TEAM_TABS: readonly { id: TeamTab; label: string }[] = [
   { id: "attend", label: "الحضور" },
+  { id: "board", label: "المرجع" },
   { id: "invoices", label: "الفواتير" },
-  { id: "message", label: "رسالة للإدارة" },
+  { id: "requests", label: "طلباتي" },
 ];
 
+/** و«message» اسمُها القديم — رابطٌ محفوظ يفتح «طلباتي». */
 export function asTeamTab(v: unknown): TeamTab {
-  return v === "invoices" || v === "message" ? v : "attend";
+  if (v === "message") return "requests";
+  return v === "invoices" || v === "board" || v === "requests" ? v : "attend";
 }
 
 /** مسارُ التطبيق لرمز — هو `start_url` و`scope` في بيان تثبيته. */
@@ -26,7 +29,7 @@ export function teamAppPath(token: string): string {
 export function teamInvite(name: string, url: string): string {
   return [
     `أهلاً ${name}، هذا رابط تطبيق ${TEAM_APP_NAME} الخاص بك في ذا بوبليك هاوس.`,
-    "منه تسجّل حضورك وانصرافك، وتصوّر الفواتير حين تستلمها، وترسل اقتراحاتك أو شكواك للإدارة.",
+    "منه تسجّل حضورك وانصرافك، وترجع للوصفات والطحنات، وتصوّر الفواتير، وتطلب إجازة أو تبديلاً، وترسل اقتراحاتك للإدارة.",
     "افتحه من سفاري، ثم اضغط زر المشاركة واختر «إضافة إلى الشاشة الرئيسية». ولا يحتاج تسجيل دخول.",
     "واسمح له بقراءة الموقع عند تسجيل الحضور.",
     url,

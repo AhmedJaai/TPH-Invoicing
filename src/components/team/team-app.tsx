@@ -9,11 +9,13 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
-import { Clock, MessageSquareText, ScanLine, Share, SquarePlus, X } from "lucide-react";
+import { BookOpen, Clock, Inbox, Megaphone, ScanLine, Share, SquarePlus, X } from "lucide-react";
 import { BrandMark } from "@/components/icons";
 import { TEAM_APP_NAME, TEAM_TABS, type TeamTab } from "@/lib/team-app";
 import { AttendPanel, type AttendPanelProps } from "./attend-panel";
-import { MessagePanel, type MyMessageView } from "./message-panel";
+import type { MyMessageView } from "./message-panel";
+import { BoardPanel, type BoardCard } from "./board-panel";
+import { RequestsPanel, type MyRequestView, type StockOption } from "./requests-panel";
 import type { SentItem } from "@/components/scan/scanner";
 
 const Scanner = dynamic(() => import("@/components/scan/scanner").then((m) => m.Scanner), {
@@ -21,7 +23,7 @@ const Scanner = dynamic(() => import("@/components/scan/scanner").then((m) => m.
   loading: () => <p className="py-10 text-center text-sm text-muted" role="status">يُفتح الماسح…</p>,
 });
 
-const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, invoices: ScanLine, message: MessageSquareText };
+const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, board: BookOpen, invoices: ScanLine, requests: Inbox };
 
 export interface TeamAppProps {
   token: string;
@@ -30,6 +32,12 @@ export interface TeamAppProps {
   attend: Omit<AttendPanelProps, "token">;
   captures: SentItem[];
   messages: MyMessageView[];
+  board: BoardCard[];
+  pendingBoardIds: string[];
+  todayWeekday: number;
+  requests: MyRequestView[];
+  mates: { id: string; name: string }[];
+  stock: StockOption[];
 }
 
 const SEEN_KEY = "tph-team.seen-replies";
@@ -44,18 +52,19 @@ function writeSeen(v: string) {
   try { window.localStorage.setItem(SEEN_KEY, v); } catch { /* تخزينٌ ممنوع: تبقى النقطة */ }
 }
 
-export function TeamApp({ token, name, initialTab, attend, captures, messages }: TeamAppProps) {
+export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock }: TeamAppProps) {
+  const announcements = board.filter((c) => c.kind === "ANNOUNCEMENT");
   const [tab, setTab] = useState<TeamTab>(initialTab);
   const latestReply = messages.reduce<string>((m, x) => (x.repliedAt && x.repliedAt > m ? x.repliedAt : m), "");
   /* في الخادم لا تخزين: لا نقطة حتى يُقرأ الجوال */
   const stored = useSyncExternalStore(noSubscribe, readSeen, () => null);
   const [seenNow, setSeen] = useState<string | null>(null);
   const seen = seenNow ?? stored;
-  const newReply = seen !== null && latestReply !== "" && latestReply > seen && tab !== "message";
+  const newReply = seen !== null && latestReply !== "" && latestReply > seen && tab !== "requests";
 
   function open(next: TeamTab) {
     setTab(next);
-    if (next === "message" && latestReply) { writeSeen(latestReply); setSeen(latestReply); }
+    if (next === "requests" && latestReply) { writeSeen(latestReply); setSeen(latestReply); }
     try {
       const url = new URL(window.location.href);
       if (next === "attend") url.searchParams.delete("tab"); else url.searchParams.set("tab", next);
@@ -75,13 +84,25 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages }:
       </header>
 
       <main className="flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4">
-        {tab === "attend" && <><InstallHint /><AttendPanel token={token} {...attend} /></>}
+        {tab === "attend" && (
+          <>
+            <InstallHint />
+            {announcements.map((a) => (
+              <aside key={a.id} className="mb-4 flex items-start gap-3 rounded-2xl border border-accent-line bg-raised p-3.5">
+                <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
+                <div className="min-w-0"><p className="text-sm font-bold">{a.title}</p>{a.body && <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-soft">{a.body}</p>}</div>
+              </aside>
+            ))}
+            <AttendPanel token={token} {...attend} />
+          </>
+        )}
+        {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}
         {tab === "invoices" && <Scanner token={token} label={name} recent={captures} embedded />}
-        {tab === "message" && <MessagePanel token={token} messages={messages} />}
+        {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} />}
       </main>
 
       <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className="mx-auto grid max-w-lg grid-cols-3">
+        <ul className="mx-auto grid max-w-lg grid-cols-4">
           {TEAM_TABS.map((t) => {
             const Icon = ICON[t.id];
             const active = tab === t.id;
@@ -93,7 +114,7 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages }:
                     <Icon className="h-5 w-5" aria-hidden />
                   </span>
                   {t.label}
-                  {t.id === "message" && newReply && (
+                  {t.id === "requests" && newReply && (
                     <span className="absolute top-2 h-2.5 w-2.5 translate-x-4 rounded-full bg-danger ring-2 ring-raised" aria-label="رد جديد من الإدارة" />
                   )}
                 </button>

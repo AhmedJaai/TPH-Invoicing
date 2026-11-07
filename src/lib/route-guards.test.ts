@@ -96,6 +96,7 @@ const UNGUARDED: Record<string, string> = {
   "src/app/api/attend/route.ts": "تسجيلُ حضور الموظّف وانصرافه — برمز رابطه لا بجلسة",
   /* «TPH Team»: الرمزُ نفسُه إذنُه، والعدُّ لكلّ موظّف، ولا يملك إلّا إضافةَ رسالةٍ للإدارة */
   "src/app/api/team/message/route.ts": "رسالةُ الموظّف للإدارة من TPH Team — برمز رابطه لا بجلسة",
+  "src/app/api/team/request/route.ts": "طلبُ الموظّف (إجازة · تبديل · تالف · تعديل مرجع) من TPH Team — برمز رابطه، ولا يُنفَّذ إلّا بإقرار",
 };
 
 /**

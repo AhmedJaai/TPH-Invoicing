@@ -43,7 +43,7 @@ export function TeamReplyForm({ id, current }: { id: string; current: string | n
       <textarea id={`reply-${id}`} className={`${fieldClass("md", false)} min-h-20 py-2`} value={text} onChange={(e) => setText(e.target.value)} maxLength={MAX + 50} autoFocus />
       <div className="flex flex-wrap items-center gap-2">
         <ReadySubmit ready={length > 0 && length <= MAX} busy={busy} size="sm" missing={length > MAX ? `الرد أطول من ${MAX} حرف.` : "اكتب الرد أولاً."}>{busy ? "يُرسل…" : "أرسل الرد"}</ReadySubmit>
-        <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setOpen(false); setText(current ?? ""); setError(null); }}>تراجع</button>
+        <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setOpen(false); setText(current ?? ""); setError(null); }}>ألغِ</button>
         <span className={`ms-auto text-[11px] ${length > MAX ? "font-bold text-danger" : "text-muted"}`}><span className="nums">{length}</span> / <span className="nums">{MAX}</span></span>
       </div>
       {error && <p role="alert" className="text-[11px] font-bold text-danger">{error}</p>}

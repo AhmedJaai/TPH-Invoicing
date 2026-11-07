@@ -34,6 +34,7 @@ import {
 import { pgErrorCode } from "@/lib/pg-error";
 import { assertMonthsOpen } from "./month-guard";
 import { unreadTeamMessages } from "./team.service";
+import { pendingRequestCount } from "./team-requests-count";
 import type { Conn, Tx } from "./types";
 
 export class PayrollRefused extends Error {
@@ -1168,16 +1169,19 @@ export interface PayrollAttentionFacts {
   owed: { month: string; remainingMinor: number; people: number } | null;
   /** رسائلُ من الفريق (TPH Team) لم تُقرأ، ومنها الشكاوى. */
   unreadMessages: { count: number; complaints: number };
+  /** طلباتُ الفريق تنتظر قرارك (إجازة · تبديل · تالف · تعديل مرجع). */
+  pendingRequests: number;
 }
 
 export async function loadPayrollAttentionFacts(today: string, conn: Conn = db): Promise<PayrollAttentionFacts> {
   try {
     const month = today.slice(0, 7);
-    const [open, unreviewed, list, unreadMessages] = await Promise.all([
+    const [open, unreviewed, list, unreadMessages, pendingRequests] = await Promise.all([
       loadOpenTransfers(addDays(today, -60), conn, addDays(today, -60)),
       conn.execute<{ n: number }>(sql`select count(*)::int as n from attendance_checkins where verdict in ('FAR', 'NO_LOCATION') and review is null`),
       loadEmployees(conn),
       unreadTeamMessages(conn),
+      pendingRequestCount(conn),
     ]);
     const salary = open.filter((o) => !o.viaOwner);
     /* من يوم الصرف (٢٧) يُسأل عن رواتب الشهر الجاري، وقبله عن الماضي */
@@ -1195,12 +1199,85 @@ export async function loadPayrollAttentionFacts(today: string, conn: Conn = db):
       missingRates: list.filter((e) => activeIn(e, month) && rateFor(e.rates, month) === null).map((e) => e.name),
       owed,
       unreadMessages,
+      pendingRequests,
     };
   } catch (e) {
     /* جدولٌ لم تُطبَّق هجرتُه بعد لا يُسقط «يحتاج قرارك» */
     if (pgErrorCode(e) === "42P01") {
-      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [], owed: null, unreadMessages: { count: 0, complaints: 0 } };
+      return { unlinkedSalary: { count: 0, amountMinor: 0 }, unreviewedCheckins: 0, missingRates: [], owed: null, unreadMessages: { count: 0, complaints: 0 }, pendingRequests: 0 };
     }
     throw e;
   }
+}
+
+/**
+ * حضورُ الأسبوع الماضي للفريق كلّه — سطرُ إشعار صباح الأحد: كم تأخيراً (فوق السماح) وانصرافاً
+ * مبكّراً وغياباً، بلا أسماءٍ ولا مبالغ. `null` لا موظّفين بدوامٍ مكتوب (لا يُقال «بلا تأخير» وهو لا يعرف).
+ */
+export async function weekAttendanceSummary(today = todayInRiyadh(), conn: Conn = db): Promise<{ late: number; early: number; absent: number } | null> {
+  try {
+    const r = await conn.execute<{ late: number; early: number; absent: number; known: number }>(sql`
+      select
+        count(*) filter (where a.kind = 'LATE' and a.minutes > e.late_grace_minutes)::int as late,
+        count(*) filter (where a.kind = 'EARLY')::int as early,
+        count(*) filter (where a.kind = 'ABSENT')::int as absent,
+        (select count(*)::int from employees x where x.shift_start is not null and (x.left_on is null or x.left_on >= ${today})) as known
+      from payroll_attendance a join employees e on e.id = a.employee_id
+      where a.voided_at is null and a.day >= ${addDays(today, -7)} and a.day < ${today}`);
+    const row = r.rows[0];
+    if (!row || Number(row.known) === 0) return null;
+    return { late: Number(row.late), early: Number(row.early), absent: Number(row.absent) };
+  } catch (e) {
+    if (pgErrorCode(e) === "42P01") return null;
+    throw e;
+  }
+}
+
+/* ─────────────────────────── قسيمةُ الموظّف في TPH Team ─────────────────────────── */
+
+const SLIP_KEY = (month: string) => `payroll.published.${month}`;
+
+/** يُظهر قسائمَ الشهر للموظّفين في تطبيقهم — أو يخفيها. لا يرى أحدٌ قسيمته قبل أن تنشرها. */
+export async function setSlipsPublished(month: string, published: boolean, actorId: string): Promise<void> {
+  await db.transaction(async (t) => {
+    if (published) {
+      await t.insert(appSettings).values({ key: SLIP_KEY(month), value: new Date().toISOString(), updatedById: actorId })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: new Date().toISOString(), updatedById: actorId, updatedAt: new Date() } });
+    } else {
+      await t.delete(appSettings).where(eq(appSettings.key, SLIP_KEY(month)));
+    }
+    await recordAudit({ actorId, action: "PAYROLL_SLIP_PUBLISHED", entityType: "setting", entityId: SLIP_KEY(month), before: null, after: { month, published } }, t);
+  });
+}
+
+/** الأشهرُ المنشورةُ قسائمُها، الأحدثُ أوّلاً. */
+export async function publishedSlipMonths(conn: Conn = db): Promise<string[]> {
+  const rows = await conn.select({ key: appSettings.key }).from(appSettings).where(sql`${appSettings}.key like 'payroll.published.%'`);
+  return rows.map((r) => r.key.slice("payroll.published.".length)).filter((m) => /^\d{4}-\d{2}$/.test(m)).sort().reverse();
+}
+
+export interface MySlip {
+  month: string;
+  baseMinor: number | null;
+  additionsMinor: number;
+  deductionsMinor: number | null;
+  advancesMinor: number;
+  dueMinor: number | null;
+  paidMinor: number;
+  remainingMinor: number | null;
+}
+
+/** قسيمةُ آخر شهرٍ منشور للموظّف — `null` لا منشور، أو لم يعمل فيه. */
+export async function mySlip(employeeId: string): Promise<MySlip | null> {
+  const [month] = await publishedSlipMonths();
+  if (!month) return null;
+  const row = (await loadPayrollMonth(month)).rows.find((r) => r.employee.id === employeeId);
+  if (!row) return null;
+  const s = row.slip;
+  return { month, baseMinor: s.baseMinor, additionsMinor: s.additionsMinor, deductionsMinor: s.deductionsMinor, advancesMinor: s.advancesMinor, dueMinor: s.dueMinor, paidMinor: s.paidMinor, remainingMinor: s.remainingMinor };
+}
+
+/** دوامُ الأيّام السبعة القادمة — لصفحة الموظّف في تطبيقه. */
+export function weekAhead(employee: CheckinEmployee, today = todayInRiyadh()): { day: string; shift: ReturnType<typeof shiftOn> }[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(today, i)).map((day) => ({ day, shift: shiftOn(day, employee, employee.shiftRules) }));
 }

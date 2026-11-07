@@ -251,6 +251,8 @@ export const AREAS: readonly NavArea[] = [
       { href: "/payroll/employees", label: "الموظفون" },
       /* ما يرسله الفريقُ من «TPH Team»: اقتراحٌ أو شكوى (098) */
       { href: "/payroll/messages", label: "رسائل الفريق" },
+      /* المرجعُ الذي يقرؤه الفريق، وطلباتُهم (100) */
+      { href: "/payroll/team", label: "المرجع والطلبات" },
     ],
   },
 ];

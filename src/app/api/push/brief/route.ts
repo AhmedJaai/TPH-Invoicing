@@ -11,7 +11,8 @@ import { can } from "@/lib/permissions";
 import { workCount } from "@/lib/work";
 import { pushBriefText } from "@/lib/push/web-push";
 import { previousMonth } from "@/lib/filing";
-import { currentMonthRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
+import { weekAttendanceSummary } from "@/services/payroll.service";
 import { loadStartState } from "@/services/start.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
 import { loadDueTasks } from "@/services/task.service";
@@ -32,12 +33,16 @@ export async function GET() {
 async function handle() {
   const user = await guard("push-brief", "amounts:view");
   const canPay = can(user.role, "payment:approve");
-  const [pending, start, run, tasksDue] = await Promise.all([
+  const today = todayInRiyadh();
+  /* الأحدُ أوّلُ الأسبوع: ملخّصُ حضور الأسبوع الماضي لمن يرى الرواتب */
+  const sunday = new Date(`${today}T00:00:00Z`).getUTCDay() === 0;
+  const [pending, start, run, tasksDue, attendanceWeek] = await Promise.all([
     workCount(user.role),
     loadStartState(),
     canPay ? loadPaymentRun(previousMonth(currentMonthRiyadh())) : Promise.resolve(null),
     can(user.role, "task:view") ? loadDueTasks().then((t) => t.length) : Promise.resolve(0),
+    sunday && can(user.role, "payroll:view") ? weekAttendanceSummary(today) : Promise.resolve(null),
   ]);
-  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0, tasksDue });
+  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0, tasksDue, attendanceWeek });
   return NextResponse.json({ ...text, url: "/" }, { headers: { "cache-control": "no-store" } });
 }

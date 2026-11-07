@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ١٠٠
+## الجداول — ١٠٢
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -20,7 +20,7 @@
 `finance_declarations` `finance_snapshots` `finance_readings`
 `capture_links` `captures`
 `employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
-`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages` · `employee_shifts`
+`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages` · `employee_shifts` · `team_board` `team_requests`
 
 التعريف في `src/db/schema.ts`.
 
@@ -143,6 +143,7 @@
 | `093_foodics_kitchen_times.sql` | `foodics_orders.kitchen_received_at` · `kitchen_done_at` (وقتا شاشة التحضير) · `wasted_lines` (أسطرٌ قال الكاشير إنّ مكوّناتها هُدرت) — مرآةٌ لا مال، والفارغ «لم يُقرأ» |
 | `094_advisor.sql` | `advisor_threads` · `advisor_messages` · `advisor_plan_items` — محادثاتُ المستشار وخطّتُه؛ نصٌّ لا مال، والأرقامُ تُحسَب من الدفاتر لحظةَ السؤال |
 | `095_advisor_jobs.sql` | `advisor_messages.status` (`PENDING`·`DONE`·`FAILED`) · `steps` · `error` — الجوابُ يُكمَل في الخلفية ولو أُغلقت الصفحة |
+| `100_team_board.sql` | «TPH Team»: `team_board` (مرجعُ النظافة والطحنات والوصفات والبن والإعلانات — لا مهامّ) و`team_requests` (اقتراحُ تعديل · إجازة · تبديل · تالف، لا يُنفَّذ إلّا بإقرار) — إضافةٌ خالصة |
 | `099_employee_shifts.sql` | `employee_shifts` — الدوامُ المخصَّص: وقتٌ لكلّ يومٍ من الأسبوع، أو ليومٍ بعينه أو راحتُه؛ اليومُ بعينه يغلب يومَ الأسبوع ويغلب الأصل — إضافةٌ خالصة |
 | `098_team_app.sql` | «TPH Team»: `capture_links.employee_id` (صورُ فواتير الموظّف تُنسب إليه برابطٍ واحدٍ قائم، بلا رمزٍ خاصّ — يُفتح برمز حضوره، فصار `token_hash` يُترك فارغاً لهذه وحدها)، و`team_messages` (اقتراحٌ أو شكوى؛ المرسَلةُ بلا اسم بلا `employee_id` أصلاً، وتُغلَق ولا تُحذف) — إضافةٌ خالصة |
 | `097_tasks.sql` | `tasks` — قائمةُ المهامّ والتذكيرات يكتبها الفريق: موعدٌ وتذكيرٌ (يومٌ لا ساعة) وتكرارٌ؛ تُغلَق بسببها (`outcome`) ولا تُحذف، والمكرَّرةُ تلد تاليتَها (`successor_id`) — لا مال، إضافةٌ خالصة |

@@ -94,3 +94,11 @@ describe("pushBriefText — يظهر على شاشة القفل، فلا مبا�
     expect(pushBriefText({ knowsNothing: false, pending: 12, runReady: true }).body).not.toMatch(/ريال|SAR|\d+\.\d\d/);
   });
 });
+
+describe("ملخّصُ حضور الأسبوع في إشعار الأحد", () => {
+  it("يعدّ بلا أسماءٍ ولا مبالغ", async () => {
+    const { attendanceLine } = await import("./web-push");
+    expect(attendanceLine({ late: 3, early: 0, absent: 1 })).toBe("وحضور الأسبوع الماضي: تأخير 3 مرّات، وغياب يوم.");
+    expect(attendanceLine({ late: 0, early: 0, absent: 0 })).toBe("وحضور الأسبوع الماضي بلا تأخير ولا غياب.");
+  });
+});
