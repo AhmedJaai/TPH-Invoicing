@@ -2706,6 +2706,8 @@ export const teamRequests = pgTable("team_requests", {
   fromDay: text("from_day"),
   toDay: text("to_day"),
   withEmployeeId: text("with_employee_id").references((): AnyPgColumn => employees.id, { onDelete: "set null" }),
+  /** تبديلُ الراحة دائماً: يتبادلان يومَي الراحة الأسبوعيّين (101). */
+  permanent: boolean("permanent").notNull().default(false),
   productId: text("product_id").references(() => products.id),
   quantityMilli: bigint("quantity_milli", { mode: "number" }),
   unit: text("unit"),

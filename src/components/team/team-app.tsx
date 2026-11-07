@@ -36,7 +36,8 @@ export interface TeamAppProps {
   pendingBoardIds: string[];
   todayWeekday: number;
   requests: MyRequestView[];
-  mates: { id: string; name: string }[];
+  mates: { id: string; name: string; daysOff: string }[];
+  myDaysOff: string;
   stock: StockOption[];
 }
 
@@ -52,7 +53,7 @@ function writeSeen(v: string) {
   try { window.localStorage.setItem(SEEN_KEY, v); } catch { /* تخزينٌ ممنوع: تبقى النقطة */ }
 }
 
-export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock }: TeamAppProps) {
+export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff }: TeamAppProps) {
   const announcements = board.filter((c) => c.kind === "ANNOUNCEMENT");
   const [tab, setTab] = useState<TeamTab>(initialTab);
   const latestReply = messages.reduce<string>((m, x) => (x.repliedAt && x.repliedAt > m ? x.repliedAt : m), "");
@@ -98,7 +99,7 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
         )}
         {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}
         {tab === "invoices" && <Scanner token={token} label={name} recent={captures} embedded />}
-        {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} />}
+        {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} myDaysOff={myDaysOff} />}
       </main>
 
       <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

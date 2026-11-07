@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock3, MessageSquareText, Repeat2, Trash2, XCircle } from "lucide-react";
 import { postJson } from "@/lib/http-client";
+import { isoDay } from "@/lib/riyadh-time";
 import { ReadySubmit } from "@/components/ui-client";
 import { MessagePanel, type MyMessageView } from "./message-panel";
 import type { TeamRequestKind, TeamRequestStatus } from "@/db/schema";
@@ -20,6 +21,7 @@ export interface MyRequestView {
   fromDay: string | null;
   toDay: string | null;
   withEmployeeName: string | null;
+  permanent: boolean;
   productName: string | null;
   quantity: string | null;
   decisionNote: string | null;
@@ -40,9 +42,9 @@ const dayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateStrin
 const field = "min-h-12 w-full rounded-xl border border-line-input bg-surface px-3 text-base focus:border-accent focus:outline-none";
 const lbl = "block text-xs font-bold text-ink-soft";
 
-export function RequestsPanel({ token, today, messages, requests, mates, stock }: {
+export function RequestsPanel({ token, today, messages, requests, mates, stock, myDaysOff }: {
   token: string; today: string; messages: MyMessageView[]; requests: MyRequestView[];
-  mates: readonly { id: string; name: string }[]; stock: readonly StockOption[];
+  mates: readonly { id: string; name: string; daysOff: string }[]; stock: readonly StockOption[]; myDaysOff: string;
 }) {
   const [mode, setMode] = useState<Mode>("message");
   return (
@@ -56,7 +58,7 @@ export function RequestsPanel({ token, today, messages, requests, mates, stock }
         ))}
       </div>
       {mode === "message" && <MessagePanel token={token} messages={messages} />}
-      {mode === "swap" && <SwapForm token={token} today={today} mates={mates} />}
+      {mode === "swap" && <SwapForm token={token} today={today} mates={mates} myDaysOff={myDaysOff} />}
       {mode === "waste" && <WasteForm token={token} stock={stock} />}
       {mode !== "message" && <MyRequests token={token} requests={requests} />}
     </div>
@@ -87,31 +89,78 @@ function Feedback({ error, sent }: { error: string | null; sent: boolean }) {
   return null;
 }
 
-function SwapForm({ token, today, mates }: { token: string; today: string; mates: readonly { id: string; name: string }[] }) {
+/** أقربُ تاريخٍ قادمٍ ليومٍ من الأسبوع (اليومُ نفسُه إن وافق). */
+function nextOf(today: string, weekday: number): string {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + ((weekday - d.getUTCDay() + 7) % 7));
+  return isoDay(d);
+}
+const WEEK = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"] as const;
+
+function SwapForm({ token, today, mates, myDaysOff }: { token: string; today: string; mates: readonly { id: string; name: string; daysOff: string }[]; myDaysOff: string }) {
+  const [permanent, setPermanent] = useState(false);
   const [mine, setMine] = useState("");
   const [mate, setMate] = useState("");
   const [theirs, setTheirs] = useState("");
+  const [myDay, setMyDay] = useState<number | null>(myDaysOff ? Number(myDaysOff[0]) : null);
+  const [theirDay, setTheirDay] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const { busy, error, sent, create } = useCreate(token);
-  const ready = Boolean(mine && mate && theirs && mine !== theirs);
-  const mateName = mates.find((m) => m.id === mate)?.name ?? "زميلك";
+  const chosen = mates.find((m) => m.id === mate);
+  const mateName = chosen?.name ?? "زميلك";
+  const ready = permanent ? Boolean(mate && myDay !== null && theirDay !== null && myDay !== theirDay) : Boolean(mine && mate && theirs && mine !== theirs);
+  const chips = (days: string, value: number | null, set: (d: number) => void) => (
+    days ? (
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {days.split("").map(Number).map((d) => (
+          <button key={d} type="button" aria-pressed={value === d} onClick={() => set(d)}
+            className={`min-h-11 rounded-lg border px-3 text-xs font-bold ${value === d ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:bg-hover"}`}>{WEEK[d]}</button>
+        ))}
+      </div>
+    ) : <p className="mt-1.5 text-xs text-muted">لا يوم راحة مكتوب.</p>
+  );
   return (
-    <form className="space-y-3 rounded-2xl border border-line bg-raised p-4" onSubmit={async (e) => { e.preventDefault(); if (ready && await create({ kind: "SWAP", fromDay: mine, toDay: theirs, withEmployeeId: mate, note })) setNote(""); }}>
+    <form className="space-y-3 rounded-2xl border border-line bg-raised p-4" onSubmit={async (e) => {
+      e.preventDefault();
+      if (!ready) return;
+      const request = permanent
+        ? { kind: "SWAP", permanent: true, fromDay: nextOf(today, myDay!), toDay: nextOf(today, theirDay!), withEmployeeId: mate, note }
+        : { kind: "SWAP", permanent: false, fromDay: mine, toDay: theirs, withEmployeeId: mate, note };
+      if (await create(request)) setNote("");
+    }}>
       <h2 className="text-base font-bold">تبديل يوم الراحة</h2>
-      <p className="text-xs leading-relaxed text-ink-soft">تعمل أنت في يوم راحتك ويرتاح {mateName}، ويعمل هو في يوم راحته وترتاح أنت. اتفقا أولاً، ثم تعتمده الإدارة.</p>
+      <div role="radiogroup" aria-label="مدة التبديل" className="grid grid-cols-2 gap-1.5">
+        {([[false, "لمرة واحدة"], [true, "دائم"]] as const).map(([v, l]) => (
+          <button key={l} type="button" role="radio" aria-checked={permanent === v} onClick={() => setPermanent(v)}
+            className={`min-h-11 rounded-xl border text-sm font-bold ${permanent === v ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:bg-hover"}`}>{l}</button>
+        ))}
+      </div>
+      <p className="text-xs leading-relaxed text-ink-soft">
+        {permanent
+          ? `يصير يوم راحتك يوم راحة ${mateName} كل أسبوع، ويصير يوم راحته يوم راحتك — من يوم اعتماده.`
+          : `تعمل أنت في يوم راحتك ويرتاح ${mateName}، ويعمل هو في يوم راحته وترتاح أنت. مرة واحدة فقط.`}
+        {" "}اتفقا أولاً، ثم تعتمده الإدارة.
+      </p>
       <label className={lbl}>مع
-        <select className={`${field} mt-1.5`} value={mate} onChange={(e) => setMate(e.target.value)}>
+        <select className={`${field} mt-1.5`} value={mate} onChange={(e) => { setMate(e.target.value); setTheirDay(null); }}>
           <option value="">— اختر زميلك —</option>
           {mates.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </label>
-      <div className="grid grid-cols-2 gap-3">
-        <label className={lbl}>يوم راحتي<input type="date" dir="ltr" className={`${field} mt-1.5`} value={mine} min={today} onChange={(e) => setMine(e.target.value)} /></label>
-        <label className={lbl}>يوم راحة {mateName}<input type="date" dir="ltr" className={`${field} mt-1.5`} value={theirs} min={today} onChange={(e) => setTheirs(e.target.value)} /></label>
-      </div>
+      {permanent ? (
+        <>
+          <fieldset><legend className={lbl}>يوم راحتي</legend>{chips(myDaysOff, myDay, setMyDay)}</fieldset>
+          {chosen && <fieldset><legend className={lbl}>يوم راحة {mateName}</legend>{chips(chosen.daysOff, theirDay, setTheirDay)}</fieldset>}
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <label className={lbl}>يوم راحتي<input type="date" dir="ltr" className={`${field} mt-1.5`} value={mine} min={today} onChange={(e) => setMine(e.target.value)} /></label>
+          <label className={lbl}>يوم راحة {mateName}<input type="date" dir="ltr" className={`${field} mt-1.5`} value={theirs} min={today} onChange={(e) => setTheirs(e.target.value)} /></label>
+        </div>
+      )}
       <label className={lbl}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} /></label>
       <Feedback error={error} sent={sent} />
-      <ReadySubmit ready={ready} busy={busy} size="lg" className="w-full" missing={!mate ? "اختر زميلك." : mine && mine === theirs ? "اختر يومين مختلفين." : "اختر يوم راحتك ويوم راحته."}>{busy ? "يُرسل…" : "أرسل الطلب"}</ReadySubmit>
+      <ReadySubmit ready={ready} busy={busy} size="lg" className="w-full" missing={!mate ? "اختر زميلك." : "اختر يوم راحتك ويوم راحته (يومين مختلفين)."}>{busy ? "يُرسل…" : "أرسل الطلب"}</ReadySubmit>
     </form>
   );
 }
@@ -174,7 +223,9 @@ function MyRequests({ token, requests }: { token: string; requests: MyRequestVie
             </div>
             <p className="mt-1 text-ink-soft">
               {r.kind === "LEAVE" && r.fromDay && <>{dayLabel(r.fromDay)}{r.toDay && r.toDay !== r.fromDay && <> إلى {dayLabel(r.toDay)}</>}</>}
-              {r.kind === "SWAP" && r.fromDay && <>راحتك {dayLabel(r.fromDay)} براحة {r.withEmployeeName ?? "زميل"} {r.toDay ? dayLabel(r.toDay) : ""}</>}
+              {r.kind === "SWAP" && r.fromDay && (r.permanent
+                ? <>دائماً: راحتك {WEEK[new Date(`${r.fromDay}T00:00:00Z`).getUTCDay()]} براحة {r.withEmployeeName ?? "زميل"} {r.toDay ? WEEK[new Date(`${r.toDay}T00:00:00Z`).getUTCDay()] : ""}</>
+                : <>مرة: راحتك {dayLabel(r.fromDay)} براحة {r.withEmployeeName ?? "زميل"} {r.toDay ? dayLabel(r.toDay) : ""}</>)}
               {r.kind === "WASTE" && <>{r.productName} · <span className="nums">{r.quantity}</span></>}
               {r.kind === "BOARD_EDIT" && r.boardTitle}
             </p>

@@ -10,6 +10,7 @@ import { addDays, currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyad
 import { formatQuantity } from "@/lib/team-units";
 import { WASTE_REASON_LABEL } from "@/lib/inventory/waste-board";
 import { TEAM_APP_NAME } from "@/lib/team-app";
+import { WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { publishedSlipMonths } from "@/services/payroll.service";
 import { BOARD_KINDS, BOARD_LABEL, decidedRequests, loadBoard, pendingRequests, type RequestView } from "@/services/team-board.service";
 import type { TeamBoardKind } from "@/db/schema";
@@ -88,7 +89,10 @@ export default async function TeamAdminPage() {
 
 function summary(r: RequestView): string {
   if (r.kind === "LEAVE") return r.toDay && r.toDay !== r.fromDay ? `${formatDay(r.fromDay!)} إلى ${formatDay(r.toDay)}` : formatDay(r.fromDay!);
-  if (r.kind === "SWAP") return `راحة ${r.employeeName} ${formatDay(r.fromDay!)} براحة ${r.withEmployeeName ?? "زميل"} ${r.toDay ? formatDay(r.toDay) : ""}`;
+  if (r.kind === "SWAP") {
+    if (r.permanent) return `دائماً: راحة ${r.employeeName} ${WEEKDAY_LABEL[new Date(`${r.fromDay}T00:00:00Z`).getUTCDay()]} براحة ${r.withEmployeeName ?? "زميل"} ${r.toDay ? WEEKDAY_LABEL[new Date(`${r.toDay}T00:00:00Z`).getUTCDay()] : ""}`;
+    return `لمرة واحدة: راحة ${r.employeeName} ${formatDay(r.fromDay!)} براحة ${r.withEmployeeName ?? "زميل"} ${r.toDay ? formatDay(r.toDay) : ""}`;
+  }
   if (r.kind === "WASTE") return `${r.productName ?? "صنف"} ${r.quantityMilli !== null && r.unit ? formatQuantity(r.quantityMilli, r.unit) : ""}`;
   return r.boardTitle ?? "بطاقة حُذفت";
 }

@@ -15,7 +15,7 @@ import { addDays, daysBetween, todayInRiyadh } from "@/lib/riyadh-time";
 import { isStoredUnit } from "@/lib/unit-conversion";
 import type { WasteReason } from "@/lib/inventory/waste-board";
 import { recordWaste } from "./inventory-movement.service";
-import { loadEmployee, PayrollRefused, setAttendance, setDayShift } from "./payroll.service";
+import { loadEmployee, PayrollRefused, saveShift, setAttendance, setDayShift } from "./payroll.service";
 import { shiftOn } from "@/lib/payroll/attendance";
 import type { Conn } from "./types";
 
@@ -116,7 +116,7 @@ export type RequestInput =
   | { kind: "BOARD_EDIT"; boardId: string; proposedTitle: string | null; proposedBody: string; note: string | null }
   | { kind: "LEAVE"; fromDay: string; toDay: string; note: string | null }
   /** تبديلُ الراحة: يومُ راحتي (`fromDay`) بيوم راحة زميلي (`toDay`) — أعمل يومَ راحتي ويعمله هو مكاني… والعكس. */
-  | { kind: "SWAP"; fromDay: string; toDay: string; withEmployeeId: string; note: string | null }
+  | { kind: "SWAP"; fromDay: string; toDay: string; withEmployeeId: string; permanent: boolean; note: string | null }
   | { kind: "WASTE"; productId: string; quantityMilli: number; unit: string; wasteReason: WasteReason; note: string | null };
 
 /** يحفظ طلبَ الموظّف «ينتظر» — ويفحص ما يُفحص الآن، والباقي عند الإقرار. */
@@ -142,7 +142,7 @@ export async function createRequest(employeeId: string, input: RequestInput, tod
     if (!me || !mate || (mate.leftOn && mate.leftOn < today)) throw new TeamRequestRefused("الزميل غير موجود.");
     if (!shiftOn(input.fromDay, me, me.shiftRules).off) throw new TeamRequestRefused("اليوم الأول ليس يوم راحتك. اختر يوم راحتك.");
     if (!shiftOn(input.toDay, mate, mate.shiftRules).off) throw new TeamRequestRefused(`اليوم الثاني ليس يوم راحة ${mate.name}.`);
-    values = { ...base, fromDay: input.fromDay, toDay: input.toDay, withEmployeeId: mate.id };
+    values = { ...base, fromDay: input.fromDay, toDay: input.toDay, withEmployeeId: mate.id, permanent: input.permanent };
   } else {
     if (!isStoredUnit(input.unit)) throw new TeamRequestRefused("وحدة غير معروفة.");
     if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) throw new TeamRequestRefused("اكتب الكمية.");
@@ -176,6 +176,7 @@ export interface RequestView {
   toDay: string | null;
   withEmployeeId: string | null;
   withEmployeeName: string | null;
+  permanent: boolean;
   productName: string | null;
   quantityMilli: number | null;
   unit: string | null;
@@ -192,7 +193,7 @@ async function loadRequests(where: ReturnType<typeof sql> | ReturnType<typeof eq
       id: teamRequests.id, kind: teamRequests.kind, status: teamRequests.status, employeeId: teamRequests.employeeId,
       employeeName: employees.name, boardId: teamRequests.boardId, boardTitle: teamBoard.title, boardBody: teamBoard.body,
       proposedTitle: teamRequests.proposedTitle, proposedBody: teamRequests.proposedBody, fromDay: teamRequests.fromDay, toDay: teamRequests.toDay,
-      withEmployeeId: teamRequests.withEmployeeId, productName: products.nameAr, quantityMilli: teamRequests.quantityMilli, unit: teamRequests.unit,
+      withEmployeeId: teamRequests.withEmployeeId, permanent: teamRequests.permanent, productName: products.nameAr, quantityMilli: teamRequests.quantityMilli, unit: teamRequests.unit,
       wasteReason: teamRequests.wasteReason, note: teamRequests.note, decisionNote: teamRequests.decisionNote, createdAt: teamRequests.createdAt, decidedAt: teamRequests.decidedAt,
     }).from(teamRequests)
       .innerJoin(employees, eq(employees.id, teamRequests.employeeId))
@@ -238,6 +239,15 @@ export async function decideRequest(id: string, approve: boolean, note: string |
       const [a, b] = await Promise.all([loadEmployee(r.employeeId), r.withEmployeeId ? loadEmployee(r.withEmployeeId) : null]);
       if (!a || !b) throw new TeamRequestRefused("أحد الموظفَين لم يعد موجوداً — ارفض الطلب.");
       const why = `تبديل راحة بين ${a.name} و${b.name}`;
+      if (r.permanent) {
+        /* دائماً: يومُ راحة A الأسبوعيّ يصير يومَ B، والعكس — من الإقرار فصاعداً */
+        const x = String(new Date(`${r.fromDay}T00:00:00Z`).getUTCDay()), y = String(new Date(`${r.toDay}T00:00:00Z`).getUTCDay());
+        if (!a.daysOff.includes(x) || !b.daysOff.includes(y)) throw new TeamRequestRefused("تغيّرت أيام راحتهما منذ الطلب — ارفضه واطلب من جديد.");
+        const swapIn = (off: string, out: string, inn: string) => [...new Set(off.replace(out, "").split("").concat(inn))].filter(Boolean).sort().join("");
+        const keep = (e: typeof a) => ({ shiftStart: e.shiftStart, shiftMinutes: e.shiftMinutes, lateGraceMinutes: e.lateGraceMinutes });
+        await saveShift(a.id, { ...keep(a), daysOff: swapIn(a.daysOff, x, y) }, actorId);
+        await saveShift(b.id, { ...keep(b), daysOff: swapIn(b.daysOff, y, x) }, actorId);
+      } else {
       /* دوامُه المعتاد في اليوم لو لم يكن راحة — يومُ الأسبوع أو الأصل */
       const usual = (e: typeof a, day: string) => {
         const s = shiftOn(day, { ...e, daysOff: "" }, e.shiftRules.filter((x) => x.day !== day));
@@ -250,6 +260,7 @@ export async function decideRequest(id: string, approve: boolean, note: string |
       await setDayShift(b.id, { day: r.fromDay!, off: true, shiftStart: null, shiftMinutes: null, note: why }, actorId);
       await setDayShift(b.id, { day: r.toDay!, off: false, ...bWorks, note: why }, actorId);
       await setDayShift(a.id, { day: r.toDay!, off: true, shiftStart: null, shiftMinutes: null, note: why }, actorId);
+      }
     } else if (r.kind === "WASTE") {
       const emp = await loadEmployee(r.employeeId);
       if (!isStoredUnit(r.unit)) throw new TeamRequestRefused("وحدة غير معروفة — ارفض الطلب.");

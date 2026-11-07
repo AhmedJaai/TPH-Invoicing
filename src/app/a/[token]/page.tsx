@@ -72,7 +72,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
     loadStockOptions(),
     mySlip(employee.id),
   ]);
-  const mates = everyone.filter((e) => e.id !== employee.id && activeIn(e, today.slice(0, 7)) && (!e.leftOn || e.leftOn >= today)).map((e) => ({ id: e.id, name: e.name }));
+  const mates = everyone.filter((e) => e.id !== employee.id && activeIn(e, today.slice(0, 7)) && (!e.leftOn || e.leftOn >= today)).map((e) => ({ id: e.id, name: e.name, daysOff: e.daysOff }));
   return (
     <TeamApp
       token={token}
@@ -95,9 +95,10 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
       requests={requests.map((r) => ({
         id: r.id, kind: r.kind, status: r.status, boardTitle: r.boardTitle, fromDay: r.fromDay, toDay: r.toDay, withEmployeeName: r.withEmployeeName,
         productName: r.productName, quantity: r.quantityMilli !== null && r.unit ? formatQuantity(r.quantityMilli, r.unit) : null,
-        decisionNote: r.decisionNote, createdAt: r.createdAt.toISOString(),
+        decisionNote: r.decisionNote, createdAt: r.createdAt.toISOString(), permanent: r.permanent,
       }))}
       mates={mates}
+      myDaysOff={employee.daysOff}
       stock={stock}
       captures={captures.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
       messages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString(), repliedAt: m.repliedAt?.toISOString() ?? null }))}
