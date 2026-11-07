@@ -115,7 +115,8 @@ export async function setBoardArchived(id: string, archived: boolean, actorId: s
 export type RequestInput =
   | { kind: "BOARD_EDIT"; boardId: string; proposedTitle: string | null; proposedBody: string; note: string | null }
   | { kind: "LEAVE"; fromDay: string; toDay: string; note: string | null }
-  | { kind: "SWAP"; fromDay: string; withEmployeeId: string; note: string | null }
+  /** تبديلُ الراحة: يومُ راحتي (`fromDay`) بيوم راحة زميلي (`toDay`) — أعمل يومَ راحتي ويعمله هو مكاني… والعكس. */
+  | { kind: "SWAP"; fromDay: string; toDay: string; withEmployeeId: string; note: string | null }
   | { kind: "WASTE"; productId: string; quantityMilli: number; unit: string; wasteReason: WasteReason; note: string | null };
 
 /** يحفظ طلبَ الموظّف «ينتظر» — ويفحص ما يُفحص الآن، والباقي عند الإقرار. */
@@ -135,10 +136,13 @@ export async function createRequest(employeeId: string, input: RequestInput, tod
     values = { ...base, fromDay: input.fromDay, toDay: input.toDay };
   } else if (input.kind === "SWAP") {
     if (input.withEmployeeId === employeeId) throw new TeamRequestRefused("اختر زميلاً غيرك.");
-    if (input.fromDay < today) throw new TeamRequestRefused("التبديل ليومٍ قادم، لا ليومٍ مضى.");
-    const mate = await loadEmployee(input.withEmployeeId);
-    if (!mate || (mate.leftOn && mate.leftOn < today)) throw new TeamRequestRefused("الزميل غير موجود.");
-    values = { ...base, fromDay: input.fromDay, withEmployeeId: mate.id };
+    if (input.fromDay < today || input.toDay < today) throw new TeamRequestRefused("التبديل لأيامٍ قادمة، لا لأيامٍ مضت.");
+    if (input.fromDay === input.toDay) throw new TeamRequestRefused("اختر يومين مختلفين: يوم راحتك ويوم راحة زميلك.");
+    const [me, mate] = await Promise.all([loadEmployee(employeeId), loadEmployee(input.withEmployeeId)]);
+    if (!me || !mate || (mate.leftOn && mate.leftOn < today)) throw new TeamRequestRefused("الزميل غير موجود.");
+    if (!shiftOn(input.fromDay, me, me.shiftRules).off) throw new TeamRequestRefused("اليوم الأول ليس يوم راحتك. اختر يوم راحتك.");
+    if (!shiftOn(input.toDay, mate, mate.shiftRules).off) throw new TeamRequestRefused(`اليوم الثاني ليس يوم راحة ${mate.name}.`);
+    values = { ...base, fromDay: input.fromDay, toDay: input.toDay, withEmployeeId: mate.id };
   } else {
     if (!isStoredUnit(input.unit)) throw new TeamRequestRefused("وحدة غير معروفة.");
     if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) throw new TeamRequestRefused("اكتب الكمية.");
@@ -233,12 +237,19 @@ export async function decideRequest(id: string, approve: boolean, note: string |
     } else if (r.kind === "SWAP") {
       const [a, b] = await Promise.all([loadEmployee(r.employeeId), r.withEmployeeId ? loadEmployee(r.withEmployeeId) : null]);
       if (!a || !b) throw new TeamRequestRefused("أحد الموظفَين لم يعد موجوداً — ارفض الطلب.");
-      const day = r.fromDay!;
-      const sa = shiftOn(day, a, a.shiftRules), sb = shiftOn(day, b, b.shiftRules);
-      const why = `تبديل بين ${a.name} و${b.name}`;
-      const asRule = (s: typeof sa) => (s.off || !s.start ? { off: true, shiftStart: null, shiftMinutes: null } : { off: false, shiftStart: s.start, shiftMinutes: s.minutes });
-      await setDayShift(a.id, { day, ...asRule(sb), note: why }, actorId);
-      await setDayShift(b.id, { day, ...asRule(sa), note: why }, actorId);
+      const why = `تبديل راحة بين ${a.name} و${b.name}`;
+      /* دوامُه المعتاد في اليوم لو لم يكن راحة — يومُ الأسبوع أو الأصل */
+      const usual = (e: typeof a, day: string) => {
+        const s = shiftOn(day, { ...e, daysOff: "" }, e.shiftRules.filter((x) => x.day !== day));
+        return s.off || !s.start ? null : { shiftStart: s.start, shiftMinutes: s.minutes };
+      };
+      const aWorks = usual(a, r.fromDay!), bWorks = usual(b, r.toDay ?? r.fromDay!);
+      if (!aWorks || !bWorks) throw new TeamRequestRefused("لم يُكتب وقت دوام أحدهما، فلا يُعرف دوامه في يوم التبديل. اكتبه ثم اعتمد.");
+      /* يومُ راحة A: يعمله A ويرتاح B · ويومُ راحة B: يعمله B ويرتاح A */
+      await setDayShift(a.id, { day: r.fromDay!, off: false, ...aWorks, note: why }, actorId);
+      await setDayShift(b.id, { day: r.fromDay!, off: true, shiftStart: null, shiftMinutes: null, note: why }, actorId);
+      await setDayShift(b.id, { day: r.toDay!, off: false, ...bWorks, note: why }, actorId);
+      await setDayShift(a.id, { day: r.toDay!, off: true, shiftStart: null, shiftMinutes: null, note: why }, actorId);
     } else if (r.kind === "WASTE") {
       const emp = await loadEmployee(r.employeeId);
       if (!isStoredUnit(r.unit)) throw new TeamRequestRefused("وحدة غير معروفة — ارفض الطلب.");

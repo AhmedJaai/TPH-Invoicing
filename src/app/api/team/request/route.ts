@@ -22,8 +22,7 @@ export const runtime = "nodejs";
 const Note = z.string().trim().max(1000).optional().transform((v) => v || null);
 const Request = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("BOARD_EDIT"), boardId: z.string().min(1).max(64), proposedTitle: z.string().max(120).optional(), proposedBody: z.string().max(4000), note: Note }).strict(),
-  z.object({ kind: z.literal("LEAVE"), fromDay: Day, toDay: Day, note: Note }).strict(),
-  z.object({ kind: z.literal("SWAP"), fromDay: Day, withEmployeeId: z.string().min(1).max(64), note: Note }).strict(),
+  z.object({ kind: z.literal("SWAP"), fromDay: Day, toDay: Day, withEmployeeId: z.string().min(1).max(64), note: Note }).strict(),
   z.object({ kind: z.literal("WASTE"), productId: z.string().min(1).max(64), quantity: z.string().trim().min(1).max(20), unit: z.string().max(10), wasteReason: z.enum(["EXPIRED", "SPILLED", "FAILED_PREP", "DAMAGED", "OTHER"]), note: Note }).strict(),
 ]);
 const Body = z.discriminatedUnion("action", [

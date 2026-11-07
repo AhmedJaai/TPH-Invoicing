@@ -88,7 +88,7 @@ export default async function TeamAdminPage() {
 
 function summary(r: RequestView): string {
   if (r.kind === "LEAVE") return r.toDay && r.toDay !== r.fromDay ? `${formatDay(r.fromDay!)} إلى ${formatDay(r.toDay)}` : formatDay(r.fromDay!);
-  if (r.kind === "SWAP") return `${formatDay(r.fromDay!)} مع ${r.withEmployeeName ?? "زميل"}`;
+  if (r.kind === "SWAP") return `راحة ${r.employeeName} ${formatDay(r.fromDay!)} براحة ${r.withEmployeeName ?? "زميل"} ${r.toDay ? formatDay(r.toDay) : ""}`;
   if (r.kind === "WASTE") return `${r.productName ?? "صنف"} ${r.quantityMilli !== null && r.unit ? formatQuantity(r.quantityMilli, r.unit) : ""}`;
   return r.boardTitle ?? "بطاقة حُذفت";
 }
@@ -99,7 +99,7 @@ function RequestCard({ r, canEdit }: { r: RequestView; canEdit: boolean }) {
       <div className="min-w-0 flex-1 basis-60">
         <p className="text-sm font-bold">{KIND[r.kind]} · {r.employeeName}</p>
         <p className="mt-0.5 text-xs text-ink-soft">{summary(r)}{r.kind === "WASTE" && r.wasteReason ? ` · ${WASTE_REASON_LABEL[r.wasteReason as keyof typeof WASTE_REASON_LABEL] ?? r.wasteReason}` : ""}</p>
-        {r.kind === "SWAP" && <p className="mt-1 text-[11px] text-muted">باعتماده يأخذ كلٌّ منهما دوام الآخر في هذا اليوم (أو راحته).</p>}
+        {r.kind === "SWAP" && <p className="mt-1 text-[11px] text-muted">باعتماده يعمل {r.employeeName} يومَ راحته ويرتاح {r.withEmployeeName ?? "زميله"}، ويعمل {r.withEmployeeName ?? "زميله"} يومَ راحته ويرتاح {r.employeeName}.</p>}
         {r.kind === "BOARD_EDIT" && (
           <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
             <div className="rounded-lg bg-sunken/60 p-2.5"><p className="text-[11px] font-bold text-muted">الآن</p><p className="mt-1 whitespace-pre-line text-xs leading-relaxed">{r.boardBody}</p></div>

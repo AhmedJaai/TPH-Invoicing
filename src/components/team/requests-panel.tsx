@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * «طلباتي» في TPH Team — رسالةٌ للإدارة، وطلبُ إجازة، وتبديلُ راحةٍ أو وردية مع زميل، وتبليغٌ عن تالف.
+ * «طلباتي» في TPH Team — رسالةٌ للإدارة، وتبديلُ يوم الراحة مع زميل، وتبليغٌ عن تالف.
  * كلُّها تصل صاحبَ المقهى فيقرّها أو يردّها، ويرى الموظّفُ قرارَه هنا. لا يُنفَّذ شيءٌ قبل إقراره.
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarOff, CheckCircle2, Clock3, MessageSquareText, Repeat2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, MessageSquareText, Repeat2, Trash2, XCircle } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { ReadySubmit } from "@/components/ui-client";
 import { MessagePanel, type MyMessageView } from "./message-panel";
@@ -28,10 +28,9 @@ export interface MyRequestView {
 
 export interface StockOption { id: string; name: string; unit: string; unitLabel: string }
 
-type Mode = "message" | "leave" | "swap" | "waste";
-const MODES: readonly { id: Mode; label: string; Icon: typeof CalendarOff }[] = [
+type Mode = "message" | "swap" | "waste";
+const MODES: readonly { id: Mode; label: string; Icon: typeof Repeat2 }[] = [
   { id: "message", label: "رسالة", Icon: MessageSquareText },
-  { id: "leave", label: "إجازة", Icon: CalendarOff },
   { id: "swap", label: "تبديل", Icon: Repeat2 },
   { id: "waste", label: "تالف", Icon: Trash2 },
 ];
@@ -48,7 +47,7 @@ export function RequestsPanel({ token, today, messages, requests, mates, stock }
   const [mode, setMode] = useState<Mode>("message");
   return (
     <div className="space-y-5">
-      <div role="tablist" aria-label="نوع الطلب" className="grid grid-cols-4 gap-1.5 rounded-2xl border border-line bg-raised p-1.5">
+      <div role="tablist" aria-label="نوع الطلب" className="grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-raised p-1.5">
         {MODES.map((m) => (
           <button key={m.id} type="button" role="tab" aria-selected={mode === m.id} onClick={() => setMode(m.id)}
             className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-xs font-bold transition-colors motion-reduce:transition-none ${mode === m.id ? "bg-accent text-accent-ink" : "text-ink-soft hover:bg-hover"}`}>
@@ -57,7 +56,6 @@ export function RequestsPanel({ token, today, messages, requests, mates, stock }
         ))}
       </div>
       {mode === "message" && <MessagePanel token={token} messages={messages} />}
-      {mode === "leave" && <LeaveForm token={token} today={today} />}
       {mode === "swap" && <SwapForm token={token} today={today} mates={mates} />}
       {mode === "waste" && <WasteForm token={token} stock={stock} />}
       {mode !== "message" && <MyRequests token={token} requests={requests} />}
@@ -89,48 +87,31 @@ function Feedback({ error, sent }: { error: string | null; sent: boolean }) {
   return null;
 }
 
-function LeaveForm({ token, today }: { token: string; today: string }) {
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
-  const [note, setNote] = useState("");
-  const { busy, error, sent, create } = useCreate(token);
-  const ready = Boolean(from && to && to >= from);
-  return (
-    <form className="space-y-3 rounded-2xl border border-line bg-raised p-4" onSubmit={async (e) => { e.preventDefault(); if (ready && await create({ kind: "LEAVE", fromDay: from, toDay: to, note })) setNote(""); }}>
-      <h2 className="text-base font-bold">طلب إجازة</h2>
-      <div className="grid grid-cols-2 gap-3">
-        <label className={lbl}>من<input type="date" dir="ltr" className={`${field} mt-1.5`} value={from} min={today} onChange={(e) => { setFrom(e.target.value); if (to < e.target.value) setTo(e.target.value); }} /></label>
-        <label className={lbl}>إلى<input type="date" dir="ltr" className={`${field} mt-1.5`} value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
-      </div>
-      <label className={lbl}>السبب <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} /></label>
-      <Feedback error={error} sent={sent} />
-      <ReadySubmit ready={ready} busy={busy} size="lg" className="w-full" missing="اختر يوم البداية والنهاية.">{busy ? "يُرسل…" : "أرسل الطلب"}</ReadySubmit>
-    </form>
-  );
-}
-
 function SwapForm({ token, today, mates }: { token: string; today: string; mates: readonly { id: string; name: string }[] }) {
-  const [day, setDay] = useState(today);
+  const [mine, setMine] = useState("");
   const [mate, setMate] = useState("");
+  const [theirs, setTheirs] = useState("");
   const [note, setNote] = useState("");
   const { busy, error, sent, create } = useCreate(token);
-  const ready = Boolean(day && mate);
+  const ready = Boolean(mine && mate && theirs && mine !== theirs);
+  const mateName = mates.find((m) => m.id === mate)?.name ?? "زميلك";
   return (
-    <form className="space-y-3 rounded-2xl border border-line bg-raised p-4" onSubmit={async (e) => { e.preventDefault(); if (ready && await create({ kind: "SWAP", fromDay: day, withEmployeeId: mate, note })) setNote(""); }}>
-      <h2 className="text-base font-bold">تبديل مع زميل</h2>
-      <p className="text-xs leading-relaxed text-ink-soft">يأخذ كلٌّ منكما دوام الآخر في هذا اليوم: إن كان يوم راحتك ويعمل فيه زميلك، تعمل أنت ويرتاح هو. اتفق معه أولاً، ثم تعتمده الإدارة.</p>
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
-        <label className={lbl}>اليوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={day} min={today} onChange={(e) => setDay(e.target.value)} /></label>
-        <label className={lbl}>مع
-          <select className={`${field} mt-1.5`} value={mate} onChange={(e) => setMate(e.target.value)}>
-            <option value="">— اختر زميلك —</option>
-            {mates.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-        </label>
+    <form className="space-y-3 rounded-2xl border border-line bg-raised p-4" onSubmit={async (e) => { e.preventDefault(); if (ready && await create({ kind: "SWAP", fromDay: mine, toDay: theirs, withEmployeeId: mate, note })) setNote(""); }}>
+      <h2 className="text-base font-bold">تبديل يوم الراحة</h2>
+      <p className="text-xs leading-relaxed text-ink-soft">تعمل أنت في يوم راحتك ويرتاح {mateName}، ويعمل هو في يوم راحته وترتاح أنت. اتفقا أولاً، ثم تعتمده الإدارة.</p>
+      <label className={lbl}>مع
+        <select className={`${field} mt-1.5`} value={mate} onChange={(e) => setMate(e.target.value)}>
+          <option value="">— اختر زميلك —</option>
+          {mates.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className={lbl}>يوم راحتي<input type="date" dir="ltr" className={`${field} mt-1.5`} value={mine} min={today} onChange={(e) => setMine(e.target.value)} /></label>
+        <label className={lbl}>يوم راحة {mateName}<input type="date" dir="ltr" className={`${field} mt-1.5`} value={theirs} min={today} onChange={(e) => setTheirs(e.target.value)} /></label>
       </div>
-      <label className={lbl}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="مثلاً: أعوّضه يوم الخميس" /></label>
+      <label className={lbl}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} /></label>
       <Feedback error={error} sent={sent} />
-      <ReadySubmit ready={ready} busy={busy} size="lg" className="w-full" missing="اختر اليوم والزميل.">{busy ? "يُرسل…" : "أرسل الطلب"}</ReadySubmit>
+      <ReadySubmit ready={ready} busy={busy} size="lg" className="w-full" missing={!mate ? "اختر زميلك." : mine && mine === theirs ? "اختر يومين مختلفين." : "اختر يوم راحتك ويوم راحته."}>{busy ? "يُرسل…" : "أرسل الطلب"}</ReadySubmit>
     </form>
   );
 }
@@ -193,7 +174,7 @@ function MyRequests({ token, requests }: { token: string; requests: MyRequestVie
             </div>
             <p className="mt-1 text-ink-soft">
               {r.kind === "LEAVE" && r.fromDay && <>{dayLabel(r.fromDay)}{r.toDay && r.toDay !== r.fromDay && <> إلى {dayLabel(r.toDay)}</>}</>}
-              {r.kind === "SWAP" && r.fromDay && <>{dayLabel(r.fromDay)} مع {r.withEmployeeName ?? "زميل"}</>}
+              {r.kind === "SWAP" && r.fromDay && <>راحتك {dayLabel(r.fromDay)} براحة {r.withEmployeeName ?? "زميل"} {r.toDay ? dayLabel(r.toDay) : ""}</>}
               {r.kind === "WASTE" && <>{r.productName} · <span className="nums">{r.quantity}</span></>}
               {r.kind === "BOARD_EDIT" && r.boardTitle}
             </p>
