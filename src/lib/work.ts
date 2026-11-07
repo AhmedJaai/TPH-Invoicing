@@ -41,6 +41,7 @@ import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { loadRepeatDeliveries } from "@/services/repeat-delivery.service";
 import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { loadPayrollAttentionFacts } from "@/services/payroll.service";
+import { loadTeamCountsWaiting } from "@/services/team-count.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
 import { loadSealDrift } from "@/services/month-seal.service";
 import { loadLowAiBalance } from "@/services/daily-checks.service";
@@ -51,13 +52,14 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, teamCounts] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
     /* فحوصُ الصباح تُقرأ ولا تُعاد: آخرُ ما وجده `/api/cron/daily` */
     loadSealDrift(), loadLowAiBalance(),
     loadDueTasks(),
+    loadTeamCountsWaiting(),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -75,6 +77,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     financeRentLumps: finance.rentLumps,
     financeLastMonthMissing: finance.lastMonthMissing,
     payroll,
+    teamCounts,
     stockLinksReady: finance.readyLinks,
     foodicsTillGaps: finance.tillGaps,
     foodicsStaleHours: finance.foodicsStaleHours,

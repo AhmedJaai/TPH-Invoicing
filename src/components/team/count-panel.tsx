@@ -9,8 +9,9 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CheckCircle2, ClipboardList, Lock, Search } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardList, Copy, Lock, MessageCircle, Search, Send } from "lucide-react";
 import { postJson } from "@/lib/http-client";
+import { PRODUCT, countNoun } from "@/lib/arabic";
 import type { TeamCountView } from "@/services/team-count.service";
 
 const dayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -21,7 +22,7 @@ export function CountPanel({ token, view }: { token: string; view: TeamCountView
     return (
       <Notice icon={CalendarClock} title={`الجرد يوم ${dayLabel(view.nextSaturday)}`}>
         يُفتح جرد الأسبوع هنا يوم السبت بعد التقفيلة، ويبقى مفتوحاً حتى نهاية الأحد.
-        {view.lastCounted !== null && <span className="mt-1 block">جرد الأسبوع الماضي: سُجّل فيه {view.lastCounted} صنفاً.</span>}
+        {view.lastCounted !== null && <span className="mt-1 block">جرد الأسبوع الماضي: سُجّل فيه {countNoun(view.lastCounted, PRODUCT)}.</span>}
       </Notice>
     );
   }
@@ -29,7 +30,7 @@ export function CountPanel({ token, view }: { token: string; view: TeamCountView
     return <Notice icon={Lock} title="أُقفل جرد هذا الأسبوع">أقفلته الإدارة بعد مراجعته، فلا يُعدَّل من هنا. إن وجدت خطأ فأرسل رسالة من «طلباتي».</Notice>;
   }
   if (view.state === "not-started") return <StartCount token={token} week={view.week} />;
-  return <CountSheet key={view.countId} token={token} countId={view.countId} week={view.week} lines={view.lines} />;
+  return <CountSheet key={view.countId} token={token} countId={view.countId} week={view.week} lines={view.lines} sent={view.sent} />;
 }
 
 function Notice({ icon: Icon, title, children }: { icon: typeof Lock; title: string; children: React.ReactNode }) {
@@ -94,7 +95,9 @@ function parseDrafts(raw: string | null): Record<string, Draft> {
   } catch { return {}; }
 }
 
-function CountSheet({ token, countId, week, lines }: { token: string; countId: string; week: { start: string; end: string }; lines: Line[] }) {
+type Sent = Extract<TeamCountView, { state: "open" }>["sent"];
+
+function CountSheet({ token, countId, week, lines, sent }: { token: string; countId: string; week: { start: string; end: string }; lines: Line[]; sent: Sent }) {
   const router = useRouter();
   /* المسوّدةُ من الجوال بعد التركيب — في الخادم لا تخزين */
   const stored = useSyncExternalStore(noSubscribe, () => readDrafts(countId), () => null);
@@ -153,8 +156,16 @@ function CountSheet({ token, countId, week, lines }: { token: string; countId: s
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-valuemin={0} aria-valuemax={lines.length} aria-valuenow={counted} aria-label="ما عُدّ">
           <div className="h-full rounded-full bg-accent transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${Math.round((counted / lines.length) * 100)}%` }} />
         </div>
-        <p className="mt-1.5 text-xs font-bold text-ink-soft">عُدّ {counted} من {lines.length} صنفاً</p>
+        <p className="mt-1.5 text-xs font-bold text-ink-soft">عُدّ {counted} من {countNoun(lines.length, PRODUCT)}</p>
       </section>
+
+      {/* الإرسالُ آخرُ الجرد ولازمٌ فيه — يُذكَّر به حتى يقع، وثانيةً إن عُدّ بعده */}
+      {counted > 0 && (!sent || sent.stale) && (
+        <p role="status" className="flex items-start gap-2 rounded-xl border border-warn/30 bg-warn-bg px-3 py-2.5 text-sm font-bold text-warn">
+          <Send className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          {sent ? "عدّلت بعد إرسال الجرد. أرسله للإدارة مرة أخرى من أسفل الصفحة." : "لم ترسل الجرد للإدارة بعد. حين تنتهي اضغط «أنهِ الجرد وأرسله» في أسفل الصفحة."}
+        </p>
+      )}
 
       <label className="relative block">
         <span className="sr-only">ابحث عن صنف</span>
@@ -198,6 +209,8 @@ function CountSheet({ token, countId, week, lines }: { token: string; countId: s
       ))}
       {shown.length === 0 && <p className="py-6 text-center text-sm text-muted">لا صنف بهذا الاسم.</p>}
 
+      <SendReport token={token} countId={countId} counted={counted} total={lines.length} unsaved={dirty.length} sent={sent} />
+
       <div className="fixed inset-x-0 bottom-(--team-nav) z-30 mx-auto max-w-lg space-y-2 px-4 pb-2">
         <ErrorLine error={error} />
         {saved && <p role="status" className="flex items-center gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-sm font-bold text-ok"><CheckCircle2 className="h-4 w-4" aria-hidden />{saved}</p>}
@@ -209,5 +222,58 @@ function CountSheet({ token, countId, week, lines }: { token: string; countId: s
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * «أنهِ الجرد وأرسله» — يسجّل الخادمُ الإرسال ويبني التقريرَ ممّا حُفظ، ثمّ يُفتح واتساب برقم الإدارة
+ * والنصُّ جاهز. وما لم يُحفظ يمنع الإرسال: التقريرُ يقول ما في الجرد، لا ما في الشاشة.
+ */
+function SendReport({ token, countId, counted, total, unsaved, sent }: { token: string; countId: string; counted: number; total: number; unsaved: number; sent: Sent }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<{ text: string; href: string; phone: boolean } | null>(null);
+
+  async function send() {
+    if (busy) return;
+    setBusy(true); setError(null);
+    const r = await postJson<{ text: string; phone: string | null }>("/api/team/count", { action: "send", token, countId });
+    setBusy(false);
+    if (!r.ok) { setError(r.error); return; }
+    const href = `https://wa.me/${r.data.phone ?? ""}?text=${encodeURIComponent(r.data.text)}`;
+    setReport({ text: r.data.text, href, phone: r.data.phone !== null });
+    router.refresh();
+    window.location.href = href;
+  }
+
+  const done = sent && !sent.stale;
+  return (
+    <section aria-labelledby="send-title" className="space-y-3 rounded-2xl border border-accent-line bg-raised p-4">
+      <h3 id="send-title" className="flex items-center gap-2 text-base font-bold"><MessageCircle className="h-5 w-5 text-accent" aria-hidden />أرسل الجرد للإدارة</h3>
+      <p className="text-sm leading-relaxed text-ink-soft">
+        {done ? `أُرسل ${new Date(sent.at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" })}. إن عدّلت شيئاً فأرسله مرة أخرى.`
+          : `بعد أن تحفظ كل الأصناف، يفتح واتساب برسالة فيها الجرد كاملاً، فاضغط إرسال. عُدّ ${counted} من ${countNoun(total, PRODUCT)}.`}
+      </p>
+      {unsaved > 0 && <p className="text-sm font-bold text-warn">احفظ ما كتبته أولاً ({unsaved}) ثم أرسل.</p>}
+      <button type="button" onClick={() => void send()} disabled={busy || unsaved > 0 || counted === 0} aria-busy={busy}
+        className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-bold disabled:opacity-50 ${done ? "border border-line bg-surface text-ink" : "bg-accent text-accent-ink"}`}>
+        <Send className="h-4 w-4" aria-hidden />{busy ? "يُجهَّز التقرير…" : done ? "أرسله مرة أخرى" : "أنهِ الجرد وأرسله"}
+      </button>
+      <ErrorLine error={error} />
+      {report && (
+        <div className="space-y-2">
+          {!report.phone && <p className="text-xs font-bold text-warn">لم تكتب الإدارة رقمها بعد، فاختر المحادثة بنفسك في واتساب.</p>}
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-sunken p-3 text-xs leading-relaxed">{report.text}</pre>
+          <div className="grid grid-cols-2 gap-2">
+            <a href={report.href} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-sm font-bold"><MessageCircle className="h-4 w-4" aria-hidden />افتح واتساب</a>
+            <button type="button" className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-sm font-bold"
+              onClick={() => { navigator.clipboard.writeText(report.text).then(() => setError(null), () => setError("تعذّر النسخ. حدّد النص بنفسك وانسخه.")); }}>
+              <Copy className="h-4 w-4" aria-hidden />انسخ التقرير
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

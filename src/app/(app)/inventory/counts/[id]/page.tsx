@@ -1,3 +1,4 @@
+import { TeamCountNote } from "@/components/team-count-note";
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -59,6 +60,7 @@ export default async function CountReportPage({
         ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجل الجرد</LinkButton>
         : undefined}
     >
+      {!locked && <TeamCountNote countId={header.id} />}
       <InventoryWorkspace
         header={header}
         report={report}

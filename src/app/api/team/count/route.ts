@@ -3,6 +3,7 @@
  *
  *   POST { token, action: "start" }                         → يبدأ جردَ هذا السبت إن لم يُبدأ
  *   POST { token, action: "save", countId, entries: [{productId, quantity, unit}] }
+ *   POST { token, action: "send", countId }                → { text, phone } يفتحه في واتساب
  *
  * الكمّيّةُ تصل نصّاً وتُقرأ مِلّيّاتٍ هنا، والتحويلُ إلى وحدة الصنف في الخادم. والأسبوعُ يُشتقّ
  * من يوم الرياض لا من المتصفّح (`team-count.service.ts`).
@@ -17,7 +18,7 @@ import { todayInRiyadh } from "@/lib/riyadh-time";
 import { failWith, respondTo } from "@/services/guard";
 import { consume } from "@/services/rate-limit.service";
 import { resolveCheckinToken } from "@/services/payroll.service";
-import { saveTeamCount, startTeamCount } from "@/services/team-count.service";
+import { saveTeamCount, sendTeamCount, startTeamCount } from "@/services/team-count.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,6 +26,7 @@ export const maxDuration = 60;
 const Token = z.string().trim().min(24).max(64);
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), token: Token }).strict(),
+  z.object({ action: z.literal("send"), token: Token, countId: z.string().min(1).max(64) }).strict(),
   z.object({
     action: z.literal("save"), token: Token, countId: z.string().min(1).max(64),
     entries: z.array(z.object({
@@ -51,6 +53,11 @@ export async function POST(request: Request) {
     if (b.action === "start") {
       const countId = await startTeamCount(today, by);
       return NextResponse.json({ ok: true, countId, message: "بدأ جرد السبت. اكتب ما تجده على الرف." });
+    }
+
+    if (b.action === "send") {
+      const { text, phone } = await sendTeamCount(today, b.countId, by);
+      return NextResponse.json({ ok: true, text, phone });
     }
 
     const entries = [];

@@ -193,6 +193,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   EMPLOYEE_CHECKIN_LINK_ISSUED: "إنشاء رابط حضور لموظف",
   EMPLOYEE_CHECKIN_LINK_REVOKED: "إلغاء رابط حضور موظف",
   EMPLOYEE_INVENTORY_ACCESS_CHANGED: "إذن جرد السبت لموظف",
+  INVENTORY_COUNT_TEAM_SENT: "إرسال جرد السبت للإدارة واتساب",
   ATTENDANCE_SETTINGS_SET: "ضبط موقع المقهى أو شبكته للحضور",
   ATTENDANCE_CHECKIN_REVIEWED: "قبول أو رد تسجيل حضور",
   FINANCE_DECLARATION_CREATED: "إضافة مصروف خارج الكشف أو توزيعه",

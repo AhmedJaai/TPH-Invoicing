@@ -1,4 +1,5 @@
 import { TEAM_APP_NAME } from "@/lib/team-app";
+import { loadCountWhatsapp } from "@/services/team-count.service";
 import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -11,7 +12,7 @@ import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { ObligationForm } from "@/components/obligation-form";
 import {
-  AdjustmentForm, CheckinLinkPanel, DayForm, DayShiftForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
+  AdjustmentForm, CheckinLinkPanel, CountWhatsappForm, DayForm, DayShiftForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
 } from "@/components/payroll/forms";
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
@@ -59,7 +60,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const endMonth = employee.leftOn && employee.leftOn.slice(0, 7) < current ? employee.leftOn.slice(0, 7) : current;
   const workMonths = monthsBetween(employee.hiredOn.slice(0, 7), endMonth).reverse();
 
-  const [sheet, links, docs, open, checkins, history] = await Promise.all([
+  const [sheet, links, docs, open, checkins, history, countWhatsapp] = await Promise.all([
     loadPayrollMonth(month),
     loadEmployeeLinks(id),
     loadEmployeeDocuments(id),
@@ -67,6 +68,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     /* تسجيلاتُ فترة الخصم — هي ما يُحسب منه تأخيرُ الشهر */
     loadCheckins(deductionPeriod(month).from, deductionPeriod(month).to),
     loadEmployeeHistory(id, workMonths.slice(0, 24)),
+    loadCountWhatsapp(),
   ]);
   const row = sheet.rows.find((r) => r.employee.id === id);
   const slip = row?.slip;
@@ -370,7 +372,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3">
           <div className="min-w-0 flex-1 basis-56">
             <p className="flex items-center gap-2 text-sm font-bold">جرد السبت من رابطه {employee.canCountInventory ? <Badge tone="ok">مسموح</Badge> : <Badge tone="muted">غير مسموح</Badge>}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted">يُدخل عدّ الرف لجرد الأسبوع يوم السبت (والأحد بعده) من صفحة «الجرد» في {TEAM_APP_NAME}. لا يرى المتوقع ولا الفرق ولا التكلفة، ولا يعدّل جرداً قديماً، والإقفال لك.</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">يُدخل عدّ الرف لجرد الأسبوع يوم السبت (والأحد بعده) من صفحة «الجرد» في {TEAM_APP_NAME}، ثم يرسل التقرير واتساب إلى رقمك. لا يرى المتوقع ولا الفرق ولا التكلفة، ولا يعدّل جرداً قديماً، والإقفال لك.</p>
+            {canEdit && employee.canCountInventory && <CountWhatsappForm current={countWhatsapp} />}
           </div>
           {canEdit && (
             <PostAction url="/api/payroll/employee" body={{ action: "inventory-access", id, on: !employee.canCountInventory }} variant={employee.canCountInventory ? "quiet" : "secondary"}

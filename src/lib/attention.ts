@@ -266,6 +266,11 @@ export interface AttentionFacts {
     pendingRequests?: number;
   };
   stockLinksReady?: { count: number; valueMinor: number };
+  /** جرودٌ مفتوحة عدّها الفريقُ من «TPH Team» وتنتظر مراجعةَ المالك وإقفالَه (`team-count.service.ts`). */
+  teamCounts?: {
+    countId: string; week: { start: string; end: string }; counters: { name: string; lines: number }[];
+    counted: number; total: number; sent: { at: string; stale: boolean } | null;
+  }[];
   foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
   foodicsStaleHours?: number | null;
   /**
@@ -1079,6 +1084,25 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
       needs: "payroll:view",
+    });
+  }
+  /* جردُ السبت من الفريق — لا يُقفل نفسَه: المراجعةُ والإقفالُ للمالك */
+  for (const c of f.teamCounts ?? []) {
+    const who = c.counters.map((x) => x.name.split(" ")[0]).join(" و") || "الفريق";
+    const sentText = !c.sent ? "لم يُرسَل التقرير واتساب بعد" : c.sent.stale ? "عُدّل بعد إرسال التقرير" : "أُرسل التقرير واتساب";
+    out.push({
+      id: `team-count:${c.countId}`,
+      area: "DATA",
+      severity: "MEDIUM",
+      title: `جرد السبت ينتظر إقفالك: عدّ ${who} ${c.counted} من ${countNoun(c.total, PRODUCT)}`,
+      detail: `أسبوع ${formatDay(c.week.start)} إلى ${formatDay(c.week.end)}، من TPH Team. ${sentText}.`,
+      action: "راجع الفروق والافتتاحي والاستلامات، ثم أقفل الجرد. وما لم يُعدّ يبقى بلا فرق محسوب.",
+      actionLabel: "راجع الجرد",
+      href: `/inventory/counts/${c.countId}`,
+      count: 1,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: c.counters.map((x) => ({ label: x.name, sub: `عدّ ${countNoun(x.lines, PRODUCT)}` })),
+      needs: "inventory:count",
     });
   }
   if (pay?.pendingRequests && pay.pendingRequests > 0) {

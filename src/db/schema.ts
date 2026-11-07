@@ -1483,6 +1483,9 @@ export const inventoryCounts = pgTable("inventory_counts", {
   startedById: text("started_by_id").references(() => users.id),
   /** أو موظّفٌ بدأه من «TPH Team» يومَ السبت (102). */
   startedByEmployeeId: text("started_by_employee_id").references(() => employees.id, { onDelete: "set null" }),
+  /** آخرُ إرسالٍ لتقرير الجرد واتساب من «TPH Team» (103) — وما عُدّ بعده «عُدّل بعد الإرسال». */
+  teamSentAt: timestamp("team_sent_at", { withTimezone: true }),
+  teamSentByEmployeeId: text("team_sent_by_employee_id").references(() => employees.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finalisedById: text("finalised_by_id").references(() => users.id),
   finalisedAt: timestamp("finalised_at", { withTimezone: true }),

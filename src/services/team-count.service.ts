@@ -7,9 +7,11 @@
  * افتتاحيّ، ولا إقفال ولا إلغاء — تلك للمالك في `/inventory`. والعدُّ **أعمى**: لا يرى المتوقَّعَ
  * ولا الفرقَ ولا كلفة، فلا يكتب ما يُنتظر منه.
  */
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { inventoryCountLines, inventoryCounts, products } from "@/db/schema";
+import { appSettings, inventoryCountLines, inventoryCounts, products } from "@/db/schema";
+import { recordAudit } from "@/lib/audit";
+import { teamCountReport, whatsappNumber } from "@/lib/inventory/team-report";
 import { addDays } from "@/lib/riyadh-time";
 import { dayOfWeek, weekOf, type Week } from "@/lib/inventory/week";
 import { formatQuantity, unitChoices } from "@/lib/inventory/units";
@@ -54,14 +56,18 @@ export type TeamCountView =
   | { state: "closed"; nextSaturday: string; lastWeek: Week; lastCounted: number | null }
   | { state: "not-started"; week: Week }
   | { state: "locked"; week: Week }
-  | { state: "open"; week: Week; countId: string; lines: TeamCountLine[] };
+  | {
+    state: "open"; week: Week; countId: string; lines: TeamCountLine[];
+    /** آخرُ إرسالٍ للإدارة، و`stale` عُدّ شيءٌ بعده فيُرسَل ثانيةً. و`null` لم يُرسَل قطّ. */
+    sent: { at: string; stale: boolean } | null;
+  };
 
 /** جردُ أسبوعٍ بعينه (للمقهى كلّه، بلا فرع) — إن بُدئ. */
-async function countFor(week: Week): Promise<{ id: string; status: string } | null> {
-  const [row] = await db.select({ id: inventoryCounts.id, status: inventoryCounts.status }).from(inventoryCounts)
+async function countFor(week: Week): Promise<{ id: string; status: string; sentAt: Date | null } | null> {
+  const [row] = await db.select({ id: inventoryCounts.id, status: inventoryCounts.status, sentAt: inventoryCounts.teamSentAt }).from(inventoryCounts)
     .where(and(eq(inventoryCounts.periodStart, week.start), eq(inventoryCounts.periodEnd, week.end), isNull(inventoryCounts.branchId)))
     .limit(1);
-  return row ? { id: row.id, status: String(row.status) } : null;
+  return row ? { id: row.id, status: String(row.status), sentAt: row.sentAt } : null;
 }
 
 async function linesOf(countId: string): Promise<TeamCountLine[]> {
@@ -99,7 +105,16 @@ export async function loadTeamCount(today: string): Promise<TeamCountView> {
   const count = await countFor(w.week);
   if (!count) return { state: "not-started", week: w.week };
   if (count.status === "FINALISED") return { state: "locked", week: w.week };
-  return { state: "open", week: w.week, countId: count.id, lines: await linesOf(count.id) };
+  return { state: "open", week: w.week, countId: count.id, lines: await linesOf(count.id), sent: await sentState(count.id, count.sentAt) };
+}
+
+/** أُرسل؟ وهل عُدّ شيءٌ بعد الإرسال؟ */
+async function sentState(countId: string, sentAt: Date | null): Promise<{ at: string; stale: boolean } | null> {
+  if (!sentAt) return null;
+  const [r] = (await db.execute<{ stale: boolean }>(sql`
+    select exists (select 1 from inventory_count_lines where count_id = ${countId} and counted_at > ${sentAt.toISOString()}::timestamptz) as stale
+  `)).rows;
+  return { at: sentAt.toISOString(), stale: Boolean(r?.stale) };
 }
 
 /**
@@ -135,4 +150,91 @@ export async function saveTeamCount(
   const canonical = await canonicalCounts(entries);
   await saveActualCounts(countId, canonical, by);
   return canonical.length;
+}
+
+const WHATSAPP_KEY = "team.count_whatsapp";
+
+/** رقمُ واتساب الإدارة الذي يصله تقريرُ الجرد — `null` لم يُكتب. */
+export async function loadCountWhatsapp(): Promise<string | null> {
+  const [row] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, WHATSAPP_KEY)).limit(1);
+  return whatsappNumber(row?.value);
+}
+
+/** يكتب الرقمَ أو يمسحه (`null`) — للمالك. والرقمُ الذي لا يُقرأ يُرفض لا يُحفظ. */
+export async function saveCountWhatsapp(raw: string | null, actorId: string): Promise<void> {
+  const value = raw === null || raw.trim() === "" ? null : whatsappNumber(raw);
+  if (raw !== null && raw.trim() !== "" && value === null) throw new TeamCountRefused("رقم الجوال غير مفهوم. اكتبه مثل 0551234567.");
+  await db.transaction(async (t) => {
+    const [before] = await t.select().from(appSettings).where(eq(appSettings.key, WHATSAPP_KEY)).for("update");
+    if (value === null) await t.delete(appSettings).where(eq(appSettings.key, WHATSAPP_KEY));
+    else await t.insert(appSettings).values({ key: WHATSAPP_KEY, value, updatedById: actorId })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedById: actorId, updatedAt: new Date() } });
+    await recordAudit({ actorId, action: "ATTENDANCE_SETTINGS_SET", entityType: "setting", entityId: WHATSAPP_KEY, before: before?.value ?? null, after: value }, t);
+  });
+}
+
+/**
+ * «أنهِ الجرد وأرسله»: يُكتب وقتُ الإرسال ومَن أرسله، ويُعاد نصُّ التقرير ممّا حُفظ ورقمُ الإدارة
+ * لتفتحه الشاشةُ في واتساب. الإرسالُ نفسُه في جوال الموظّف — نسجّل أنّه ضغط، لا أنّه وصل.
+ */
+export async function sendTeamCount(today: string, countId: string, by: TeamCounter): Promise<{ text: string; phone: string | null }> {
+  const w = teamCountWindow(today);
+  if (!w.open) throw new TeamCountRefused("انتهى وقت جرد السبت.");
+  const count = await countFor(w.week);
+  if (!count || count.id !== countId) throw new TeamCountRefused("هذا ليس جرد هذا الأسبوع. حدّث الصفحة.");
+  const lines = await linesOf(countId);
+  if (!lines.some((l) => l.counted !== null)) throw new TeamCountRefused("لم يُحفظ عدّ أي صنف بعد. اكتب الكميات واحفظها أولاً.");
+  await db.transaction(async (t) => {
+    await t.update(inventoryCounts).set({ teamSentAt: new Date(), teamSentByEmployeeId: by.employeeId }).where(eq(inventoryCounts.id, countId));
+    await recordAudit({ action: "INVENTORY_COUNT_TEAM_SENT", entityType: "inventory_count", entityId: countId, after: { أرسله: by.name, عُدّ: lines.filter((l) => l.counted !== null).length, من: lines.length } }, t);
+  });
+  return { text: teamCountReport({ week: w.week, by: by.name, lines }), phone: await loadCountWhatsapp() };
+}
+
+export interface TeamCountWaiting {
+  countId: string;
+  week: Week;
+  /** مَن عدّ من الفريق وكم صنفاً — بالأكثر أوّلاً. */
+  counters: { name: string; lines: number }[];
+  /** ما عُدّ في النطاق من أيّ أحد، ومجموعُ النطاق. */
+  counted: number;
+  total: number;
+  /** متى أرسله واتساب، و`stale` عُدّ بعده. و`null` لم يُرسَل بعد. */
+  sent: { at: string; stale: boolean } | null;
+}
+
+/**
+ * جرودٌ مفتوحة فيها عدٌّ من «TPH Team» — تنتظر مراجعةَ المالك وإقفالَه. بندٌ في «يحتاج قرارك»،
+ * ووصفٌ في رأس الجرد («عدّه أنس من TPH Team»). استعلامٌ واحد.
+ */
+export async function loadTeamCountsWaiting(countId?: string): Promise<TeamCountWaiting[]> {
+  const rows = (await db.execute<{ count_id: string; period_start: string; period_end: string; team_sent_at: string | Date | null; stale: boolean; name: string | null; by_lines: number; counted: number; total: number }>(sql`
+    with open as (
+      select c.id, c.period_start, c.period_end, c.team_sent_at,
+             exists (select 1 from inventory_count_lines s where s.count_id = c.id and c.team_sent_at is not null and s.counted_at > c.team_sent_at) as stale
+        from inventory_counts c
+       where c.status = 'DRAFT' ${countId ? sql`and c.id = ${countId}` : sql``}
+         and exists (select 1 from inventory_count_lines l where l.count_id = c.id and l.counted_by_employee_id is not null)
+    ), totals as (
+      select l.count_id, count(*) filter (where l.in_scope)::int as total,
+             count(*) filter (where l.in_scope and l.actual_milli is not null)::int as counted
+        from inventory_count_lines l join open o on o.id = l.count_id group by l.count_id
+    )
+    select o.id as count_id, o.period_start, o.period_end, o.team_sent_at, o.stale, e.name, count(l.id)::int as by_lines, t.counted, t.total
+      from open o
+      join totals t on t.count_id = o.id
+      join inventory_count_lines l on l.count_id = o.id and l.counted_by_employee_id is not null
+      join employees e on e.id = l.counted_by_employee_id
+     group by o.id, o.period_start, o.period_end, o.team_sent_at, o.stale, e.name, t.counted, t.total
+     order by o.period_end desc, by_lines desc
+  `)).rows;
+  const by = new Map<string, TeamCountWaiting>();
+  for (const r of rows) {
+    const id = String(r.count_id);
+    const w = by.get(id) ?? { countId: id, week: { start: String(r.period_start), end: String(r.period_end) }, counters: [], counted: Number(r.counted), total: Number(r.total),
+      sent: r.team_sent_at ? { at: new Date(r.team_sent_at).toISOString(), stale: Boolean(r.stale) } : null };
+    if (r.name) w.counters.push({ name: r.name, lines: Number(r.by_lines) });
+    by.set(id, w);
+  }
+  return [...by.values()];
 }

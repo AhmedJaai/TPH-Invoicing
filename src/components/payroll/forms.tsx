@@ -667,6 +667,23 @@ export function CheckinLinkPanel({ employeeId, name, phone, hasLink }: { employe
   );
 }
 
+/* ─────────────── رقمُ واتساب الإدارة لتقرير جرد السبت ─────────────── */
+
+export function CountWhatsappForm({ current }: { current: string | null }) {
+  const [phone, setPhone] = useState(current ? `+${current}` : "");
+  const { busy, error, send } = useSend();
+  return (
+    <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); void send("/api/payroll/employee", { action: "count-whatsapp", phone: phone.trim() }); }}>
+      <label className="min-w-0 flex-1 basis-48">
+        <span className={label}>رقم واتسابك الذي يصله تقرير الجرد</span>
+        <input className={`${field} mt-1`} dir="ltr" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0551234567" />
+      </label>
+      <button type="submit" className={buttonClass("secondary", "sm")} disabled={busy} aria-busy={busy}>احفظ الرقم</button>
+      <ErrorLine error={error} />
+    </form>
+  );
+}
+
 /* ─────────────── موقعُ المقهى وشبكتُه ─────────────── */
 
 export function AttendancePlaceForm({ current }: { current: { lat: string; lng: string; radiusM: number } | null }) {

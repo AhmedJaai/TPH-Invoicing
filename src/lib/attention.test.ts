@@ -714,3 +714,21 @@ describe("رسائل الفريق من TPH Team", () => {
     expect(many.title).toBe("3 رسائل جديدة من الفريق، منها شكويان");
   });
 });
+
+describe("بندُ جرد السبت في «يحتاج قرارك»", () => {
+  const team = (sent: { at: string; stale: boolean } | null) => buildAttention({
+    ...quiet,
+    teamCounts: [{ countId: "c1", week: { start: "2026-11-01", end: "2026-11-07" }, counters: [{ name: "أنس أمين", lines: 48 }], counted: 48, total: 52, sent }],
+  }).find((i) => i.id === "team-count:c1");
+  it("يقول من عدّ وكم، ويفتح الجردَ نفسه، لمن يملك العدّ", () => {
+    const item = team(null);
+    expect(item?.title).toBe("جرد السبت ينتظر إقفالك: عدّ أنس 48 من 52 صنفاً");
+    expect(item?.detail).toContain("لم يُرسَل التقرير واتساب بعد");
+    expect(item?.href).toBe("/inventory/counts/c1");
+    expect(item?.needs).toBe("inventory:count");
+  });
+  it("ويقول إن أُرسل، أو عُدّل بعد إرساله", () => {
+    expect(team({ at: "2026-11-07T20:00:00Z", stale: false })?.detail).toContain("أُرسل التقرير واتساب");
+    expect(team({ at: "2026-11-07T20:00:00Z", stale: true })?.detail).toContain("عُدّل بعد إرسال التقرير");
+  });
+});

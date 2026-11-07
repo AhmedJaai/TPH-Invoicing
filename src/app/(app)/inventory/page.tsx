@@ -21,6 +21,7 @@ import { PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { lastCompleteWeek, nextWeek } from "@/lib/inventory/week";
 import { T } from "@/components/i18n/t";
+import { TeamCountNote } from "@/components/team-count-note";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,7 @@ export default async function InventoryPage({
               ))}
             </nav>
           )}
+          <TeamCountNote countId={header.id} />
           <InventoryWorkspace
             header={header}
             report={report}
