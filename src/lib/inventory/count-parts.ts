@@ -97,3 +97,12 @@ export function readParts(value: unknown): CountPart[] | null {
   }
   return out.length > 0 ? out : null;
 }
+
+/**
+ * رقمٌ يستحقّ «تأكّد منه»: خمسةُ أضعاف آخر عدٍّ أو خُمسُه — صفرٌ زائد أو ناقص في الغالب.
+ * يُسأل في الخادم ويُقال للموظّف اسمُ الصنف وحده، فيبقى العدُّ أعمى عن الرقم السابق.
+ */
+export function unusualCount(now: number | null, previous: number | null): boolean {
+  if (now === null || previous === null || now <= 0 || previous <= 0) return false;
+  return now >= previous * 5 || now * 5 <= previous;
+}

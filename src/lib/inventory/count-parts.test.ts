@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { partFields, partsText, readParts, storagePack, sumParts } from "./count-parts";
+import { partFields, partsText, readParts, storagePack, sumParts, unusualCount } from "./count-parts";
 
 /** ورقةُ أنس: «اكواب ١٢ اونص — كرتون ١٩، حبّة ٨٩٧»، و«سيرب فانيلا — جرام ٥٠٠». */
 describe("sumParts", () => {
@@ -59,5 +59,19 @@ describe("partsText · readParts", () => {
     expect(readParts(JSON.parse(JSON.stringify(parts)))).toEqual(parts);
     expect(readParts([{ key: "WAT", label: "x", quantity: "1" }])).toBeNull();
     expect(readParts("x")).toBeNull();
+  });
+});
+
+describe("unusualCount", () => {
+  it("صفرٌ زائد أو ناقص عن الأسبوع الماضي يُسأل عنه، والتغيّرُ العاديّ لا", () => {
+    expect(unusualCount(8_970_000, 897_000)).toBe(true);
+    expect(unusualCount(89_000, 897_000)).toBe(true);
+    expect(unusualCount(700_000, 897_000)).toBe(false);
+    expect(unusualCount(2_000_000, 897_000)).toBe(false);
+  });
+  it("ولا يُحكم بلا سابقٍ أو على صفر", () => {
+    expect(unusualCount(5_000, null)).toBe(false);
+    expect(unusualCount(0, 897_000)).toBe(false);
+    expect(unusualCount(null, 897_000)).toBe(false);
   });
 });

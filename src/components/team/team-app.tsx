@@ -59,6 +59,8 @@ function writeSeen(v: string) {
 
 export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, count }: TeamAppProps) {
   const tabs = teamTabsFor(count !== null);
+  /* جردُ السبت ينتظره: لم يُبدأ، أو لم يُرسَل، أو عُدّل بعد إرساله — يُذكَّر في «الحضور» ونقطةٌ على «الجرد» */
+  const countDue = count !== null && (count.state === "not-started" || (count.state === "open" && (!count.sent || count.sent.stale)));
   const announcements = board.filter((c) => c.kind === "ANNOUNCEMENT");
   const [tab, setTab] = useState<TeamTab>(initialTab);
   const latestReply = messages.reduce<string>((m, x) => (x.repliedAt && x.repliedAt > m ? x.repliedAt : m), "");
@@ -93,6 +95,16 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
         {tab === "attend" && (
           <>
             <InstallHint />
+            {countDue && (
+              <button type="button" onClick={() => open("count")}
+                className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-accent-line bg-accent-soft/60 p-3.5 text-start">
+                <ClipboardList className="h-5 w-5 shrink-0 text-accent" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">{count?.state === "open" && count.sent?.stale ? "عدّلت الجرد بعد إرساله" : "اليوم جرد السبت"}</span>
+                  <span className="block text-xs text-ink-soft">{count?.state === "not-started" ? "ابدأه من صفحة «الجرد»، ثم أرسل التقرير للإدارة." : "أكمله وأرسل تقرير PDF للإدارة من صفحة «الجرد»."}</span>
+                </span>
+              </button>
+            )}
             {announcements.map((a) => (
               <aside key={a.id} className="mb-4 flex items-start gap-3 rounded-2xl border border-accent-line bg-raised p-3.5">
                 <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
@@ -121,6 +133,9 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
                     <Icon className="h-5 w-5" aria-hidden />
                   </span>
                   {t.label}
+                  {t.id === "count" && countDue && tab !== "count" && (
+                    <span className="absolute top-2 h-2.5 w-2.5 translate-x-4 rounded-full bg-warn ring-2 ring-raised" aria-label="جرد السبت ينتظرك" />
+                  )}
                   {t.id === "requests" && newReply && (
                     <span className="absolute top-2 h-2.5 w-2.5 translate-x-4 rounded-full bg-danger ring-2 ring-raised" aria-label="رد جديد من الإدارة" />
                   )}

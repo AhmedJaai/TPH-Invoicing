@@ -27,8 +27,10 @@ let fontsReady = false;
 function ensureFonts() {
   if (fontsReady) return;
   const dir = path.join(process.cwd(), "src/fonts");
-  GlobalFonts.registerFromPath(path.join(dir, "thmanyahsans-Regular.woff2"), "TPHSans");
-  GlobalFonts.registerFromPath(path.join(dir, "thmanyahsans-Bold.woff2"), "TPHSansBold");
+  const regular = GlobalFonts.registerFromPath(path.join(dir, "thmanyahsans-Regular.woff2"), "TPHSans");
+  const bold = GlobalFonts.registerFromPath(path.join(dir, "thmanyahsans-Bold.woff2"), "TPHSansBold");
+  /* بلا الخطّ يخرج التقريرُ مربّعاتٍ لا عربيّة — يُرفض ويُسمع، لا يُرسَل فارغاً (`outputFileTracingIncludes`) */
+  if (!regular || !bold) throw new Error("خطّ التقرير غير موجود على الخادم، فلم يُعدّ الملف. أبلغ الإدارة.");
   fontsReady = true;
 }
 

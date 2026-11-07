@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { isStoredUnit } from "@/lib/unit-conversion";
+import { PRODUCT, countNoun } from "@/lib/arabic";
 import type { PartKey } from "@/lib/inventory/count-parts";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { failWith, respondTo } from "@/services/guard";
@@ -61,8 +62,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, text, phone });
     }
 
-    const saved = await saveTeamCount(today, b.countId, b.entries, by);
-    return NextResponse.json({ ok: true, saved, message: saved === 1 ? "حُفظ عدّ صنف واحد" : `حُفظ عدّ ${saved} أصناف` });
+    const { saved, check } = await saveTeamCount(today, b.countId, b.entries, by);
+    return NextResponse.json({ ok: true, saved, check, message: `حُفظ: ${countNoun(saved, PRODUCT)}` });
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

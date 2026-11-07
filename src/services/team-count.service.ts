@@ -15,7 +15,7 @@ import { teamCountReport, whatsappNumber } from "@/lib/inventory/team-report";
 import { addDays } from "@/lib/riyadh-time";
 import { dayOfWeek, weekOf, type Week } from "@/lib/inventory/week";
 import { formatQuantity } from "@/lib/inventory/units";
-import { partFields, partsText, readParts, storagePack, sumParts, type CountPart, type PartField, type PartKey, type StoragePack } from "@/lib/inventory/count-parts";
+import { partFields, partsText, readParts, storagePack, sumParts, unusualCount, type CountPart, type PartField, type PartKey, type StoragePack } from "@/lib/inventory/count-parts";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { CATEGORY_LABEL } from "@/lib/products";
 import { DomainError } from "@/lib/domain-error";
@@ -118,11 +118,11 @@ export async function loadTeamCount(today: string): Promise<TeamCountView> {
   return { state: "open", week: w.week, countId: count.id, lines: await linesOf(count.id), sent: await sentState(count.id, count.sentAt) };
 }
 
-/** أُرسل؟ وهل عُدّ شيءٌ بعد الإرسال؟ */
+/** أُرسل؟ وهل عدّ الفريقُ شيئاً بعد الإرسال؟ — تعديلُ المالك لا يُعيد على الموظّف «أرسله ثانيةً». */
 async function sentState(countId: string, sentAt: Date | null): Promise<{ at: string; stale: boolean } | null> {
   if (!sentAt) return null;
   const [r] = (await db.execute<{ stale: boolean }>(sql`
-    select exists (select 1 from inventory_count_lines where count_id = ${countId} and counted_at > ${sentAt.toISOString()}::timestamptz) as stale
+    select exists (select 1 from inventory_count_lines where count_id = ${countId} and counted_by_employee_id is not null and counted_at > ${sentAt.toISOString()}::timestamptz) as stale
   `)).rows;
   return { at: sentAt.toISOString(), stale: Boolean(r?.stale) };
 }
@@ -148,7 +148,7 @@ export async function saveTeamCount(
   countId: string,
   entries: readonly { productId: string; parts: readonly { key: PartKey; quantity: string }[] }[],
   by: TeamCounter,
-): Promise<number> {
+): Promise<{ saved: number; check: string[] }> {
   const w = teamCountWindow(today);
   if (!w.open) throw new TeamCountRefused("انتهى وقت جرد السبت، فلم يُحفظ شيء. أرسل العدد للإدارة.");
   const count = await countFor(w.week);
@@ -165,7 +165,23 @@ export async function saveTeamCount(
     actuals.push({ productId: e.productId, actualMilli: sum.canonical, parts: sum.parts });
   }
   await saveActualCounts(countId, actuals, by);
-  return actuals.length;
+  /* رقمٌ بعيدٌ جداً عن آخر عدٍّ سابق — يُسمّى الصنفُ وحده ليتأكّد، لا الرقمُ السابق */
+  const previous = await previousActuals(w.week.start, actuals.map((a) => a.productId));
+  const check = actuals.filter((a) => unusualCount(a.actualMilli, previous.get(a.productId) ?? null)).map((a) => lines.get(a.productId)?.name ?? "");
+  return { saved: actuals.length, check };
+}
+
+/** آخرُ عدٍّ لكلّ صنفٍ في جردٍ قبل هذا الأسبوع. */
+async function previousActuals(before: string, productIds: readonly string[]): Promise<Map<string, number>> {
+  if (productIds.length === 0) return new Map();
+  const rows = (await db.execute<{ product_id: string; actual_milli: string | number }>(sql`
+    select distinct on (l.product_id) l.product_id, l.actual_milli
+      from inventory_count_lines l join inventory_counts c on c.id = l.count_id
+     where c.period_end < ${before} and l.actual_milli is not null
+       and l.product_id in (${sql.join(productIds.map((id) => sql`${id}`), sql`, `)})
+     order by l.product_id, c.period_end desc
+  `)).rows;
+  return new Map(rows.map((r) => [String(r.product_id), Number(r.actual_milli)]));
 }
 
 const WHATSAPP_KEY = "team.count_whatsapp";
@@ -243,7 +259,7 @@ export async function loadTeamCountsWaiting(countId?: string): Promise<TeamCount
   const rows = (await db.execute<{ count_id: string; period_start: string; period_end: string; team_sent_at: string | Date | null; stale: boolean; name: string | null; by_lines: number; counted: number; total: number }>(sql`
     with open as (
       select c.id, c.period_start, c.period_end, c.team_sent_at,
-             exists (select 1 from inventory_count_lines s where s.count_id = c.id and c.team_sent_at is not null and s.counted_at > c.team_sent_at) as stale
+             exists (select 1 from inventory_count_lines s where s.count_id = c.id and c.team_sent_at is not null and s.counted_by_employee_id is not null and s.counted_at > c.team_sent_at) as stale
         from inventory_counts c
        where c.status = 'DRAFT' ${countId ? sql`and c.id = ${countId}` : sql``}
          and exists (select 1 from inventory_count_lines l where l.count_id = c.id and l.counted_by_employee_id is not null)

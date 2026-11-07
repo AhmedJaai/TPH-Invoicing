@@ -120,6 +120,9 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  /* أصنافٌ أرقامُها بعيدةٌ جداً عن آخر عدّ — يُسأل عنها بأسمائها */
+  const [check, setCheck] = useState<string[]>([]);
+  const [onlyLeft, setOnlyLeft] = useState(false);
 
   const dirty = Object.keys(drafts).filter((id) => lines.some((l) => l.productId === id));
   const counted = lines.filter((l) => l.counted !== null).length;
@@ -149,16 +152,19 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
       productId,
       parts: Object.entries(drafts[productId]).map(([key, quantity]) => ({ key, quantity: quantity.trim() })),
     }));
-    const r = await postJson<{ message?: string }>("/api/team/count", { action: "save", token, countId, entries });
+    const r = await postJson<{ message?: string; check?: string[] }>("/api/team/count", { action: "save", token, countId, entries });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
     setEdits({});
     setSaved(r.data.message ?? "حُفظ");
+    setCheck(r.data.check ?? []);
     router.refresh();
   }
 
   const q = query.trim();
-  const shown = q ? lines.filter((l) => l.name.includes(q) || l.name.toLowerCase().includes(q.toLowerCase())) : lines;
+  const shown = lines
+    .filter((l) => !onlyLeft || l.counted === null || l.productId in drafts)
+    .filter((l) => !q || l.name.includes(q) || l.name.toLowerCase().includes(q.toLowerCase()));
   const groups = [...new Set(shown.map((l) => l.categoryLabel))];
 
   if (lines.length === 0) {
@@ -190,6 +196,14 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
         <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث عن صنف"
           className="min-h-12 w-full rounded-xl border border-line-input bg-surface ps-9 pe-3 text-base focus:border-accent focus:outline-none" />
       </label>
+
+      {/* ما بقي وحده — آخرُ الجرد يُبحث فيه عمّا لم يُعَدّ لا في القائمة كلّها */}
+      <div role="group" aria-label="ما يُعرض" className="grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-raised p-1">
+        {([[false, `الكل (${lines.length})`], [true, `لم يُعَدّ (${lines.length - counted})`]] as const).map(([v, label]) => (
+          <button key={label} type="button" aria-pressed={onlyLeft === v} onClick={() => setOnlyLeft(v)}
+            className={`min-h-11 rounded-lg text-sm font-bold transition-colors motion-reduce:transition-none ${onlyLeft === v ? "bg-accent text-accent-ink" : "text-ink-soft hover:bg-hover"}`}>{label}</button>
+        ))}
+      </div>
 
       {groups.map((g) => (
         <section key={g} aria-label={g}>
@@ -224,13 +238,19 @@ function CountSheet({ token, countId, week, lines, sent }: { token: string; coun
           </ul>
         </section>
       ))}
-      {shown.length === 0 && <p className="py-6 text-center text-sm text-muted">لا صنف بهذا الاسم.</p>}
+      {shown.length === 0 && <p className="py-6 text-center text-sm text-muted">{onlyLeft && !q ? "عُدّت الأصناف كلها." : "لا صنف بهذا الاسم."}</p>}
 
       <SendReport token={token} countId={countId} counted={counted} total={lines.length} unsaved={dirty.length} sent={sent} />
 
       <div className="fixed inset-x-0 bottom-(--team-nav) z-30 mx-auto max-w-lg space-y-2 px-4 pb-2">
         <ErrorLine error={error} />
         {saved && <p role="status" className="flex items-center gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-sm font-bold text-ok"><CheckCircle2 className="h-4 w-4" aria-hidden />{saved}</p>}
+        {check.length > 0 && dirty.length === 0 && (
+          <p role="alert" className="rounded-lg border border-warn/30 bg-warn-bg px-3 py-2 text-sm font-bold text-warn">
+            تأكّد من {check.join("، ")}: الرقم بعيد جداً عن الجرد الماضي. إن كان صحيحاً فاتركه.
+            <button type="button" className="ms-1 inline-flex min-h-11 items-center px-2 underline" onClick={() => setCheck([])}>صحيح</button>
+          </p>
+        )}
         {dirty.length > 0 && (
           <button type="button" onClick={() => void save()} disabled={busy} aria-busy={busy}
             className="min-h-12 w-full rounded-xl bg-accent px-4 text-base font-bold text-accent-ink shadow-lifted disabled:opacity-60">
@@ -320,6 +340,9 @@ function SendReport({ token, countId, counted, total, unsaved, sent }: { token: 
           : `بعد أن تحفظ كل الأصناف، جهّز التقرير PDF ثم أرسله في واتساب لمحادثة الإدارة. عُدّ ${counted} من ${countNoun(total, PRODUCT)}.`}
       </p>
       {unsaved > 0 && <p className="text-sm font-bold text-warn">احفظ ما كتبته أولاً ({unsaved}) ثم أرسل.</p>}
+      {unsaved === 0 && counted > 0 && counted < total && !file && (
+        <p className="text-sm font-bold text-warn">بقي {countNoun(total - counted, PRODUCT)} لم يُعَدّ. اعرضها من «لم يُعَدّ» أعلى الصفحة، وما ليس على الرف منها اكتب فيه 0.</p>
+      )}
       {!file ? (
         <button type="button" onClick={() => void prepare()} disabled={busy !== null || unsaved > 0 || counted === 0} aria-busy={busy === "prepare"}
           className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-bold disabled:opacity-50 ${done ? "border border-line bg-surface text-ink" : "bg-accent text-accent-ink"}`}>
