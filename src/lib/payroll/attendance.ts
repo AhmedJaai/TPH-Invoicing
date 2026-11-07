@@ -96,6 +96,17 @@ export function earlyMinutesAt(outAt: Date, day: string, shiftStart: string, shi
   return Math.max(0, Math.ceil((end - outAt.getTime()) / 60_000));
 }
 
+/**
+ * أوّلُ يومٍ يُحسب فيه التأخيرُ والانصرافُ المبكّر من تسجيل الحضور (أحمد، ٧ نوفمبر ٢٠٢٦: «اليوم تجريبيّ،
+ * من الغد يبدأ»). ما سُجّل قبله يُحفظ ويُعرض ولا يُخصم منه شيء.
+ */
+export const CHECKIN_COUNTS_FROM = "2026-11-08";
+
+/** يُحسب من تسجيل هذا اليوم تأخيرٌ أو انصراف؟ */
+export function checkinCounts(day: string): boolean {
+  return day >= CHECKIN_COUNTS_FROM;
+}
+
 /** الانصرافُ يُنسب إلى يوم آخر حضورٍ قبله بعشرين ساعةٍ على الأكثر — دوامُ الليل يعبر منتصفه. */
 export const OUT_PAIRS_WITHIN_MS = 20 * 60 * 60 * 1000;
 

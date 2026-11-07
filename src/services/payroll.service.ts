@@ -24,7 +24,7 @@ import {
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
 } from "@/lib/payroll/calc";
 import {
-  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, type CafePlace,
+  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, type CafePlace,
 } from "@/lib/payroll/attendance";
 import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
@@ -608,7 +608,7 @@ export async function backfillFromCheckins(t: Conn, employeeId: string, today = 
   const [emp] = await t.select().from(employees).where(eq(employees.id, employeeId)).limit(1);
   if (!emp || !emp.shiftStart || emp.kind !== "MONTHLY") return { late: 0, early: 0 };
   const period = deductionPeriod(deductionMonthOf(today));
-  const from = emp.hiredOn > period.from ? emp.hiredOn : period.from;
+  const from = [emp.hiredOn, period.from, CHECKIN_COUNTS_FROM].sort()[2];
   const to = today < period.to ? today : period.to;
   if (from > to) return { late: 0, early: 0 };
   const [checks, rows] = await Promise.all([
@@ -1029,7 +1029,7 @@ export async function recordCheckin(input: {
     }).returning({ id: attendanceCheckins.id });
 
     let lateMinutes = 0, earlyMinutes = 0;
-    if (emp.shiftStart && isWorkday(day, emp.daysOff) && emp.kind === "MONTHLY") {
+    if (emp.shiftStart && isWorkday(day, emp.daysOff) && emp.kind === "MONTHLY" && checkinCounts(day)) {
       const manual = await t.select({ kind: payrollAttendance.kind }).from(payrollAttendance)
         .where(and(eq(payrollAttendance.employeeId, emp.id), eq(payrollAttendance.day, day), eq(payrollAttendance.source, "MANUAL"), isNull(payrollAttendance.voidedAt)));
       const manualKinds = new Set(manual.map((m) => m.kind));

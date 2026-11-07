@@ -81,3 +81,11 @@ describe("الدوام من الساعة كم إلى كم", () => {
     expect(daysOffLabel("")).toBeNull();
   });
 });
+
+describe("يومُ التجربة لا يُخصم منه", () => {
+  it("التأخيرُ من التسجيل يبدأ ٨ نوفمبر ٢٠٢٦", async () => {
+    const { checkinCounts } = await import("./attendance");
+    expect(checkinCounts("2026-11-07")).toBe(false);
+    expect(checkinCounts("2026-11-08")).toBe(true);
+  });
+});

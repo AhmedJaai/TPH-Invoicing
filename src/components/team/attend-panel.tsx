@@ -9,7 +9,7 @@
  */
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CheckCircle2, Coffee, LogIn, LogOut, MapPin, TriangleAlert } from "lucide-react";
+import { CalendarCheck, CheckCircle2, ChevronUp, Coffee, Info, LogIn, LogOut, MapPin, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { countNoun, DAY_AGO, MINUTE } from "@/lib/arabic";
 import { clock12, nextKind, riyadhClock, trusted, VERDICT_LABEL } from "@/lib/payroll/attendance";
@@ -56,6 +56,8 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
   const [optimistic, setOptimistic] = useState<RecentCheckin[]>([]);
   const [busy, setBusy] = useState<"IN" | "OUT" | null>(null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "danger"; text: string } | null>(null);
+  /* سجلُّه وتأخيرُه لا يُعرضان كلّما فتح التطبيق — يُطلبان بزرٍّ صغير (أحمد: «شعور غير جميل») */
+  const [details, setDetails] = useState(false);
   /* الساعةُ بالدقيقة — في الخادم لا ساعة، فلا تختلف الصفحتان عند التحميل */
   const minute = useSyncExternalStore(everyFewSeconds, currentMinute, () => null);
   const now = minute === null ? null : new Date(minute * 60_000);
@@ -86,8 +88,6 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
     const ok = trusted(d.verdict);
     const what = kind === "IN" ? "حضورك" : "انصرافك";
     let text = d.duplicate ? `سُجّل ${what} قبل لحظات، لا حاجة للضغط مرة أخرى.` : `سُجّل ${what} الساعة ${clock}.`;
-    if (!d.duplicate && kind === "IN" && d.lateMinutes > 0) text += ` تأخرت ${countNoun(d.lateMinutes, MINUTE)}.`;
-    if (!d.duplicate && kind === "OUT" && d.earlyMinutes > 0) text += ` قبل نهاية الدوام بـ${countNoun(d.earlyMinutes, MINUTE)}.`;
     if (!ok) text += p ? " موقعك بعيد عن المقهى، فسيراجعه المدير." : " لم يُقرأ موقعك، فسيراجعه المدير. اسمح بالموقع في المرة القادمة.";
     setResult({ tone: ok ? "ok" : "warn", text });
     if (!d.duplicate) setOptimistic((xs) => [{ id: `local-${d.at}`, kind, at: d.at, day: today, verdict: d.verdict }, ...xs]);
@@ -115,7 +115,7 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
         <p className="mt-2 flex items-center gap-2 text-sm text-ink-soft">
           {dayOff ? <><Coffee className="h-4 w-4 shrink-0 text-accent" aria-hidden />اليوم يوم راحتك</>
             : shiftRange ? <><CalendarCheck className="h-4 w-4 shrink-0 text-muted" aria-hidden />دوامك اليوم <span className="nums font-bold text-ink">{shiftRange}</span></>
-            : <><CalendarCheck className="h-4 w-4 shrink-0 text-muted" aria-hidden />لم يحدّد المدير وقت دوامك بعد</>}
+            : <><CalendarCheck className="h-4 w-4 shrink-0 text-muted" aria-hidden />لم يُحدَّد وقت دوامك بعد</>}
         </p>
         {shiftNote && <p className="mt-1 text-xs font-bold text-accent">{shiftNote}</p>}
         {(firstIn || lastOut) && (
@@ -147,6 +147,19 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
         </p>
       )}
 
+      <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
+        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        يُقرأ موقع جوالك لحظة الضغط فقط، للتأكد أنك في المقهى. لا يُتتبَّع بعدها.
+      </p>
+
+      <div>
+        <button type="button" onClick={() => setDetails((x) => !x)} aria-expanded={details}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-bold text-ink-soft hover:bg-hover">
+          {details ? <ChevronUp className="h-4 w-4" aria-hidden /> : <Info className="h-4 w-4" aria-hidden />}
+          {details ? "أخفِ" : "استعلام"}
+        </button>
+        {details && (
+          <div className="mt-3 space-y-4">
       {period && (
         <section className="rounded-2xl border border-line bg-raised p-4" aria-label="هذه الفترة">
           <h2 className="text-xs font-bold text-ink-soft">منذ {dayLabel(period.from)}</h2>
@@ -159,14 +172,9 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
               {period.absentDays > 0 && <li>غبت {period.absentDays === 1 ? "يوماً واحداً" : countNoun(period.absentDays, DAY_AGO)}</li>}
             </ul>
           )}
-          <p className="mt-2 text-[11px] leading-relaxed text-muted">يُحسب التأخير من أول حضور في اليوم. إن كان لك عذر فأخبر المدير أو أرسله من «رسالة للإدارة».</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">يُحسب التأخير من أول حضور في اليوم. إن كان لك عذر فأرسله من «رسالة للإدارة».</p>
         </section>
       )}
-
-      <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
-        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-        يُقرأ موقع جوالك لحظة الضغط فقط، للتأكد أنك في المقهى. لا يُتتبَّع بعدها.
-      </p>
 
       {recent.length > 0 && (
         <section>
@@ -182,6 +190,10 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
           </ul>
         </section>
       )}
+            {!period && recent.length === 0 && <p className="text-sm text-muted">لا تسجيلات بعد.</p>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
