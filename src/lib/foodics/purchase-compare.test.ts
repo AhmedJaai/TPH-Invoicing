@@ -132,16 +132,64 @@ describe("اقتراحُ ربط المورّد من الفواتير لا من �
       [purchase(), purchase({ id: "p2", reference: "PUR-000002", invoiceNumber: "175630" })],
       [invoice(), invoice({ id: "i2", invoiceNumber: "175630" })],
     );
-    expect(suggestSupplierLinks(r.matched)).toEqual([expect.objectContaining({ foodicsSupplierId: "fs1", supplierId: "s1", evidence: 2, against: 0 })]);
+    expect(suggestSupplierLinks(r)).toEqual([expect.objectContaining({ foodicsSupplierId: "fs1", supplierId: "s1", evidence: 2, against: 0 })]);
   });
   it("اسمٌ جامعٌ توزّعت حركاتُه على مورّدين ← لا اقتراح", () => {
     const r = comparePurchases(
       [purchase(), purchase({ id: "p2", reference: "PUR-000002", invoiceNumber: "175630" })],
       [invoice(), invoice({ id: "i2", invoiceNumber: "175630", supplierId: "s2" })],
     );
-    expect(suggestSupplierLinks(r.matched)).toEqual([]);
+    expect(suggestSupplierLinks(r)).toEqual([]);
+  });
+  it("«Aval»: الرقمُ لا يلتقي (S000102 · INV-2026-00080) والمبلغُ في يومه يلتقي ← يُقترَح «أفال»", () => {
+    const ps = [
+      purchase({ id: "p1", reference: "PUR-000089", foodicsSupplierName: "Aval", invoiceNumber: "S000102", businessDate: "2026-08-13", invoiceDate: "2026-08-13", totalMinor: 199_870 }),
+      purchase({ id: "p2", reference: "PUR-000120", foodicsSupplierName: "Aval", invoiceNumber: "S00134", businessDate: "2026-08-29", invoiceDate: "2026-08-29", totalMinor: 50_600 }),
+      /* يومُ إدخالها في فودكس بعد يومٍ من فاتورتنا، وتاريخُ فاتورتها قبلها بأسبوع */
+      purchase({ id: "p3", reference: "PUR-000045", foodicsSupplierName: "Aval", invoiceNumber: "00057", businessDate: "2026-06-30", invoiceDate: "2026-06-22", totalMinor: 101_200 }),
+    ];
+    const is = [
+      invoice({ id: "i1", supplierId: "aval", supplierName: "أفال — بدر", invoiceNumber: "INV-2026-00080", day: "2026-08-13", totalMinor: 199_870 }),
+      invoice({ id: "i2", supplierId: "aval", supplierName: "أفال — بدر", invoiceNumber: "INV-2026-00110", day: "2026-08-29", totalMinor: 50_600 }),
+      invoice({ id: "i3", supplierId: "aval", supplierName: "أفال — بدر", invoiceNumber: "INV-2026-00046", day: "2026-06-29", totalMinor: 101_200 }),
+    ];
+    const before = comparePurchases(ps, is);
+    expect(before.matched).toEqual([]);
+    expect(suggestSupplierLinks(before, is)).toEqual([expect.objectContaining({ foodicsSupplierId: "fs1", supplierId: "aval", evidence: 3, against: 0 })]);
+    /* وبعد الربط تُطابَق كلُّها بالمورّد والمبلغ — والثالثةُ بأقرب تاريخَيها */
+    const after = comparePurchases(ps.map((p) => ({ ...p, linkedSupplierId: "aval" })), is);
+    expect(after.onlyFoodics).toEqual([]);
+    expect(after.matched.map((m) => [m.purchase.id, m.invoice.id, m.basis]).sort()).toEqual([
+      ["p1", "i1", "SUPPLIER_DAY_AMOUNT"], ["p2", "i2", "SUPPLIER_DAY_AMOUNT"], ["p3", "i3", "SUPPLIER_DATE_AMOUNT"],
+    ]);
+  });
+  it("اسمٌ جامعٌ حملت حركاتُه فواتيرَ مورّدٍ اقتُرح لغيره أقوى دليلاً ← لا يُقترَح له، ولا لمورّدٍ مربوط", () => {
+    const aval = (id: string, day: string, totalMinor: number) => purchase({ id, reference: `PUR-${id}`, foodicsSupplierId: "aval", invoiceNumber: `S${id}`, businessDate: day, invoiceDate: day, totalMinor });
+    const generic = (id: string, day: string, totalMinor: number) => purchase({ id, reference: `PUR-${id}`, foodicsSupplierId: "generic", invoiceNumber: `0${id}`, businessDate: day, invoiceDate: day, totalMinor });
+    const ps = [aval("a1", "2026-08-01", 100_00), aval("a2", "2026-08-08", 200_00), aval("a3", "2026-08-15", 300_00), generic("g1", "2026-06-03", 400_00), generic("g2", "2026-06-11", 500_00)];
+    const is = [
+      invoice({ id: "i1", invoiceNumber: "INV-1", day: "2026-08-01", totalMinor: 100_00 }), invoice({ id: "i2", invoiceNumber: "INV-2", day: "2026-08-08", totalMinor: 200_00 }),
+      invoice({ id: "i3", invoiceNumber: "INV-3", day: "2026-08-15", totalMinor: 300_00 }), invoice({ id: "i4", invoiceNumber: "INV-4", day: "2026-06-03", totalMinor: 400_00 }),
+      invoice({ id: "i5", invoiceNumber: "INV-5", day: "2026-06-11", totalMinor: 500_00 }),
+    ];
+    expect(suggestSupplierLinks(comparePurchases(ps, is), is)).toEqual([expect.objectContaining({ foodicsSupplierId: "aval", supplierId: "s1", evidence: 3 })]);
+    const linked = ps.map((p) => (p.foodicsSupplierId === "aval" ? { ...p, linkedSupplierId: "s1" } : p));
+    expect(suggestSupplierLinks(comparePurchases(linked, is), is)).toEqual([]);
+  });
+  it("مبلغٌ يقع عند مورّدَين في الأيّام نفسها لا يشهد لأحدهما", () => {
+    const ps = [purchase({ invoiceNumber: "X1" }), purchase({ id: "p2", reference: "PUR-000002", invoiceNumber: "X2" })];
+    const is = [
+      invoice({ invoiceNumber: "A1" }), invoice({ id: "i2", invoiceNumber: "A2", supplierId: "s2" }),
+      invoice({ id: "i3", invoiceNumber: "A3" }), invoice({ id: "i4", invoiceNumber: "A4", supplierId: "s2" }),
+    ];
+    expect(suggestSupplierLinks(comparePurchases(ps, is), is)).toEqual([]);
+  });
+  it("مبلغُها بعيدُ اليوم لا يشهد", () => {
+    const ps = [purchase({ invoiceNumber: "X1" }), purchase({ id: "p2", reference: "PUR-000002", invoiceNumber: "X2" })];
+    const is = [invoice({ invoiceNumber: "A1", day: "2026-09-20" }), invoice({ id: "i2", invoiceNumber: "A2", day: "2026-09-20" })];
+    expect(suggestSupplierLinks(comparePurchases(ps, is), is)).toEqual([]);
   });
   it("حركةٌ واحدة لا تكفي", () => {
-    expect(suggestSupplierLinks(comparePurchases([purchase()], [invoice()]).matched)).toEqual([]);
+    expect(suggestSupplierLinks(comparePurchases([purchase()], [invoice()]), [invoice()])).toEqual([]);
   });
 });

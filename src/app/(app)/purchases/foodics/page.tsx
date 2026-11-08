@@ -210,7 +210,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
           title="مورّدو فودكس ومن يقابلهم عندنا"
           icon={Link2}
           count={unlinked.length}
-          hint="الاسم وحده لا يحدد المورّد، فقد يكون «Lanius» في فودكس هو «سرد كو» عندنا. لذلك يُبنى الاقتراح على الفواتير التي تطابق رقمها ومبلغها لا على الاسم، والربط يتم بضغطة منك. والمقارنة بالمورّد واليوم والمبلغ تحتاج إلى الربط، وبدونه تبقى المقارنة برقم الفاتورة وحده."
+          hint="الاسم وحده لا يحدد المورّد، فقد يكون «Lanius» في فودكس هو «سرد كو» عندنا. لذلك يُبنى الاقتراح على الفواتير التي طابقت حركاته، برقمها ومبلغها أو بمبلغها في يومها، لا على الاسم، والربط يتم بضغطة منك. والمقارنة بالمورّد واليوم والمبلغ تحتاج إلى الربط، وبدونه تبقى المقارنة برقم الفاتورة وحده."
         >
           {unlinked.length === 0 ? (
             <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">كل مورّد له حركات شراء مربوط.</p>
@@ -225,9 +225,9 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                       <p className="text-sm font-bold">{s.name}</p>
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                         <T s="{0} بمجموع {1}. {2}" a={[<span key="0" className="nums">{countNoun(s.purchases, TRANSACTION)}</span>, <Money key="1" minor={s.totalMinor} />, hint
-                          ? <Fragment key="2"><T s="المورّد المقترح «{0}»: طابقت {1} من حركاته فواتيرَه رقماً ومبلغاً." a={[hint.supplierName, <span key="1" className="nums">{hint.evidence}</span>]} /></Fragment>
+                          ? <Fragment key="2"><T s="المورّد المقترح «{0}»: طابقت {1} من حركاته فواتيرَه، بالرقم والمبلغ أو بالمبلغ نفسه في اليوم نفسه. اربطه فتُطابَق حركاته كلها." a={[hint.supplierName, <span key="1" className="nums">{hint.evidence}</span>]} /></Fragment>
                           : byName
-                            ? <Fragment key="2"><T s="لم تطابق حركاته أي فاتورة برقمها بعد. الاسم يشبه «{0}»، لكن {1}، فتأكد قبل الربط." a={[byName.supplierName, <strong key="1">تشابه الأسماء ليس دليلاً</strong>]} /></Fragment>
+                            ? <Fragment key="2"><T s="لم تطابق حركاته أي فاتورة برقمها ولا بمبلغها في يومها. الاسم يشبه «{0}»، لكن {1}، فتأكد قبل الربط." a={[byName.supplierName, <strong key="1">تشابه الأسماء ليس دليلاً</strong>]} /></Fragment>
                             : "لا اقتراح، لأن حركاته لم تطابق فواتير مورّد واحد. وإن كان اسماً عاماً يجمع عدة مورّدين (مثل «مورد حبوب قهوة») فاتركه بلا ربط."]} /></p>
                     </div>
                     {canLink && (

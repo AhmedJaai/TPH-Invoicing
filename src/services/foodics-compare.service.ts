@@ -79,7 +79,7 @@ export async function loadPurchaseWitness(): Promise<PurchaseWitness> {
   const comparison = comparePurchases(side, invoiceSide);
   return {
     comparison,
-    suggestions: suggestSupplierLinks(comparison.matched),
+    suggestions: suggestSupplierLinks(comparison, invoiceSide),
     foodicsSuppliers: suppliers.rows.map((s) => ({
       id: s.id, name: s.name, linkedSupplierId: s.supplier_id, linkedSupplierName: s.linked_name,
       purchases: Number(s.purchases), totalMinor: Number(s.total ?? 0),

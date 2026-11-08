@@ -94,6 +94,14 @@ export interface PurchaseComparison {
   foodicsSince: string | null;
 }
 
+/** بُعدُ الفاتورة عن الحركة بالأيّام: عن أقرب تاريخَيها — تاريخِ فاتورتها أو يومِ إدخالها في فودكس. */
+function daysOff(p: PurchaseSide, i: InvoiceSide): number {
+  return Math.min(
+    Math.abs(daysBetween(i.day, p.businessDate)),
+    p.invoiceDate ? Math.abs(daysBetween(i.day, p.invoiceDate)) : Infinity,
+  );
+}
+
 function within(gapMinor: number): boolean {
   return Math.abs(gapMinor) <= TOTAL_ROUNDING_TOLERANCE_MINOR;
 }
@@ -109,7 +117,6 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
   const matched: MatchedPair[] = [];
 
   const sortedPurchases = [...purchases].sort((a, b) => a.reference.localeCompare(b.reference));
-  const dateOf = (p: PurchaseSide) => p.invoiceDate ?? p.businessDate;
 
   const pick = (p: PurchaseSide, candidates: InvoiceSide[]): InvoiceSide | null => {
     const free = candidates.filter((i) => !takenInvoices.has(i.id));
@@ -120,7 +127,7 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
       || Number(normaliseInvoiceNumber(b.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
         - Number(normaliseInvoiceNumber(a.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
       || Math.abs(a.totalMinor - p.totalMinor) - Math.abs(b.totalMinor - p.totalMinor)
-      || Math.abs(daysBetween(a.day, dateOf(p))) - Math.abs(daysBetween(b.day, dateOf(p)))
+      || daysOff(p, a) - daysOff(p, b)
       || a.id.localeCompare(b.id),
     )[0];
   };
@@ -172,7 +179,7 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
     const found = pick(p, invoices.filter((i) =>
       i.supplierId === p.linkedSupplierId
       && within(p.totalMinor - i.totalMinor)
-      && Math.abs(daysBetween(i.day, dateOf(p))) <= DATE_WINDOW_DAYS));
+      && daysOff(p, i) <= DATE_WINDOW_DAYS));
     if (found) take(p, found, "SUPPLIER_DATE_AMOUNT");
   }
 
@@ -232,7 +239,7 @@ export interface SupplierLinkSuggestion {
   foodicsSupplierId: string;
   supplierId: string;
   supplierName: string;
-  /** كم حركةً طابقت فاتورةً لهذا المورّد برقمها ومبلغها — الدليل. */
+  /** كم حركةً طابقت فاتورةً لهذا المورّد — برقمها ومبلغها، أو بمبلغها في يومها. الدليل. */
   evidence: number;
   /** وكم حركةً لمورّد فودكس هذا طابقت مورّداً آخر — ما ينقض الاقتراح. */
   against: number;
@@ -244,30 +251,67 @@ export const LINK_MIN_EVIDENCE = 2;
 /**
  * يقترح لمورّد فودكس غير المربوط مورّدَنا — **من الفواتير التي طابقت لا من الاسم**.
  *
- * حركتان فأكثر لمورّد فودكس طابقتا رقماً ومبلغاً فواتيرَ مورّدٍ واحد عندنا، ولم
- * يطابق غيرَه أكثرُ منها. ومن توزّعت حركاتُه على مورّدين («مورد حبوب قهوة») لا
- * يُقترَح له: هو اسمٌ جامعٌ لا مورّد. والاقتراحُ يُعرَض، والربطُ بضغطة إنسان.
+ * الدليلُ حركةٌ طابقت فاتورةً لمورّدٍ عندنا بأحد بابين:
+ *   - رقمُها ومبلغُها (`matched` بتأكيد الرقم)؛
+ *   - أو **مبلغُها في يومها أو قريباً منه** ولا فاتورةَ بهذا المبلغ في هذه الأيّام لمورّدٍ غيره
+ *     (أحمد، ٨ نوفمبر ٢٠٢٦: «Aval» يكتب في فودكس ‎S000102‎ وفاتورتُه ‎INV-2026-00080‎ —
+ *     الرقمُ يُكتب بيدٍ فلا يلتقي، والمبلغُ بالهللة في اليوم نفسِه لا يتّفق مصادفةً).
+ *
+ * حركتان فأكثر لمورّدٍ واحد، والدليلُ ثلاثةُ أضعاف ما ينقضه. ومن توزّعت حركاتُه على
+ * مورّدين («مورد حبوب قهوة») لا يُقترَح له: هو اسمٌ جامعٌ لا مورّد.
+ * **والاقتراحُ يُعرَض، والربطُ بضغطة إنسان** — وبعده يطابق المورّدُ واليومُ والمبلغ.
  */
-export function suggestSupplierLinks(matched: readonly MatchedPair[]): SupplierLinkSuggestion[] {
+export function suggestSupplierLinks(comparison: Pick<PurchaseComparison, "matched" | "onlyFoodics">, invoices: readonly InvoiceSide[] = []): SupplierLinkSuggestion[] {
   const tally = new Map<string, Map<string, { name: string; n: number }>>();
-  for (const m of matched) {
+  const count = (foodicsSupplierId: string, i: InvoiceSide) => {
+    let of = tally.get(foodicsSupplierId);
+    if (!of) tally.set(foodicsSupplierId, (of = new Map()));
+    const cell = of.get(i.supplierId) ?? { name: i.supplierName, n: 0 };
+    cell.n++;
+    of.set(i.supplierId, cell);
+  };
+
+  for (const m of comparison.matched) {
     const f = m.purchase.foodicsSupplierId;
     if (!f || m.purchase.linkedSupplierId !== null || !m.agrees || !m.numberConfirms) continue;
-    let of = tally.get(f);
-    if (!of) tally.set(f, (of = new Map()));
-    const cell = of.get(m.invoice.supplierId) ?? { name: m.invoice.supplierName, n: 0 };
-    cell.n++;
-    of.set(m.invoice.supplierId, cell);
+    count(f, m.invoice);
   }
-  const out: SupplierLinkSuggestion[] = [];
+
+  /* الحركاتُ التي لم تجد فاتورةً لأنّ مورّدَها غيرُ مربوط ورقمَها لا يلتقي — يُسأل مبلغُها في يومها */
+  const taken = new Set(comparison.matched.map((m) => m.invoice.id));
+  const free = invoices.filter((i) => !taken.has(i.id));
+  for (const p of comparison.onlyFoodics) {
+    if (!p.foodicsSupplierId || p.linkedSupplierId !== null) continue;
+    const near = free.filter((i) => within(p.totalMinor - i.totalMinor) && daysOff(p, i) <= DATE_WINDOW_DAYS);
+    const owners = new Set(near.map((i) => i.supplierId));
+    /* مبلغٌ يقع عند مورّدَين في الأيّام نفسها لا يشهد لأحدهما */
+    if (owners.size === 1) count(p.foodicsSupplierId, near[0]);
+  }
+
+  const candidates: SupplierLinkSuggestion[] = [];
   for (const [foodicsSupplierId, of] of tally) {
     const ranked = [...of.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
     const [supplierId, top] = ranked[0];
     const against = ranked.slice(1).reduce((s, [, c]) => s + c.n, 0);
     /* الأغلبيّةُ الساحقة: الدليلُ ثلاثةُ أضعاف ما ينقضه على الأقلّ */
     if (top.n >= LINK_MIN_EVIDENCE && top.n >= against * 3) {
-      out.push({ foodicsSupplierId, supplierId, supplierName: top.name, evidence: top.n, against });
+      candidates.push({ foodicsSupplierId, supplierId, supplierName: top.name, evidence: top.n, against });
     }
+  }
+
+  /*
+    مورّدُنا يُقترَح لمورّد فودكس واحد — الأقوى دليلاً — ولا يُقترَح وقد رُبط بغيره. فـ«مورد حبوب
+    قهوة» حملت حركاتُه الأولى فواتيرَ «أفال» قبل أن يُنشأ «Aval» في فودكس، وحركاتٍ لغيره؛
+    وربطُه بـ«أفال» ينسب إليه ما ليس له. والاسمان لمورّدٍ واحد يُربط ثانيهما بيدٍ من القائمة.
+  */
+  const claimed = new Set(
+    [...comparison.matched.map((m) => m.purchase), ...comparison.onlyFoodics].flatMap((p) => (p.linkedSupplierId ? [p.linkedSupplierId] : [])),
+  );
+  const out: SupplierLinkSuggestion[] = [];
+  for (const c of candidates.sort((a, b) => b.evidence - a.evidence || a.foodicsSupplierId.localeCompare(b.foodicsSupplierId))) {
+    if (claimed.has(c.supplierId)) continue;
+    claimed.add(c.supplierId);
+    out.push(c);
   }
   return out;
 }
