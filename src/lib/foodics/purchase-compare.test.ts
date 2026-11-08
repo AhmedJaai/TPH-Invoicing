@@ -21,6 +21,14 @@ describe("رقمُ الفاتورة بلا زخرفه", () => {
     expect(normaliseInvoiceNumber(" 536 ")).toBe("536");
     expect(normaliseInvoiceNumber(null)).toBe("");
   });
+  it("السنةُ بين فاصلين لا تفرّق، والملتصقةُ بالرقم جزءٌ منه", () => {
+    expect(normaliseInvoiceNumber("INV/2026/00228")).toBe(normaliseInvoiceNumber("INV00228"));
+    expect(normaliseInvoiceNumber("INV-2026-00015")).toBe("inv00015");
+    expect(normaliseInvoiceNumber("2026/536")).toBe("536");
+    expect(normaliseInvoiceNumber("20261102-001")).toBe("20261102001");
+    expect(normaliseInvoiceNumber("RIFT-20261101-001")).toBe("rift20261101001");
+    expect(normaliseInvoiceNumber("2026")).toBe("2026");
+  });
 });
 
 describe("مشترياتُ فودكس أمام فواتيرنا", () => {
@@ -36,8 +44,12 @@ describe("مشترياتُ فودكس أمام فواتيرنا", () => {
     expect(r.matched[0]).toMatchObject({ agrees: false, gapMinor: -4_986 });
   });
 
-  it("«INV175629» و«INV/2026/175629» يلتقيان عند ذيل الأرقام حين يتّفق المبلغ", () => {
+  it("«INV175629» و«INV/2026/175629» رقمٌ واحد — السنةُ بين فاصلين لا تفرّق", () => {
     const r = comparePurchases([purchase({ invoiceNumber: "INV175629" })], [invoice({ invoiceNumber: "INV/2026/175629" })]);
+    expect(r.matched[0]).toMatchObject({ basis: "NUMBER", numberConfirms: true });
+  });
+  it("«INV175629» و«SI-175629» يلتقيان عند ذيل الأرقام حين يتّفق المبلغ", () => {
+    const r = comparePurchases([purchase({ invoiceNumber: "INV175629" })], [invoice({ invoiceNumber: "SI-175629" })]);
     expect(r.matched[0].basis).toBe("NUMBER_TAIL");
   });
 
@@ -47,6 +59,13 @@ describe("مشترياتُ فودكس أمام فواتيرنا", () => {
     expect(r.onlyFoodics).toHaveLength(1);
   });
 
+  it("«Aval» ‎PUR-000256‎: تاريخُ الفاتورة في فودكس قبل أسبوع ويومُ إدخالها بعد يوم — والرقمُ نفسُه بلا السنة", () => {
+    const r = comparePurchases(
+      [purchase({ linkedSupplierId: "s1", invoiceNumber: "INV00228", invoiceDate: "2026-10-31", businessDate: "2026-11-08", totalMinor: 213_785 })],
+      [invoice({ invoiceNumber: "INV/2026/00228", day: "2026-11-07", totalMinor: 213_785 })],
+    );
+    expect(r.matched.map((m) => [m.basis, m.agrees, m.numberConfirms])).toEqual([["SUPPLIER_DATE_AMOUNT", true, true]]);
+  });
   it("المورّدُ نفسُه واليومُ نفسُه والمبلغُ نفسُه ← موجودة، ولو كُتب الرقمُ في فودكس على غير صيغته", () => {
     const p = purchase({ invoiceNumber: "رقمٌ آخر", linkedSupplierId: "s1" });
     const r = comparePurchases([p], [invoice({ invoiceNumber: "X9" })]);

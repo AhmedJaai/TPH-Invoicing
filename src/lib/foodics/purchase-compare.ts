@@ -43,9 +43,15 @@ export interface InvoiceSide {
   totalMinor: number;
 }
 
-/** رقمُ الفاتورة بلا زخرفه: الحروفُ والأرقام وحدها، وبلا أصفارٍ في أوّله. */
+/**
+ * رقمُ الفاتورة بلا زخرفه: الحروفُ والأرقام وحدها، وبلا أصفارٍ في أوّله، وبلا **سنةٍ قائمةٍ بين
+ * فاصلين** — «INV/2026/00228» في المستند هي «INV00228» في فودكس (أحمد، ٨ نوفمبر ٢٠٢٦).
+ * والسنةُ الملتصقةُ بأرقامٍ بعدها («20261102-001») جزءٌ من الرقم فتبقى.
+ */
 export function normaliseInvoiceNumber(raw: string | null | undefined): string {
-  return (raw ?? "").toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, "").replace(/^0+(?=.)/, "");
+  return (raw ?? "")
+    .replace(/(^|[^0-9])20\d{2}[^0-9a-z\u0600-\u06ff]+(?=[0-9a-z])/gi, "$1")
+    .toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, "").replace(/^0+(?=.)/, "");
 }
 
 /** آخرُ سلسلةِ أرقامٍ في الرقم — «INV/2026/175629» و«INV175629» يلتقيان عند ‎175629‎. */
@@ -167,7 +173,11 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
     if (normaliseInvoiceNumber(p.invoiceNumber) === "") continue;
     const found = pick(p, numberCandidates(p).filter((i) =>
       within(p.totalMinor - i.totalMinor) && (p.linkedSupplierId === null || i.supplierId === p.linkedSupplierId)));
-    if (found) take(p, found, p.linkedSupplierId !== null && sameDay(p, found) ? "SUPPLIER_DAY_AMOUNT" : "NUMBER");
+    if (found) {
+      take(p, found, p.linkedSupplierId === null ? "NUMBER"
+        : sameDay(p, found) ? "SUPPLIER_DAY_AMOUNT"
+          : daysOff(p, found) <= DATE_WINDOW_DAYS ? "SUPPLIER_DATE_AMOUNT" : "NUMBER");
+    }
   }
 
   /* ٢. القاعدة: المورّدُ المربوط واليومُ نفسُه والمبلغُ نفسُه — والرقمُ لا يُسأل عنه */
