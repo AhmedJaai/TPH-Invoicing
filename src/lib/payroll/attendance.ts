@@ -12,7 +12,7 @@
  * نقيّ. الإحداثيّاتُ أعدادٌ صحيحة بالميكرودرجة، والمسافةُ أمتارٌ صحيحة.
  */
 import type { CheckinVerdict } from "@/db/schema";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, todayInRiyadh } from "@/lib/riyadh-time";
 
 const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
 const EARTH_RADIUS_M = 6_371_000;
@@ -116,9 +116,26 @@ export function checkinCounts(day: string, employeeId?: string): boolean {
 /** الانصرافُ يُنسب إلى يوم آخر حضورٍ قبله بعشرين ساعةٍ على الأكثر — دوامُ الليل يعبر منتصفه. */
 export const OUT_PAIRS_WITHIN_MS = 20 * 60 * 60 * 1000;
 
-export function dayForOut(outAt: Date, lastIn: { at: Date; day: string } | null): string {
+/** ما يُغتفر من انصرافٍ بعد نهاية دوام الأمس ويُنسب إليه — نسيانُ الضغط ساعةً أو ساعتين. */
+export const OUT_AFTER_END_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * يومُ الانصراف: يومُ آخر حضورٍ قبله بعشرين ساعةٍ على الأكثر. وبلا حضورٍ يُقابله (نسي أن يسجّل
+ * حضوره): إن كان دوامُ الأمس يعبر منتصف الليل وانصرف قبل نهايته بعد أربع ساعات فهو لأمس —
+ * انصرافُ ١٢:٣٠ صباحَ الأحد من دوام السبت الذي ينتهي ١٢:٣٠ لا يُحسب انصرافاً مبكّراً من دوام الأحد.
+ */
+export function dayForOut(outAt: Date, lastIn: { at: Date; day: string } | null, shiftFor?: (day: string) => DayShift): string {
   if (lastIn && outAt.getTime() - lastIn.at.getTime() <= OUT_PAIRS_WITHIN_MS && outAt >= lastIn.at) return lastIn.day;
-  return riyadhDay(outAt);
+  const today = riyadhDay(outAt);
+  if (shiftFor) {
+    const yesterday = addDays(today, -1);
+    const ys = shiftFor(yesterday);
+    if (!ys.off && ys.start) {
+      const end = shiftStartAt(yesterday, ys.start).getTime() + ys.minutes * 60_000;
+      if (end > shiftStartAt(today, "00:00").getTime() && outAt.getTime() <= end + OUT_AFTER_END_MS) return yesterday;
+    }
+  }
+  return today;
 }
 
 /* ─────────────── الدوام: من الساعة كم إلى كم ─────────────── */

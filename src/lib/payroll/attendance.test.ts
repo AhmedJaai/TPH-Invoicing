@@ -120,3 +120,24 @@ describe("سجلُّ أحمد يُحسب من أوّل يوم للتجربة", (
     expect(checkinCounts("2026-11-07", "someone-else")).toBe(false);
   });
 });
+
+describe("الانصرافُ بعد منتصف الليل لدوامٍ يعبره", () => {
+  // دوامُ السبت ١٥:٣٠ ← ٠٠:٣٠ الأحد. والأحدُ ١٦:٠٠ ← ٠٠:٠٠.
+  const shiftFor = (day: string) => (day === "2026-11-07"
+    ? { off: false as const, start: "15:30", minutes: 540, source: "BASE" as const }
+    : { off: false as const, start: "16:00", minutes: 480, source: "BASE" as const });
+  const at = (iso: string) => new Date(iso);
+  it("بلا حضورٍ يقابله: ١٢:٣٠ صباحَ الأحد لدوام السبت", async () => {
+    const { dayForOut } = await import("./attendance");
+    expect(dayForOut(at("2026-11-07T21:30:00Z"), null, shiftFor)).toBe("2026-11-07");
+  });
+  it("وبعد أربع ساعاتٍ من نهايته فهو للأحد", async () => {
+    const { dayForOut } = await import("./attendance");
+    expect(dayForOut(at("2026-11-08T07:00:00Z"), null, shiftFor)).toBe("2026-11-08");
+  });
+  it("ودوامُ أمسٍ لا يعبر منتصف الليل لا يأخذ انصرافَ الصباح", async () => {
+    const { dayForOut } = await import("./attendance");
+    const dayShift = () => ({ off: false as const, start: "08:00", minutes: 480, source: "BASE" as const });
+    expect(dayForOut(at("2026-11-07T21:30:00Z"), null, dayShift)).toBe("2026-11-08");
+  });
+});

@@ -681,7 +681,7 @@ export async function backfillFromCheckins(t: Conn, employeeId: string, today = 
       const minutes = lateMinutesAt(ins[0].at, day, shift.start);
       if (minutes > 0) { await insertDerived(t, employeeId, day, "LATE", minutes, shift.minutes); late++; }
     }
-    if (outs.length > 0 && !touched.has(`${day}:EARLY`)) {
+    if (outs.length > 0 && ins.length > 0 && !touched.has(`${day}:EARLY`)) {
       const minutes = earlyMinutesAt(outs[outs.length - 1].at, day, shift.start, shift.minutes);
       if (minutes > 0) { await insertDerived(t, employeeId, day, "EARLY", minutes, shift.minutes); early++; }
     }
@@ -1083,10 +1083,12 @@ export async function recordCheckin(input: {
       return { id: last.id, at: last.at, day: last.day, verdict: last.verdict, lateMinutes: 0, earlyMinutes: 0, duplicate: true };
     }
     let day = riyadhDay(now);
+    const rules = (await t.select().from(employeeShifts).where(eq(employeeShifts.employeeId, emp.id))).map(toRule);
     if (input.kind === "OUT") {
       const [lastIn] = await t.select({ at: attendanceCheckins.at, day: attendanceCheckins.day }).from(attendanceCheckins)
-        .where(and(eq(attendanceCheckins.employeeId, emp.id), eq(attendanceCheckins.kind, "IN"))).orderBy(desc(attendanceCheckins.at)).limit(1);
-      day = dayForOut(now, lastIn ?? null);
+        .where(and(eq(attendanceCheckins.employeeId, emp.id), eq(attendanceCheckins.kind, "IN"), sql`coalesce(${attendanceCheckins}.review, '') <> 'REJECTED'`))
+        .orderBy(desc(attendanceCheckins.at)).limit(1);
+      day = dayForOut(now, lastIn ?? null, emp.shiftStart ? (d) => shiftOn(d, emp, rules) : undefined);
     }
     const onNetwork = settings.networkIp !== null && input.ip !== null && input.ip === settings.networkIp;
     const { verdict, distanceM } = judgeCheckin({ place: settings.place, position: input.position, onNetwork });
@@ -1097,7 +1099,6 @@ export async function recordCheckin(input: {
     }).returning({ id: attendanceCheckins.id });
 
     let lateMinutes = 0, earlyMinutes = 0;
-    const rules = (await t.select().from(employeeShifts).where(eq(employeeShifts.employeeId, emp.id))).map(toRule);
     const shift = emp.shiftStart ? shiftOn(day, emp, rules) : ({ off: true } as const);
     if (!shift.off && shift.start && emp.kind === "MONTHLY" && checkinCounts(day, emp.id)) {
       const manual = await t.select({ kind: payrollAttendance.kind }).from(payrollAttendance)
@@ -1112,7 +1113,10 @@ export async function recordCheckin(input: {
           await writeDerived(t, emp.id, day, "LATE", lateMinutes, shift.minutes);
         }
       } else {
-        earlyMinutes = earlyMinutesAt(now, day, shift.start, shift.minutes);
+        /* انصرافٌ بلا حضورٍ في يومه لا يُحسب مبكّراً: لا يُعرف دوامُ أيّ يومٍ كان (نسي أن يسجّل حضوره) */
+        const [hadIn] = await t.select({ id: attendanceCheckins.id }).from(attendanceCheckins)
+          .where(and(eq(attendanceCheckins.employeeId, emp.id), eq(attendanceCheckins.day, day), eq(attendanceCheckins.kind, "IN"), sql`coalesce(${attendanceCheckins}.review, '') <> 'REJECTED'`)).limit(1);
+        earlyMinutes = hadIn ? earlyMinutesAt(now, day, shift.start, shift.minutes) : 0;
         if (!handled && !manualKinds.has("EARLY")) {
           await t.update(payrollAttendance).set({ voidedAt: now })
             .where(and(eq(payrollAttendance.employeeId, emp.id), eq(payrollAttendance.day, day), eq(payrollAttendance.kind, "EARLY"), eq(payrollAttendance.source, "CHECKIN"), isNull(payrollAttendance.voidedAt)));
