@@ -15,6 +15,7 @@ import { failWith } from "@/services/guard";
 import { consume } from "@/services/rate-limit.service";
 import { CAPTURE_READING_MAX_AGE_MS, CaptureInputError, inspectFile, readCaptureLater, resolveLink, saveCapture, submitDraft } from "@/services/capture.service";
 import { loadCachedReading } from "@/services/reading-cache.service";
+import { employeeOfLink, notifyInvoiceReceivers } from "@/services/team-invoices.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +38,8 @@ export async function POST(request: Request) {
     if (typeof draftId === "string" && draftId !== "") {
       const sent = await submitDraft(link, draftId, note);
       if (!sent) return NextResponse.json({ missing: true });
+      /* مستلمُ الفواتير (موظّفُ المشتريات) يُنبَّه في جواله — بعد الردّ، فلا ينتظره المصوِّر */
+      after(async () => { await notifyInvoiceReceivers(await employeeOfLink(link.id)); });
       if (!(await loadCachedReading(sent.sha256, CAPTURE_READING_MAX_AGE_MS))) {
         after(() => withDeadline(55_000, () => readCaptureLater(sent.id, link.createdById)));
       }
@@ -46,6 +49,7 @@ export async function POST(request: Request) {
     const file = await inspectFile(form.get("file"));
     const saved = await saveCapture(link, file, note);
     if (saved.kind === "DUPLICATE") return NextResponse.json({ duplicate: saved.where });
+    after(async () => { await notifyInvoiceReceivers(await employeeOfLink(link.id)); });
 
     if (!(await loadCachedReading(file.sha256, CAPTURE_READING_MAX_AGE_MS))) {
       after(() => withDeadline(55_000, () => readCaptureLater(saved.id, link.createdById)));

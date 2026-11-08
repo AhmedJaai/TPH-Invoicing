@@ -9,6 +9,7 @@ import { loadEmployees, myPeriod, mySlip, recentCheckins, resolveCheckinToken, w
 import { myMessages } from "@/services/team.service";
 import { loadBoard, myRequests } from "@/services/team-board.service";
 import { loadStockOptions } from "@/services/team-stock.service";
+import { hasTeamSubscription, invoiceInbox } from "@/services/team-invoices.service";
 import { loadTeamCount } from "@/services/team-count.service";
 import { activeIn } from "@/lib/payroll/calc";
 import { formatQuantity } from "@/lib/team-units";
@@ -75,6 +76,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
     employee.canCountInventory ? loadTeamCount(today) : Promise.resolve(null),
   ]);
   const mates = everyone.filter((e) => e.id !== employee.id && activeIn(e, today.slice(0, 7)) && (!e.leftOn || e.leftOn >= today)).map((e) => ({ id: e.id, name: e.name, daysOff: e.daysOff }));
+  const [inbox, pushOn] = employee.invoicesSince ? await Promise.all([invoiceInbox(employee.invoicesSince, today), hasTeamSubscription(employee.id)]) : [null, false];
   return (
     <TeamApp
       token={token}
@@ -99,6 +101,11 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
         productName: r.productName, quantity: r.quantityMilli !== null && r.unit ? formatQuantity(r.quantityMilli, r.unit) : null,
         decisionNote: r.decisionNote, createdAt: r.createdAt.toISOString(), permanent: r.permanent,
       }))}
+      inbox={inbox ? inbox.map((i) => ({
+        id: i.id, sender: i.sender, createdAt: i.createdAt.toISOString(), note: i.note, isPdf: i.mimeType === "application/pdf", viewable: i.viewable,
+        read: i.read, enteredAt: i.enteredAt?.toISOString() ?? null, enteredBy: i.enteredBy,
+      })) : null}
+      pushOn={pushOn}
       mates={mates}
       myDaysOff={employee.daysOff}
       stock={stock}

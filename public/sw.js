@@ -128,16 +128,39 @@ async function morningBrief() {
   }
 }
 
+/* ── تنبيهُ «TPH Team»: عاملٌ مسجَّلٌ بنطاق رابط الموظّف (`/a/<رمز>`) يسأل برمزه عن نصّه ── */
+const TEAM_FALLBACK = { title: "TPH Team", body: "وصلت فاتورة جديدة.", url: "/" };
+
+function teamToken() {
+  const m = /\/a\/([A-Za-z0-9_-]{24,64})/.exec(new URL(self.registration.scope).pathname);
+  return m ? m[1] : null;
+}
+
+async function teamBrief(token) {
+  const fallback = { ...TEAM_FALLBACK, url: `/a/${token}?tab=invoices` };
+  try {
+    const res = await fetch(`/api/team/push-brief?token=${encodeURIComponent(token)}`, { cache: "no-store", referrerPolicy: "no-referrer" });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    if (!data || typeof data.title !== "string" || typeof data.body !== "string") return fallback;
+    const url = typeof data.url === "string" && data.url.startsWith("/a/") ? data.url : fallback.url;
+    return { title: data.title, body: data.body, url };
+  } catch {
+    return fallback;
+  }
+}
+
 self.addEventListener("push", (event) => {
+  const token = teamToken();
   event.waitUntil(
-    morningBrief().then((b) =>
+    (token ? teamBrief(token) : morningBrief()).then((b) =>
       self.registration.showNotification(b.title, {
         body: b.body,
         lang: "ar",
         dir: "rtl",
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
-        tag: "morning-brief",
+        tag: token ? "team-invoice" : "morning-brief",
         data: { url: b.url },
       }),
     ),

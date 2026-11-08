@@ -177,6 +177,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   TEAM_MESSAGE_REPLIED: "رد على رسالة من الفريق",
   TEAM_MESSAGE_CLOSED: "إغلاق رسالة من الفريق",
   TEAM_MESSAGE_REOPENED: "إعادة فتح رسالة من الفريق",
+  EMPLOYEE_INVOICE_RECEIVER_CHANGED: "تغيير مستلم فواتير الفريق",
   TEAM_BOARD_SAVED: "تعديل مرجع الفريق",
   TEAM_BOARD_ARCHIVED: "إخراج بطاقة من مرجع الفريق",
   TEAM_REQUEST_APPROVED: "اعتماد طلب موظف",

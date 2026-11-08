@@ -102,5 +102,6 @@
   "101_swap_permanent.sql": "a2c6bd218fc898ca563734a13b3311641a29e0f5247c6fc4e71b93a1da22f0d8",
   "102_team_inventory_count.sql": "b1d9d4ff0b40145c44699d86a09b50a9c1cec282ebf1bcc2420f1f93cf30e398",
   "103_team_count_sent.sql": "0fa92031cbd843c993657bbabe183db029a32a8aee2f31f2bec49746adef0853",
-  "104_count_parts.sql": "b4ffdd06525b6e0b7d1ded6e340e1a2d7e1f0ea48e0a6438044224422e327431"
+  "104_count_parts.sql": "b4ffdd06525b6e0b7d1ded6e340e1a2d7e1f0ea48e0a6438044224422e327431",
+  "105_invoice_receivers.sql": "77bbefaf62db9240e3f7b624e957849b5fb8cb5917c8340cb49a611db8b24731"
 }

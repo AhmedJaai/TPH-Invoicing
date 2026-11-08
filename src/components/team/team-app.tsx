@@ -19,6 +19,7 @@ import type { MyMessageView } from "./message-panel";
 import { BoardPanel, type BoardCard } from "./board-panel";
 import { RequestsPanel, type MyRequestView, type StockOption } from "./requests-panel";
 import type { SentItem } from "@/components/scan/scanner";
+import { InvoiceInbox, type InboxItem } from "./invoice-inbox";
 
 const Scanner = dynamic(() => import("@/components/scan/scanner").then((m) => m.Scanner), {
   ssr: false,
@@ -43,6 +44,9 @@ export interface TeamAppProps {
   stock: StockOption[];
   /** جردُ السبت — لمن أذن له المالك وحده، وإلّا `null` فلا تظهر الصفحة. */
   count: TeamCountView | null;
+  /** فواتيرُ الفريق لمستلمها — `null` لغيره. */
+  inbox?: InboxItem[] | null;
+  pushOn?: boolean;
 }
 
 const SEEN_KEY = "tph-team.seen-replies";
@@ -57,7 +61,24 @@ function writeSeen(v: string) {
   try { window.localStorage.setItem(SEEN_KEY, v); } catch { /* تخزينٌ ممنوع: تبقى النقطة */ }
 }
 
-export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, count }: TeamAppProps) {
+/** «الفواتير» لمستلمها: ما وصل من الفريق، وتصويرُ فاتورته هو. */
+function InvoicesTab({ token, name, captures, inbox, subscribed }: { token: string; name: string; captures: SentItem[]; inbox: InboxItem[]; subscribed: boolean }) {
+  const waiting = inbox.filter((i) => !i.enteredAt).length;
+  const [view, setView] = useState<"inbox" | "scan">("inbox");
+  return (
+    <div className="space-y-4">
+      <div role="tablist" aria-label="الفواتير" className="grid grid-cols-2 gap-1.5 rounded-2xl border border-line bg-raised p-1.5">
+        {([["inbox", waiting > 0 ? `وصلت (${waiting})` : "وصلت"], ["scan", "صوّر فاتورة"]] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
+            className={`min-h-12 rounded-xl text-sm font-bold ${view === id ? "bg-accent text-accent-ink" : "text-ink-soft hover:bg-hover"}`}>{label}</button>
+        ))}
+      </div>
+      {view === "inbox" ? <InvoiceInbox token={token} items={inbox} subscribed={subscribed} /> : <Scanner token={token} label={name} recent={captures} embedded />}
+    </div>
+  );
+}
+
+export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, count, inbox = null, pushOn = false }: TeamAppProps) {
   const tabs = teamTabsFor(count !== null);
   /* جردُ السبت ينتظره: لم يُبدأ، أو لم يُرسَل، أو عُدّل بعد إرساله — يُذكَّر في «الحضور» ونقطةٌ على «الجرد» */
   const countDue = count !== null && (count.state === "not-started" || (count.state === "open" && (!count.sent || count.sent.stale)));
@@ -116,7 +137,7 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
         )}
         {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}
         {tab === "count" && count && <CountPanel token={token} view={count} />}
-        {tab === "invoices" && <Scanner token={token} label={name} recent={captures} embedded />}
+        {tab === "invoices" && (inbox ? <InvoicesTab token={token} name={name} captures={captures} inbox={inbox} subscribed={pushOn} /> : <Scanner token={token} label={name} recent={captures} embedded />)}
         {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} myDaysOff={myDaysOff} />}
       </main>
 

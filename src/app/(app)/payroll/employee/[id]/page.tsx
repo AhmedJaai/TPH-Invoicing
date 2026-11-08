@@ -382,6 +382,18 @@ export default async function EmployeePage({ params, searchParams }: { params: P
             </PostAction>
           )}
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3">
+          <div className="min-w-0 flex-1 basis-56">
+            <p className="flex items-center gap-2 text-sm font-bold">يستلم فواتير الفريق {employee.receivesInvoices ? <Badge tone="ok">نعم</Badge> : <Badge tone="muted">لا</Badge>}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">كل فاتورة يصوّرها أي موظف تصله في «الفواتير» في {TEAM_APP_NAME} ليُدخلها في فودكس، ويصله تنبيه على جواله بكل فاتورة. يرى الصورة وما قُرئ منها فقط.</p>
+          </div>
+          {canEdit && (
+            <PostAction url="/api/payroll/employee" body={{ action: "invoice-receiver", id, on: !employee.receivesInvoices }} variant={employee.receivesInvoices ? "quiet" : "secondary"}
+              done={employee.receivesInvoices ? "لم تعد تصله الفواتير" : "صارت تصله الفواتير"}>
+              {employee.receivesInvoices ? "أوقف" : "اجعله يستلمها"}
+            </PostAction>
+          )}
+        </div>
       </Section>
 
       <Section id="docs" title="الوثائق" icon={FileBadge} count={docs.length} hint="الإقامة والشهادة الصحية وغيرها، ويُذكّرك النظام قبل انتهائها." action={canEdit ? <ObligationForm preset={{ kind: "HEALTH_CERTIFICATE", holder: employee.name, employeeId: id }} /> : undefined}>

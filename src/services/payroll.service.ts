@@ -64,6 +64,9 @@ export interface EmployeeView {
   hasCheckinLink: boolean;
   /** يُدخل جرد السبت من رابطه (102). */
   canCountInventory: boolean;
+  /** يستلم فواتيرَ الفريق ليُدخلها في فودكس (105)، ومنذ متى. */
+  receivesInvoices: boolean;
+  invoicesSince: Date | null;
   note: string | null;
   rates: { id: string; fromMonth: string; amountMinor: number }[];
   /** الدوامُ المخصَّص لأيّام الأسبوع ولأيّامٍ بعينها (099). */
@@ -80,7 +83,7 @@ function toView(e: EmployeeRow, rates: readonly (typeof employeeRates.$inferSele
     id: e.id, name: e.name, kind: e.kind, jobTitle: e.jobTitle, phone: e.phone, nationalId: e.nationalId,
     bankBeneficiaryId: e.bankBeneficiaryId, iban: e.iban, hiredOn: e.hiredOn, leftOn: e.leftOn,
     shiftStart: e.shiftStart, shiftMinutes: e.shiftMinutes, lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
-    hasCheckinLink: e.checkinTokenHash !== null, canCountInventory: e.canCountInventory, note: e.note,
+    hasCheckinLink: e.checkinTokenHash !== null, canCountInventory: e.canCountInventory, receivesInvoices: e.invoicesSince !== null, invoicesSince: e.invoicesSince, note: e.note,
     rates: rates.filter((r) => r.employeeId === e.id).map((r) => ({ id: r.id, fromMonth: r.fromMonth, amountMinor: r.amountMinor })),
     shiftRules: shifts.filter((r) => r.employeeId === e.id).map(toRule),
   };
@@ -965,6 +968,17 @@ export async function setInventoryAccess(employeeId: string, on: boolean, actorI
   });
 }
 
+/** يجعله مستلمَ فواتير الفريق في «TPH Team» (يراها ويُنبَّه بها) أو يسحب ذلك — للمالك (105). */
+export async function setInvoiceReceiver(employeeId: string, on: boolean, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const done = await t.update(employees).set({ invoicesSince: on ? new Date() : null, updatedAt: new Date() })
+      .where(and(eq(employees.id, employeeId), on ? sql`${employees}.invoices_since is null` : sql`${employees}.invoices_since is not null`)).returning({ id: employees.id });
+    if (done.length === 0) return false;
+    await recordAudit({ actorId, action: "EMPLOYEE_INVOICE_RECEIVER_CHANGED", entityType: "employee", entityId: employeeId, before: { "يستلم الفواتير": !on }, after: { "يستلم الفواتير": on } }, t);
+    return true;
+  });
+}
+
 export interface CheckinEmployee {
   id: string;
   name: string;
@@ -976,6 +990,8 @@ export interface CheckinEmployee {
   shiftRules: ShiftRule[];
   /** يُدخل جردَ السبت من رابطه (102). */
   canCountInventory: boolean;
+  receivesInvoices: boolean;
+  invoicesSince: Date | null;
 }
 
 /** الموظّفُ لهذا الرمز — ما دام لم يخرج ورابطُه لم يُلغَ. */
@@ -987,7 +1003,7 @@ export async function resolveCheckinToken(token: string | null | undefined): Pro
   const rules = await db.select().from(employeeShifts).where(eq(employeeShifts.employeeId, row.id));
   return {
     id: row.id, name: row.name, kind: row.kind, shiftStart: row.shiftStart, shiftMinutes: row.shiftMinutes,
-    lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff, shiftRules: rules.map(toRule),
+    lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff, shiftRules: rules.map(toRule), receivesInvoices: row.invoicesSince !== null, invoicesSince: row.invoicesSince,
     canCountInventory: row.canCountInventory,
   };
 }

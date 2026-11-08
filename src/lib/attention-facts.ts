@@ -26,7 +26,13 @@ import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
 import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, vatRiskKey } from "./signal-decisions";
-import { MAX_PLAUSIBLE_PRICE_MULTIPLE } from "./items";
+import { annualImpactMinor, isRealMove, trackPrices } from "./price-watch";
+import { addDays } from "./riyadh-time";
+
+/** ارتفاعٌ دون ٥٪ لا يُسأل عنه في الطابور، وما مضى عليه أكثرُ من ١٢٠ يوماً خبرٌ قديم. */
+const PRICE_RISE_FLOOR_BP = 500;
+const PRICE_RISE_RECENT_DAYS = 120;
+import { loadPriceLines } from "@/services/price-watch.service";
 import { todayInRiyadh } from "./riyadh-time";
 import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
 
@@ -114,47 +120,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         where suppliers.is_active and ${needsContractSql()}
         order by unbacked desc
       `),
-    db.execute<Row>(sql`
-        with ranked as (
-          select l.normalized_description, l.supplier_id, s.name_ar, l.description,
-                 l.unit_price_minor, l.invoice_date,
-                 row_number() over (partition by l.supplier_id, l.normalized_description
-                                    order by l.invoice_date desc) as rn
-          from invoice_lines l left join suppliers s on s.id = l.supplier_id
-          where l.invoice_date is not null and l.supplier_id is not null
-            and l.normalized_description <> ''
-        ),
-        pairs as (
-          select a.supplier_id, a.normalized_description, a.name_ar, a.description,
-                 a.unit_price_minor as now_price,
-                 b.unit_price_minor as then_price
-          from ranked a join ranked b
-            on a.supplier_id = b.supplier_id
-           and a.normalized_description = b.normalized_description
-           and a.rn = 1 and b.rn = 2
-          where a.unit_price_minor > b.unit_price_minor
-        )
-        /*
-          الأثر السنويّ = الزيادة في سعر الوحدة × ما اشتري منه فعلاً في
-          آخر سنة، بحساب القاعدة العشريّ لا بعدد عائم. وكان «× ٢٠»: عشرون
-          شراءً في السنة لكلّ صنف مفترضةً بيد — رقم مخترع يعرض مالاً.
-        */
-        select p.supplier_id, p.normalized_description, p.name_ar, p.description, p.now_price, p.then_price,
-               round((p.now_price - p.then_price) * coalesce((
-                 select sum(l.qty) from invoice_lines l
-                  where l.supplier_id = p.supplier_id
-                    and l.normalized_description = p.normalized_description
-                    and l.invoice_date >= now() - interval '365 days'
-               ), 0))::bigint as annual_minor
-        from pairs p
-        /*
-          وما تضاعف فوق ثلاثة أضعاف وحدة أخرى لا سعر ارتفع: «تشيز كيك الربتزل» قطعةً
-          بـ١٢٫٥٠ ثمّ صينيةً بـ١٧٥ قيل «ارتفع ١٣٠٠٪ ويكلّفك ٩٧٥ في السنة» (لوريفا، سبتمبر ٢٠٢٦).
-        */
-        where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
-          and p.now_price <= ${MAX_PLAUSIBLE_PRICE_MULTIPLE} * p.then_price
-        order by annual_minor desc, (p.now_price - p.then_price) desc limit 40
-      `),
+    /* تغيّرُ السعر من بابه الواحد (`lib/price-watch.ts`) — سنةٌ وشهران ليُعرف السعرُ المعتاد قبل التغيّر */
+    loadPriceLines({ sinceDays: 430 }),
     db.execute<{ start: string | null; end: string | null }>(sql`
         select to_char(min(value_date), 'YYYY-MM-DD') as start,
                to_char(max(value_date), 'YYYY-MM-DD') as end
@@ -300,24 +267,34 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const noContract = noContractRows.map((r) => String(r.name_ar));
 
   /*
-   * ارتفاعات الأسعار: تُقارَن آخر قراءتين مختلفتين للصنف عند مورّده.
-   * والمقارنة داخل المورّد الواحد عمداً — الانتقال من مورّد غالٍ إلى رخيص
-   * ليس «انخفاض سعر».
+   * ارتفاعاتُ الأسعار: ما أكّدته فاتورتان فأكثر ولا يفسّره غيرُ السعر (الضريبة، أو وحدةٌ
+   * قُرئت خطأ)، ٥٪ فأكثر، ووقع في آخر ١٢٠ يوماً — `lib/price-watch.ts`. كان يقارن آخرَ
+   * سطرين فيصير بندا فاتورةٍ واحدة بسعرين، أو قراءةٌ خاطئةٌ واحدة، «ارتفاعاً».
+   * والمقارنة داخل المورّد الواحد عمداً — الانتقال من مورّد غالٍ إلى رخيص ليس «انخفاض سعر».
    */
   /* «علمتُ» على صنفٍ يُخرجه من البند حتى يرتفع سعرُه ثانيةً (`priceRiseKey`) */
   const silenced = silencedKeys((await db.execute<{ key: string; decision: string }>(sql`
     select key, decision from alert_resolutions where key like 'price-rise:%' or key like 'statement-gap:%' or key like 'statement-missing:%'`)).rows, todayInRiyadh());
-  const rises = q6.rows
-    .filter((r) => !silenced.has(priceRiseKey(String(r.supplier_id), String(r.normalized_description), Number(r.now_price))))
+  const supplierNames = new Map((await db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)).map((r) => [r.id, r.name]));
+  const recentFrom = addDays(today, -PRICE_RISE_RECENT_DAYS);
+  const rises = trackPrices(q6, today)
+    .flatMap((item) => {
+      const s = item.state;
+      if (!isRealMove(s) || s.deltaBp < PRICE_RISE_FLOOR_BP || s.sinceDay < recentFrom) return [];
+      if (silenced.has(priceRiseKey(item.supplierId, item.normalized, s.toMinor))) return [];
+      return [{ item, s, annual: annualImpactMinor(item, s.fromMinor, s.toMinor) }];
+    })
+    .sort((a, b) => (b.annual ?? 0) - (a.annual ?? 0) || (b.s.toMinor - b.s.fromMinor) - (a.s.toMinor - a.s.fromMinor))
     .slice(0, 10);
 
-  const priceRises = rises.map<AttentionEvidence>((r) => ({
-    label: String(r.description).slice(0, 40),
-    sub: `${r.name_ar ?? "—"} · ${formatRiyalsDisplay(Number(r.then_price))} ← ${formatRiyalsDisplay(Number(r.now_price))}`,
-    amountMinor: Number(r.now_price) - Number(r.then_price),
-    signalKey: priceRiseKey(String(r.supplier_id), String(r.normalized_description), Number(r.now_price)),
+  const priceRises = rises.map<AttentionEvidence>(({ item, s }) => ({
+    label: item.displayName.slice(0, 40),
+    sub: `${supplierNames.get(item.supplierId) ?? "—"} · ${formatRiyalsDisplay(s.fromMinor)} ← ${formatRiyalsDisplay(s.toMinor)}`,
+    amountMinor: s.toMinor - s.fromMinor,
+    signalKey: priceRiseKey(item.supplierId, item.normalized, s.toMinor),
   }));
-  const priceRiseAnnualMinor = rises.reduce((sum, r) => sum + Number(r.annual_minor), 0);
+  /* الأثرُ ممّا عُرفت كمّيّتُه وحده — المجهولُ لا يُجمع صفراً ولا يُخترع */
+  const priceRiseAnnualMinor = rises.reduce((sum, r) => sum + (r.annual ?? 0), 0);
 
   /*
     فجوات التغطية — تُحسب من فترات الاستيرادات نفسها.

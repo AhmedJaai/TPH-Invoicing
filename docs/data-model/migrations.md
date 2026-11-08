@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ١٠٢
+## الجداول — ١٠٣
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -20,7 +20,7 @@
 `finance_declarations` `finance_snapshots` `finance_readings`
 `capture_links` `captures`
 `employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
-`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages` · `employee_shifts` · `team_board` `team_requests`
+`advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages` · `employee_shifts` · `team_board` `team_requests` `team_push_subscriptions`
 
 التعريف في `src/db/schema.ts`.
 
@@ -146,6 +146,7 @@
 | `101_swap_permanent.sql` | `team_requests.permanent` — تبديلُ الراحة دائماً (يتبادلان يومَي الراحة الأسبوعيّين) أو لمرّة — إضافةٌ خالصة |
 | `102_team_inventory_count.sql` | `employees.can_count_inventory` · `inventory_count_lines.counted_by_employee_id` · `inventory_counts.started_by_employee_id` — جردُ السبت من «TPH Team» — إضافةٌ خالصة |
 | `103_team_count_sent.sql` | `inventory_counts.team_sent_at` · `team_sent_by_employee_id` — متى أُرسل تقريرُ جرد السبت واتساب ومَن أرسله — إضافةٌ خالصة |
+| `105_invoice_receivers.sql` | فواتيرُ الفريق لموظّف المشتريات: `employees.invoices_since` (يستلمها منذ منحه، لا قبل)، و`captures.foodics_entered_at`/`_by` (أدخلها في فودكس)، و`team_push_subscriptions` (تنبيهُ جواله، نداءٌ فارغ) — إضافةٌ خالصة |
 | `104_count_parts.sql` | `inventory_count_lines.count_parts` — العدُّ بخاناته (كرتون · حبّة · كيلو · جرام) كما كُتب، بجانب مجموعه — إضافةٌ خالصة |
 | `100_team_board.sql` | «TPH Team»: `team_board` (مرجعُ النظافة والطحنات والوصفات والبن والإعلانات — لا مهامّ) و`team_requests` (اقتراحُ تعديل · إجازة · تبديل · تالف، لا يُنفَّذ إلّا بإقرار) — إضافةٌ خالصة |
 | `099_employee_shifts.sql` | `employee_shifts` — الدوامُ المخصَّص: وقتٌ لكلّ يومٍ من الأسبوع، أو ليومٍ بعينه أو راحتُه؛ اليومُ بعينه يغلب يومَ الأسبوع ويغلب الأصل — إضافةٌ خالصة |

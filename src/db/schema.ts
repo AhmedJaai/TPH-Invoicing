@@ -1862,6 +1862,20 @@ export const dailyChecks = pgTable("daily_checks", {
  * خاملٌ بلا `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`. والإشعارُ بلا محتوى: عاملُ الخدمة
  * يسأل `/api/push/brief` بجلسة صاحبه — فلا يمرّ رقمٌ بمزوّد الإشعار.
  */
+/** جوالُ موظّفٍ مشتركٌ في تنبيه «TPH Team» (105) — نداءٌ فارغ، ونصُّه برمز رابطه. */
+export const teamPushSubscriptions = pgTable("team_push_subscriptions", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references((): AnyPgColumn => employees.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: now(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  failures: integer("failures").notNull().default(0),
+  lastError: text("last_error"),
+}, (t) => [index("team_push_subscriptions_employee_idx").on(t.employeeId)]);
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: id(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -2505,6 +2519,9 @@ export const captures = pgTable("captures", {
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionNote: text("decision_note"),
   createdAt: now(),
+  /** أدخلها موظّفُ المشتريات في فودكس (105). */
+  foodicsEnteredAt: timestamp("foodics_entered_at", { withTimezone: true }),
+  foodicsEnteredBy: text("foodics_entered_by").references((): AnyPgColumn => employees.id, { onDelete: "set null" }),
 });
 
 /* ───────────────────────── الموظّفون والرواتب والحضور (084) ───────────────────────── */
@@ -2526,6 +2543,8 @@ export const employees = pgTable("employees", {
   lateGraceMinutes: integer("late_grace_minutes").notNull().default(0),
   daysOff: text("days_off").notNull().default(""),
   checkinTokenHash: text("checkin_token_hash"),
+  /** يستلم فواتيرَ الفريق في «TPH Team» ليُدخلها في فودكس ويُنبَّه بها — منذ هذه اللحظة (105). `null`: لا. */
+  invoicesSince: timestamp("invoices_since", { withTimezone: true }),
   /** يُدخل جردَ السبت من رابطه (102) — عدٌّ لا تعديلُ جردٍ قديم. */
   canCountInventory: boolean("can_count_inventory").notNull().default(false),
   note: text("note"),

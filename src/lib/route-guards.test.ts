@@ -97,6 +97,10 @@ const UNGUARDED: Record<string, string> = {
   /* «TPH Team»: الرمزُ نفسُه إذنُه، والعدُّ لكلّ موظّف، ولا يملك إلّا إضافةَ رسالةٍ للإدارة */
   "src/app/api/team/message/route.ts": "رسالةُ الموظّف للإدارة من TPH Team — برمز رابطه لا بجلسة",
   "src/app/api/team/count/route.ts": "جردُ السبت من TPH Team — برمز رابطه ولمن أذن له المالك وحده، ولأسبوع هذا السبت لا جرداً قديماً",
+  "src/app/api/team/invoices/route.ts": "مستلمُ الفواتير يعلّم «أدخلتها في فودكس» — برمز رابطه وصلاحيّته (invoices_since)",
+  "src/app/api/team/invoice-file/route.ts": "صورةُ فاتورة الفريق لمستلم الفواتير — برمز رابطه وصلاحيّته، قراءةٌ لا كتابة",
+  "src/app/api/team/push/route.ts": "اشتراكُ جوال الموظّف في تنبيه TPH Team — برمز رابطه",
+  "src/app/api/team/push-brief/route.ts": "نصُّ تنبيه TPH Team بلا أسماءٍ ولا مبالغ — برمز رابطه",
   "src/app/api/team/request/route.ts": "طلبُ الموظّف (إجازة · تبديل · تالف · تعديل مرجع) من TPH Team — برمز رابطه، ولا يُنفَّذ إلّا بإقرار",
 };
 
