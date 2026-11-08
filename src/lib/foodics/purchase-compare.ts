@@ -67,7 +67,12 @@ export type MatchBasis =
   /** الرقمُ نفسُه — لمورّدٍ لم يُربَط، أو حين اختلف المبلغ. */
   | "NUMBER"
   /** ذيلُ الأرقام نفسُه والمبلغُ أو المورّدُ يؤيّده. */
-  | "NUMBER_TAIL";
+  | "NUMBER_TAIL"
+  /**
+   * مورّدُ فودكس غيرُ مربوط، وفاتورةٌ واحدةٌ لا غيرُها عندنا بمبلغها بالهللة في يومها أو قريباً منه.
+   * «مورد حبوب قهوة» حمل فواتيرَ «أفال» قبل أن يُنشأ «Aval» في فودكس — ولا يُربط، فهو اسمٌ جامع.
+   */
+  | "DAY_AMOUNT";
 
 export interface MatchedPair {
   purchase: PurchaseSide;
@@ -209,6 +214,24 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
     if (found) take(p, found, "NUMBER_TAIL");
   }
 
+  /*
+    ٦. مورّدُ فودكس غيرُ مربوط ورقمُه لا يلتقي: يُقرَن بفاتورةٍ **واحدةٍ لا غيرُها** بمبلغه في يومه،
+       ثمّ في أيّامٍ قريبة. فإن وقع المبلغُ على فاتورتَين فلا يُختار — المبلغُ وحده لا يفرّق بينهما.
+       (أحمد، ٨ نوفمبر ٢٠٢٦: «نفس الفاتورة بنفس المبلغ بنفس اليوم، والفرقُ في كتابة الرقم».)
+  */
+  for (const near of [(p: PurchaseSide, i: InvoiceSide) => daysOff(p, i) === 0, (p: PurchaseSide, i: InvoiceSide) => daysOff(p, i) <= DATE_WINDOW_DAYS]) {
+    for (const p of sortedPurchases) {
+      if (takenPurchases.has(p.id) || p.linkedSupplierId !== null) continue;
+      /* المبلغُ بالهللة لا بسماحة الريال: «١٤٠» من البقالة ليست «١٤١» من المطبعة */
+      const free = invoices.filter((i) => !takenInvoices.has(i.id) && i.totalMinor === p.totalMinor && near(p, i));
+      if (free.length !== 1) continue;
+      /* وحركةٌ أخرى غيرُ مربوطة تطلب الفاتورةَ نفسَها بالشرط نفسِه — لا يُحسَم بينهما */
+      const rivals = sortedPurchases.filter((o) => o.id !== p.id && !takenPurchases.has(o.id) && o.linkedSupplierId === null
+        && o.totalMinor === free[0].totalMinor && near(o, free[0]));
+      if (rivals.length === 0) take(p, free[0], "DAY_AMOUNT");
+    }
+  }
+
   const foodicsSince = purchases.length === 0 ? null : purchases.map((p) => p.businessDate).sort()[0];
   /* مورّدٌ «يتابعه فودكس»: رُبط به مورّدُ فودكس، أو طابقت له فاتورةٌ فعلاً */
   const tracked = new Set<string>([
@@ -273,7 +296,7 @@ export function suggestSupplierLinks(comparison: Pick<PurchaseComparison, "match
 
   for (const m of comparison.matched) {
     const f = m.purchase.foodicsSupplierId;
-    if (!f || m.purchase.linkedSupplierId !== null || !m.agrees || !m.numberConfirms) continue;
+    if (!f || m.purchase.linkedSupplierId !== null || !m.agrees || !(m.numberConfirms || m.basis === "DAY_AMOUNT")) continue;
     count(f, m.invoice);
   }
 
@@ -282,7 +305,7 @@ export function suggestSupplierLinks(comparison: Pick<PurchaseComparison, "match
   const free = invoices.filter((i) => !taken.has(i.id));
   for (const p of comparison.onlyFoodics) {
     if (!p.foodicsSupplierId || p.linkedSupplierId !== null) continue;
-    const near = free.filter((i) => within(p.totalMinor - i.totalMinor) && daysOff(p, i) <= DATE_WINDOW_DAYS);
+    const near = free.filter((i) => i.totalMinor === p.totalMinor && daysOff(p, i) <= DATE_WINDOW_DAYS);
     const owners = new Set(near.map((i) => i.supplierId));
     /* مبلغٌ يقع عند مورّدَين في الأيّام نفسها لا يشهد لأحدهما */
     if (owners.size === 1) count(p.foodicsSupplierId, near[0]);

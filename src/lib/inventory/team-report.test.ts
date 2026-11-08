@@ -45,3 +45,17 @@ describe("countedText", () => {
     expect(countedText({ name: "سكر", categoryLabel: "أخرى", counted: null, entered: null })).toBeNull();
   });
 });
+
+describe("ما يُقارَن وما يُحفظ", () => {
+  it("أصنافُ المالك أوّلاً، وما عدّه الفريقُ خارجها تحت «للحفظ فقط»", () => {
+    const text = teamCountReport({
+      week: { start: "2026-11-01", end: "2026-11-07" }, by: "أنس",
+      lines: [
+        { name: "مناديل", categoryLabel: "أخرى", counted: "8 حبّة", inScope: false },
+        { name: "Yemen", categoryLabel: "أخرى", counted: "569 جرام", inScope: true },
+      ],
+    });
+    expect(text.indexOf("• Yemen")).toBeLessThan(text.indexOf("• مناديل"));
+    expect(text).toContain("*للحفظ فقط · أخرى*\n• مناديل: 8 حبّة");
+  });
+});

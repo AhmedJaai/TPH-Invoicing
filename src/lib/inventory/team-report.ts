@@ -12,6 +12,18 @@ export interface ReportLine {
   counted: string | null;
   /** ما كتبه بخاناته («١٩ كرتون + ٨٩٧ حبّة»)، أو `null` لا تفصيل. */
   entered?: string | null;
+  /** أمن الأصناف التي اختارها المالك للمقارنة؟ — وغيرُها يُعدّ ويُحفظ للمرجع. الغيابُ: نعم. */
+  inScope?: boolean;
+}
+
+/** فئةُ السطر في التقرير: ما يُقارَن أوّلاً، ثمّ «للحفظ فقط». */
+export function reportGroup(l: ReportLine): string {
+  return l.inScope === false ? `للحفظ فقط · ${l.categoryLabel}` : l.categoryLabel;
+}
+
+/** ما يُقارَن قبل ما يُحفظ، والترتيبُ داخلهما كما جاء. */
+export function reportOrder<T extends ReportLine>(lines: readonly T[]): T[] {
+  return [...lines.filter((l) => l.inScope !== false), ...lines.filter((l) => l.inScope === false)];
 }
 
 /** «١٩ كرتون + ٨٩٧ حبّة = ١٠٣٩٧ حبّة» — والتفصيلُ الذي يساوي مجموعَه لا يُكرَّر. */
@@ -36,8 +48,8 @@ export function teamCountReport(input: { week: { start: string; end: string }; b
     `عُدّ ${counted.length} من ${countNoun(input.lines.length, PRODUCT)}`,
   ];
   let group: string | null = null;
-  for (const l of counted) {
-    if (l.categoryLabel !== group) { group = l.categoryLabel; out.push("", `*${group}*`); }
+  for (const l of reportOrder(counted)) {
+    if (reportGroup(l) !== group) { group = reportGroup(l); out.push("", `*${group}*`); }
     out.push(`• ${l.name}: ${countedText(l)}`);
   }
   if (missing.length > 0) {

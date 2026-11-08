@@ -71,8 +71,31 @@ describe("مشترياتُ فودكس أمام فواتيرنا", () => {
     expect(comparePurchases([p], [invoice({ invoiceNumber: "X9", day: "2026-09-20" })]).matched).toHaveLength(0);
   });
 
-  it("بلا ربطٍ لا يُطابَق بالمبلغ واليوم — مورّدٌ مجهول لا يُنسَب إليه", () => {
-    expect(comparePurchases([purchase({ invoiceNumber: "خطأ" })], [invoice({ invoiceNumber: "X9" })]).matched).toHaveLength(0);
+  it("بلا ربطٍ: فاتورةٌ واحدةٌ لا غيرُها بالمبلغ في اليوم ← هي، والرقمُ مكتوبٌ على غير صيغته", () => {
+    /* «مورد حبوب قهوة» ‎00030‎ هو «أفال» ‎INV-2026-00015‎ — ١٨ يونيو بـ‏١٬٥٤٩٫٦٣ */
+    const r = comparePurchases(
+      [purchase({ foodicsSupplierName: "مورد حبوب قهوة", invoiceNumber: "00030", businessDate: "2026-06-18", invoiceDate: "2026-06-18", totalMinor: 154_963 })],
+      [invoice({ supplierName: "أفال — بدر", invoiceNumber: "INV-2026-00015", day: "2026-06-18", totalMinor: 154_963 })],
+    );
+    expect(r.matched.map((m) => [m.basis, m.agrees])).toEqual([["DAY_AMOUNT", true]]);
+    expect(r.onlyFoodics).toEqual([]);
+    expect(r.onlyOurs).toEqual([]);
+  });
+  it("بلا ربطٍ: المبلغُ على فاتورتَين، أو حركتان تطلبان فاتورةً واحدة ← لا يُختار", () => {
+    expect(comparePurchases([purchase({ invoiceNumber: "خطأ" })], [invoice({ invoiceNumber: "X9" }), invoice({ id: "i2", invoiceNumber: "X8", supplierId: "s2" })]).matched).toHaveLength(0);
+    expect(comparePurchases([purchase({ invoiceNumber: "خطأ" }), purchase({ id: "p2", reference: "PUR-000002", invoiceNumber: "خطأ2" })], [invoice({ invoiceNumber: "X9" })]).matched).toHaveLength(0);
+  });
+  it("بلا ربطٍ: المبلغُ بالهللة لا بسماحة الريال — «١٤٠» من البقالة ليست «١٤١» من المطبعة", () => {
+    expect(comparePurchases([purchase({ invoiceNumber: "183", totalMinor: 14_000 })], [invoice({ invoiceNumber: "1139", totalMinor: 14_100 })]).matched).toHaveLength(0);
+  });
+  it("بلا ربطٍ: اليومُ نفسُه يسبق القريب — فلا تأخذ حركةٌ فاتورةَ يومِ غيرها", () => {
+    /* ‎PUR-000007‎ (٦ يونيو) و‎PUR-000009‎ (أُدخلت ١٠ يونيو) بالمبلغ نفسِه، وفاتورتان: ٦ و‏١٣ يونيو */
+    const r = comparePurchases(
+      [purchase({ id: "p7", reference: "PUR-000007", invoiceNumber: "00022", businessDate: "2026-06-06", invoiceDate: "2026-06-06", totalMinor: 132_825 }),
+        purchase({ id: "p9", reference: "PUR-000009", invoiceNumber: "00023", businessDate: "2026-06-10", invoiceDate: "2026-06-07", totalMinor: 132_825 })],
+      [invoice({ id: "i17", invoiceNumber: "INV-2026-00017", day: "2026-06-06", totalMinor: 132_825 }), invoice({ id: "i16", invoiceNumber: "INV-2026-00016", day: "2026-06-13", totalMinor: 132_825 })],
+    );
+    expect(r.matched.map((m) => [m.purchase.id, m.invoice.id]).sort()).toEqual([["p7", "i17"], ["p9", "i16"]]);
   });
 
   it("الرقمُ والمبلغُ معاً يُحجَزان أوّلاً: حركةٌ أخرى بالمبلغ نفسِه لا تأخذ فاتورةَ غيرها", () => {
@@ -154,7 +177,8 @@ describe("اقتراحُ ربط المورّد من الفواتير لا من �
       invoice({ id: "i3", supplierId: "aval", supplierName: "أفال — بدر", invoiceNumber: "INV-2026-00046", day: "2026-06-29", totalMinor: 101_200 }),
     ];
     const before = comparePurchases(ps, is);
-    expect(before.matched).toEqual([]);
+    /* بلا ربطٍ تُقرَن بالمبلغ في اليوم، والاقتراحُ يبقى ليُربَط فيُطابَق ما بعدها بالمورّد */
+    expect(before.matched.map((m) => m.basis)).toEqual(["DAY_AMOUNT", "DAY_AMOUNT", "DAY_AMOUNT"]);
     expect(suggestSupplierLinks(before, is)).toEqual([expect.objectContaining({ foodicsSupplierId: "fs1", supplierId: "aval", evidence: 3, against: 0 })]);
     /* وبعد الربط تُطابَق كلُّها بالمورّد والمبلغ — والثالثةُ بأقرب تاريخَيها */
     const after = comparePurchases(ps.map((p) => ({ ...p, linkedSupplierId: "aval" })), is);

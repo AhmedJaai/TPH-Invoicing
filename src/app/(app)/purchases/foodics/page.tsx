@@ -30,6 +30,7 @@ const BASIS: Record<MatchBasis, string> = {
   SUPPLIER_DATE_AMOUNT: "بالمورّد والمبلغ، بتاريخ قريب",
   NUMBER: "برقم الفاتورة",
   NUMBER_TAIL: "بآخر أرقام الفاتورة",
+  DAY_AMOUNT: "بالمبلغ واليوم، ومورّد فودكس غير مربوط",
 };
 
 

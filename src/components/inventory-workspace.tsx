@@ -30,6 +30,7 @@ import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purc
 import type { StaleReason } from "@/services/inventory-staleness.service";
 import { PurchaseLinkPanel } from "./inventory-purchase-links";
 import { T } from "@/components/i18n/t";
+import { SavedForReference } from "./team-count-note";
 
 /**
  * ورشةُ الجرد — الشاشةُ التي يعمل فيها صاحبُ المقهى.
@@ -472,6 +473,7 @@ export function InventoryWorkspace({
             initialStep={initialStep ?? null}
             review={review}
             finalise={finalise}
+            saved={<SavedForReference countId={header.id} />}
           />
         )}
       </div>

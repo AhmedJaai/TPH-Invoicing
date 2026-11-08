@@ -11,7 +11,7 @@ import { GlobalFonts, PDFDocument, loadImage, type Image } from "@napi-rs/canvas
 
 type Ctx = ReturnType<PDFDocument["beginPage"]>;
 import { PRODUCT, countNoun } from "../arabic";
-import type { ReportLine } from "./team-report";
+import { reportGroup, reportOrder, type ReportLine } from "./team-report";
 
 const W = 595;
 const H = 842;
@@ -42,9 +42,11 @@ type Row = { kind: "group"; label: string; counted: number; total: number; cont?
 /** الصفوفُ بفئاتها بترتيب الجرد — وكلُّ فئةٍ تبدأ بسطرها. */
 function rowsOf(lines: readonly ReportLine[]): Row[] {
   const out: Row[] = [];
-  const groups = [...new Set(lines.map((l) => l.categoryLabel))];
+  /* ما يُقارَن أوّلاً، ثمّ «للحفظ فقط» — عدّه الفريقُ ولا يدخل الحساب */
+  const ordered = reportOrder(lines);
+  const groups = [...new Set(ordered.map(reportGroup))];
   for (const g of groups) {
-    const items = lines.filter((l) => l.categoryLabel === g);
+    const items = ordered.filter((l) => reportGroup(l) === g);
     out.push({ kind: "group", label: g, counted: items.filter((l) => l.counted !== null).length, total: items.length });
     items.forEach((line, i) => out.push({ kind: "item", line, zebra: i % 2 === 1 }));
   }

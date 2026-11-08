@@ -7,7 +7,7 @@
  * افتتاحيّ، ولا إقفال ولا إلغاء — تلك للمالك في `/inventory`. والعدُّ **أعمى**: لا يرى المتوقَّعَ
  * ولا الفرقَ ولا كلفة، فلا يكتب ما يُنتظر منه.
  */
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings, inventoryCountLines, inventoryCounts, products } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -92,14 +92,15 @@ async function cafeBranch(): Promise<string | null> {
   return active.length === 1 ? String(active[0].id) : null;
 }
 
-async function linesOf(countId: string): Promise<(TeamCountLine & { pack: StoragePack | null })[]> {
+async function linesOf(countId: string): Promise<(TeamCountLine & { pack: StoragePack | null; inScope: boolean })[]> {
   const rows = await db.select({
-    productId: inventoryCountLines.productId, actual: inventoryCountLines.actualMilli, parts: inventoryCountLines.countParts,
+    productId: inventoryCountLines.productId, actual: inventoryCountLines.actualMilli, parts: inventoryCountLines.countParts, inScope: inventoryCountLines.inScope,
     name: products.nameAr, category: products.category, baseUnit: products.baseUnit,
     packUnit: products.catalogPackUnit, packMilli: products.catalogPackMilli,
   }).from(inventoryCountLines)
     .innerJoin(products, eq(products.id, inventoryCountLines.productId))
-    .where(and(eq(inventoryCountLines.countId, countId), eq(inventoryCountLines.inScope, true)))
+    /* كلُّ أسطر الجرد لا ما في النطاق وحده — يعدّ الموظّفُ كلَّ شيء، والمقارنةُ لما اختاره المالك */
+    .where(eq(inventoryCountLines.countId, countId))
     .orderBy(asc(products.category), asc(products.nameAr));
   return rows.map((r) => {
     const pack = storagePack(r.baseUnit, r.packUnit, r.packMilli);
@@ -111,12 +112,13 @@ async function linesOf(countId: string): Promise<(TeamCountLine & { pack: Storag
       parts: r.actual === null ? null : readParts(r.parts),
       counted: r.actual === null ? null : formatQuantity(r.actual, r.baseUnit),
       pack,
+      inScope: r.inScope,
     };
   });
 }
 
 /** سطرُ التقرير: المجموع وما كُتب بخاناته. */
-const reportLine = (l: TeamCountLine) => ({ name: l.name, categoryLabel: l.categoryLabel, counted: l.counted, entered: l.parts ? partsText(l.parts) : null });
+const reportLine = (l: TeamCountLine & { inScope: boolean }) => ({ name: l.name, categoryLabel: l.categoryLabel, counted: l.counted, entered: l.parts ? partsText(l.parts) : null, inScope: l.inScope });
 
 /** ما يراه الموظّفُ في صفحة الجرد اليوم. */
 export async function loadTeamCount(today: string): Promise<TeamCountView> {
@@ -257,6 +259,24 @@ export async function teamCountPdf(today: string, by: TeamCounter): Promise<{ pd
   return { pdf, fileName: `جرد-السبت-${w.week.end}.pdf` };
 }
 
+/**
+ * ما عُدّ خارج نطاق الجرد — محفوظٌ في أسطره للمرجع (المحرّكُ يُخفيه من الحساب عمداً فلا يُظنّ معدوداً
+ * في المقارنة). بخاناته كما كُتبت ومجموعه.
+ */
+export async function loadSavedForReference(countId: string): Promise<{ productId: string; name: string; counted: string; entered: string | null }[]> {
+  const rows = await db.select({
+    productId: inventoryCountLines.productId, actual: inventoryCountLines.actualMilli, parts: inventoryCountLines.countParts,
+    name: products.nameAr, baseUnit: products.baseUnit,
+  }).from(inventoryCountLines)
+    .innerJoin(products, eq(products.id, inventoryCountLines.productId))
+    .where(and(eq(inventoryCountLines.countId, countId), eq(inventoryCountLines.inScope, false), isNotNull(inventoryCountLines.actualMilli)))
+    .orderBy(asc(products.nameAr));
+  return rows.flatMap((r) => r.actual === null ? [] : [{
+    productId: r.productId, name: r.name, counted: formatQuantity(r.actual, r.baseUnit),
+    entered: (() => { const p = readParts(r.parts); return p ? partsText(p) : null; })(),
+  }]);
+}
+
 export interface TeamCountWaiting {
   countId: string;
   week: Week;
@@ -282,8 +302,8 @@ export async function loadTeamCountsWaiting(countId?: string): Promise<TeamCount
        where c.status = 'DRAFT' ${countId ? sql`and c.id = ${countId}` : sql``}
          and exists (select 1 from inventory_count_lines l where l.count_id = c.id and l.counted_by_employee_id is not null)
     ), totals as (
-      select l.count_id, count(*) filter (where l.in_scope)::int as total,
-             count(*) filter (where l.in_scope and l.actual_milli is not null)::int as counted
+      select l.count_id, count(*)::int as total,
+             count(*) filter (where l.actual_milli is not null)::int as counted
         from inventory_count_lines l join open o on o.id = l.count_id group by l.count_id
     )
     select o.id as count_id, o.period_start, o.period_end, o.team_sent_at, o.stale, e.name, count(l.id)::int as by_lines, t.counted, t.total
