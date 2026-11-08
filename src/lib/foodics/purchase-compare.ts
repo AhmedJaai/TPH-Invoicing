@@ -137,10 +137,23 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
       /* الرقمُ المطابق يرجّح بين متساويَين — تأكيدٌ زائد */
       || Number(normaliseInvoiceNumber(b.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
         - Number(normaliseInvoiceNumber(a.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
+      /*
+        ثمّ ذيلُ الأرقام ولو قصيراً: أنس يكتب «0041» لـ«SI-0041»، و«Sl-0034» بحرف L لـ«SI-0034».
+        فاتورتان لـ«لوريفا» بـ‏٢٥٣ — ‎SI-0034‎ يومَ فاتورة الحركة و‎SI-0041‎ يومَ إدخالها — كانت
+        الحركةُ تأخذ أيّتَهما اتّفق، فتبقى ‎0041‎ «بلا فاتورة» و‎SI-0034‎ «ليست في فودكس».
+      */
+      || Number(sameTail(p, b)) - Number(sameTail(p, a))
       || Math.abs(a.totalMinor - p.totalMinor) - Math.abs(b.totalMinor - p.totalMinor)
+      /* ثمّ يومُ المستند (تاريخُ الفاتورة) قبل يومِ الإدخال في فودكس */
+      || Number(b.day === p.invoiceDate) - Number(a.day === p.invoiceDate)
       || daysOff(p, a) - daysOff(p, b)
       || a.id.localeCompare(b.id),
     )[0];
+  };
+  /** أيلتقيان في آخر سلسلة أرقام؟ لترجيح مرشّحٍ على مرشّح ولتأكيد زوجٍ قام بالمورّد والمبلغ — لا لإنشاء زوج. */
+  const sameTail = (p: PurchaseSide, i: InvoiceSide) => {
+    const tail = digitTail(p.invoiceNumber);
+    return tail !== "" && tail === digitTail(i.invoiceNumber);
   };
   const sameNumber = (p: PurchaseSide, i: InvoiceSide) => {
     const key = normaliseInvoiceNumber(p.invoiceNumber);
@@ -151,7 +164,7 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
     takenPurchases.add(p.id);
     const gapMinor = p.totalMinor - i.totalMinor;
     matched.push({
-      purchase: p, invoice: i, basis, gapMinor, agrees: within(gapMinor), numberConfirms: sameNumber(p, i),
+      purchase: p, invoice: i, basis, gapMinor, agrees: within(gapMinor), numberConfirms: sameNumber(p, i) || ((basis === "SUPPLIER_DAY_AMOUNT" || basis === "SUPPLIER_DATE_AMOUNT") && sameTail(p, i)),
       supplierConflict: p.linkedSupplierId !== null && p.linkedSupplierId !== i.supplierId,
     });
   };
