@@ -64,6 +64,10 @@ export function sumParts(
     if (isAmbiguousThousands(raw)) return { ok: false, error: ambiguousThousandsMessage(raw) };
     const milli = decimalToMilli(raw);
     if (milli === null || milli < 0) return { ok: false, error: `«${raw}» ليس رقماً. اكتب مثل 2 أو 0.5` };
+    /* «0.032» في خانة الجرام كيلو كُتب في غير خانته — ولا يُعدّ في المقهى ما دون الجرام أو الملّل */
+    if ((p.key === "G" || p.key === "ML") && milli > 0 && milli < 1000) {
+      return { ok: false, error: `«${raw}» ${field.label} أقلّ من ${field.label} واحد. إن كان بال${p.key === "G" ? "كيلو فاكتبه في خانة الكيلو" : "لتر فاكتبه في خانة اللتر"}.` };
+    }
     if (p.key === "STORAGE") {
       if (!pack) return { ok: false, error: "وحدة التخزين غير معروفة لهذا الصنف." };
       /* كراتين × ما في الكرتون، بالمِلّي — وكسرُ المِلّي يُقرَّب (جزءٌ من ألفٍ من الحبّة) */

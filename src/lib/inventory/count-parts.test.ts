@@ -28,6 +28,13 @@ describe("sumParts", () => {
     expect(sumParts([{ key: "PIECE", quantity: "1-7" }], "PIECE", null).ok).toBe(false);
     expect(sumParts([{ key: "PIECE", quantity: "1,500" }], "PIECE", null).ok).toBe(false);
   });
+  it("«0.032» في خانة الجرام يُرفض — كيلو كُتب في غير خانته (وقع في أوّل جردٍ حقيقيّ)", () => {
+    const r = sumParts([{ key: "G", quantity: "0.032" }], "G", null);
+    expect(r.ok).toBe(false);
+    expect(r.ok ? "" : r.error).toContain("الكيلو");
+    expect(sumParts([{ key: "KG", quantity: "0.032" }], "G", null)).toMatchObject({ ok: true, canonical: 32_000 });
+    expect(sumParts([{ key: "G", quantity: "12.5" }], "G", null).ok).toBe(true);
+  });
   it("نصفُ كرتونٍ من ٣٣٣ يُقرَّب إلى جزءٍ من ألفٍ من الحبّة", () => {
     const r = sumParts([{ key: "STORAGE", quantity: "0.5" }], "PIECE", storagePack("PIECE", "كرتون", 333_000));
     expect(r.ok && r.canonical).toBe(166_500);

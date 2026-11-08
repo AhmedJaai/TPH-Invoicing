@@ -68,10 +68,28 @@ export type TeamCountView =
 
 /** جردُ أسبوعٍ بعينه (للمقهى كلّه، بلا فرع) — إن بُدئ. */
 async function countFor(week: Week): Promise<{ id: string; status: string; sentAt: Date | null } | null> {
+  const branch = await cafeBranch();
   const [row] = await db.select({ id: inventoryCounts.id, status: inventoryCounts.status, sentAt: inventoryCounts.teamSentAt }).from(inventoryCounts)
-    .where(and(eq(inventoryCounts.periodStart, week.start), eq(inventoryCounts.periodEnd, week.end), isNull(inventoryCounts.branchId)))
+    .where(and(eq(inventoryCounts.periodStart, week.start), eq(inventoryCounts.periodEnd, week.end), branch === null ? isNull(inventoryCounts.branchId) : eq(inventoryCounts.branchId, branch)))
     .limit(1);
   return row ? { id: row.id, status: String(row.status), sentAt: row.sentAt } : null;
+}
+
+/**
+ * فرعُ جرود المقهى — فرعُ آخر جردٍ أجراه المالك، وإلّا الفرعُ النشط الوحيد، وإلّا بلا فرع.
+ *
+ * كان جردُ الفريق يُنشأ بلا فرع وجرودُ أحمد كلُّها على «الفرع الرئيسي» (٨ نوفمبر ٢٠٢٦): فصار سلسلةً
+ * وحده — لا جردَ سابق فلا افتتاحيّ ولا متوقَّع، ونطاقُه كلُّ الأصناف لا اختيارُ أحمد. فالجردُ واحد:
+ * ما يكتبه الموظّف يدخل جردَ أحمد نفسَه، ويراجعه أحمد ويقفله.
+ */
+async function cafeBranch(): Promise<string | null> {
+  const [last] = (await db.execute<{ branch_id: string }>(sql`
+    select branch_id from inventory_counts where branch_id is not null and started_by_employee_id is null
+     order by period_end desc limit 1
+  `)).rows;
+  if (last) return String(last.branch_id);
+  const active = (await db.execute<{ id: string }>(sql`select id from branches where is_active limit 2`)).rows;
+  return active.length === 1 ? String(active[0].id) : null;
 }
 
 async function linesOf(countId: string): Promise<(TeamCountLine & { pack: StoragePack | null })[]> {
@@ -134,7 +152,7 @@ async function sentState(countId: string, sentAt: Date | null): Promise<{ at: st
 export async function startTeamCount(today: string, by: TeamCounter): Promise<string> {
   const w = teamCountWindow(today);
   if (!w.open) throw new TeamCountRefused("الجرد يُفتح يوم السبت فقط.");
-  const { countId, created } = await startCount({ periodStart: w.week.start, periodEnd: w.week.end, branchId: null, actorId: by });
+  const { countId, created } = await startCount({ periodStart: w.week.start, periodEnd: w.week.end, branchId: await cafeBranch(), actorId: by });
   if (created) await recomputeCount(countId);
   return countId;
 }
