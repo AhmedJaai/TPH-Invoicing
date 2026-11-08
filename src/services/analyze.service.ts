@@ -19,8 +19,11 @@ import { matchSupplier } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
 import { can } from "@/lib/permissions";
 import type { CurrentUser } from "@/lib/session";
-import { itemKeys, priceMovesAtReview, type PriceMove } from "@/lib/price-at-review";
-import { loadLastItemPrices } from "./price-review.service";
+import { priceMovesAtReview, type PriceMove } from "@/lib/price-at-review";
+import { loadPriceLines } from "./price-watch.service";
+import { itemAliases } from "./invoice.service";
+import { parseRiyals } from "@/lib/money";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { loadSupplierRecords, numbersForPipeline } from "./upload-review.service";
 import { CAPTURE_READING_MAX_AGE_MS, isWaitingCapture } from "./capture.service";
 
@@ -126,15 +129,17 @@ export async function analyzeForReview(buffer: Buffer, mimeType: string, fileNam
   });
 
   /*
-    سعرُ كلّ بندٍ مقابل آخر سعرٍ قُيِّد له عند المورّد نفسه — يُقال لحظةَ المراجعة
+    سعرُ كلّ بندٍ الفعليّ مقابل سعره المعتاد عند المورّد نفسه (`price-watch.ts`) — يُقال لحظةَ المراجعة
     والمندوبُ عند الباب، لا بعد القيد. ولمن يرى المبالغ وحده، وللمورّد المعروف وحده.
     وتعذُّرُه لا يُسقط القراءة: هو عونٌ لا شرط.
   */
   let priceMoves: PriceMove[] = [];
   if (match.supplier && can(user.role, "amounts:view") && extraction.value.lines.length > 0) {
     try {
-      const last = await loadLastItemPrices(match.supplier.id, itemKeys(extraction.value.lines));
-      priceMoves = priceMovesAtReview(extraction.value.lines, last).slice(0, 20);
+      const [history, aliases] = await Promise.all([loadPriceLines({ supplierId: match.supplier.id }), itemAliases(db, match.supplier.id)]);
+      priceMoves = priceMovesAtReview(
+        extraction.value.lines, parseRiyals(extraction.value.subtotalAmount ?? ""), history, aliases, todayInRiyadh(),
+      ).slice(0, 20);
     } catch (e) {
       console.error("[analyze] تعذّرت مقارنة الأسعار", e);
     }

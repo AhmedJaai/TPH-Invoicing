@@ -11,6 +11,9 @@
  */
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { loadPriceLines } from "./price-watch.service";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { supplierPriceDriftBp, trackPrices } from "@/lib/price-watch";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import {
   buildLedger,
@@ -117,6 +120,8 @@ export interface TimelineEvent {
 export interface SupplierIntel {
   reliability: PaymentReliability;
   prices: ProductPriceHistory[];
+  /** تغيّرُ أسعاره في مجملها بنقاط الأساس (`supplierPriceDriftBp`) — `null` إن لم يُقَس */
+  priceDriftBp: number | null;
   events: TimelineEvent[];
   lastPayment: { date: string; amountMinor: number } | null;
 }
@@ -157,20 +162,7 @@ export async function loadSupplierIntel(
        where i.supplier_id = ${supplierId}
          and i.total_minor - a.s <= ${SETTLED_TOLERANCE_MINOR}
     `),
-    db.execute<{
-      normalized_description: string; description: string; d: string; unit_price_minor: number;
-      invoice_id: string; invoice_number: string;
-    }>(sql`
-      select l.normalized_description, l.description, ${RIYADH_DAY(sql`i.invoice_date`)} as d,
-             l.unit_price_minor, i.id as invoice_id, i.invoice_number
-        from invoice_lines l
-        join invoices i on i.id = l.invoice_id
-       where i.supplier_id = ${supplierId}
-         and l.normalized_description <> ''
-         and l.unit_price_minor > 0
-         /* سطر تعارض ضربه ولم يفسّر لا يبنى عليه سعر */
-         and coalesce(l.pricing_basis, '') not in ('INCONSISTENT', 'QTY_UNREAD')
-    `),
+    loadPriceLines({ supplierId }),
     db.execute<{
       id: string; at: string; kind: string; title: string; amount: string | number | null;
       meta: string | null; ref_id: string | null; cancelled: boolean | null;
@@ -226,16 +218,9 @@ export async function loadSupplierIntel(
     },
   );
 
-  const prices = priceHistory(
-    lines.rows.map((r) => ({
-      normalized: r.normalized_description,
-      description: r.description,
-      date: r.d,
-      unitPriceMinor: Number(r.unit_price_minor),
-      invoiceId: r.invoice_id,
-      invoiceNumber: r.invoice_number,
-    })),
-  );
+  const prices = priceHistory(lines, todayInRiyadh());
+  const priceDriftBp = supplierPriceDriftBp(trackPrices(lines, todayInRiyadh()));
+
 
   const merged: TimelineEvent[] = events.rows
     .map((r): TimelineEvent => {
@@ -263,6 +248,7 @@ export async function loadSupplierIntel(
   return {
     reliability,
     prices,
+    priceDriftBp,
     events: merged,
     lastPayment: lp ? { date: lp.d, amountMinor: Number(lp.amount) } : null,
   };

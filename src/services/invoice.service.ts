@@ -13,8 +13,8 @@ import { findStatementTwin } from "@/lib/statement-twin";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { invoiceNumberKey } from "@/lib/invoice-twin";
 import { normalizeItem } from "@/lib/items";
-import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
-import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
+import { resolveReadLines } from "@/lib/line-pricing";
+import { checkInvoiceTotals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { Conn, RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
@@ -249,31 +249,7 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
   })
     .from(invoiceLines).where(eq(invoiceLines.invoiceId, input.invoiceId)).orderBy(invoiceLines.id);
 
-  const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
-    description: string;
-    quantity: number;
-    /** كما كُتبت — أو `null` إن لم تُقرأ */
-    qtyText: string | null;
-  })[] = [];
-
-  for (const l of input.lines) {
-    const description = l.description?.trim();
-    if (!description) continue;
-    const qtyText = parseLineQuantity(l.quantity);
-    const quantity = qtyText === null ? 1 : Number(qtyText);
-    // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد كل متوسط بعده
-    const priced = resolveLinePricing({
-      quantity,
-      unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
-      lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
-    });
-    if (!priced) continue;
-    /* بلا كمّيّةٍ لا يُعرف أيّ الرقمين سعرُ الوحدة — فلا يدخل تتبّعَ الأسعار */
-    const pricing = qtyText === null ? { ...priced, basis: "QTY_UNREAD" as const } : priced;
-    resolved.push({ ...pricing, description, quantity, qtyText });
-  }
-
-  const { lines } = reconcileInvoiceLines(resolved, input.subtotalMinor);
+  const lines = resolveReadLines(input.lines, input.subtotalMinor);
   /* قراءةٌ لا بندَ مسعَّراً فيها لا تمحو بنوداً صالحة — «لم يُقرأ» ليس «لا بنود» */
   if (lines.length === 0 && previous.length > 0) return 0;
 

@@ -4,7 +4,8 @@
  * كلها دوال خالصة تأخذ صفوفاً وتُرجع نتائج — لا تلمس قاعدة البيانات،
  * فتُختبر كلها. الاستعلام مسؤولية الصفحة، والحساب مسؤولية هذا الملف.
  */
-import { detectPriceChange, normalizeItem, type PriceChange } from "./items";
+import { normalizeItem, type PriceChange } from "./items";
+import { isRealMove, trackPrices, type PriceLine, type PriceState } from "./price-watch";
 import type { InputVatStatus } from "./validation";
 import { currentMonthRiyadh, dayOfMonthRiyadh, MS_PER_DAY, isoDay } from "./riyadh-time";
 
@@ -109,6 +110,11 @@ export interface LineRow {
   quantity: number | null;
   unitPriceMinor: number;
   lineTotalMinor: number;
+  /** فاتورةُ البند — بها يُعرف أنّ سعرين لصنفٍ في فاتورةٍ واحدة. بلاه يُعدّ اليومُ فاتورة. */
+  invoiceId?: string;
+  invoiceNumber?: string | null;
+  /** `pricing_basis` — ما لا يستقيم ضربُه لا يُبنى عليه سعر */
+  pricingBasis?: string | null;
 }
 
 export interface ItemSummary {
@@ -130,26 +136,19 @@ export interface ItemSummary {
   firstOrderedAt: Date | null;
   /** متوسط الأيام بين طلبين — يكشف دورة إعادة الطلب */
   averageDaysBetweenOrders: number | null;
-  /** تغيّر السعر عند هذا المورّد */
+  /** تغيّرُ السعر عند هذا المورّد — ما أكّدته فاتورتان ولا يفسّره غيرُ السعر وحده (`price-watch.ts`) */
   priceChange: PriceChange | null;
+  /** حكمُ السعر كاملاً: ثابت، تغيّر، ينتظر تأكيداً، أو بندان باسمٍ واحد */
+  priceState: PriceState;
   /**
-   * آخرُ أسعار الوحدة بترتيب تواريخها (الأقدمُ أوّلاً) — لرسم الاتّجاه. سعرٌ لكلّ يوم
-   * شراء (آخرُ سطرٍ فيه)، وما لا تاريخَ له لا يدخل: لا يُوضَع سعرٌ في زمنٍ مخترَع.
+   * آخرُ أسعار الوحدة بترتيب تواريخها (الأقدمُ أوّلاً) — لرسم الاتّجاه. سعرٌ لكلّ فاتورة،
+   * بلا الشاذّ ولا الفاتورة ذات السعرين، وما لا تاريخَ له لا يدخل.
    */
   priceTrail: number[];
 }
 
 /** كم نقطةً تُرسَم في منحنى السعر. */
 export const PRICE_TRAIL_POINTS = 12;
-
-function priceTrailOf(dated: readonly LineRow[]): number[] {
-  const byDay = new Map<string, number>();
-  for (const r of dated) {
-    if (!r.invoiceDate || r.unitPriceMinor <= 0) continue;
-    byDay.set(isoDay(r.invoiceDate), r.unitPriceMinor);
-  }
-  return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, price]) => price).slice(-PRICE_TRAIL_POINTS);
-}
 
 /**
  * تجميع الأصناف — **لكل مورّد على حدة**.
@@ -169,12 +168,33 @@ function averageUnitPrice(list: readonly LineRow[]): number | null {
   return qty > 0 ? Math.round(known.reduce((s, r) => s + r.lineTotalMinor, 0) / qty) : null;
 }
 
-export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
+export function summarizeItems(rows: readonly LineRow[], todayDay: string = isoDay(new Date())): ItemSummary[] {
+  /*
+    الصنفُ وسعرُه من بابٍ واحد (`price-watch.ts`): صيغُ الاسم الواحد تُجمع بالدليل القاطع،
+    والتغيّرُ يُصدَّق بفاتورتين. وما لا تاريخَ له يبقى في المجاميع ولا يدخل السعر.
+  */
+  const priceLines: PriceLine[] = [];
+  for (const row of rows) {
+    const normalized = row.normalizedDescription || normalizeItem(row.description);
+    if (!normalized || !row.supplierId || !row.invoiceDate) continue;
+    const day = isoDay(row.invoiceDate);
+    priceLines.push({
+      supplierId: row.supplierId, normalized, description: row.description,
+      invoiceId: row.invoiceId ?? `day:${day}`, invoiceNumber: row.invoiceNumber ?? null, day,
+      unitMinor: row.unitPriceMinor, qtyMilli: null, basis: row.pricingBasis ?? null,
+    });
+  }
+  const tracked = trackPrices(priceLines, todayDay);
+  const priceOf = new Map(tracked.map((t) => [t.key, t]));
+  const keyOf = new Map<string, string>();
+  for (const t of tracked) for (const v of t.variants) keyOf.set(`${t.supplierId}::${v}`, t.key);
+
   const groups = new Map<string, LineRow[]>();
   for (const row of rows) {
     const normalized = row.normalizedDescription || normalizeItem(row.description);
     if (!normalized) continue;
-    const key = `${row.supplierId ?? "—"}::${normalized}`;
+    const raw = `${row.supplierId ?? "—"}::${normalized}`;
+    const key = keyOf.get(raw) ?? raw;
     const list = groups.get(key) ?? [];
     list.push(row);
     groups.set(key, list);
@@ -183,6 +203,7 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
   const summaries: ItemSummary[] = [];
 
   for (const [key, list] of groups) {
+    const price = priceOf.get(key);
     const dated = list
       .filter((r) => r.invoiceDate)
       .sort((a, b) => a.invoiceDate!.getTime() - b.invoiceDate!.getTime());
@@ -192,7 +213,7 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
     const totalSpentMinor = list.reduce((s, r) => s + r.lineTotalMinor, 0);
 
     // الأطول اسماً أوفى وصفاً غالباً: «حليب طازج كامل الدسم ٢ لتر» خير من «حليب»
-    const displayName = list.reduce(
+    const displayName = price?.displayName ?? list.reduce(
       (best, r) => (r.description.length > best.length ? r.description : best),
       list[0].description,
     );
@@ -207,6 +228,18 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
     }
 
     const latest = dated[dated.length - 1] ?? list[list.length - 1];
+    const state: PriceState = price?.state ?? { kind: "NEW" };
+    const priceChange: PriceChange | null = isRealMove(state)
+      ? {
+          currentMinor: state.toMinor,
+          previousMinor: state.fromMinor,
+          deltaMinor: state.toMinor - state.fromMinor,
+          deltaRatio: state.deltaBp / 10_000,
+          direction: state.toMinor > state.fromMinor ? "up" : "down",
+          currentDate: new Date(`${state.sinceDay}T00:00:00Z`),
+          previousDate: new Date(`${state.previousDay}T00:00:00Z`),
+        }
+      : null;
 
     summaries.push({
       key,
@@ -218,14 +251,13 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
       totalQuantity,
       totalSpentMinor,
       averageUnitPriceMinor: averageUnitPrice(list),
-      lastUnitPriceMinor: latest.unitPriceMinor,
+      lastUnitPriceMinor: price?.lastMinor ?? latest.unitPriceMinor,
       lastOrderedAt: dated.length ? dated[dated.length - 1].invoiceDate : null,
       firstOrderedAt: dated.length ? dated[0].invoiceDate : null,
       averageDaysBetweenOrders,
-      priceChange: detectPriceChange(
-        dated.map((r) => ({ date: r.invoiceDate!, unitPriceMinor: r.unitPriceMinor })),
-      ),
-      priceTrail: priceTrailOf(dated),
+      priceChange,
+      priceState: state,
+      priceTrail: (price?.trail ?? []).slice(-PRICE_TRAIL_POINTS),
     });
   }
 

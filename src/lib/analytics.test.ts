@@ -123,10 +123,11 @@ describe("تحليل الاستهلاك", () => {
     expect(items[0].averageDaysBetweenOrders).toBeNull();
   });
 
-  it("يكشف تغيّر السعر داخل الصنف", () => {
+  it("يكشف تغيّر السعر داخل الصنف — حين يتكرّر في فاتورتين", () => {
     const items = summarizeItems([
       line({ description: "بن اثيوبي", invoiceDate: "2026-06-01", unitPriceMinor: 5000 }),
       line({ description: "بن اثيوبي", invoiceDate: "2026-08-01", unitPriceMinor: 6000 }),
+      line({ description: "بن اثيوبي", invoiceDate: "2026-09-01", unitPriceMinor: 6000 }),
     ]);
     expect(items[0].priceChange?.direction).toBe("up");
     expect(items[0].priceChange?.deltaRatio).toBeCloseTo(0.2);
@@ -248,6 +249,7 @@ describe("تغيّر السعر يقارن داخل المورّد الواحد"
     const items = summarizeItems([
       line({ description: "بن", invoiceDate: "2026-06-01", supplierId: "s1", supplierName: "أفال", unitPriceMinor: 5000 }),
       line({ description: "بن", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أفال", unitPriceMinor: 6000 }),
+      line({ description: "بن", invoiceDate: "2026-09-01", supplierId: "s1", supplierName: "أفال", unitPriceMinor: 6000 }),
     ]);
     expect(items[0].priceChange?.direction).toBe("up");
     expect(items[0].supplierName).toBe("أفال");
@@ -258,6 +260,7 @@ describe("تغيّر السعر يقارن داخل المورّد الواحد"
       line({ description: "حليب", invoiceDate: "2026-05-01", supplierId: "s1", supplierName: "أ", unitPriceMinor: 2000 }),
       line({ description: "حليب", invoiceDate: "2026-07-01", supplierId: "s2", supplierName: "ب", unitPriceMinor: 900 }),
       line({ description: "حليب", invoiceDate: "2026-08-01", supplierId: "s2", supplierName: "ب", unitPriceMinor: 1000 }),
+      line({ description: "حليب", invoiceDate: "2026-09-01", supplierId: "s2", supplierName: "ب", unitPriceMinor: 1000 }),
     ]);
     // «ب» صنف مستقلّ: ارتفع من ٩ إلى ١٠، ولا يُقارن بسعر «أ» إطلاقاً
     const b = items.find((i) => i.supplierName === "ب")!;
@@ -362,11 +365,17 @@ describe("منحنى سعر الصنف", () => {
     expect(item.priceTrail).toEqual([500, 600]);
   });
 
-  it("يوم واحد نقطة واحدة، والمنحنى آخر اثنتي عشرة", () => {
+  it("المنحنى آخر اثنتي عشرة فاتورة، ويومٌ فيه للصنف سعران لا يُرسم", () => {
     const rows = Array.from({ length: 15 }, (_, i) => row(`2026-01-${String(i + 1).padStart(2, "0")}`, 100 + i));
     const [item] = summarizeItems([...rows, row("2026-01-15", 999)]);
     expect(item.priceTrail).toHaveLength(12);
-    expect(item.priceTrail.at(-1)).toBe(999);
-    expect(item.priceTrail[0]).toBe(103);
+    expect(item.priceTrail.at(-1)).toBe(113);
+    expect(item.priceTrail).not.toContain(999);
+  });
+
+  it("قراءةٌ شاذّة بين قراءتين متّفقتين لا تُرسم", () => {
+    const [item] = summarizeItems([row("2026-01-01", 500), row("2026-02-01", 5_000), row("2026-03-01", 500)]);
+    expect(item.priceTrail).toEqual([500, 500]);
+    expect(item.priceChange).toBeNull();
   });
 });

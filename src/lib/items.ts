@@ -57,12 +57,6 @@ export function priceKey(supplierId: string, description: string): string {
   return `${supplierId}::${normalizeItem(description)}`;
 }
 
-export interface PricePoint {
-  date: Date;
-  unitPriceMinor: number;
-  invoiceNumber?: string | null;
-}
-
 export interface PriceChange {
   /** آخر سعر مسجّل */
   currentMinor: number;
@@ -74,52 +68,6 @@ export interface PriceChange {
   direction: "up" | "down";
   currentDate: Date;
   previousDate: Date;
-}
-
-/**
- * يقارن آخر سعرين مختلفين فعلاً.
- *
- * تجاهل التكرارات مقصود: عشر فواتير بالسعر نفسه ثم ارتفاع يجب أن تُظهر
- * الارتفاع، لا أن تقارن آخر فاتورتين متطابقتين وتقول «لا تغيير».
- */
-export function detectPriceChange(history: readonly PricePoint[]): PriceChange | null {
-  if (history.length < 2) return null;
-
-  const sorted = [...history].sort((a, b) => b.date.getTime() - a.date.getTime());
-  const current = sorted[0];
-
-  const previous = sorted.slice(1).find((p) => p.unitPriceMinor !== current.unitPriceMinor);
-  if (!previous) return null;
-
-  const deltaMinor = current.unitPriceMinor - previous.unitPriceMinor;
-  return {
-    currentMinor: current.unitPriceMinor,
-    previousMinor: previous.unitPriceMinor,
-    deltaMinor,
-    /* النسبة من صفرٍ مجهولةٌ لا صفر — والصفر كان يُعرض «لا تغيير» */
-    deltaRatio: previous.unitPriceMinor === 0 ? null : deltaMinor / previous.unitPriceMinor,
-    direction: deltaMinor > 0 ? "up" : "down",
-    currentDate: current.date,
-    previousDate: previous.date,
-  };
-}
-
-/**
- * تغيّرٌ يُصدَّق: السعرُ الجديد لا يتجاوز ثلاثةَ أضعاف السابق ولا ينزل تحت ثلثه.
- *
- * ما وراء ذلك وحدةٌ مختلفة في الغالب لا سعرٌ تغيّر — كرتونٌ قُرئ حبّةً أو العكس: كانت
- * «الأصناف والأسعار» تقول «أعلى زيادة 1397٪»، و«يحتاج قرارك» يُسقط ما فوق ثلاثة أضعاف
- * بحدٍّ مكتوبٍ في استعلامه. فالحدُّ واحدٌ هنا يقرؤه الاثنان.
- */
-export const MAX_PLAUSIBLE_PRICE_MULTIPLE = 3;
-
-export function plausiblePriceChange(c: Pick<PriceChange, "previousMinor" | "currentMinor">): boolean {
-  return c.previousMinor > 0 && c.currentMinor <= c.previousMinor * MAX_PLAUSIBLE_PRICE_MULTIPLE && c.currentMinor * MAX_PLAUSIBLE_PRICE_MULTIPLE >= c.previousMinor;
-}
-
-/** الأثر السنوي المقدَّر لتغيّر السعر، بناءً على الكمية المشتراة فعلاً. */
-export function annualImpactMinor(change: PriceChange, quantityPerYear: number): number {
-  return Math.round(change.deltaMinor * quantityPerYear);
 }
 
 /**

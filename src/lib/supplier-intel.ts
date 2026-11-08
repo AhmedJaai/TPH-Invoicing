@@ -7,6 +7,7 @@
  * تحرّك السعر، ومن القيود كشفَ حسابٍ يُطبَع. وما لا تكفي بياناتُه
  * يبقى `null` — «غير معروف» — ولا يصير صفراً.
  */
+import { deltaBp, gapReason, trackPrices, type PriceLine as WatchedLine, type PriceState } from "./price-watch";
 import { MS_PER_DAY } from "@/lib/riyadh-time";
 
 
@@ -148,81 +149,68 @@ export function paymentReliability(
 
 /* ───────────────────────── تاريخُ الأسعار ───────────────────────── */
 
-export interface PriceLine {
-  /** الوصفُ بعد التطبيع — والمورّدُ واحدٌ هنا، فالمفتاحُ `${supplierId}::${normalized}` ضمناً. */
-  normalized: string;
-  description: string;
-  /** YYYY-MM-DD */
-  date: string;
-  unitPriceMinor: number;
-  invoiceId: string;
-  invoiceNumber: string;
-}
-
 export interface ProductPriceHistory {
+  /** ممثّلُ صيغ الاسم — به يُدمج («هو نفسه…») */
   normalized: string;
+  /** كلُّ صيغ الاسم التي جُمعت هنا بالدليل القاطع (`price-watch.ts`) */
+  variants: string[];
   displayName: string;
+  /** عددُ الفواتير التي فيها الصنف */
   purchases: number;
-  firstMinor: number;
-  firstDate: string;
-  lastMinor: number;
-  lastDate: string;
-  lastInvoiceId: string;
-  /** النسبةُ من أوّل سعرٍ إلى آخره، بعددٍ صحيح من الهللات — `null` لشراءٍ واحد أو أوّلٍ صفر. */
+  firstMinor: number | null;
+  firstDate: string | null;
+  lastMinor: number | null;
+  lastDate: string | null;
+  lastInvoiceId: string | null;
+  /** من أوّل سعرٍ معتاد إلى المعتاد الآن، بالمئة — `null` لشراءٍ واحد أو فرقٍ يفسّره غيرُ السعر. */
   changePct: number | null;
-  /** آخرُ تغيّر: السعر الحاليّ مقابل آخر سعرٍ **خالفه** — `null` إن لم يتغيّر قطّ. */
-  lastMove: { previousMinor: number; previousDate: string; pct: number | null } | null;
-  /** سعرُ كلّ شراءٍ بترتيبه — للمنحنى، من قيمٍ حقيقيّة وحدها. */
+  /** حكمُ السعر: ثابت، تغيّر مؤكَّد، جديدٌ ينتظر تأكيداً، أو بندان باسمٍ واحد. */
+  state: PriceState;
+  /** سعرُ كلّ فاتورة بترتيبها — بلا الشاذّ ولا المزدوج. */
   points: number[];
 }
 
-function pct(from: number, to: number): number | null {
-  return from === 0 ? null : Math.round(((to - from) * 100) / from);
-}
+const rank = (s: PriceState): number => {
+  if (s.kind !== "MOVED" && s.kind !== "UNCONFIRMED") return 3;
+  if (s.reason !== null) return 1;
+  return s.kind === "MOVED" ? 0 : 2;
+};
+const movePct = (s: PriceState): number =>
+  s.kind === "MOVED" || s.kind === "UNCONFIRMED" ? Math.abs(s.deltaBp) : 0;
 
 /**
- * سعرُ كلّ صنفٍ عند المورّد نفسه عبر الزمن.
+ * سعرُ كلّ صنفٍ عند المورّد نفسه عبر الزمن — من بابه الواحد (`lib/price-watch.ts`).
  *
- * المقارنةُ داخل المورّد لا عبره (درسُ «العنب»)، ومن سعر الوحدة الفعليّ
- * (`line-pricing.ts`) لا سعر القائمة. والصنفُ الذي اشتُري مرّةً لا
- * «تغيّر» له — يُعرض سعرُه ولا تُخترع له نسبة.
+ * المقارنةُ داخل المورّد لا عبره (درسُ «العنب»)، ومن سعر الوحدة الفعليّ لا سعر القائمة،
+ * والتغيّرُ يُصدَّق بفاتورتين. والصنفُ الذي اشتُري مرّةً لا «تغيّر» له.
  */
-export function priceHistory(lines: readonly PriceLine[]): ProductPriceHistory[] {
-  const groups = new Map<string, PriceLine[]>();
-  for (const l of lines) {
-    if (!l.normalized || l.unitPriceMinor <= 0) continue;
-    const g = groups.get(l.normalized) ?? [];
-    g.push(l);
-    groups.set(l.normalized, g);
-  }
+/** من أوّل سعرٍ معتاد إلى المعتاد الآن بالمئة — نقاطُ أساسٍ لا مال. */
+function sinceFirstPct(first: number | null, expected: number | null): number | null {
+  if (!first || !expected || gapReason(first, expected) !== null) return null;
+  const bp = deltaBp(first, expected);
+  return Math.round(bp / 100);
+}
 
-  const out: ProductPriceHistory[] = [];
-  for (const [normalized, list] of groups) {
-    const sorted = [...list].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    const previous = [...sorted].reverse().find((p) => p.unitPriceMinor !== last.unitPriceMinor);
-    out.push({
-      normalized,
-      displayName: list.reduce((best, r) => (r.description.length > best.length ? r.description : best), list[0].description),
-      purchases: sorted.length,
-      firstMinor: first.unitPriceMinor,
-      firstDate: first.date,
-      lastMinor: last.unitPriceMinor,
-      lastDate: last.date,
-      lastInvoiceId: last.invoiceId,
-      changePct: sorted.length >= 2 ? pct(first.unitPriceMinor, last.unitPriceMinor) : null,
-      lastMove: previous
-        ? { previousMinor: previous.unitPriceMinor, previousDate: previous.date, pct: pct(previous.unitPriceMinor, last.unitPriceMinor) }
-        : null,
-      points: sorted.map((p) => p.unitPriceMinor),
-    });
-  }
-
-  /* ما تحرّك أوّلاً وبالأكبر، ثمّ الأكثر شراءً */
+export function priceHistory(lines: readonly WatchedLine[], todayDay: string): ProductPriceHistory[] {
+  const out = trackPrices(lines, todayDay).map<ProductPriceHistory>((i) => ({
+    normalized: i.normalized,
+    variants: i.variants,
+    displayName: i.displayName,
+    purchases: i.invoices,
+    firstMinor: i.firstMinor,
+    firstDate: i.firstDay,
+    lastMinor: i.lastMinor,
+    lastDate: i.lastDay,
+    lastInvoiceId: i.lastInvoiceId,
+    changePct: i.trail.length >= 2 && i.state.kind !== "MIXED" ? sinceFirstPct(i.firstMinor, i.expectedMinor) : null,
+    state: i.state,
+    points: i.trail,
+  }));
+  /* ما تغيّر فعلاً أوّلاً وبالأكبر، ثمّ ما يحتاج مراجعة بنده، ثمّ الأكثر شراءً */
   return out.sort(
     (a, b) =>
-      Math.abs(b.lastMove?.pct ?? 0) - Math.abs(a.lastMove?.pct ?? 0) ||
+      rank(a.state) - rank(b.state) ||
+      movePct(b.state) - movePct(a.state) ||
       b.purchases - a.purchases ||
       a.displayName.localeCompare(b.displayName, "ar"),
   );

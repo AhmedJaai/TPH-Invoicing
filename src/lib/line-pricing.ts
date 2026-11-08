@@ -16,6 +16,7 @@
  */
 import { grossOfNetExact, netInsideGross } from "./vat";
 import { latinDigits } from "./digits";
+import { parseRiyals } from "./money";
 
 export type PricingBasis =
   /** الضرب يستقيم — لا خصم ولا التباس */
@@ -215,4 +216,39 @@ export function reconcileInvoiceLines<T extends LineToReconcile>(
   }
 
   return { lines: [...lines], verdict: "UNVERIFIED" };
+}
+
+/* ─────────────────── من القراءة إلى البنود ─────────────────── */
+
+export interface ReadLine {
+  description?: string;
+  quantity?: string;
+  unitPrice?: string;
+  lineTotal?: string;
+}
+
+/**
+ * بنودُ قراءةٍ كما تُقيَّد: سعرُ الوحدة الفعليّ لكلّ بند، مسوّىً بصافي الفاتورة.
+ * بابٌ واحد يقرؤه القيدُ (`replaceLines`) وبطاقةُ المراجعة — فلا تقارن البطاقةُ سعرَ
+ * القائمة أو السعرَ الشامل للضريبة بما قُيِّد صافياً بعد الخصم.
+ */
+export function resolveReadLines(lines: readonly ReadLine[], subtotalMinor: number | null | undefined) {
+  const resolved: (LinePricing & { description: string; quantity: number; qtyText: string | null })[] = [];
+  for (const l of lines) {
+    const description = l.description?.trim();
+    if (!description) continue;
+    const qtyText = parseLineQuantity(l.quantity);
+    const quantity = qtyText === null ? 1 : Number(qtyText);
+    // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد كل متوسط بعده
+    const priced = resolveLinePricing({
+      quantity,
+      unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
+      lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
+    });
+    if (!priced) continue;
+    /* بلا كمّيّةٍ لا يُعرف أيّ الرقمين سعرُ الوحدة — فلا يدخل تتبّعَ الأسعار */
+    const pricing = qtyText === null ? { ...priced, basis: "QTY_UNREAD" as const } : priced;
+    resolved.push({ ...pricing, description, quantity, qtyText });
+  }
+  return reconcileInvoiceLines(resolved, subtotalMinor).lines;
 }

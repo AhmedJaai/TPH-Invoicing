@@ -2,6 +2,7 @@
  * ما يُشتقّ في ملفّ الفاتورة — دوالّ خالصة يختبرها الاختبار بلا قاعدة.
  */
 import { MEDIUM_COVERAGE } from "./provenance";
+import { gapReason, samePrice, type PriceGapReason } from "./price-watch";
 
 export interface PreviousPrice {
   unitPriceMinor: number;
@@ -21,10 +22,16 @@ export interface PriceMove {
    * عشريّ. و`null` إن كان السابق صفراً: النسبة من صفرٍ مجهولة لا صفر.
    */
   percent: number | null;
+  /** دون ٣٪ «بلا تغيير» — تقريبٌ لا حركة، كما في كلّ شاشة سعر */
   direction: "up" | "down" | "same";
+  /** فرقٌ يفسّره غيرُ السعر (الضريبة، أو الوحدة والكمّيّة) — «راجع البند» لا ارتفاع */
+  reason: PriceGapReason | null;
 }
 
-/** سعرُ البند اليوم مقابل آخر ما اشتُري به الصنفُ نفسه من المورّد نفسه. */
+/**
+ * سعرُ البند مقابل **السعر المعتاد** للصنف نفسه عند المورّد نفسه قبل هذه الفاتورة
+ * (`usualPrices` في `price-watch.ts`) — لا آخرَ سطرٍ قُيِّد: كان فرقُ هللةٍ «ارتفاعاً».
+ */
 export function priceMove(currentMinor: number, previous: PreviousPrice): PriceMove {
   const deltaMinor = currentMinor - previous.unitPriceMinor;
   return {
@@ -36,7 +43,8 @@ export function priceMove(currentMinor: number, previous: PreviousPrice): PriceM
     percent: previous.unitPriceMinor === 0
       ? null
       : Math.round((deltaMinor * 100) / previous.unitPriceMinor),
-    direction: deltaMinor > 0 ? "up" : deltaMinor < 0 ? "down" : "same",
+    direction: previous.unitPriceMinor > 0 && samePrice(currentMinor, previous.unitPriceMinor) ? "same" : deltaMinor > 0 ? "up" : deltaMinor < 0 ? "down" : "same",
+    reason: gapReason(previous.unitPriceMinor, currentMinor),
   };
 }
 

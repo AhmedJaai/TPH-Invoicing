@@ -23,7 +23,8 @@
  *
  * أعدادٌ صحيحة بالهللات والنسبُ بنقاط الأساس. والاسمُ المخزّن لا يتغيّر: الجمعُ هنا
  * للمقارنة وحدها، والدمجُ الدائم يُقرّه إنسانٌ («هو نفسه…» في صفحة المورّد).
- */
+*/
+import { addDays } from "./riyadh-time";
 
 /** دون هذا تقريبٌ لا حركة — بنقاط الأساس (٣٪). */
 export const PRICE_MOVE_FLOOR_BP = 300;
@@ -178,6 +179,12 @@ export function itemIdentity(lines: readonly Pick<PriceLine, "normalized" | "inv
 /** ما يفسّر فرقاً غيرَ تغيّر السعر. */
 export type PriceGapReason = "VAT" | "UNIT";
 
+/** سببُ الفرق بلسان صاحب المقهى — في كلّ شاشةٍ تقوله. */
+export const PRICE_GAP_LABEL: Record<PriceGapReason, string> = {
+  VAT: "الفرق قدر الضريبة: قُرئ البند مرة شاملاً الضريبة ومرة بدونها",
+  UNIT: "الفرق بضعفين أو أكثر: الكمية أو الوحدة قُرئت خطأً على الأرجح",
+};
+
 /** نسبةُ ما بين سعرين بنقاط الأساس — موجبٌ ارتفاع. */
 export function deltaBp(fromMinor: number, toMinor: number): number {
   return Math.round(((toMinor - fromMinor) * 10_000) / fromMinor);
@@ -329,7 +336,7 @@ export function trackPrices(lines: readonly PriceLine[], todayDay: string): Item
     list.push(l);
     bySupplier.set(l.supplierId, list);
   }
-  const yearAgo = shiftDay(todayDay, -365);
+  const yearAgo = addDays(todayDay, -365);
   const out: ItemPrice[] = [];
 
   for (const [supplierId, list] of bySupplier) {
@@ -396,12 +403,6 @@ export function trackPrices(lines: readonly PriceLine[], todayDay: string): Item
   return out;
 }
 
-function shiftDay(day: string, days: number): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 /** الأثرُ السنويّ لتغيّرٍ مؤكَّد: الفرقُ × كمّيّةِ السنة — `null` إن جُهلت الكمّيّة. */
 export function annualImpactMinor(item: Pick<ItemPrice, "yearQtyMilli">, fromMinor: number, toMinor: number): number | null {
   if (item.yearQtyMilli === null) return null;
@@ -439,6 +440,43 @@ export interface PriceMove {
   reason: PriceGapReason | null;
 }
 
+export interface UsualPrice {
+  /** الصنفُ كما جُمعت صيغُه */
+  key: string;
+  minor: number;
+  /** آخرُ فاتورةٍ جاءت بهذا السعر — دليلُه */
+  day: string;
+  invoiceId: string;
+  invoiceNumber: string | null;
+}
+
+/**
+ * السعرُ المعتاد لكلّ اسمٍ مطبَّع في فاتورةٍ جديدة، من تاريخ مورّدها وحده (`history`).
+ * الاسمُ يُلحق بصنفه بالدليل نفسه الذي يجمع صيغَ التاريخ. ما لا سابقةَ له، أو صنفٌ
+ * باسمٍ واحدٍ لسعرين (`MIXED`)، لا معتادَ له فلا يُذكَر.
+ */
+export function usualPrices(names: readonly string[], history: readonly PriceLine[], todayDay: string): Map<string, UsualPrice> {
+  const out = new Map<string, UsualPrice>();
+  if (names.length === 0 || history.length === 0) return out;
+  const probe = "__new__";
+  const identity = itemIdentity([...history, ...names.filter(Boolean).map((n) => ({ normalized: n, invoiceId: probe }))]);
+  const items = trackPrices(history, todayDay);
+  for (const n of names) {
+    const rep = identity.get(n);
+    if (rep === undefined || out.has(n)) continue;
+    const item = items.find((i) => i.variants.some((v) => identity.get(v) === rep));
+    if (!item || item.expectedMinor === null || item.expectedMinor <= 0) continue;
+    const proof = [...item.readings].reverse().find((r) => r.unitMinor !== null && samePrice(r.unitMinor, item.expectedMinor!));
+    out.set(n, {
+      key: item.key, minor: item.expectedMinor,
+      day: proof?.day ?? item.lastDay ?? todayDay,
+      invoiceId: proof?.invoiceId ?? item.lastInvoiceId ?? "",
+      invoiceNumber: proof?.invoiceNumber ?? null,
+    });
+  }
+  return out;
+}
+
 /**
  * أسعارُ فاتورةٍ تُراجَع مقابل السعر المعتاد لكلّ صنفٍ عند مورّدها.
  * `lines` بسعر الوحدة الفعليّ (بعد `resolveLinePricing` وتسوية الصافي) لا كما قُرئ.
@@ -448,40 +486,21 @@ export function movesAtReview(
   history: readonly PriceLine[],
   todayDay: string,
 ): PriceMove[] {
-  if (lines.length === 0 || history.length === 0) return [];
-  const probe = "__review__";
-  const supplierId = history[0].supplierId;
-  const withNew: PriceLine[] = [
-    ...history,
-    ...lines.filter((l) => l.normalized).map((l) => ({
-      supplierId, normalized: l.normalized, description: l.description, invoiceId: probe, day: todayDay,
-      unitMinor: 0, qtyMilli: null, basis: null,
-    })),
-  ];
-  const identity = itemIdentity(withNew);
-  const items = trackPrices(history, todayDay);
-  /* الصنفُ الذي تقع صيغتُه الجديدة في مجموعته — بالدليل نفسه الذي يجمع صيغَ التاريخ */
-  const itemOf = (normalized: string): ItemPrice | undefined => {
-    const rep = identity.get(normalized);
-    return rep === undefined ? undefined : items.find((i) => i.variants.some((v) => identity.get(v) === rep));
-  };
-
+  const usual = usualPrices(lines.map((l) => l.normalized), history, todayDay);
   const out: PriceMove[] = [];
   const seen = new Set<string>();
   for (const l of lines) {
     if (!l.normalized || l.unitMinor === null || l.unitMinor <= 0) continue;
-    const item = itemOf(l.normalized);
-    if (!item || item.expectedMinor === null || item.expectedMinor <= 0 || seen.has(item.key)) continue;
-    if (samePrice(item.expectedMinor, l.unitMinor)) continue;
-    seen.add(item.key);
-    const wasDay = [...item.readings].reverse().find((r) => r.unitMinor !== null && samePrice(r.unitMinor, item.expectedMinor!))?.day ?? item.lastDay ?? todayDay;
+    const u = usual.get(l.normalized);
+    if (!u || seen.has(u.key) || samePrice(u.minor, l.unitMinor)) continue;
+    seen.add(u.key);
     out.push({
       description: l.description,
       nowMinor: l.unitMinor,
-      wasMinor: item.expectedMinor,
-      wasDay,
-      deltaBp: deltaBp(item.expectedMinor, l.unitMinor),
-      reason: gapReason(item.expectedMinor, l.unitMinor),
+      wasMinor: u.minor,
+      wasDay: u.day,
+      deltaBp: deltaBp(u.minor, l.unitMinor),
+      reason: gapReason(u.minor, l.unitMinor),
     });
   }
   /* ما يُعترض عليه أوّلاً: الارتفاعُ الحقيقيّ، ثمّ ما يحتاج مراجعةَ البند */

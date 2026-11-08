@@ -1,3 +1,4 @@
+import { PRICE_GAP_LABEL } from "@/lib/price-watch";
 import { Fragment } from "react";
 import { and, asc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
@@ -167,7 +168,9 @@ export async function InvoiceView({
     ? null
     : amountsAddUp(inv.subtotalMinor, inv.vatMinor, inv.totalMinor, TOTAL_ROUNDING_TOLERANCE_MINOR, inv.discountMinor, inv.chargesMinor);
   const weak = weakFields(doc.fieldConfidence);
-  const risen = p.lines.filter((l) => l.move?.direction === "up");
+  /* ما ارتفع عن سعره المعتاد فعلاً — وما فرقُه الضريبةُ أو الوحدة بندٌ يُراجَع لا ارتفاع */
+  const risen = p.lines.filter((l) => l.move?.direction === "up" && l.move.reason === null);
+  const misread = p.lines.filter((l) => l.move && l.move.direction !== "same" && l.move.reason !== null);
   /* ما هو للعلم (تقريبُ مورّد، بنودٌ معفاة) لا يُرفع إلى «ما يستحقّ الانتباه» */
   const problems = reasons.filter((r) => r.severity !== "INFO");
   /* الإلغاء يرفضه الخادمُ على فاتورةٍ عليها سدادٌ أو طوبقت بكشف — فلا يُعرَض زرٌّ يُرفَض */
@@ -368,8 +371,15 @@ export async function InvoiceView({
           {risen.length > 0 && (
             <Notice tone="warn" icon={TrendingUp} href="#lines" cta="انظر البنود">
               {risen.length === 1
-                ? `ارتفع سعر «${risen[0].description}» ${risen[0].move?.percent ?? "?"}٪ عن آخر شراء.`
-                : `ارتفعت أسعار ${countNoun(risen.length, ITEM)} عن آخر شراء.`}
+                ? `ارتفع سعر «${risen[0].description}» ${risen[0].move?.percent ?? "?"}٪ عن سعره المعتاد.`
+                : `ارتفعت أسعار ${countNoun(risen.length, ITEM)} عن سعرها المعتاد.`}
+            </Notice>
+          )}
+          {misread.length > 0 && (
+            <Notice tone="warn" icon={ScanText} href="#lines" cta="انظر البنود">
+              {misread.length === 1
+                ? `سعر «${misread[0].description}» يبعد عن المعتاد بما لا يشبه تغيّر سعر: ${PRICE_GAP_LABEL[misread[0].move!.reason!]}.`
+                : `${countNoun(misread.length, ITEM)} بسعرٍ يبعد عن المعتاد بما لا يشبه تغيّر سعر — الأرجح أنها قُرئت خطأً، فصحّح الكمية أو السعر.`}
             </Notice>
           )}
         </ul>
@@ -385,8 +395,8 @@ export async function InvoiceView({
             count={p.lines.length > 0 ? p.lines.length : undefined}
             hint={p.lines.length > 0
               ? canEdit && !monthClosed
-                ? "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه. إن قُرئت الكمية خطأً فصحّحها بالقلم بجانبها."
-                : "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه."
+                ? "كل بند مقارن بسعره المعتاد عند المورّد نفسه قبل هذه الفاتورة. إن قُرئت الكمية خطأً فصحّحها بالقلم بجانبها."
+                : "كل بند مقارن بسعره المعتاد عند المورّد نفسه قبل هذه الفاتورة."
               : undefined}
           >
             {p.lines.length === 0 ? (
@@ -416,15 +426,17 @@ export async function InvoiceView({
                   { key: "total", header: "المجموع", numeric: true, cell: (l) => <span className="font-bold"><Money minor={l.lineTotalMinor} /></span> },
                   {
                     key: "move",
-                    header: "عن آخر شراء",
+                    header: "عن السعر المعتاد",
                     cell: (l) => {
                       if (!l.move) return <span className="text-[11px] text-muted">أول شراء</span>;
                       const m = l.move;
                       const pct = m.percent === null ? "?" : Math.abs(m.percent);
                       const badge = m.direction === "same"
                         ? <Badge>بلا تغيير</Badge>
+                        : m.reason !== null
+                        ? <Badge tone="warn">راجع البند</Badge>
                         : <Badge tone={m.direction === "up" ? "warn" : "ok"}>{m.direction === "up" ? "▲ ارتفع" : "▼ انخفض"} <span className="nums">{pct}</span>٪</Badge>;
-                      const title = `كان ${formatRiyalsDisplay(m.previousMinor)} في ${formatDay(m.previousDate)}`;
+                      const title = `${m.reason !== null ? `${PRICE_GAP_LABEL[m.reason]}. ` : ""}المعتاد ${formatRiyalsDisplay(m.previousMinor)}، آخره في ${formatDay(m.previousDate)}`;
                       return m.previousInvoiceId ? (
                         <Link href={invoiceHref(m.previousInvoiceId, "lines")} title={title} className="relative inline-flex">
                           {badge}

@@ -105,34 +105,35 @@ describe("انتظام السداد من التخصيصات وحدها", () => {
 });
 
 describe("تاريخ الأسعار داخل المورّد", () => {
-  const line = (n: string, date: string, unit: number, id = date) => ({
-    normalized: n, description: n, date, unitPriceMinor: unit, invoiceId: id, invoiceNumber: id,
+  const line = (n: string, day: string, unitMinor: number, invoiceId = `${n}-${day}`) => ({
+    supplierId: "s1", normalized: n, description: n, day, unitMinor, invoiceId, invoiceNumber: invoiceId,
+    qtyMilli: 1000, basis: "CONSISTENT",
   });
 
-  it("النسبة من الهللات، وآخر تغيّر مقابل آخر سعر خالفه", () => {
+  it("التغيّرُ المؤكَّد من المعتاد إلى المعتاد، والنسبة منذ أوّل سعر", () => {
     const [h] = priceHistory([
       line("حليب", "2026-06-01", 1_000),
       line("حليب", "2026-07-01", 1_100),
       line("حليب", "2026-08-01", 1_100),
-      line("حليب", "2026-09-01", 1_210),
-    ]);
-    expect(h.changePct).toBe(21);
-    expect(h.lastMove).toEqual({ previousMinor: 1_100, previousDate: "2026-08-01", pct: 10 });
-    expect(h.points).toEqual([1_000, 1_100, 1_100, 1_210]);
+      line("حليب", "2026-09-01", 1_100),
+    ], "2026-11-09");
+    expect(h.state).toMatchObject({ kind: "MOVED", fromMinor: 1_000, toMinor: 1_100 });
+    expect(h.changePct).toBe(10);
+    expect(h.points).toEqual([1_000, 1_100, 1_100, 1_100]);
   });
 
   it("شراء واحد لا نسبة له، وسعر صفر لا يدخل", () => {
-    const h = priceHistory([line("سكر", "2026-09-01", 500), line("سكر", "2026-09-02", 0)]);
-    expect(h[0].purchases).toBe(1);
+    const h = priceHistory([line("سكر", "2026-09-01", 500), line("سكر", "2026-09-02", 0)], "2026-11-09");
+    expect(h[0].purchases).toBe(2);
     expect(h[0].changePct).toBeNull();
-    expect(h[0].lastMove).toBeNull();
+    expect(h[0].state.kind).toBe("NEW");
   });
 
-  it("ما تحرّك أكثر يتقدّم", () => {
+  it("ما تغيّر فعلاً يتقدّم على ما لم يؤكَّد", () => {
     const h = priceHistory([
-      line("أ", "2026-06-01", 1_000), line("أ", "2026-07-01", 1_050),
-      line("ب", "2026-06-01", 1_000), line("ب", "2026-07-01", 1_300),
-    ]);
+      line("أ", "2026-06-01", 1_000), line("أ", "2026-07-01", 1_300),
+      line("ب", "2026-06-01", 1_000), line("ب", "2026-07-01", 1_050), line("ب", "2026-08-01", 1_050),
+    ], "2026-11-09");
     expect(h.map((x) => x.normalized)).toEqual(["ب", "أ"]);
   });
 });

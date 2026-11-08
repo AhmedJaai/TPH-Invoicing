@@ -4,10 +4,19 @@ import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "./money";
 
 const prev = (unitPriceMinor: number) => ({ unitPriceMinor, date: new Date("2026-08-01"), invoiceNumber: "A-1" });
 
-describe("priceMove — سعر البند مقابل آخر شراء", () => {
+describe("priceMove — سعر البند مقابل السعر المعتاد", () => {
   it("ارتفاع بنسبة صحيحة من الهللات", () => {
-    const m = priceMove(4600, prev(4000));
-    expect(m).toMatchObject({ deltaMinor: 600, percent: 15, direction: "up", previousNumber: "A-1" });
+    const m = priceMove(4400, prev(4000));
+    expect(m).toMatchObject({ deltaMinor: 400, percent: 10, direction: "up", previousNumber: "A-1", reason: null });
+  });
+
+  it("فرقٌ بقدر الضريبة أو بضعفين يُسمّى سببُه لا ارتفاعاً", () => {
+    expect(priceMove(4600, prev(4000)).reason).toBe("VAT");
+    expect(priceMove(7000, prev(1400)).reason).toBe("UNIT");
+  });
+
+  it("دون ٣٪ بلا تغيير — تقريبٌ لا حركة", () => {
+    expect(priceMove(4050, prev(4000)).direction).toBe("same");
   });
 
   it("انخفاض", () => {

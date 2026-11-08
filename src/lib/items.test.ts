@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { annualImpactMinor, detectPriceChange, normalizeItem, plausiblePriceChange, priceKey, similarItems } from "./items";
+import { normalizeItem, priceKey, similarItems } from "./items";
 
-const at = (iso: string, price: number) => ({ date: new Date(`${iso}T00:00:00Z`), unitPriceMinor: price });
 
 describe("تطبيع أسماء الأصناف", () => {
   it("يوحّد الأرقام العربية واللاتينية", () => {
@@ -36,54 +35,6 @@ describe("تطبيع أسماء الأصناف", () => {
   });
 });
 
-describe("كشف تغيّر السعر", () => {
-  it("لا يكشف شيئاً من نقطة واحدة", () => {
-    expect(detectPriceChange([at("2026-08-01", 1000)])).toBeNull();
-  });
-
-  it("لا يكشف شيئاً حين لا يتغيّر السعر أبداً", () => {
-    expect(detectPriceChange([at("2026-08-01", 1000), at("2026-08-10", 1000)])).toBeNull();
-  });
-
-  it("يكشف الارتفاع ويحسب نسبته", () => {
-    const c = detectPriceChange([at("2026-07-01", 1000), at("2026-08-01", 1200)]);
-    expect(c).not.toBeNull();
-    expect(c!.direction).toBe("up");
-    expect(c!.deltaMinor).toBe(200);
-    expect(c!.deltaRatio).toBeCloseTo(0.2);
-  });
-
-  it("يكشف الانخفاض", () => {
-    const c = detectPriceChange([at("2026-07-01", 1200), at("2026-08-01", 1000)]);
-    expect(c!.direction).toBe("down");
-    expect(c!.deltaMinor).toBe(-200);
-  });
-
-  it("يتخطّى الأسعار المكرّرة ليجد التغيّر الحقيقي", () => {
-    // النمط الشائع: سعر ثابت لأشهر ثم ارتفاع، وآخر فاتورتين متطابقتان
-    const c = detectPriceChange([
-      at("2026-05-01", 1000), at("2026-06-01", 1000),
-      at("2026-07-01", 1200), at("2026-08-01", 1200),
-    ]);
-    expect(c).not.toBeNull();
-    expect(c!.previousMinor).toBe(1000);
-    expect(c!.currentMinor).toBe(1200);
-  });
-
-  it("لا يتأثّر بترتيب الإدخال", () => {
-    const shuffled = [at("2026-08-01", 1200), at("2026-05-01", 1000), at("2026-07-01", 1000)];
-    const c = detectPriceChange(shuffled);
-    expect(c!.currentMinor).toBe(1200);
-    expect(c!.previousMinor).toBe(1000);
-  });
-
-  it("لا يقسم على صفر — والنسبة من صفر مجهولة لا صفر", () => {
-    const c = detectPriceChange([at("2026-07-01", 0), at("2026-08-01", 500)]);
-    expect(c!.deltaRatio).toBeNull();
-    expect(c!.deltaMinor).toBe(500);
-  });
-});
-
 describe("الفاصلة العشرية في وصف الصنف", () => {
   it("«١٫٥ لتر» و«1.5 لتر» صنف واحد", () => {
     expect(normalizeItem("حليب ١٫٥ لتر")).toBe(normalizeItem("حليب 1.5 لتر"));
@@ -91,18 +42,6 @@ describe("الفاصلة العشرية في وصف الصنف", () => {
 
   it("ولا تلتقي بـ«١٥ لتر»", () => {
     expect(normalizeItem("حليب ١٫٥ لتر")).not.toBe(normalizeItem("حليب ١٥ لتر"));
-  });
-});
-
-describe("الأثر السنوي", () => {
-  it("يضرب فرق السعر في الكمية السنوية", () => {
-    const c = detectPriceChange([at("2026-07-01", 1000), at("2026-08-01", 1200)])!;
-    expect(annualImpactMinor(c, 480)).toBe(96_000); // ٩٦٠ ريال سنوياً
-  });
-
-  it("الانخفاض يعطي أثراً سالباً أي توفيراً", () => {
-    const c = detectPriceChange([at("2026-07-01", 1200), at("2026-08-01", 1000)])!;
-    expect(annualImpactMinor(c, 100)).toBe(-20_000);
   });
 });
 
@@ -121,12 +60,3 @@ describe("أقرب أصناف المورّد — للاقتراح لا للدم�
   });
 });
 
-describe("التغيّرُ الذي يُصدَّق", () => {
-  it("ثلاثةُ أضعافٍ حدٌّ: 1397٪ وحدةٌ مختلفة لا سعر، وما دونها يُصدَّق", () => {
-    expect(plausiblePriceChange({ previousMinor: 1_00, currentMinor: 14_97 })).toBe(false);
-    expect(plausiblePriceChange({ previousMinor: 30_00, currentMinor: 9_00 })).toBe(false);
-    expect(plausiblePriceChange({ previousMinor: 10_00, currentMinor: 12_50 })).toBe(true);
-    expect(plausiblePriceChange({ previousMinor: 10_00, currentMinor: 30_00 })).toBe(true);
-    expect(plausiblePriceChange({ previousMinor: 0, currentMinor: 5_00 })).toBe(false);
-  });
-});

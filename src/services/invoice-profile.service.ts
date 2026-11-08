@@ -18,6 +18,9 @@ import {
 } from "@/db/schema";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { priceMove, type PriceMove } from "@/lib/invoice-profile";
+import { usualPrices } from "@/lib/price-watch";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { loadPriceLines } from "./price-watch.service";
 
 /**
  * نافذةُ «فاتورةٌ بالمبلغ نفسه من المورّد نفسه» — يومٌ قبلها وبعدها.
@@ -155,32 +158,16 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
 
   const [lines, allocs, stmt, twins, history] = await Promise.all([
     /*
-      البندُ ومعه آخرُ سعرٍ اشتُري به الصنفُ نفسه من المورّد نفسه قبل هذه
-      الفاتورة. والمقارنة داخل المورّد لا عبره — كـ`priceKey`.
+      البندُ، وسعرُه المعتاد قبل هذه الفاتورة يُحسب بعدها من تاريخ المورّد (`usualPrices`)
+      — لا آخرُ سطرٍ قُيِّد: قراءةٌ خاطئةٌ واحدة كانت تجعل كلَّ فاتورةٍ بعدها «ارتفاعاً».
     */
     db.execute<{
-      id: string; description: string; qty: string | null; unit_price_minor: number;
+      id: string; description: string; normalized: string; qty: string | null; unit_price_minor: number;
       line_total_minor: number; discount_minor: number; pricing_basis: string | null;
-      prev_price: number | null; prev_date: Date | string | null; prev_number: string | null; prev_id: string | null;
     }>(sql`
-      select l.id, l.description, l.qty::text as qty, l.unit_price_minor, l.line_total_minor,
-             l.discount_minor, l.pricing_basis,
-             prev.unit_price_minor as prev_price, prev.invoice_date as prev_date,
-             prev.invoice_number as prev_number, prev.invoice_id as prev_id
+      select l.id, l.description, l.normalized_description as normalized, l.qty::text as qty, l.unit_price_minor,
+             l.line_total_minor, l.discount_minor, l.pricing_basis
         from invoice_lines l
-        left join lateral (
-          select p.unit_price_minor, pi.invoice_date, pi.invoice_number, pi.id as invoice_id
-            from invoice_lines p
-            join invoices pi on pi.id = p.invoice_id
-           where pi.supplier_id = ${inv.supplierId}
-             and p.normalized_description = l.normalized_description
-             and l.normalized_description <> ''
-             and pi.id <> ${inv.id}
-             and pi.invoice_date < ${inv.invoiceDate}::timestamptz
-             and p.unit_price_minor > 0
-           order by pi.invoice_date desc
-           limit 1
-        ) prev on true
        where l.invoice_id = ${inv.id}
        order by l.line_total_minor desc
     `),
@@ -255,6 +242,12 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
       .limit(30),
   ]);
 
+  /* تاريخُ المورّد قبل هذه الفاتورة وحده — فلا تُقاس الفاتورةُ بنفسها ولا بما جاء بعدها */
+  const invDay = todayInRiyadh(inv.invoiceDate);
+  const before = (await loadPriceLines({ supplierId: inv.supplierId }))
+    .filter((l) => l.invoiceId !== inv.id && l.day <= invDay);
+  const usual = usualPrices(lines.rows.map((l) => l.normalized), before, invDay);
+
   const allocations = allocs.map((a) => ({ ...a, bankTxId: a.bankTxId ?? null }));
   /* المردودةُ والملغاة لا تُحسَب سداداً — التخصيصُ عليها يبقى أثراً لا مالاً */
   const paidMinor = allocations
@@ -301,14 +294,17 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
       lineTotalMinor: Number(l.line_total_minor),
       discountMinor: Number(l.discount_minor),
       pricingBasis: l.pricing_basis,
-      move: l.prev_price === null || l.prev_date === null
-        ? null
-        : priceMove(Number(l.unit_price_minor), {
-            unitPriceMinor: Number(l.prev_price),
-            date: new Date(l.prev_date),
-            invoiceNumber: l.prev_number,
-            invoiceId: l.prev_id ?? undefined,
-          }),
+      move: (() => {
+        const u = usual.get(l.normalized);
+        /* بندٌ لم تُقرأ كمّيّتُه أو لا يستقيم ضربُه لا سعرَ وحدةٍ له يُقارَن */
+        if (!u || l.pricing_basis === "QTY_UNREAD" || l.pricing_basis === "INCONSISTENT" || Number(l.unit_price_minor) <= 0) return null;
+        return priceMove(Number(l.unit_price_minor), {
+          unitPriceMinor: u.minor,
+          date: new Date(`${u.day}T00:00:00Z`),
+          invoiceNumber: u.invoiceNumber,
+          invoiceId: u.invoiceId || undefined,
+        });
+      })(),
     })),
     allocations,
     paidMinor,

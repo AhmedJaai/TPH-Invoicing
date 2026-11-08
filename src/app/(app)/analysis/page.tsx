@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { CalendarClock, Info, Layers, Link2, MessageCircle, ShoppingBasket, Tags, TrendingDown, TrendingUp } from "lucide-react";
 import { db } from "@/db";
-import { invoiceLines, suppliers } from "@/db/schema";
+import { invoiceLines, invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Money, PageShell } from "@/components/page-shell";
@@ -14,8 +14,8 @@ import {
 } from "@/components/ui";
 import { Figure } from "@/components/supplier-intel";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
-import { MAX_PLAUSIBLE_PRICE_MULTIPLE, plausiblePriceChange } from "@/lib/items";
-import { formatDay, MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
+import { needsLineCheck } from "@/lib/price-watch";
+import { formatDay, MS_PER_DAY, isoDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { whatsappHref } from "@/lib/supplier-edit";
 import { buildPriceRiseMessage, yearlyQuantity } from "@/lib/supplier-requests";
 import { buttonClass } from "@/components/ui-tokens";
@@ -87,8 +87,12 @@ export default async function ItemsAndPricesPage({
         quantity: invoiceLines.qty,
         unitPriceMinor: invoiceLines.unitPriceMinor,
         lineTotalMinor: invoiceLines.lineTotalMinor,
+        invoiceId: invoiceLines.invoiceId,
+        invoiceNumber: invoices.invoiceNumber,
+        pricingBasis: invoiceLines.pricingBasis,
       })
       .from(invoiceLines)
+      .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
       .leftJoin(suppliers, eq(invoiceLines.supplierId, suppliers.id))
       /* الأحدثُ أوّلاً: إن بُلغ الحدُّ سقط الأقدمُ لا عشوائيٌّ — ويُقال ذلك في الصفحة */
       .orderBy(desc(invoiceLines.invoiceDate))
@@ -110,7 +114,11 @@ export default async function ItemsAndPricesPage({
       quantity: r.quantity === null ? null : Number(r.quantity),
       unitPriceMinor: r.unitPriceMinor,
       lineTotalMinor: r.lineTotalMinor,
+      invoiceId: r.invoiceId,
+      invoiceNumber: r.invoiceNumber,
+      pricingBasis: r.pricingBasis,
     })),
+    todayInRiyadh(),
   );
 
   if (items.length === 0) {
@@ -132,12 +140,17 @@ export default async function ItemsAndPricesPage({
   const lineCoverage = health.metrics.find((m) => m.id === "lines");
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
 
-  /* ما تحرّك 3٪ فأكثر — دون ذلك تقريبٌ لا حركة */
+  /*
+    ما تغيّر سعرُه فعلاً: أكّدته فاتورتان ولا يفسّره غيرُ السعر، و٣٪ فأكثر (`price-watch.ts`).
+    كان «آخرَ سعرين مختلفين»، فقراءةٌ خاطئةٌ واحدة أو بندان باسمٍ واحد صارا «تغيّراً».
+  */
   const priceMoves = items
-    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03 && plausiblePriceChange(i.priceChange))
+    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null)
     .sort((a, b) => Math.abs(b.priceChange!.deltaRatio!) - Math.abs(a.priceChange!.deltaRatio!));
-  /* ما تغيّر بأكثر من ثلاثة أضعاف وحدةٌ مختلفة في الغالب — يُقال ولا يُعدّ ارتفاعاً */
-  const unitSuspects = items.filter((i) => i.priceChange && i.priceChange.previousMinor > 0 && !plausiblePriceChange(i.priceChange));
+  /* فرقٌ بضعفين أو بقدر الضريبة: قراءةُ بندٍ لا سعر — يُقال ولا يُعدّ ارتفاعاً */
+  const unitSuspects = items.filter((i) => needsLineCheck(i.priceState));
+  /* سعرٌ جديد في آخر فاتورةٍ وحدها — يظهر في الجدول إن تكرّر في التالية */
+  const pending = items.filter((i) => i.priceState.kind === "UNCONFIRMED" && i.priceState.reason === null);
   const rises = priceMoves.filter((i) => i.priceChange!.direction === "up");
   const falls = priceMoves.filter((i) => i.priceChange!.direction === "down");
   const maxRise = Math.max(0, ...rises.map((i) => pctOf(i) ?? 0));
@@ -174,7 +187,7 @@ export default async function ItemsAndPricesPage({
           href="/analysis#price-moves"
           tone={rises.length > 0 ? "warn" : undefined}
           value={<span className="nums">{rises.length}</span>}
-          sub={rises.length > 0 ? `أعلى زيادة ${maxRise}٪ في آخر شراء من المورّد نفسه.` : "لم يرتفع سعر أي صنف بنسبة 3٪ أو أكثر في آخر شراء."}
+          sub={rises.length > 0 ? `أعلى زيادة ${maxRise}٪، تكرّرت في فاتورتين على الأقل.` : "لم يرتفع سعر أي صنف ارتفاعاً تكرّر في فاتورتين."}
         />
         <Figure
           icon={TrendingDown}
@@ -214,8 +227,8 @@ export default async function ItemsAndPricesPage({
           <T s="أرقام هذه الصفحة مبنية على {0}، والباقي غير محسوب." a={[lineCoverage.detail]} /></Callout>
       )}
       {unitSuspects.length > 0 && (
-        <Callout tone="warn" icon={Info} className="mt-4" title={`تغيّرٌ بأكثر من ${MAX_PLAUSIBLE_PRICE_MULTIPLE} أضعاف في السعر: ${countNoun(unitSuspects.length, PRODUCT)}، ولا يُعدّ ارتفاعاً`}>
-          <T s="الأرجح أن الوحدة اختلفت بين الفاتورتين (كرتون قُرئ حبة أو العكس)، لا أن السعر تغيّر. صحّح البند في فاتورته إن كان خطأً: {0}." a={[unitSuspects.slice(0, 6).map((i, n) => {
+        <Callout tone="warn" icon={Info} className="mt-4" title={`بنودٌ تحتاج مراجعة قراءتها: ${countNoun(unitSuspects.length, PRODUCT)}، ولا يُعدّ فرقها تغيّراً في السعر`}>
+          <T s="الفرق بضعفين أو أكثر يعني غالباً أن الكمية أو الوحدة قُرئت خطأً (قُرئ المجموع مكان سعر الحبة، أو كرتون مكان حبة). والفرق بقدر الضريبة (15٪) يعني أن البند قُرئ مرة شاملاً الضريبة ومرة بدونها. صحّح البند في فاتورته إن كان خطأً: {0}." a={[unitSuspects.slice(0, 6).map((i, n) => {
             const slug = i.supplierId ? slugOf.get(i.supplierId) : undefined;
             return <span key={i.key}>{n > 0 && "، "}{slug ? <Link href={`/suppliers/${slug}?tab=prices#detail`} className="font-bold text-accent hover:underline">{i.displayName}</Link> : i.displayName}</span>;
           })]} />
@@ -247,7 +260,7 @@ export default async function ItemsAndPricesPage({
             icon={Tags}
             count={priceMoves.length}
             className="mt-6"
-            hint="سعر الوحدة في آخر شراء مقارنةً بالسعر السابق عند المورّد نفسه، بعد الخصم. الفرق الأقل من 3٪ يُعد تقريباً لا تغيّراً."
+            hint="سعر الوحدة المعتاد الآن مقارنةً بالسعر المعتاد قبله عند المورّد نفسه، بعد الخصم. لا يُعدّ السعر متغيّراً حتى يتكرّر في فاتورتين، ولا يُحسب فرقٌ أقل من 3٪ ولا فرقٌ سببه الضريبة أو وحدة مختلفة."
           >
             <DataTable
               rows={priceMoves}
@@ -258,8 +271,8 @@ export default async function ItemsAndPricesPage({
                 <EmptyState
                   compact
                   icon={Tags}
-                  title="لم يتغيّر سعر أي صنف بنسبة 3٪ أو أكثر."
-                  hint="كل صنف اشتريته أكثر من مرة بقي سعره في آخر شراء قريباً من سعره السابق."
+                  title="لم يتغيّر سعر أي صنف تغيّراً مؤكَّداً."
+                  hint="كل صنف اشتريته أكثر من مرة بقي سعره المعتاد كما هو، أو لم يتكرّر سعره الجديد في فاتورتين بعد."
                 />
               }
               columns={[
@@ -323,6 +336,14 @@ export default async function ItemsAndPricesPage({
               ]}
             />
           </Section>
+          {pending.length > 0 && (
+            <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+              <span>
+                <T s="{0} بسعر جديد في آخر فاتورة فقط: {1}. يظهر هنا إن تكرّر السعر في الفاتورة التالية." a={[countNoun(pending.length, PRODUCT), pending.slice(0, 4).map((i, n) => <span key={i.key} dir="auto">{n > 0 && "، "}{i.displayName}</span>)]} />
+              </span>
+            </p>
+          )}
 
           <Section
             title="اقترب موعد شرائه المعتاد"

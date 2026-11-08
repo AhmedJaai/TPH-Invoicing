@@ -3,7 +3,8 @@ import { isUntaxedInvoice, UNTAXED_HINT, UNTAXED_LABEL } from "@/lib/invoice-tax
 import { SupplierQrLine } from "@/components/supplier-qr";
 import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
-import { plausiblePriceChange } from "@/lib/items";
+import { PriceStateCell } from "@/components/price-state";
+import { isRealMove } from "@/lib/price-watch";
 import { notFound, redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import {
@@ -142,7 +143,7 @@ export async function SupplierView({
 
   const [
     statsRes, balRows, ages, findingsRaw, intel, atStatementRes, invoicesAtStatementRes, why,
-    priceRes, recent, statementRes, paymentRes,
+    recent, statementRes, paymentRes,
   ] = await Promise.all([
     db.execute<Record<string, number | string | null>>(sql`
       select
@@ -207,19 +208,6 @@ export async function SupplierView({
     `),
     /* ما يفسّر الفرق — سطراً سطراً من آخر كشف، لا رقماً واحداً */
     showAmounts ? latestStatementDiscrepancies(s.id) : Promise.resolve(null),
-    /*
-      تغيّر السعر للتقييم: متوسّط سعر الوحدة في أوّل شهر مقابل آخر شهر، من
-      بنودٍ بسعرٍ موثوق وحدها — وإلّا بقي `null` ولم يُقيَّم البُعد.
-    */
-    db.execute<{ month: string; avg_unit: string; lines: number }>(sql`
-      select i.period_month as month, avg(l.unit_price_minor)::bigint as avg_unit, count(*)::int as lines
-      from invoice_lines l
-      join invoices i on i.id = l.invoice_id
-      where l.supplier_id = ${s.id} and l.unit_price_minor is not null and l.unit_price_minor > 0
-      group by i.period_month
-      having count(*) >= 3
-      order by i.period_month
-    `),
     /* ── بيانات اللسان المفتوح وحده ── */
     tab === "invoices"
       ? db
@@ -272,7 +260,6 @@ export async function SupplierView({
         `)
       : Promise.resolve(null),
   ]);
-  const priceRows = priceRes.rows;
   const statementRows = statementRes.rows;
   const paymentRows = paymentRes?.rows ?? [];
 
@@ -352,10 +339,8 @@ export async function SupplierView({
     invoicesAtStatement,
   });
 
-  const priceChangePct =
-    priceRows.length >= 2 && Number(priceRows[0].avg_unit) > 0
-      ? ((Number(priceRows[priceRows.length - 1].avg_unit) - Number(priceRows[0].avg_unit)) / Number(priceRows[0].avg_unit)) * 100
-      : null;
+  /* تغيّرُ أسعاره في مجملها من بابٍ واحد (`supplierPriceDriftBp`): كان متوسّطَ كلّ السطور شهراً بشهر، فيخلط الكيسَ بالكرتون */
+  const priceChangePct = intel.priceDriftBp === null ? null : intel.priceDriftBp / 100;
 
   const health = buildSupplierHealth({
     invoiceCount: n("invoice_count"),
@@ -385,7 +370,7 @@ export async function SupplierView({
         || a.displayName.localeCompare(b.displayName, "ar"))
       .map((p) => ({ key: p.normalized, name: p.displayName, suggested: near.has(p.normalized) }));
   };
-  const rising = intel.prices.filter((p) => (p.lastMove?.pct ?? 0) > 0).length;
+  const rising = intel.prices.filter((p) => isRealMove(p.state) && p.state.deltaBp > 0).length;
 
   const tabCount: Partial<Record<Tab, number>> = {
     invoices: n("invoice_count"),
@@ -801,12 +786,12 @@ export async function SupplierView({
           {tab === "prices" && (
             <>
               <p className="mb-3 max-w-3xl text-xs leading-relaxed text-muted">
-                سعر الوحدة الفعلي في كل شراء منه بعد الخصم، ولهذا المورّد وحده. «آخر تغيّر» هو الفرق بين السعر الحالي وآخر سعر مختلف عنه.
+                سعر الوحدة الفعلي في كل شراء منه بعد الخصم، ولهذا المورّد وحده. «آخر تغيّر» هو الفرق بين سعره المعتاد الآن وسعره المعتاد قبله، ولا يُعدّ تغيّراً حتى يتكرّر في فاتورتين. صيغ الاسم الواحد للصنف تُجمع، والفرق الذي سببه الضريبة أو وحدة مختلفة يُعرض «راجع البند».
               </p>
               <DataTable
                 rows={intel.prices}
                 keyOf={(p) => p.normalized}
-                hrefOf={(p) => (showAmounts ? invoiceHref(p.lastInvoiceId, "lines") : undefined)}
+                hrefOf={(p) => (showAmounts && p.lastInvoiceId ? invoiceHref(p.lastInvoiceId, "lines") : undefined)}
                 searchOf={(p) => p.displayName}
                 searchLabel="ابحث عن صنف"
                 empty={
@@ -840,25 +825,11 @@ export async function SupplierView({
                   },
                   ...(showAmounts
                     ? [
-                        { key: "now", header: "السعر الآن", numeric: true as const, cell: (p: (typeof intel.prices)[number]) => <span className="font-bold"><Money minor={p.lastMinor} /></span> },
+                        { key: "now", header: "السعر الآن", numeric: true as const, cell: (p: (typeof intel.prices)[number]) => p.lastMinor === null ? <span className="text-[11px] text-muted">غير معروف</span> : <span className="font-bold"><Money minor={p.lastMinor} /></span> },
                         {
                           key: "move",
                           header: "آخر تغيّر",
-                          cell: (p: (typeof intel.prices)[number]) =>
-                            /* ثلاثةُ أضعافٍ فأكثر وحدةٌ مختلفة في الغالب (حليبٌ بالكرتون ثمّ بالقارورة: «انخفاض 93٪») — يُقال ولا يُعدّ تغيّراً */
-                            p.lastMove && !plausiblePriceChange({ previousMinor: p.lastMove.previousMinor, currentMinor: p.lastMinor }) ? (
-                              <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px]">
-                                <Badge tone="warn">وحدة مختلفة على الأرجح</Badge>
-                                <span className="text-muted"><T s="كان {0} — راجع البند في فاتورته" a={[<Money key="0" minor={p.lastMove.previousMinor} />]} /></span>
-                              </span>
-                            ) : p.lastMove ? (
-                              <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <Delta pct={p.lastMove.pct} favourable={p.lastMove.pct === null ? null : p.lastMove.pct <= 0} />
-                                <span className="text-[11px] text-muted"><T s="من {0}" a={[<Money key="0" minor={p.lastMove.previousMinor} />]} /></span>
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-muted">{p.purchases > 1 ? "لم يتغيّر" : "شراء واحد"}</span>
-                            ),
+                          cell: (p: (typeof intel.prices)[number]) => <PriceStateCell state={p.state} purchases={p.purchases} />,
                         },
                         {
                           key: "since",
@@ -872,8 +843,8 @@ export async function SupplierView({
                           header: "اتجاه السعر",
                           secondary: true,
                           cell: (p: (typeof intel.prices)[number]) =>
-                            p.lastMove ? (
-                              <Sparkline values={p.points} label={`اتجاه سعر ${p.displayName}`} tone={(p.lastMove?.pct ?? 0) > 0 ? "warn" : "accent"} />
+                            p.points.length >= 2 && p.state.kind !== "STABLE" && p.state.kind !== "NEW" ? (
+                              <Sparkline values={p.points} label={`اتجاه سعر ${p.displayName}`} tone={isRealMove(p.state) && p.state.deltaBp > 0 ? "warn" : "accent"} />
                             ) : (
                               <span className="text-[11px] text-muted">ثابت</span>
                             ),

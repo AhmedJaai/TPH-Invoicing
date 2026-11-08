@@ -1,68 +1,49 @@
 /**
- * «أغلى بـ٨٪ من آخر مرّة» — مقارنةُ سعر البند لحظةَ المراجعة، والمندوبُ عند الباب.
+ * «أغلى بـ٨٪ من المعتاد» — مقارنةُ سعر البند لحظةَ المراجعة، والمندوبُ عند الباب.
  *
- * ملفُّ الفاتورة يقارن البنودَ بعد القيد، وتنبيهُ ارتفاع الأسعار يأتي لاحقاً في
- * الطابور. وهذه تُحسب في الخادم عند القراءة: سعرُ الوحدة المقروء مقابل آخر سعرٍ
- * قُيِّد **للصنف نفسه عند المورّد نفسه** (الاسمُ وحده لا يعرّف صنفاً). أعدادٌ صحيحة
- * بالهللات، والنسبةُ بنقاط الأساس. وما لم يُقرأ سعرُه أو لا سابقةَ له لا يُذكَر —
- * لا «تغيّر 0٪» عن مجهول. ودون ٣٪ تقريبٌ لا حركة، كما في «الأصناف والأسعار».
+ * تُحسب في الخادم عند القراءة: سعرُ الوحدة **الفعليّ** (بعد الخصم وتسوية الضريبة —
+ * `resolveReadLines`، كما يُقيَّد) مقابل **السعر المعتاد** للصنف عند المورّد نفسه
+ * (`price-watch.ts`)، لا آخرَ سطرٍ قُيِّد. كانت تقارن ما قرأه النموذجُ خاماً — سعرَ
+ * القائمة قبل الخصم أو الشاملَ للضريبة — بما قُيِّد صافياً، فتقول «ارتفع» عن سعرٍ لم يتغيّر.
+ *
+ * وما يفسّره غيرُ السعر (الضريبة، أو الكمّيّة والوحدة) يُقال سببُه ولا يُعترض به.
  */
 import { normalizeItem } from "./items";
-import { parseRiyals } from "./money";
+import { resolveReadLines, type ReadLine } from "./line-pricing";
+import { movesAtReview, type PriceLine, type PriceMove } from "./price-watch";
 
-/** دون هذا تقريبٌ لا حركة — بنقاط الأساس (٣٪). */
-export const PRICE_MOVE_FLOOR_BP = 300;
+export type { PriceMove } from "./price-watch";
 
-export interface LastPrice {
-  unitPriceMinor: number;
-  /** YYYY-MM-DD */
-  day: string;
-}
-
-export interface PriceMove {
-  description: string;
-  nowMinor: number;
-  wasMinor: number;
-  wasDay: string;
-  /** موجبٌ ارتفاع وسالبٌ انخفاض — بنقاط الأساس، مقرَّبةً إلى أقرب نقطة. */
-  deltaBp: number;
-}
-
+/**
+ * بنودُ القراءة مقابل تاريخ المورّد. `aliases` صيغٌ أقرّها إنسانٌ أنّها صنفٌ آخر (056)،
+ * فيُقارَن البندُ باسمه الذي سيُقيَّد به.
+ */
 export function priceMovesAtReview(
-  lines: readonly { description?: string; unitPrice?: string }[],
-  lastByItem: ReadonlyMap<string, LastPrice>,
+  lines: readonly ReadLine[],
+  subtotalMinor: number | null,
+  history: readonly PriceLine[],
+  aliases: ReadonlyMap<string, string>,
+  todayDay: string,
 ): PriceMove[] {
-  const out: PriceMove[] = [];
-  const seen = new Set<string>();
-  for (const line of lines) {
-    const description = (line.description ?? "").trim();
-    const key = normalizeItem(description);
-    if (!key || seen.has(key)) continue;
-    const nowMinor = parseRiyals(line.unitPrice ?? "");
-    const last = lastByItem.get(key);
-    /* سعرٌ لم يُقرأ، أو صفر، أو لا سابقةَ له: لا مقارنةَ تُقال */
-    if (nowMinor === null || nowMinor <= 0 || !last || last.unitPriceMinor <= 0) continue;
-    const deltaBp = Math.round(((nowMinor - last.unitPriceMinor) * 10_000) / last.unitPriceMinor);
-    if (Math.abs(deltaBp) < PRICE_MOVE_FLOOR_BP) continue;
-    seen.add(key);
-    out.push({ description, nowMinor, wasMinor: last.unitPriceMinor, wasDay: last.day, deltaBp });
-  }
-  /* الأثقلُ ارتفاعاً أوّلاً — هو ما يُعترَض عليه */
-  return out.sort((a, b) => b.deltaBp - a.deltaBp);
+  const resolved = resolveReadLines(lines, subtotalMinor).map((l) => {
+    const read = normalizeItem(l.description);
+    return {
+      description: l.description,
+      normalized: aliases.get(read) ?? read,
+      /* ما لم تُقرأ كمّيّتُه أو تعارض ضربُه لا سعرَ وحدةٍ يُقارَن به */
+      unitMinor: l.basis === "QTY_UNREAD" || l.basis === "INCONSISTENT" ? null : l.effectiveUnitMinor,
+    };
+  });
+  return movesAtReview(resolved, history, todayDay);
 }
 
-/** مفاتيحُ الأصناف في البنود — يُسأل بها الخادمُ عن آخر أسعارها. */
-export function itemKeys(lines: readonly { description?: string }[]): string[] {
-  return [...new Set(lines.map((l) => normalizeItem((l.description ?? "").trim())).filter(Boolean))];
-}
-
-/** رسالةُ اعتراضٍ جاهزة — بالبنود التي ارتفعت وحدها، بسعرَيها. */
+/** رسالةُ اعتراضٍ جاهزة — بما ارتفع فعلاً وحده، لا بما يفسّره الضريبةُ أو الوحدة. */
 export function priceObjection(supplierName: string, moves: readonly PriceMove[], riyals: (minor: number) => string, day: (iso: string) => string): string {
-  const rises = moves.filter((m) => m.deltaBp > 0);
+  const rises = moves.filter((m) => m.deltaBp > 0 && m.reason === null);
   return [
     `السلام عليكم ${supplierName}،`,
     "",
-    "لاحظنا في الفاتورة الأخيرة أسعاراً أعلى من آخر توريد:",
+    "لاحظنا في الفاتورة الأخيرة أسعاراً أعلى من سعركم المعتاد:",
     ...rises.map((m) => `• ${m.description}: ${riyals(m.nowMinor)} (كان ${riyals(m.wasMinor)} في ${day(m.wasDay)})`),
     "",
     "نرجو التوضيح أو تصحيح الفاتورة قبل اعتمادها، شاكرين لكم.",
