@@ -13,7 +13,6 @@ import { recordAudit } from "@/lib/audit";
 import { pgErrorCode } from "@/lib/pg-error";
 import type { Conn } from "./types";
 
-export const TEAM_MESSAGE_KINDS: readonly TeamMessageKind[] = ["SUGGESTION", "COMPLAINT", "OTHER"];
 
 export const TEAM_MESSAGE_LABEL: Record<TeamMessageKind, string> = {
   SUGGESTION: "اقتراح",

@@ -46,6 +46,7 @@
 ## الأوامر
 
 `npm test` (العددُ يُقرأ من التشغيل لا يُكتَب هنا) · `npm run test:db` · `npm run typecheck` · `npm run lint`
+(`lint` يشمل فحصَ الصادرات الميّتة `lint:dead` — كان خارجَه فمرّ محلياً وسقط «فحص الجودة» على GitHub أسبوعاً، ٩ نوفمبر ٢٠٢٦)
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

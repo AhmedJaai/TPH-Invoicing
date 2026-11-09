@@ -34,7 +34,6 @@ export function isBoardKind(v: unknown): v is TeamBoardKind {
   return typeof v === "string" && BOARD_KINDS.some((k) => k === v);
 }
 
-export const WASTE_REASONS: readonly WasteReason[] = ["EXPIRED", "SPILLED", "FAILED_PREP", "DAMAGED", "OTHER"];
 
 /** أطولُ إجازةٍ تُطلب مرّةً — ما فوقها يُكلَّم فيه صاحبُ المقهى. */
 export const MAX_LEAVE_DAYS = 30;
@@ -213,8 +212,6 @@ async function loadRequests(where: ReturnType<typeof sql> | ReturnType<typeof eq
 export const myRequests = (employeeId: string) => loadRequests(eq(teamRequests.employeeId, employeeId), 15);
 export const pendingRequests = (conn: Conn = db) => loadRequests(eq(teamRequests.status, "PENDING"), 200, conn);
 export const decidedRequests = () => loadRequests(sql`${teamRequests}.status in ('APPROVED', 'REJECTED')`, 30);
-
-export { pendingRequestCount } from "./team-requests-count";
 
 /**
  * يقرّ الطلبَ أو يردّه. الإقرارُ يُنفّذه بخدمات التطبيق نفسها:

@@ -29,10 +29,6 @@ export interface Task {
 
 export type TaskLevel = "OVERDUE" | "TODAY" | "REMINDER" | "UPCOMING" | "UNDATED";
 
-export const TASK_LEVEL_LABEL: Record<TaskLevel, string> = {
-  OVERDUE: "متأخّرة", TODAY: "اليوم", REMINDER: "تذكير", UPCOMING: "قادمة", UNDATED: "بلا موعد",
-};
-
 export function isTaskPriority(v: string): v is TaskPriority {
   return (TASK_PRIORITIES as readonly string[]).includes(v);
 }

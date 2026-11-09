@@ -8,7 +8,7 @@
     "vercel-build": "tsx scripts/migrate.ts && next build",
     "postinstall": "node scripts/copy-ort.mjs",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && tsx scripts/dead-exports.ts",
     "lint:dead": "tsx scripts/dead-exports.ts",
     "test": "vitest run",
     "test:watch": "vitest",
