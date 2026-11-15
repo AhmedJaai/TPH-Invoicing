@@ -14,7 +14,6 @@
  * عداه يُشتقّ هنا: الدرسُ نفسه من `confirm.ts` و«الإقرار الجماعيّ
  * يُعيد الحساب».
  */
-import type { CountPart } from "@/lib/inventory/count-parts";
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -735,8 +734,6 @@ export interface ActualInput {
   productId: string;
   /** بالمِلّي المعياريّ، و`null` «لم يُعَدّ بعد». */
   actualMilli: number | null;
-  /** الخاناتُ كما كُتبت («١٩ كرتون + ٨٩٧ حبّة») — من «TPH Team». وغيابُها يمسح ما سبق فلا يخالف المجموع. */
-  parts?: readonly CountPart[] | null;
 }
 
 /** يجمع كلَّ ما يحتاجه المحرّك لفترةٍ وفرع. */
@@ -1107,15 +1104,8 @@ export interface StartCountInput {
   periodStart: string;
   periodEnd: string;
   branchId: string | null;
-  /** مستخدمٌ بمعرّفه، أو موظّفٌ من «TPH Team» (`TeamCounter`) — بدأ جردَ السبت. */
-  actorId: string | TeamCounter;
+  actorId: string;
   note?: string | null;
-}
-
-/** موظّفٌ يعدّ من رابطه — ليس مستخدماً، فيُكتب في عمود الموظّف وباسمه في سجلّ التدقيق. */
-export interface TeamCounter {
-  employeeId: string;
-  name: string;
 }
 
 /**
@@ -1170,20 +1160,16 @@ export async function startCount(input: StartCountInput, conn: Conn = db): Promi
       periodEnd: input.periodEnd,
       status: "DRAFT",
       note: input.note ?? null,
-      startedById: typeof input.actorId === "string" ? input.actorId : null,
-      startedByEmployeeId: typeof input.actorId === "string" ? null : input.actorId.employeeId,
+      startedById: input.actorId,
     })
     .returning({ id: inventoryCounts.id });
 
   await recordAudit({
-    actorId: typeof input.actorId === "string" ? input.actorId : null,
+    actorId: input.actorId,
     action: "INVENTORY_COUNT_STARTED",
     entityType: "inventory_count",
     entityId: row.id,
-    after: {
-      الفترة: `${input.periodStart} → ${input.periodEnd}`, الفرع: input.branchId ?? "الكل",
-      ...(typeof input.actorId === "string" ? {} : { "بدأه من TPH Team": input.actorId.name }),
-    },
+    after: { الفترة: `${input.periodStart} → ${input.periodEnd}`, الفرع: input.branchId ?? "الكل" },
   }, conn);
 
   return { countId: row.id, created: true };
@@ -1393,11 +1379,9 @@ export async function canonicalCounts(
 export async function saveActualCounts(
   countId: string,
   entries: readonly ActualInput[],
-  actor: string | TeamCounter,
+  actorId: string,
   conn: Conn = db,
 ): Promise<EngineReport> {
-  const actorId = typeof actor === "string" ? actor : null;
-  const employeeId = typeof actor === "string" ? null : actor.employeeId;
   const header = await loadCountHeader(countId, conn);
   if (!header) throw new Error("الجرد غير موجود");
   if (header.status === "FINALISED") throw new CountLockedError();
@@ -1436,7 +1420,7 @@ export async function saveActualCounts(
       */
       const written = await tx
         .update(inventoryCountLines)
-        .set({ actualMilli: e.actualMilli, countedById: actorId, countedByEmployeeId: employeeId, countParts: e.parts && e.parts.length > 0 ? e.parts : null, countedAt: new Date() })
+        .set({ actualMilli: e.actualMilli, countedById: actorId, countedAt: new Date() })
         .where(and(eq(inventoryCountLines.countId, countId), eq(inventoryCountLines.productId, e.productId)))
         .returning({ id: inventoryCountLines.id });
 
@@ -1450,10 +1434,7 @@ export async function saveActualCounts(
       action: "INVENTORY_COUNT_LINE_EDITED",
       entityType: "inventory_count",
       entityId: countId,
-      after: {
-        أصناف: entries.length, أُفرغ: entries.filter((e) => e.actualMilli === null).length,
-        ...(typeof actor === "string" ? {} : { "عدّه من TPH Team": actor.name }),
-      },
+      after: { أصناف: entries.length, أُفرغ: entries.filter((e) => e.actualMilli === null).length },
     }, tx);
   });
 

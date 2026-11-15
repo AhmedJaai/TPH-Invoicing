@@ -80,7 +80,6 @@ export function InventoryCountSteps({
   initialStep,
   review,
   finalise,
-  saved,
 }: {
   countId: string;
   branchId: string | null;
@@ -94,8 +93,6 @@ export function InventoryCountSteps({
   suppliers: { id: string; name: string }[];
   /** ربطُ بنود فواتير الأسبوع بأصناف الجرد — يُرسَم في الخادم ويُمرَّر. */
   purchaseLinks: ReactNode;
-  /** ما عدّه الفريقُ خارج النطاق — محفوظٌ للمرجع، يُقرأ من أسطر الجرد في الخادم (`SavedForReference`). */
-  saved?: ReactNode;
   canEdit: boolean;
   /** يحرّر الوصفات — وإلّا «اكتب وصفة» لا يُعرض رابطاً */
   canRecipes?: boolean;
@@ -222,7 +219,6 @@ export function InventoryCountSteps({
             locked={locked}
             onDirtyChange={setDirtyCount}
           />
-          {saved}
         </div>
 
         {/* عنصرٌ بناه الخادم لا يقف أخاً لغيره في مصفوفة أبناء — وإلّا طلب React مفتاحاً له */}
@@ -488,4 +484,3 @@ function ScopePicker({
     </div>
   );
 }
-

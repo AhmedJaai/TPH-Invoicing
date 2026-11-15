@@ -2,13 +2,12 @@
  * الموظّف: إضافتُه وتعديلُه، وراتبُه من شهرٍ يبدأ منه، ورابطُ حضوره.
  */
 import { NextResponse } from "next/server";
-import { saveCountWhatsapp } from "@/services/team-count.service";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, setInventoryAccess, setInvoiceReceiver, saveEmployee, saveShift, setDayShift, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, setInvoiceReceiver, saveEmployee, saveShift, setDayShift, setRate,
 } from "@/services/payroll.service";
 import { shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 
@@ -45,9 +44,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rate-remove"), rateId: Id }).strict(),
   z.object({ action: z.literal("link-issue"), id: Id }).strict(),
   z.object({ action: z.literal("link-revoke"), id: Id }).strict(),
-  z.object({ action: z.literal("inventory-access"), id: Id, on: z.boolean() }).strict(),
   z.object({ action: z.literal("invoice-receiver"), id: Id, on: z.boolean() }).strict(),
-  z.object({ action: z.literal("count-whatsapp"), phone: z.string().trim().max(30) }).strict(),
   z.object({ action: z.literal("delete"), id: Id }).strict(),
   /* جدولُ الدوام: من كم إلى كم، والسماح، وأيّامُ الراحة — لموظّفٍ واحد */
   z.object({
@@ -108,14 +105,6 @@ export async function POST(request: Request) {
     if (b.action === "invoice-receiver") {
       const done = await setInvoiceReceiver(b.id, b.on, user.id);
       return NextResponse.json({ ok: true, message: !done ? "لا تغيير" : b.on ? "تصله كل فاتورة يصوّرها الفريق، ويُنبَّه بها" : "لم تعد تصله الفواتير" });
-    }
-    if (b.action === "inventory-access") {
-      const done = await setInventoryAccess(b.id, b.on, user.id);
-      return NextResponse.json({ ok: true, message: !done ? "لا تغيير" : b.on ? "صار يدخل جرد السبت من رابطه" : "سُحب منه جرد السبت" });
-    }
-    if (b.action === "count-whatsapp") {
-      await saveCountWhatsapp(b.phone || null, user.id);
-      return NextResponse.json({ ok: true, message: b.phone ? "حُفظ رقمك، ويصله تقرير جرد السبت" : "مُسح الرقم" });
     }
     if (b.action === "link-revoke") {
       const done = await revokeCheckinLink(b.id, user.id);

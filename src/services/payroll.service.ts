@@ -62,8 +62,6 @@ export interface EmployeeView {
   lateGraceMinutes: number;
   daysOff: string;
   hasCheckinLink: boolean;
-  /** يُدخل جرد السبت من رابطه (102). */
-  canCountInventory: boolean;
   /** يستلم فواتيرَ الفريق ليُدخلها في فودكس (105)، ومنذ متى. */
   receivesInvoices: boolean;
   invoicesSince: Date | null;
@@ -83,7 +81,7 @@ function toView(e: EmployeeRow, rates: readonly (typeof employeeRates.$inferSele
     id: e.id, name: e.name, kind: e.kind, jobTitle: e.jobTitle, phone: e.phone, nationalId: e.nationalId,
     bankBeneficiaryId: e.bankBeneficiaryId, iban: e.iban, hiredOn: e.hiredOn, leftOn: e.leftOn,
     shiftStart: e.shiftStart, shiftMinutes: e.shiftMinutes, lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
-    hasCheckinLink: e.checkinTokenHash !== null, canCountInventory: e.canCountInventory, receivesInvoices: e.invoicesSince !== null, invoicesSince: e.invoicesSince, note: e.note,
+    hasCheckinLink: e.checkinTokenHash !== null, receivesInvoices: e.invoicesSince !== null, invoicesSince: e.invoicesSince, note: e.note,
     rates: rates.filter((r) => r.employeeId === e.id).map((r) => ({ id: r.id, fromMonth: r.fromMonth, amountMinor: r.amountMinor })),
     shiftRules: shifts.filter((r) => r.employeeId === e.id).map(toRule),
   };
@@ -957,17 +955,6 @@ export async function revokeCheckinLink(employeeId: string, actorId: string): Pr
   });
 }
 
-/** يأذن للموظّف بإدخال جرد السبت من «TPH Team» أو يسحب الإذن — للمالك. */
-export async function setInventoryAccess(employeeId: string, on: boolean, actorId: string): Promise<boolean> {
-  return db.transaction(async (t) => {
-    const done = await t.update(employees).set({ canCountInventory: on, updatedAt: new Date() })
-      .where(and(eq(employees.id, employeeId), eq(employees.canCountInventory, !on))).returning({ id: employees.id });
-    if (done.length === 0) return false;
-    await recordAudit({ actorId, action: "EMPLOYEE_INVENTORY_ACCESS_CHANGED", entityType: "employee", entityId: employeeId, before: { "جرد السبت": !on }, after: { "جرد السبت": on } }, t);
-    return true;
-  });
-}
-
 /** يجعله مستلمَ فواتير الفريق في «TPH Team» (يراها ويُنبَّه بها) أو يسحب ذلك — للمالك (105). */
 export async function setInvoiceReceiver(employeeId: string, on: boolean, actorId: string): Promise<boolean> {
   return db.transaction(async (t) => {
@@ -988,8 +975,6 @@ export interface CheckinEmployee {
   lateGraceMinutes: number;
   daysOff: string;
   shiftRules: ShiftRule[];
-  /** يُدخل جردَ السبت من رابطه (102). */
-  canCountInventory: boolean;
   receivesInvoices: boolean;
   invoicesSince: Date | null;
 }
@@ -1004,7 +989,6 @@ export async function resolveCheckinToken(token: string | null | undefined): Pro
   return {
     id: row.id, name: row.name, kind: row.kind, shiftStart: row.shiftStart, shiftMinutes: row.shiftMinutes,
     lateGraceMinutes: row.lateGraceMinutes, daysOff: row.daysOff, shiftRules: rules.map(toRule), receivesInvoices: row.invoicesSince !== null, invoicesSince: row.invoicesSince,
-    canCountInventory: row.canCountInventory,
   };
 }
 

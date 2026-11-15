@@ -9,11 +9,9 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
-import { BookOpen, ClipboardList, Clock, Inbox, Megaphone, ScanLine, Share, SquarePlus, X } from "lucide-react";
+import { BookOpen, Clock, Inbox, Megaphone, ScanLine, Share, SquarePlus, X } from "lucide-react";
 import { BrandMark } from "@/components/icons";
-import { TEAM_APP_NAME, teamTabsFor, type TeamTab } from "@/lib/team-app";
-import type { TeamCountView } from "@/services/team-count.service";
-import { CountPanel } from "./count-panel";
+import { TEAM_APP_NAME, TEAM_TABS, type TeamTab } from "@/lib/team-app";
 import { AttendPanel, type AttendPanelProps } from "./attend-panel";
 import type { MyMessageView } from "./message-panel";
 import { BoardPanel, type BoardCard } from "./board-panel";
@@ -26,7 +24,7 @@ const Scanner = dynamic(() => import("@/components/scan/scanner").then((m) => m.
   loading: () => <p className="py-10 text-center text-sm text-muted" role="status">يُفتح الماسح…</p>,
 });
 
-const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, board: BookOpen, count: ClipboardList, invoices: ScanLine, requests: Inbox };
+const ICON: Record<TeamTab, typeof Clock> = { attend: Clock, board: BookOpen, invoices: ScanLine, requests: Inbox };
 
 export interface TeamAppProps {
   token: string;
@@ -42,8 +40,6 @@ export interface TeamAppProps {
   mates: { id: string; name: string; daysOff: string }[];
   myDaysOff: string;
   stock: StockOption[];
-  /** جردُ السبت — لمن أذن له المالك وحده، وإلّا `null` فلا تظهر الصفحة. */
-  count: TeamCountView | null;
   /** فواتيرُ الفريق لمستلمها — `null` لغيره. */
   inbox?: InboxItem[] | null;
   pushOn?: boolean;
@@ -78,10 +74,7 @@ function InvoicesTab({ token, name, captures, inbox, subscribed }: { token: stri
   );
 }
 
-export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, count, inbox = null, pushOn = false }: TeamAppProps) {
-  const tabs = teamTabsFor(count !== null);
-  /* جردُ السبت ينتظره: لم يُبدأ، أو لم يُرسَل، أو عُدّل بعد إرساله — يُذكَّر في «الحضور» ونقطةٌ على «الجرد» */
-  const countDue = count !== null && (count.state === "not-started" || (count.state === "open" && (!count.sent || count.sent.stale)));
+export function TeamApp({ token, name, initialTab, attend, captures, messages, board, pendingBoardIds, todayWeekday, requests, mates, stock, myDaysOff, inbox = null, pushOn = false }: TeamAppProps) {
   const announcements = board.filter((c) => c.kind === "ANNOUNCEMENT");
   const [tab, setTab] = useState<TeamTab>(initialTab);
   const latestReply = messages.reduce<string>((m, x) => (x.repliedAt && x.repliedAt > m ? x.repliedAt : m), "");
@@ -116,16 +109,6 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
         {tab === "attend" && (
           <>
             <InstallHint />
-            {countDue && (
-              <button type="button" onClick={() => open("count")}
-                className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-accent-line bg-accent-soft/60 p-3.5 text-start">
-                <ClipboardList className="h-5 w-5 shrink-0 text-accent" aria-hidden />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold">{count?.state === "open" && count.sent?.stale ? "عدّلت الجرد بعد إرساله" : "اليوم جرد السبت"}</span>
-                  <span className="block text-xs text-ink-soft">{count?.state === "not-started" ? "ابدأه من صفحة «الجرد»، ثم أرسل التقرير للإدارة." : "أكمله وأرسل تقرير PDF للإدارة من صفحة «الجرد»."}</span>
-                </span>
-              </button>
-            )}
             {announcements.map((a) => (
               <aside key={a.id} className="mb-4 flex items-start gap-3 rounded-2xl border border-accent-line bg-raised p-3.5">
                 <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
@@ -136,14 +119,13 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
           </>
         )}
         {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}
-        {tab === "count" && count && <CountPanel token={token} view={count} />}
         {tab === "invoices" && (inbox ? <InvoicesTab token={token} name={name} captures={captures} inbox={inbox} subscribed={pushOn} /> : <Scanner token={token} label={name} recent={captures} embedded />)}
         {tab === "requests" && <RequestsPanel token={token} today={attend.today} messages={messages} requests={requests} mates={mates} stock={stock} myDaysOff={myDaysOff} />}
       </main>
 
       <nav aria-label="أقسام التطبيق" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className={`mx-auto grid max-w-lg ${tabs.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
-          {tabs.map((t) => {
+        <ul className="mx-auto grid max-w-lg grid-cols-4">
+          {TEAM_TABS.map((t) => {
             const Icon = ICON[t.id];
             const active = tab === t.id;
             return (
@@ -154,9 +136,6 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
                     <Icon className="h-5 w-5" aria-hidden />
                   </span>
                   {t.label}
-                  {t.id === "count" && countDue && tab !== "count" && (
-                    <span className="absolute top-2 h-2.5 w-2.5 translate-x-4 rounded-full bg-warn ring-2 ring-raised" aria-label="جرد السبت ينتظرك" />
-                  )}
                   {t.id === "requests" && newReply && (
                     <span className="absolute top-2 h-2.5 w-2.5 translate-x-4 rounded-full bg-danger ring-2 ring-raised" aria-label="رد جديد من الإدارة" />
                   )}
