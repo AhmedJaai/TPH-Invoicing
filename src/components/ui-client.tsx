@@ -602,11 +602,14 @@ export function RowLink({
   href,
   className,
   labelledBy,
+  echo = false,
 }: {
   href: string;
   className: string;
   /** معرّفُ خليّة العمود الأساسيّ — يُسمّى بها الرابط لقارئ الشاشة. */
   labelledBy?: string;
+  /** نسخةٌ لبقيّة خانات الصفّ: تُنقر ولا تُبلَغ بـTab ولا يقرؤها قارئُ الشاشة — فالصفُّ رابطٌ واحدٌ له. */
+  echo?: boolean;
 }) {
   const [intent, setIntent] = useState(false);
   const show = () => setIntent(true);
@@ -619,8 +622,10 @@ export function RowLink({
       onTouchStart={show}
       onFocus={show}
       data-row-link=""
-      aria-label="افتح التفاصيل"
-      aria-labelledby={labelledBy}
+      aria-label={echo ? undefined : "افتح التفاصيل"}
+      aria-labelledby={echo ? undefined : labelledBy}
+      aria-hidden={echo || undefined}
+      tabIndex={echo ? -1 : undefined}
       className={className}
     />
   );

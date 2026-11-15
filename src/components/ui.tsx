@@ -965,11 +965,18 @@ export function DataTable<T>({
                       id={href && c === primary ? `${uid}-r${r}` : undefined}
                       className={`border-b border-line-soft px-3.5 py-3 align-middle group-last:border-b-0 ${
                         c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
-                      } ${c.secondary ? "hidden @4xl:table-cell" : ""} ${c.reveal ? "row-reveal" : ""}`}
+                      } ${c.secondary ? "hidden @4xl:table-cell" : ""} ${c.reveal ? "row-reveal" : ""} ${href ? "relative" : ""}`}
                     >
-                      {i === 0 && href && (
-                        /* يُبلَغ بـTab ويُسمّى بعموده الأساسيّ — كان `tabIndex={-1}` فلا يفتح الصفَّ إلّا الفأرةُ وJ/K */
-                        <RowLink href={href} labelledBy={`${uid}-r${r}`} className="absolute inset-0 rounded-lg" />
+                      {/*
+                        رابطُ الصفّ طبقةٌ في **كلّ خانة**، والخانةُ حاويتُها — لا طبقةٌ واحدةٌ حاويتُها الصفّ.
+                        متصفّحٌ لا يجعل `<tr>` حاوياً (`position: relative` على صفّ الجدول) كان يمدّ طبقاتِ
+                        الصفوف كلِّها فوق الجدول فيعلوها آخرُها: كلُّ صفٍّ في «سجل الجرد» فتح جردَ ٢٠–٢٦ سبتمبر
+                        (أحمد، ١٥ نوفمبر ٢٠٢٦). والأولى وحدها تُبلَغ بـTab وتُسمّى بعموده الأساسيّ.
+                      */}
+                      {href && (
+                        i === 0
+                          ? <RowLink href={href} labelledBy={`${uid}-r${r}`} className="absolute inset-0" />
+                          : <RowLink href={href} echo className="absolute inset-0" />
                       )}
                       {c.cell(row)}
                     </td>

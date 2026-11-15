@@ -614,6 +614,14 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
  */
 .card-rows :where(a, button, input, select, label, summary):not([data-row-link], [aria-label="افتح التفصيل"]) {
   position: relative;
+  z-index: 2;
+}
+/*
+ * والطبقةُ فوق محتوى الخانة صراحةً: ما شفافيّتُه دون ١ (كسرُ المبلغ `.nums-frac`) يصير طبقةً
+ * تعلوها بترتيب الشجرة، فالنقرُ على الهللات لا يفتح الصفّ.
+ */
+.card-rows [data-row-link] {
+  z-index: 1;
 }
 
 /*

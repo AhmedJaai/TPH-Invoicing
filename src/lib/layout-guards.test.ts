@@ -250,3 +250,20 @@ describe("النسخُ إلى الحافظة يقول إن مُنع", () => {
     expect(found).toEqual([]);
   });
 });
+
+/**
+ * رابطُ الصفّ في الجدول حاويتُه الخانةُ لا الصفّ (أحمد، ١٥ نوفمبر ٢٠٢٦): متصفّحٌ لا يجعل `<tr>` حاوياً
+ * كان يمدّ طبقاتِ الصفوف كلِّها فوق الجدول، فيفتح كلُّ صفٍّ في «سجل الجرد» آخرَها — جردَ ٢٠–٢٦ سبتمبر.
+ */
+describe("رابطُ صفّ الجدول لا يعتمد على `position` الصفّ", () => {
+  const ui = readFileSync("src/components/ui.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+  it("في كلّ خانةٍ طبقةٌ، والخانةُ حاويتُها", () => {
+    expect(ui).toContain('${href ? "relative" : ""}');
+    expect(ui).toMatch(/<RowLink href=\{href\} echo className="absolute inset-0" \/>/);
+  });
+  it("والطبقةُ فوق محتوى الخانة، والتفاعليُّ فوقها", () => {
+    expect(css).toMatch(/\.card-rows \[data-row-link\] \{\s*z-index: 1;/);
+    expect(css).toMatch(/:not\(\[data-row-link\], \[aria-label="افتح التفصيل"\]\) \{\s*position: relative;\s*z-index: 2;/);
+  });
+});
