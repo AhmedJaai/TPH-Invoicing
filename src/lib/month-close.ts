@@ -246,7 +246,10 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       state: parts.length === 0 ? "PASS" : "WARN",
       detail:
         parts.length === 0
-          ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} وصلت، ولا فروق مفتوحة فيها`
+          /* المقامُ من يصدر كشوفاً وحده — فإن خلا الشهرُ منهم قيل ذلك، لا «كشوف ٠ وصلت» */
+          ? facts.suppliersWithInvoices === 0
+            ? "لا مورّد في هذا الشهر يصدر كشف حساب، فلا كشف يُنتظر"
+            : `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} وصلت، ولا فروق مفتوحة فيها`
           : parts.join(" · "),
       action:
         parts.length === 0 ? undefined

@@ -155,6 +155,8 @@ export const AREAS: readonly NavArea[] = [
       { href: "/analysis", label: "الأصناف والأسعار", needs: "amounts:view" },
       /* شاهدٌ ثانٍ على المشتريات: ما أُدخل في فودكس أمام ما في الدرايف */
       { href: "/purchases/foodics", label: "فودكس والفواتير", needs: "amounts:view" },
+      /* الشهودُ كلُّهم على الفاتورة الغائبة: كشفُ المورّد وفودكس والبنك — ومن لا شاهدَ عليه */
+      { href: "/purchases/missing", label: "فواتير غائبة", needs: "amounts:view" },
     ],
   },
   {

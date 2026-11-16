@@ -41,7 +41,14 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       unknownTaxCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'UNKNOWN')::int`,
       unpostedCount: sql<number>`count(*) filter (where not ${invoices.postedToAccounting})::int`,
       fixedAssetCount: sql<number>`count(*) filter (where ${invoices.isFixedAsset})::int`,
-      suppliersWithInvoices: sql<number>`count(distinct ${invoices.supplierId})::int`,
+      /*
+        مقامُ «لم يصل كشفُه»: من له فواتير في الشهر **ويصدر كشوفاً** (044). كان يعدّ كلَّ مورّدٍ
+        له فاتورة، فقال الإقفالُ «١٥ من ٢١ لم يصل كشف حسابه» و«يحتاج قرارك» يقول «مورّد واحد» —
+        والفرقُ من أعلن صاحبُ المقهى أنّه لا يصدر كشفاً. القاعدةُ قاعدةُ `loadMissingStatementSuppliers`.
+      */
+      suppliersWithInvoices: sql<number>`count(distinct ${invoices.supplierId}) filter (where exists (
+        select 1 from suppliers s where s.id = invoices.supplier_id and s.issues_statements
+      ))::int`,
       /* العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
       unpaidCount: sql<number>`count(*) filter (where invoices.total_minor - coalesce((
         select sum(pa.amount_minor)::bigint from payment_allocations pa where pa.invoice_id = invoices.id
@@ -78,6 +85,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     select count(distinct i.supplier_id)::int as n
       from invoices i
      where i.period_month = ${month}
+       and exists (select 1 from suppliers s where s.id = i.supplier_id and s.issues_statements)
        and exists (
          select 1 from statements st
           where st.supplier_id = i.supplier_id

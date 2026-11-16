@@ -24,6 +24,11 @@ export interface ArchivedStatement {
   /** `null` تعني «لم يُقرأ» — وتُعرَض «غير معروف» لا صفراً. */
   closingBalanceMinor: number | null;
   lineCount: number;
+  /**
+   * أسطرُ الفواتير وحدها (المدينة) — مقامُ «طُوبق». كان المقامُ كلَّ الأسطر، فكشفُ بيكوف
+   * بسبع عشرة فاتورةً مطابَقةً كلَّها وخمسةِ أسطر سدادٍ يُقرأ «١٧ من ٢٢» كأنّ خمساً غابت.
+   */
+  invoiceLineCount: number;
   matchedCount: number;
   /** فواتيرُ يذكرها الكشفُ ولا ملفَّ لها عندنا — ومبلغُها */
   missingCount: number;
@@ -196,13 +201,15 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
             },
             {
               key: "lines",
-              header: "أسطره",
+              header: "فواتيره",
               cell: (a) =>
                 a.lineCount === 0 ? (
                   <Badge tone="warn" dot>لم تُقرأ</Badge>
+                ) : a.invoiceLineCount === 0 ? (
+                  <span className="whitespace-nowrap text-xs text-ink-soft">لا فواتير فيه</span>
                 ) : (
                   <span className="whitespace-nowrap text-xs text-ink-soft">
-                    <T s="طُوبق {0} من {1}" a={[<span key="0" className="nums">{a.matchedCount}</span>, <span key="1" className="nums">{a.lineCount}</span>]} /></span>
+                    <T s="طُوبق {0} من {1}" a={[<span key="0" className="nums">{a.matchedCount}</span>, <span key="1" className="nums">{a.invoiceLineCount}</span>]} /></span>
                 ),
             },
             { key: "closing", header: "الرصيد الختامي", numeric: true, cell: (a) => <Closing minor={a.closingBalanceMinor} /> },

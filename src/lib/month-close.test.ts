@@ -91,6 +91,12 @@ describe("buildMonthClose", () => {
     expect(r.items.find((i) => i.id === "statements")!.detail).toContain("5 من 9");
   });
 
+  it("شهرٌ كلُّ مورّديه لا يصدرون كشوفاً لا يقول «كشوف ٠ وصلت»", () => {
+    const r = buildMonthClose({ ...clean, suppliersWithInvoices: 0, suppliersWithStatement: 0 });
+    expect(state(r, "statements")).toBe("PASS");
+    expect(r.items.find((i) => i.id === "statements")!.detail).toBe("لا مورّد في هذا الشهر يصدر كشف حساب، فلا كشف يُنتظر");
+  });
+
   it("كشوف أكثر من المورّدين لا تنتج عدداً سالباً", () => {
     const r = buildMonthClose({ ...clean, suppliersWithInvoices: 3, suppliersWithStatement: 5 });
     expect(state(r, "statements")).toBe("PASS");

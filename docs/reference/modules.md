@@ -194,6 +194,7 @@
 | `src/lib/foodics/orders.ts` | الطلبُ من الواجهة ← `ParsedSalesFile` بمفاتيح ملفّ الإكسل نفسِها، ومرآةُ رأسه ودفعاته |
 | `src/lib/foodics/takings.ts` · `foodics-takings.service.ts` | بطاقاتُ فودكس أمام دفعات البنك (موضعُ الإقفال يُبحَث عنه)، والنقدُ والآجلُ شهراً بشهر — `/money/foodics` |
 | `src/lib/foodics/purchase-compare.ts` · `foodics-compare.service.ts` | مشترياتُ فودكس أمام فواتيرنا واقتراحُ ربط المورّد من الفواتير المطابِقة — `/purchases/foodics` · `/api/foodics-link` |
+| `src/lib/missing-invoices.ts` · `missing-invoices.service.ts` | فواتيرُ يُحتمل غيابُها: شهودُ كلّ مورّد (سطرُ كشفه · حركةُ فودكس · دفعةٌ بلا فاتورة) مدموجاً ما اتّفق منها، ومن لا شاهدَ عليه، والفجوةُ بين كشفين، وقرينةُ المخزون — `/purchases/missing` (قراءةٌ وحدها) |
 | `foodics-sync.service.ts` · `scripts/foodics-sync.ts` | المزامنة: المرآةُ + مجالُ المبيعات عبر `importParsedSales` — `/api/foodics-sync` · `npm run foodics:sync` |
 | `src/lib/foodics/catalog.ts` | كتالوجُ فودكس من الواجهة ← `ParsedCatalog` — «اقرأ من فودكس» في `/inventory/import` |
 | `foodics-attention.service.ts` | فروقُ فودكس (دفعةٌ · فاتورةٌ بمبلغين · شراءٌ بلا فاتورة) بنوداً في «يحتاج قرارك» |

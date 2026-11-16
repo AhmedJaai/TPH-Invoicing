@@ -52,13 +52,15 @@ export default async function StatementsPage({
   const [rows, missing, supplierRows, [monthInvoices]] = await Promise.all([
     db.execute<{
       id: string; supplier_name: string | null; supplier_slug: string | null; ps: string; pe: string;
-      closing: number | null; file_name: string | null; lines: number; matched: number; missing: number; missing_minor: number;
+      closing: number | null; file_name: string | null; lines: number; invoice_lines: number; matched: number; missing: number; missing_minor: number;
     }>(sql`
       select st.id, s.name_ar as supplier_name, s.slug as supplier_slug,
              to_char(st.period_start, 'YYYY-MM-DD') as ps, to_char(st.period_end, 'YYYY-MM-DD') as pe,
              st.closing_balance_minor as closing, d.file_name,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched,
+             /* مقامُ «طُوبق» أسطرُ الفواتير (المدينة) وحدها — سطرُ السداد ليس فاتورةً لم تُطابَق */
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.debit_minor > 0) as invoice_lines,
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED' and sl.debit_minor > 0) as matched,
              /* سطور مدينة برقم لم يطابق: فواتير يذكرها الكشف ولا ملفّ لها — إلّا ما له عندنا فاتورةٌ
                 باليوم والمبلغ نفسيهما (مرجعٌ مقروءٌ خطأً، بيكوف «000285لـ#»): ليس ناقصاً */
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")}) as missing,
@@ -174,6 +176,7 @@ export default async function StatementsPage({
             fileName: r.file_name ?? "",
             closingBalanceMinor: r.closing === null ? null : Number(r.closing),
             lineCount: Number(r.lines),
+            invoiceLineCount: Number(r.invoice_lines),
             matchedCount: Number(r.matched),
             missingCount: Number(r.missing),
             missingMinor: Number(r.missing_minor),

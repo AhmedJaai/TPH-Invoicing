@@ -24,8 +24,11 @@ export async function gatherHealthFacts(): Promise<HealthInput> {
         (select count(*)::int from invoices where vat_minor is not null)                 as with_tax,
         (select count(distinct period_month)::int from invoices)                         as months_invoices,
         (select count(distinct to_char(value_date, 'YYYY-MM'))::int from bank_transactions) as months_bank,
-        (select count(distinct supplier_id)::int from invoices)                          as suppliers_invoices,
-        (select count(distinct supplier_id)::int from statements)                        as suppliers_statements,
+        /* مقامُ الكشوف من يصدرها وحده (044) — كما في الإقفال و«يحتاج قرارك» */
+        (select count(distinct i.supplier_id)::int from invoices i
+           join suppliers s on s.id = i.supplier_id and s.issues_statements)             as suppliers_invoices,
+        (select count(distinct st.supplier_id)::int from statements st
+           join suppliers s on s.id = st.supplier_id and s.issues_statements)            as suppliers_statements,
         (select count(*)::int from bank_transactions)                                    as bank_tx,
         (select count(*)::int from bank_transactions where category = 'UNKNOWN')         as unclassified,
         (select count(distinct business_date)::int from sales)                           as sales_days,
