@@ -7,9 +7,11 @@ import { readJson } from "@/lib/request-body";
 import { Amount, Day, Id, Month, positiveMinor } from "@/lib/payroll/request";
 import { failWith, guard } from "@/services/guard";
 import {
-  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, setInvoiceReceiver, saveEmployee, saveShift, setDayShift, setRate,
+  deleteEmployee, issueCheckinLink, PayrollRefused, removeRate, revokeCheckinLink, removeDayShift, removeShiftPlan, setInvoiceReceiver, saveEmployee, saveShift, setDayShift, setRate,
 } from "@/services/payroll.service";
 import { shiftLength, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
+import { countNoun, DAY } from "@/lib/arabic";
+import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 
@@ -51,7 +53,10 @@ const Body = z.discriminatedUnion("action", [
     action: z.literal("shift"), id: Id, shiftStart: Clock.nullable(), shiftEnd: Clock.nullable(), lateGraceMinutes: Grace, daysOff: DaysOff,
     /* وقتٌ مخصَّص لأيّامٍ من الأسبوع — يحلّ محلّ ما قبله */
     week: z.array(z.object({ weekday: z.number().int().min(0).max(6), shiftStart: Clock, shiftEnd: Clock }).strict()).max(7).optional(),
+    /* يسري من هذا اليوم — بلاه من اليوم */
+    fromDay: Day.optional(),
   }).strict(),
+  z.object({ action: z.literal("shift-plan-remove"), id: Id, fromDay: Day }).strict(),
   /* يومٌ بعينه: وقتٌ غيرُ المعتاد أو راحة */
   z.object({ action: z.literal("shift-day"), id: Id, day: Day, off: z.boolean(), shiftStart: Clock.nullable().optional(), shiftEnd: Clock.nullable().optional(), note: z.string().trim().max(200).optional() }).strict(),
   z.object({ action: z.literal("shift-day-remove"), id: Id, day: Day }).strict(),
@@ -125,12 +130,20 @@ export async function POST(request: Request) {
           week.push({ weekday: w.weekday, shiftStart: w.shiftStart, shiftMinutes: minutes });
         }
       }
-      const backfilled = await saveShift(b.id, { shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes, daysOff: normDaysOff(b.daysOff), week }, user.id);
-      const found = [backfilled.late > 0 ? `تأخير ${backfilled.late} ${backfilled.late === 1 ? "يوم" : "أيام"}` : null, backfilled.early > 0 ? `انصراف مبكر ${backfilled.early} ${backfilled.early === 1 ? "يوم" : "أيام"}` : null].filter(Boolean);
-      return NextResponse.json({
-        ok: true,
-        message: found.length > 0 ? `حُفظ الدوام، وحُسب من تسجيلات هذه الفترة: ${found.join(" و")}` : "حُفظ الدوام، ويُحسب التأخير من أول تسجيل قادم",
-      });
+      const today = todayInRiyadh();
+      const fromDay = b.fromDay ?? today;
+      const saved = await saveShift(b.id, { shiftStart: b.shiftStart, shiftMinutes: shift.minutes, lateGraceMinutes: b.lateGraceMinutes, daysOff: normDaysOff(b.daysOff), week, fromDay }, user.id, today);
+      const found = [
+        saved.late > 0 ? `تأخير ${countNoun(saved.late, DAY)}` : null,
+        saved.early > 0 ? `انصراف مبكر ${countNoun(saved.early, DAY)}` : null,
+        saved.recalculated > 0 ? `وأُعيد حساب ${countNoun(saved.recalculated, DAY)} بالدوام الجديد` : null,
+      ].filter(Boolean);
+      const when = fromDay > today ? `حُفظ الدوام، ويبدأ ${formatDay(fromDay)}. وإلى ذلك اليوم يبقى دوامه الحالي` : fromDay < today ? `حُفظ الدوام من ${formatDay(fromDay)}` : "حُفظ الدوام من اليوم";
+      return NextResponse.json({ ok: true, message: found.length > 0 ? `${when}. ومن تسجيلات هذه الفترة: ${found.join("، ")}` : when });
+    }
+    if (b.action === "shift-plan-remove") {
+      const done = await removeShiftPlan(b.id, b.fromDay, user.id);
+      return NextResponse.json({ ok: true, message: done ? "أُلغي التغيير القادم، ويبقى دوامه الحالي" : "أُلغي من قبل" });
     }
 
     if (b.action === "shift-day") {

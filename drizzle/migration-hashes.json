@@ -103,5 +103,6 @@
   "102_team_inventory_count.sql": "b1d9d4ff0b40145c44699d86a09b50a9c1cec282ebf1bcc2420f1f93cf30e398",
   "103_team_count_sent.sql": "0fa92031cbd843c993657bbabe183db029a32a8aee2f31f2bec49746adef0853",
   "104_count_parts.sql": "b4ffdd06525b6e0b7d1ded6e340e1a2d7e1f0ea48e0a6438044224422e327431",
-  "105_invoice_receivers.sql": "77bbefaf62db9240e3f7b624e957849b5fb8cb5917c8340cb49a611db8b24731"
+  "105_invoice_receivers.sql": "77bbefaf62db9240e3f7b624e957849b5fb8cb5917c8340cb49a611db8b24731",
+  "106_employee_shift_plans.sql": "997d68f4956d2b54f41f192837b000254442c99c5c8e6ab99bb654f6e1822051"
 }

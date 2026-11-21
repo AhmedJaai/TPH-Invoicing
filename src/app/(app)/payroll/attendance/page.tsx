@@ -128,7 +128,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const monthRows = sheet.rows.filter((r) => r.employee.kind === "MONTHLY");
   /* كلُّ خصومِ الفترة في مكانٍ واحد — الأحدثُ أوّلاً — ليُعدَّل أو يُلغى بلا فتح كلّ موظّف */
   const deductions: DeductionRow[] = monthRows.flatMap((r) => deductionItems({
-    kind: r.employee.kind, rateMinor: r.rateMinor, shiftMinutes: r.employee.shiftMinutes, graceMinutes: r.employee.lateGraceMinutes,
+    kind: r.employee.kind, rateMinor: r.rateMinor, shiftMinutes: r.shiftMinutes, graceMinutes: r.employee.lateGraceMinutes,
     attendance: r.attendance, violations: r.violations,
   }).map((d) => ({ ...d, employeeId: r.employee.id, employeeName: r.employee.name })))
     .filter((d) => d.kind !== "LEAVE")

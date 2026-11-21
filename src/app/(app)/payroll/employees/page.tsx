@@ -6,7 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { EmployeeForm, ShiftSchedule } from "@/components/payroll/forms";
-import { daysOffLabel, hasCustomWeek, shiftEndOf, shiftRange } from "@/lib/payroll/attendance";
+import { daysOffLabel, hasCustomWeek, nextPlan, planSummary, shiftEndOf, shiftRange } from "@/lib/payroll/attendance";
 import { BLANK_EMPLOYEE } from "@/lib/payroll/form-defaults";
 import { Badge, Callout, DataTable, EmptyState, NoAccess, Section, type Column } from "@/components/ui";
 import { formatRiyals } from "@/lib/money";
@@ -26,6 +26,7 @@ export default async function EmployeesPage() {
   }
   const canEdit = can(user.role, "payroll:edit");
   const month = currentMonthRiyadh();
+  const today = todayInRiyadh();
   const [list, payees] = await Promise.all([loadEmployees(), loadBankPayees()]);
   const working = list.filter((e) => activeIn(e, month) || e.hiredOn.slice(0, 7) > month);
   const left = list.filter((e) => !working.includes(e));
@@ -67,7 +68,7 @@ export default async function EmployeesPage() {
 
       {canEdit && working.length > 0 && (
         <Section id="shifts" title="جدول الدوام" icon={CalendarClock}
-          hint="لكل موظف: من الساعة كم إلى كم، ودقائق السماح، وأيام راحته. منه يُحسب التأخير والانصراف المبكر من تسجيل الحضور في TPH Team. التغيير يسري من الآن، وأول ضبط يحسب ما سُجّل منذ بداية فترة الخصم.">
+          hint="لكل موظف: من الساعة كم إلى كم، ودقائق السماح، وأيام راحته. منه يُحسب التأخير والانصراف المبكر من تسجيل الحضور في TPH Team. اختر اليوم الذي يسري منه التغيير: ما قبله يبقى بدوامه القديم، وتغيير بتاريخ قادم يبدأ وحده في يومه.">
           {unset.length > 0 && (
             <Callout tone="warn" icon={CalendarClock} className="mb-3" title={`${unset.length === 1 ? unset[0] : countNoun(unset.length, EMPLOYEE)} بلا وقت دوام`}>
               بلا وقت دوام لا يُعرف التأخير، ولا يُقال من لم يحضر. اكتبه هنا واحفظ كل سطر.
@@ -78,6 +79,8 @@ export default async function EmployeesPage() {
             shiftEnd: e.shiftStart ? shiftEndOf(e.shiftStart, e.shiftMinutes) : "", lateGraceMinutes: e.lateGraceMinutes, daysOff: e.daysOff,
             week: e.shiftRules.filter((r) => r.weekday !== null && r.shiftStart && r.shiftMinutes)
               .map((r) => ({ weekday: r.weekday!, shiftStart: r.shiftStart!, shiftEnd: shiftEndOf(r.shiftStart!, r.shiftMinutes!) })),
+            today,
+            upcoming: (() => { const n = nextPlan(today, e.plans); return n ? { fromDay: n.fromDay, summary: planSummary(n) } : null; })(),
           }))} />
         </Section>
       )}

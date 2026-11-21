@@ -16,7 +16,7 @@ import { isStoredUnit } from "@/lib/unit-conversion";
 import type { WasteReason } from "@/lib/inventory/waste-board";
 import { recordWaste } from "./inventory-movement.service";
 import { loadEmployee, PayrollRefused, saveShift, setAttendance, setDayShift } from "./payroll.service";
-import { shiftOn } from "@/lib/payroll/attendance";
+import { shiftOn, usualOn } from "@/lib/payroll/attendance";
 import type { Conn } from "./types";
 
 export const BOARD_KINDS: readonly TeamBoardKind[] = ["ANNOUNCEMENT", "BEAN", "RECIPE", "GRIND", "CLEANING_DAILY", "CLEANING_WEEKLY"];
@@ -247,7 +247,8 @@ export async function decideRequest(id: string, approve: boolean, note: string |
       } else {
       /* دوامُه المعتاد في اليوم لو لم يكن راحة — يومُ الأسبوع أو الأصل */
       const usual = (e: typeof a, day: string) => {
-        const s = shiftOn(day, { ...e, daysOff: "" }, e.shiftRules.filter((x) => x.day !== day));
+        const u = usualOn(day, e, e.shiftRules);
+        const s = shiftOn(day, { ...u, daysOff: "", plans: undefined }, u.week.map((w) => ({ ...w, day: null, off: false })));
         return s.off || !s.start ? null : { shiftStart: s.start, shiftMinutes: s.minutes };
       };
       const aWorks = usual(a, r.fromDay!), bWorks = usual(b, r.toDay ?? r.fromDay!);

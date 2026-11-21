@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { Calculator, Copy, Link2, MessageCircle, Plus, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { formatRiyals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
-import { countNoun, EMPLOYEE } from "@/lib/arabic";
+import { countNoun, DAY, EMPLOYEE } from "@/lib/arabic";
 import {
   ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, hoursLabel, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
@@ -21,6 +21,8 @@ import type { EmployeeFormValues } from "@/lib/payroll/form-defaults";
 import { TEAM_APP_NAME, teamAppPath, teamInvite } from "@/lib/team-app";
 import { buttonClass, fieldClass } from "../ui-tokens";
 import { ConfirmAction, ReadySubmit, toast } from "../ui-client";
+import { PostAction } from "../post-action";
+import { formatDay } from "@/lib/riyadh-time";
 
 /* ─────────────── أداةٌ مشتركة ─────────────── */
 
@@ -99,14 +101,21 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
         <label className={label}>الآيبان <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" value={v.iban} onChange={(e) => set("iban", e.target.value)} placeholder="SA…" /></label>
         <label className={label}>الجوال <span className="font-normal text-muted">(لإرسال رابط الحضور)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="tel" value={v.phone} onChange={(e) => set("phone", e.target.value)} placeholder="9665…" /></label>
         <label className={label}>رقم الهوية أو الإقامة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="numeric" value={v.nationalId} onChange={(e) => set("nationalId", e.target.value.replace(/\D/g, ""))} /></label>
+        {isNew && <>
         <label className={label}>الدوام من الساعة <span className="font-normal text-muted">(لحساب التأخير)</span><input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftStart} onChange={(e) => set("shiftStart", e.target.value)} /></label>
         <label className={label}>إلى الساعة
           <input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftEnd} onChange={(e) => set("shiftEnd", e.target.value)} disabled={!v.shiftStart} />
           <ShiftLengthNote start={v.shiftStart} end={v.shiftEnd} />
         </label>
         <label className={label}>دقائق سماح التأخير<input className={`${field} nums mt-1.5 text-end`} dir="ltr" inputMode="numeric" value={v.lateGraceMinutes} onChange={(e) => set("lateGraceMinutes", e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="0" /></label>
+        </>}
       </div>
-      <fieldset className="mt-4">
+      {!isNew && (
+        <p className="mt-4 rounded-lg border border-line bg-sunken/40 px-3 py-2 text-xs text-ink-soft">
+          الدوام وأيام الراحة والسماح تُغيَّر من <Link href="/payroll/employees#shifts" className="font-bold text-accent hover:underline">جدول الدوام</Link>، ويُختار اليوم الذي يسري منه التغيير.
+        </p>
+      )}
+      {isNew && <fieldset className="mt-4">
         <legend className={label}>أيام الراحة</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
           {WEEKDAY_LABEL.map((d, i) => (
@@ -115,7 +124,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
             </label>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
       <label className={`${label} mt-4`}>ملاحظة <span className="font-normal text-muted">(اختياري)</span><textarea className={`${field} mt-1.5 min-h-16 py-2`} value={v.note} onChange={(e) => set("note", e.target.value)} maxLength={300} /></label>
       <ErrorLine error={error} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -147,6 +156,10 @@ export interface ShiftRow {
   daysOff: string;
   /** وقتٌ مخصَّص لأيّامٍ من الأسبوع — «HH:MM» بدايةً ونهاية. */
   week: readonly { weekday: number; shiftStart: string; shiftEnd: string }[];
+  /** اليومُ بتوقيت الرياض — أصلُ «يسري من». */
+  today: string;
+  /** تغييرٌ قادم لم يحلّ يومُه: يومُه ووصفُه («4:00 م – 12:00 ص · راحته الجمعة»). */
+  upcoming: { fromDay: string; summary: string } | null;
 }
 
 type WeekDraft = Record<number, { start: string; end: string }>;
@@ -159,7 +172,8 @@ const weekKey = (w: WeekDraft) => JSON.stringify(Object.entries(w).filter(([, v]
 export function ShiftSchedule({ rows }: { rows: readonly ShiftRow[] }) {
   return (
     <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
-      {rows.map((r) => <ShiftLine key={r.id} row={r} />)}
+      {/* المفتاحُ بما حُفظ: تغييرٌ بتاريخٍ قادم يُعيد السطرَ إلى دوام اليوم ويُظهر القادمَ تحته */}
+      {rows.map((r) => <ShiftLine key={`${r.id}:${JSON.stringify([r.shiftStart, r.shiftEnd, r.lateGraceMinutes, r.daysOff, r.week, r.upcoming])}`} row={r} />)}
     </ul>
   );
 }
@@ -172,6 +186,7 @@ function ShiftLine({ row }: { row: ShiftRow }) {
   const initialWeek: WeekDraft = Object.fromEntries(row.week.map((w) => [w.weekday, { start: w.shiftStart, end: w.shiftEnd }]));
   const [week, setWeek] = useState<WeekDraft>(initialWeek);
   const [custom, setCustom] = useState(row.week.length > 0);
+  const [fromDay, setFromDay] = useState(row.today);
   /* المحرّرُ مفتوحٌ حين يُكتب وحده — بعد الحفظ يُطوى إلى سطرٍ يلخّص الأيّام */
   const [editingWeek, setEditingWeek] = useState(false);
   const { busy, error, send } = useSend();
@@ -182,22 +197,23 @@ function ShiftLine({ row }: { row: ShiftRow }) {
     if (!w || (!w.start && !w.end) || daysOff.includes(String(i))) return false;
     return !w.start || !w.end || shiftLength(w.start, w.end) === null;
   });
-  const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff || weekKey(week) !== weekKey(initialWeek);
-  const valid = ((!start && !end) || minutes !== null) && badDays.length === 0 && (!custom || Boolean(start) || weekKey(week) === "[]");
+  const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff || weekKey(week) !== weekKey(initialWeek) || fromDay !== row.today;
+  const validDay = /^\d{4}-\d{2}-\d{2}$/.test(fromDay);
+  const valid = ((!start && !end) || minutes !== null) && badDays.length === 0 && (!custom || Boolean(start) || weekKey(week) === "[]") && validDay;
   const setDay = (i: number, patch: Partial<{ start: string; end: string }>) => setWeek((w) => ({ ...w, [i]: { ...(w[i] ?? { start: "", end: "" }), ...patch } }));
   const toggle = (d: number) => setDaysOff((x) => (x.includes(String(d)) ? x.replace(String(d), "") : [...x, String(d)].sort().join("")));
   return (
     <li className="px-4 py-3">
-      <form className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_5.5rem_auto]" onSubmit={(e) => {
+      <form className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[8.5rem_8.5rem_5.5rem_9.5rem_auto] xl:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_5.5rem_9.5rem_auto]" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
         const days = custom
           ? Object.entries(week).filter(([i, v]) => v.start && v.end && !daysOff.includes(i)).map(([i, v]) => ({ weekday: Number(i), shiftStart: v.start, shiftEnd: v.end }))
           : [];
-        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff, ...(start ? { week: days } : {}) })
-          .then((r) => { if (r) setEditingWeek(false); });
+        void send("/api/payroll/employee", { action: "shift", id: row.id, shiftStart: start || null, shiftEnd: end || null, lateGraceMinutes: Number(grace) || 0, daysOff, fromDay, ...(start ? { week: days } : {}) })
+          .then((r) => { if (r) { setEditingWeek(false); setFromDay(row.today); } });
       }}>
-        <p className="col-span-2 min-w-0 self-center text-sm font-bold sm:col-span-1">
+        <p className="col-span-full min-w-0 self-center text-sm font-bold xl:col-span-1">
           <Link href={`/payroll/employee/${row.id}`} className="hover:underline">{row.name}</Link>
           <span className="block text-[11px] font-normal text-muted">
             {row.kind === "PART_TIME" ? "جزئي، بالساعة" : minutes !== null ? `${hoursLabel(minutes)}${(clockMinutes(end) ?? 0) <= (clockMinutes(start) ?? 0) ? "، حتى بعد منتصف الليل" : ""}` : start || end ? "—" : "لم يُحدَّد"}
@@ -206,13 +222,14 @@ function ShiftLine({ row }: { row: ShiftRow }) {
         <label className={label}>{custom ? "المعتاد من" : "من"}<input type="time" dir="ltr" className={`${field} mt-1`} value={start} onChange={(e) => setStart(e.target.value)} aria-label={`بداية دوام ${row.name}`} /></label>
         <label className={label}>إلى<input type="time" dir="ltr" className={`${field} mt-1 ${start && end && minutes === null ? "border-danger" : ""}`} value={end} onChange={(e) => setEnd(e.target.value)} aria-label={`نهاية دوام ${row.name}`} /></label>
         <label className={label}>سماح (د)<input className={`${field} nums mt-1 text-end`} dir="ltr" inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value.replace(/\D/g, "").slice(0, 3))} aria-label={`دقائق سماح ${row.name}`} /></label>
-        <span className="flex flex-col items-stretch gap-1 sm:order-none">
+        <label className={label}>يسري من<input type="date" dir="ltr" className={`${field} mt-1 ${validDay ? "" : "border-danger"}`} value={fromDay} onChange={(e) => setFromDay(e.target.value)} aria-label={`يسري دوام ${row.name} من`} required /></label>
+        <span className="col-span-2 flex flex-col items-stretch gap-1 sm:order-none sm:col-span-1">
           <ReadySubmit ready={dirty && valid} busy={busy} size="sm" variant={dirty ? "primary" : "secondary"}
             missing={badDays.length > 0 ? "أكمل وقت الأيام المخصّصة أو امسحه." : !valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
             {busy ? "يُحفظ…" : dirty ? "احفظ" : "محفوظ"}
           </ReadySubmit>
         </span>
-        <fieldset className="col-span-2 min-w-0 sm:col-span-5">
+        <fieldset className="col-span-full min-w-0">
           <legend className={`${label} mb-1`}>أيام الراحة</legend>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAY_LABEL.map((d, i) => (
@@ -224,7 +241,7 @@ function ShiftLine({ row }: { row: ShiftRow }) {
           </div>
         </fieldset>
         {row.kind === "MONTHLY" && (
-          <div className="col-span-2 min-w-0 sm:col-span-5">
+          <div className="col-span-full min-w-0">
             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft sm:min-h-9">
               <input type="checkbox" checked={custom} onChange={(e) => { setCustom(e.target.checked); setEditingWeek(e.target.checked && weekKey(week) === "[]"); }} />
               وقت مختلف لبعض الأيام (جدول مخصّص)
@@ -268,6 +285,19 @@ function ShiftLine({ row }: { row: ShiftRow }) {
           </div>
         )}
       </form>
+      {dirty && validDay && fromDay !== row.today && (
+        <p className="mt-1.5 text-[11px] font-bold text-ink-soft">
+          {fromDay > row.today
+            ? `يبقى دوامه الحالي حتى ${formatDay(fromDay)}، ثم يبدأ الجديد.`
+            : `يسري من ${formatDay(fromDay)}. وما حُسب من حضوره في فترة الخصم الجارية منذ ذلك اليوم يُعاد حسابه بالدوام الجديد.`}
+        </p>
+      )}
+      {row.upcoming && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-accent-line bg-accent-soft/40 px-3 py-2 text-xs">
+          <span className="min-w-0 flex-1"><strong>تغيير قادم من {formatDay(row.upcoming.fromDay)}:</strong> <span className="nums">{row.upcoming.summary}</span></span>
+          <PostAction url="/api/payroll/employee" body={{ action: "shift-plan-remove", id: row.id, fromDay: row.upcoming.fromDay }} variant="quiet" done="أُلغي التغيير القادم">ألغِ التغيير</PostAction>
+        </div>
+      )}
       {badDays.length > 0 && <p className="mt-1.5 text-[11px] font-bold text-danger">دوام {badDays.map((i) => WEEKDAY_LABEL[i]).join(" و")}: اكتب البداية والنهاية، والنهاية بعد البداية بساعة إلى 16 ساعة.</p>}
       {custom && !start && weekKey(week) !== "[]" && <p className="mt-1.5 text-[11px] font-bold text-warn">اكتب الدوام المعتاد أولاً، ثم الأيام المختلفة.</p>}
       {start && end && minutes === null && <p className="mt-1.5 text-[11px] font-bold text-danger">النهاية بين ساعة و16 ساعة بعد البداية.</p>}
@@ -309,6 +339,39 @@ export function DayShiftForm({ employeeId, defaultDay }: { employeeId: string; d
       </div>
       <ErrorLine error={error} />
       <ReadySubmit ready={ready} busy={busy} size="sm" missing={off ? "اختر اليوم." : "اكتب بداية الدوام ونهايته (بين ساعة و16 ساعة)."}>احفظ هذا اليوم</ReadySubmit>
+    </form>
+  );
+}
+
+/* ─────────────── الإجازة من يومٍ إلى يوم ─────────────── */
+
+/** إجازةٌ بأيّامها — كلُّ يوم عملٍ فيها «إجازة» لا يُخصم عنه، وأيّامُ الراحة تُترك. */
+export function LeaveForm({ employeeId, defaultDay }: { employeeId: string; defaultDay: string }) {
+  const [fromDay, setFromDay] = useState(defaultDay);
+  const [toDay, setToDay] = useState(defaultDay);
+  const [note, setNote] = useState("");
+  const { busy, error, send } = useSend();
+  const okDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const span = okDay(fromDay) && okDay(toDay) ? Math.round((Date.parse(`${toDay}T00:00:00Z`) - Date.parse(`${fromDay}T00:00:00Z`)) / 86_400_000) + 1 : 0;
+  const ready = span >= 1 && span <= 60;
+  return (
+    <form className="space-y-3" onSubmit={async (e) => {
+      e.preventDefault();
+      if (!ready) return;
+      if (await send("/api/payroll/entry", { action: "leave", employeeId, fromDay, toDay, note })) setNote("");
+    }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[9.5rem_9.5rem_minmax(0,1fr)]">
+        <label className={label}>من يوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={fromDay} onChange={(e) => { setFromDay(e.target.value); if (toDay < e.target.value) setToDay(e.target.value); }} required /></label>
+        <label className={label}>إلى يوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={toDay} min={fromDay} onChange={(e) => setToDay(e.target.value)} required />
+          {span > 1 && <span className="mt-1 block text-[11px] font-normal text-muted">{countNoun(span, DAY)} مع أيام الراحة</span>}
+        </label>
+        <label className={`${label} col-span-2 sm:col-span-1`}>السبب <span className="font-normal text-muted">(اختياري)</span><input className={`${field} mt-1.5`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="إجازة سنوية" /></label>
+      </div>
+      <ErrorLine error={error} />
+      <div className="flex flex-wrap items-center gap-3">
+        <ReadySubmit ready={ready} busy={busy} size="sm" missing={span > 60 ? "أطول من 60 يوماً. اكتبها على دفعتين." : "اختر أول الإجازة وآخرها، والآخر بعد الأول."}>سجّل الإجازة</ReadySubmit>
+        <p className="min-w-0 flex-1 basis-56 text-[11px] text-muted">لا يُخصم عنها، ولا يُقال «لم يسجّل حضوراً» فيها. وأيام راحته فيها تُترك كما هي.</p>
+      </div>
     </form>
   );
 }

@@ -141,3 +141,44 @@ describe("الانصرافُ بعد منتصف الليل لدوامٍ يعبر�
     expect(dayForOut(at("2026-11-07T21:30:00Z"), null, dayShift)).toBe("2026-11-08");
   });
 });
+
+describe("الدوامُ يتغيّر من تاريخ (106)", () => {
+  // 2026-11-22 الأحد · 2026-12-01 الثلاثاء · 2026-12-04 الجمعة · 2026-12-05 السبت
+  const plans = [
+    { fromDay: "2026-05-01", shiftStart: "16:00", shiftMinutes: 480, daysOff: "5", week: [] },
+    { fromDay: "2026-12-01", shiftStart: "08:00", shiftMinutes: 540, daysOff: "6", week: [{ weekday: 2, shiftStart: "10:00", shiftMinutes: 480 }] },
+  ];
+  /* صفُّ الموظّف يُساير اليوم — ولا يُحكم به ما دام سطرٌ يغطّي اليوم */
+  const base = { shiftStart: "09:00", shiftMinutes: 480, daysOff: "", plans };
+  it("ما قبل التاريخ بدوامه القديم، وما بعده بالجديد", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-11-22", base, [])).toEqual({ off: false, start: "16:00", minutes: 480, source: "BASE" });
+    expect(shiftOn("2026-12-03", base, [])).toEqual({ off: false, start: "08:00", minutes: 540, source: "BASE" });
+  });
+  it("وأيّامُ الراحة وأيّامُ الأسبوع من سطر اليوم لا من الصفّ", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-11-27", base, [])).toEqual({ off: true }); // جمعة: راحتُه القديمة
+    expect(shiftOn("2026-12-04", base, [])).toEqual({ off: false, start: "08:00", minutes: 540, source: "BASE" }); // جمعة: صارت دواماً
+    expect(shiftOn("2026-12-05", base, [])).toEqual({ off: true }); // سبت: راحتُه الجديدة
+    expect(shiftOn("2026-12-01", base, [])).toEqual({ off: false, start: "10:00", minutes: 480, source: "WEEKDAY" });
+    /* وأيّامُ الأسبوع في الجدول القديم لا تتسرّب إلى سطرٍ بلاها */
+    expect(shiftOn("2026-11-24", base, [{ weekday: 2, day: null, shiftStart: "12:00", shiftMinutes: 300, off: false }])).toEqual({ off: false, start: "16:00", minutes: 480, source: "BASE" });
+  });
+  it("واليومُ بعينه يغلب سطرَ التاريخ", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-12-03", base, [{ weekday: null, day: "2026-12-03", shiftStart: null, shiftMinutes: null, off: true }])).toEqual({ off: true });
+  });
+  it("بلا سطورٍ يبقى الحكمُ بالصفّ كما كان", async () => {
+    const { shiftOn } = await import("./attendance");
+    expect(shiftOn("2026-12-03", { ...base, plans: [] }, [])).toEqual({ off: false, start: "09:00", minutes: 480, source: "BASE" });
+  });
+  it("النافذُ والقادم", async () => {
+    const { planOn, nextPlan, planSummary } = await import("./attendance");
+    expect(planOn("2026-11-30", plans)?.fromDay).toBe("2026-05-01");
+    expect(planOn("2026-12-01", plans)?.fromDay).toBe("2026-12-01");
+    expect(planOn("2026-04-30", plans)).toBeNull();
+    expect(nextPlan("2026-11-21", plans)?.fromDay).toBe("2026-12-01");
+    expect(nextPlan("2026-12-01", plans)).toBeNull();
+    expect(planSummary(plans[1])).toBe("8:00 ص – 5:00 م · وبوقت مخصّص الثلاثاء 10:00 ص – 6:00 م · راحته السبت");
+  });
+});

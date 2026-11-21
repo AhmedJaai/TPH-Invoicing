@@ -2,7 +2,7 @@ import { TEAM_APP_NAME } from "@/lib/team-app";
 import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, CalendarClock, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -11,13 +11,13 @@ import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { ObligationForm } from "@/components/obligation-form";
 import {
-  AdjustmentForm, CheckinLinkPanel, DayForm, DayShiftForm, DeleteEmployeeButton, EmployeeForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
+  AdjustmentForm, CheckinLinkPanel, DayForm, DayShiftForm, DeleteEmployeeButton, EmployeeForm, LeaveForm, LinkTransferForm, RateForm, ViolationForm, WeekForm,
 } from "@/components/payroll/forms";
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { ADJUSTMENT_LABEL, endOfService, formatMinutes, hoursLabel, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
-import { daysOffLabel, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
+import { daysOffLabel, planOn, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
@@ -25,7 +25,7 @@ import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, month
 import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { OBLIGATION_KIND_LABEL, isObligationKind } from "@/lib/obligations";
 import {
-  loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadOpenTransfers, loadPayrollMonth, transfersSince,
+  loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadLeave, loadOpenTransfers, loadPayrollMonth, transfersSince,
 } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const endMonth = employee.leftOn && employee.leftOn.slice(0, 7) < current ? employee.leftOn.slice(0, 7) : current;
   const workMonths = monthsBetween(employee.hiredOn.slice(0, 7), endMonth).reverse();
 
-  const [sheet, links, docs, open, checkins, history] = await Promise.all([
+  const leaveFrom = deductionPeriod(deductionMonthOf(today)).from;
+  const [sheet, links, docs, open, checkins, history, leave] = await Promise.all([
     loadPayrollMonth(month),
     loadEmployeeLinks(id),
     loadEmployeeDocuments(id),
@@ -67,7 +68,11 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     /* تسجيلاتُ فترة الخصم — هي ما يُحسب منه تأخيرُ الشهر */
     loadCheckins(deductionPeriod(month).from, deductionPeriod(month).to),
     loadEmployeeHistory(id, workMonths.slice(0, 24)),
+    loadLeave(id, leaveFrom),
   ]);
+  /* سجلُّ الدوام من تاريخ: الأحدثُ أوّلاً، والنافذُ اليوم معلَّم */
+  const currentPlan = planOn(today, employee.plans);
+  const plans = [...employee.plans].reverse();
   const row = sheet.rows.find((r) => r.employee.id === id);
   const slip = row?.slip;
   const rate = rateFor(employee.rates, month);
@@ -77,7 +82,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const dayRules = employee.shiftRules.filter((r) => r.day !== null && r.day >= deductionPeriod(deductionMonthOf(today)).from).sort((a, b) => a.day!.localeCompare(b.day!));
   const manualViolations = row?.violations.filter((v) => v.source === "MANUAL") ?? [];
   const deductions = row ? deductionItems({
-    kind: employee.kind, rateMinor: rate, shiftMinutes: employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes,
+    kind: employee.kind, rateMinor: rate, shiftMinutes: row?.shiftMinutes ?? employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes,
     attendance: row.attendance, violations: row.violations,
   }).map((d) => ({ ...d, employeeId: id })) : [];
   /* حوالاتُه هو (برقم المستفيد) في كلّ الأشهر، وتحويلاتُك لحسابك حول هذا الشهر وحده */
@@ -339,11 +344,55 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         {canEdit && <RateForm employeeId={id} kind={employee.kind} month={month} />}
       </Section>
 
+      {employee.kind === "MONTHLY" && (canEdit || leave.length > 0) && (
+        <Section id="leave" title="الإجازات" icon={CalendarOff} count={leave.length}
+          hint="من يوم إلى يوم. كل يوم عمل فيها «إجازة» لا يُخصم عنه، وأيام الراحة تُترك. تظهر هنا إجازات فترة الخصم الجارية وما بعدها.">
+          {leave.length > 0 && (
+            <ul className="mb-3 divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
+              {leave.map((l) => (
+                <li key={l.fromDay} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
+                  <span className="min-w-0 flex-1">
+                    <span className="font-bold">{l.fromDay === l.toDay ? formatDay(l.fromDay) : <>من {formatDay(l.fromDay)} إلى {formatDay(l.toDay)}</>}</span>
+                    <span className="block text-[11px] text-muted">{countNoun(l.days, DAY)} عمل{l.note ? ` · ${l.note}` : ""}</span>
+                  </span>
+                  {l.toDay < today ? <Badge tone="muted">مضت</Badge> : l.fromDay <= today ? <Badge tone="accent">الآن</Badge> : <Badge tone="ok">قادمة</Badge>}
+                  {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "leave-clear", employeeId: id, fromDay: l.fromDay, toDay: l.toDay }} variant="quiet" done="أُزيلت الإجازة">أزلها</PostAction>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <details className="rounded-xl border border-line bg-raised" open={leave.length === 0}>
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold">سجّل إجازة</summary>
+              <div className="border-t border-line p-4"><LeaveForm employeeId={id} defaultDay={today} /></div>
+            </details>
+          )}
+        </Section>
+      )}
+
       <Section id="checkin" title="تطبيق TPH Team" icon={CalendarClock} hint="رابط خاص به يثبّته على شاشة جواله: منه يسجّل حضوره وانصرافه (ويُقرأ موقعه ليُعرف أنه في المقهى)، ويصوّر الفواتير، ويرسل لك اقتراحاته أو شكواه.">
         <p className="mb-3 text-xs text-ink-soft">
           {employee.shiftStart ? <>دوامه <span className="nums font-bold">{shiftRange(employee.shiftStart, employee.shiftMinutes)}</span> ({hoursLabel(employee.shiftMinutes)})</> : <>لم يُحدَّد وقت دوامه، فلا يُحسب التأخير من الحضور. <Link href="/payroll/employees#shifts" className="font-bold text-accent hover:underline">حدّده من جدول الدوام</Link></>}
           {daysOffLabel(employee.daysOff) && <> · راحته {daysOffLabel(employee.daysOff)}</>}
         </p>
+        {plans.length > 1 && (
+          <details className="mb-3 rounded-xl border border-line bg-raised">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">تغييرات الدوام <span className="font-normal text-muted">({plans.length})</span></summary>
+            <ul className="divide-y divide-line border-t border-line">
+              {plans.map((p) => (
+                <li key={p.fromDay} className="flex flex-wrap items-center gap-3 px-4 py-2 text-xs">
+                  <span className="min-w-0 flex-1"><strong>من {formatDay(p.fromDay)}</strong> · <span className="nums">{planSummary(p)}</span></span>
+                  {p === currentPlan ? <Badge tone="accent">الحالي</Badge> : p.fromDay > today ? (
+                    <>
+                      <Badge tone="ok">قادم</Badge>
+                      {canEdit && <PostAction url="/api/payroll/employee" body={{ action: "shift-plan-remove", id, fromDay: p.fromDay }} variant="quiet" done="أُلغي التغيير القادم">ألغه</PostAction>}
+                    </>
+                  ) : <Badge tone="muted">سابق</Badge>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         {weekRules.length > 0 && (
           <p className="mb-3 text-xs text-ink-soft">
             وبوقت مخصّص: {weekRules.map((r) => <span key={r.weekday} className="me-2 inline-block">{WEEKDAY_LABEL[r.weekday!]} <span className="nums font-bold">{shiftRange(r.shiftStart, r.shiftMinutes!)}</span></span>)}

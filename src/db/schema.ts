@@ -2573,6 +2573,22 @@ export const employeeShifts = pgTable("employee_shifts", {
   uniqueIndex("employee_shifts_day_idx").on(t.employeeId, t.day).where(sql`day is not null`),
 ]);
 
+/**
+ * الدوامُ من يومٍ يبدأ منه (106): البدايةُ وطولُها وأيّامُ الراحة ووقتُ أيّام الأسبوع. دوامُ اليوم آخرُ
+ * سطرٍ بدأ فيه أو قبله — `planOn` في `lib/payroll/attendance.ts`. بلا سطورٍ: أعمدةُ `employees`.
+ */
+export const employeeShiftPlans = pgTable("employee_shift_plans", {
+  id: id(),
+  employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  fromDay: text("from_day").notNull(),
+  shiftStart: text("shift_start"),
+  shiftMinutes: integer("shift_minutes").notNull(),
+  daysOff: text("days_off").notNull().default(""),
+  week: jsonb("week").$type<{ weekday: number; shiftStart: string; shiftMinutes: number }[]>().notNull().default([]),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [uniqueIndex("employee_shift_plans_from_idx").on(t.employeeId, t.fromDay)]);
+
 /** الراتبُ من شهرٍ يبدأ منه — للشهريّ راتبُ الشهر، وللجزئيّ أجرُ الساعة. */
 export const employeeRates = pgTable("employee_rates", {
   id: id(),

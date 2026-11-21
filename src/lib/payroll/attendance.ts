@@ -204,6 +204,44 @@ export interface BaseShift {
   shiftStart: string | null;
   shiftMinutes: number;
   daysOff: string;
+  /** الدوامُ من تاريخ (106) — إن وُجد سطرٌ بدأ في اليوم أو قبله غلب ما فوقه وأيّامَ الأسبوع في `rules`. */
+  plans?: readonly ShiftPlan[];
+}
+
+/** دوامٌ يسري من يومٍ إلى أن يبدأ غيرُه (106). */
+export interface ShiftPlan {
+  fromDay: string;
+  shiftStart: string | null;
+  shiftMinutes: number;
+  daysOff: string;
+  week: readonly { weekday: number; shiftStart: string; shiftMinutes: number }[];
+}
+
+/** السطرُ النافذ في اليوم: آخرُ ما بدأ فيه أو قبله، أو `null` (يُحكم بالدوام الأصليّ). */
+export function planOn(day: string, plans: readonly ShiftPlan[] | undefined): ShiftPlan | null {
+  let found: ShiftPlan | null = null;
+  for (const p of plans ?? []) if (p.fromDay <= day && (!found || p.fromDay > found.fromDay)) found = p;
+  return found;
+}
+
+/** التغييرُ القادم بعد اليوم — ليُقال «من ١ ديسمبر يصير…». */
+export function nextPlan(day: string, plans: readonly ShiftPlan[] | undefined): ShiftPlan | null {
+  let found: ShiftPlan | null = null;
+  for (const p of plans ?? []) if (p.fromDay > day && (!found || p.fromDay < found.fromDay)) found = p;
+  return found;
+}
+
+/**
+ * الدوامُ المعتاد النافذ في اليوم — بدايتُه وطولُه وراحتُه وأيّامُ أسبوعه — قبل أيّ يومٍ بعينه.
+ * من سطر التاريخ إن وُجد، وإلّا من الأصل وأيّام الأسبوع في `rules`.
+ */
+export function usualOn(day: string, base: BaseShift, rules: readonly ShiftRule[]): ShiftPlan {
+  const plan = planOn(day, base.plans);
+  if (plan) return plan;
+  return {
+    fromDay: "", shiftStart: base.shiftStart, shiftMinutes: base.shiftMinutes, daysOff: base.daysOff,
+    week: rules.filter((r) => r.weekday !== null && !r.off && r.shiftStart && r.shiftMinutes).map((r) => ({ weekday: r.weekday!, shiftStart: r.shiftStart!, shiftMinutes: r.shiftMinutes! })),
+  };
 }
 
 /** دوامُ اليوم: راحة، أو من «start» بطوله. `start` فارغٌ: لم يُكتب له وقت (لا يُحسب تأخير). */
@@ -216,11 +254,21 @@ export type DayShift = { off: true } | { off: false; start: string | null; minut
 export function shiftOn(day: string, base: BaseShift, rules: readonly ShiftRule[]): DayShift {
   const exact = rules.find((r) => r.day === day);
   if (exact) return exact.off || !exact.shiftStart || !exact.shiftMinutes ? { off: true } : { off: false, start: exact.shiftStart, minutes: exact.shiftMinutes, source: "DAY" };
-  if (!isWorkday(day, base.daysOff)) return { off: true };
+  const usual = usualOn(day, base, rules);
+  if (!isWorkday(day, usual.daysOff)) return { off: true };
   const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
-  const week = rules.find((r) => r.weekday === weekday && !r.off && r.shiftStart && r.shiftMinutes);
-  if (week) return { off: false, start: week.shiftStart, minutes: week.shiftMinutes!, source: "WEEKDAY" };
-  return { off: false, start: base.shiftStart, minutes: base.shiftMinutes, source: "BASE" };
+  const week = usual.week.find((w) => w.weekday === weekday);
+  if (week) return { off: false, start: week.shiftStart, minutes: week.shiftMinutes, source: "WEEKDAY" };
+  return { off: false, start: usual.shiftStart, minutes: usual.shiftMinutes, source: "BASE" };
+}
+
+/** «4:00 م – 12:00 ص · وبوقتٍ مخصّص للخميس · راحته الجمعة» — سطرُ تاريخٍ كما يُقرأ. */
+export function planSummary(p: Pick<ShiftPlan, "shiftStart" | "shiftMinutes" | "daysOff" | "week">): string {
+  const parts = [shiftRange(p.shiftStart, p.shiftMinutes) ?? "بلا وقت دوام"];
+  if (p.week.length > 0) parts.push(`وبوقت مخصّص ${[...p.week].sort((a, b) => a.weekday - b.weekday).map((w) => `${WEEKDAY_LABEL[w.weekday]} ${shiftRange(w.shiftStart, w.shiftMinutes)}`).join("، ")}`);
+  const off = daysOffLabel(p.daysOff);
+  parts.push(off ? `راحته ${off}` : "بلا يوم راحة");
+  return parts.join(" · ");
 }
 
 /** «4:00 م – 12:00 ص» لدوام اليوم، أو `null` (راحة أو بلا وقت). */
