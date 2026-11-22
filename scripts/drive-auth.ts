@@ -8,6 +8,8 @@
  * ومنع الكتابة تقنياً أأمن من الاعتماد على انضباط الكود.
  */
 import http from "node:http";
+import path from "node:path";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createOAuthClient, DRIVE_SCOPE_FULL, DRIVE_SCOPE_READONLY } from "@/lib/drive";
 
 const PORT = 53682;
@@ -59,8 +61,20 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("\n─────────── أضف هذا السطر إلى .env ───────────\n");
-  console.log(`GOOGLE_DRIVE_REFRESH_TOKEN="${tokens.refresh_token}"`);
+  /*
+    يُكتب في `.env` بنفسه — كان يُطبع ليُلصق بيد، فبقي التفويضُ القديمُ المُلغى ثلاثةً وعشرين يوماً
+    وسقطت نسخةُ الدرايف الاحتياطيّة. السطرُ القائم يُستبدل، والملفُّ السابق يبقى `.env.before-drive-auth`.
+  */
+  const line = `GOOGLE_DRIVE_REFRESH_TOKEN="${tokens.refresh_token}"`;
+  const envPath = path.join(process.cwd(), ".env");
+  const before = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  if (before) copyFileSync(envPath, `${envPath}.before-drive-auth`);
+  const next = /^GOOGLE_DRIVE_REFRESH_TOKEN=.*$/m.test(before)
+    ? before.replace(/^GOOGLE_DRIVE_REFRESH_TOKEN=.*$/m, line)
+    : `${before.replace(/\n?$/, "\n")}${line}\n`;
+  writeFileSync(envPath, next, { mode: 0o600 });
+  console.log("\n✓ كُتب التفويض الجديد في .env (والسابق محفوظ في .env.before-drive-auth).");
+  console.log("  تُستكمل مرآة الدرايف في النسخة الاحتياطيّة في الساعة التالية.");
   console.log(`\nالنطاقات الممنوحة: ${tokens.scope}\n`);
 }
 

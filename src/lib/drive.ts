@@ -90,8 +90,19 @@ export async function driveForCli(
   }
   let lastError: unknown = null;
   for (const token of candidates) {
+    /*
+      المخزَّنُ مشفَّرٌ بمفتاح الإنتاج، وجهازٌ بلا المفتاح لا يفتحه — فيُترك إلى التالي (تفويضُ
+      `drive:auth` في `.env`) لا يوقف المحاولة: كان يرمي هنا فلا يُجرَّب ما بعده أبداً.
+    */
+    let refresh: string;
+    try {
+      refresh = openToken(token);
+    } catch (e) {
+      lastError = e;
+      continue;
+    }
     const auth = createOAuthClient();
-    auth.setCredentials({ refresh_token: openToken(token) });
+    auth.setCredentials({ refresh_token: refresh });
     const drive = google.drive({ version: "v3", auth });
     try {
       await drive.about.get({ fields: "user(emailAddress)" });
