@@ -25,7 +25,7 @@ import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, month
 import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { OBLIGATION_KIND_LABEL, isObligationKind } from "@/lib/obligations";
 import {
-  loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadLeave, loadOpenTransfers, loadPayrollMonth, transfersSince,
+  loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadLeave, LEAVE_TYPE_LABEL, loadOpenTransfers, loadPayrollMonth, transfersSince,
 } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
@@ -97,7 +97,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const latestRate = rateFor(employee.rates, endMonth);
   const serviceDays = daysBetween(employee.hiredOn, employee.leftOn ?? today) + 1;
   const eos = latestRate !== null && employee.kind === "MONTHLY" ? endOfService(latestRate, serviceDays) : null;
-  const annual = employee.kind === "MONTHLY" ? leaveBalance(serviceDays, allLeave.reduce((s, l) => s + l.days, 0), latestRate) : null;
+  /* السنويّةُ وحدها تُطرح من الرصيد — المرضيّةُ وبلا أجرٍ لا (109) */
+  const annual = employee.kind === "MONTHLY" ? leaveBalance(serviceDays, allLeave.filter((l) => l.leaveType === "ANNUAL").reduce((s, l) => s + l.days, 0), latestRate) : null;
   const defaultDay = month === current ? today : `${month}-01`;
   /*
     الرصيدُ منذ المباشرة: ما استحقّه كلَّ شهرٍ مقابل ما وصله — زيادةُ شهرٍ لا تُنسى في الذي بعده.
@@ -356,7 +357,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 <li key={l.fromDay} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
                   <span className="min-w-0 flex-1">
                     <span className="font-bold">{l.fromDay === l.toDay ? formatDay(l.fromDay) : <>من {formatDay(l.fromDay)} إلى {formatDay(l.toDay)}</>}</span>
-                    <span className="block text-[11px] text-muted">{countNoun(l.days, DAY)} عمل{l.note ? ` · ${l.note}` : ""}</span>
+                    <span className="block text-[11px] text-muted">{LEAVE_TYPE_LABEL[l.leaveType]} · {countNoun(l.days, DAY)} عمل{l.note && l.note !== LEAVE_TYPE_LABEL[l.leaveType] ? ` · ${l.note}` : ""}</span>
                   </span>
                   {l.toDay < today ? <Badge tone="muted">مضت</Badge> : l.fromDay <= today ? <Badge tone="accent">الآن</Badge> : <Badge tone="ok">قادمة</Badge>}
                   {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "leave-clear", employeeId: id, fromDay: l.fromDay, toDay: l.toDay }} variant="quiet" done="أُزيلت الإجازة">أزلها</PostAction>}
@@ -467,7 +468,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       )}
 
       {annual && (
-        <Section id="leave-balance" title="رصيد الإجازة السنوية (تقدير)" icon={CalendarOff} hint={`بنظام العمل: ${ANNUAL_LEAVE_DAYS} يوماً عن كل سنة خدمة، و${ANNUAL_LEAVE_DAYS_AFTER_FIVE} بعد خمس سنوات، تُستحق بقدر ما مضى. والمأخوذ كل يوم سُجّل إجازة. والقيمة بأجر اليوم (الراتب ÷ 30).`}>
+        <Section id="leave-balance" title="رصيد الإجازة السنوية (تقدير)" icon={CalendarOff} hint={`بنظام العمل: ${ANNUAL_LEAVE_DAYS} يوماً عن كل سنة خدمة، و${ANNUAL_LEAVE_DAYS_AFTER_FIVE} بعد خمس سنوات، تُستحق بقدر ما مضى. والمأخوذ كل يوم سُجّل إجازة سنوية، والمرضية وبلا أجر لا تُطرح منه. والقيمة بأجر اليوم (الراتب ÷ 30).`}>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
             <Card><p className="text-xs text-muted">استحقّ منذ المباشرة</p><p className="mt-1 text-lg font-bold"><span className="nums">{formatLeaveDays(annual.accruedMilliDays)}</span> يوماً</p></Card>
             <Card><p className="text-xs text-muted">أخذ</p><p className="mt-1 text-lg font-bold">{annual.takenDays === 0 ? "لم يأخذ إجازة" : countNoun(annual.takenDays, DAY)}</p></Card>

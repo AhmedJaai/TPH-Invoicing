@@ -9,12 +9,12 @@ import { isAdjustmentKind, parseHours } from "@/lib/payroll/calc";
 import { isViolationCode } from "@/lib/payroll/saudi-rules";
 import { Amount, Day, Id, Month, Note, positiveMinor } from "@/lib/payroll/request";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { countNoun, DAY } from "@/lib/arabic";
+import { countNoun, countNounGen, DAY } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { deductionMonthOf } from "@/lib/payroll/period";
 import { failWith, guard } from "@/services/guard";
 import {
-  addAdjustment, addViolation, clearAttendance, clearLeave, clearWeek, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
+  addAdjustment, addViolation, clearAttendance, clearLeave, clearWeek, LEAVE_TYPE_LABEL, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("week"), employeeId: Id, day: Day, hours: z.string().trim().max(8).optional(), amount: z.string().trim().max(20).optional(), note: Note }).strict(),
   z.object({ action: z.literal("week-clear"), id: Id }).strict(),
   /* إجازةٌ من يومٍ إلى يوم — أيّامُ العمل فيها، وأيّامُ الراحة تُترك */
-  z.object({ action: z.literal("leave"), employeeId: Id, fromDay: Day, toDay: Day, note: Note }).strict(),
+  z.object({ action: z.literal("leave"), employeeId: Id, fromDay: Day, toDay: Day, note: Note, leaveType: z.enum(["ANNUAL", "SICK", "UNPAID"]).optional() }).strict(),
   z.object({ action: z.literal("leave-clear"), employeeId: Id, fromDay: Day, toDay: Day }).strict(),
 ]);
 
@@ -58,8 +58,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, message: `سُجّل اليوم، ويُحسم من راتب ${formatMonth(deductionMonthOf(b.day))}` });
       }
       case "leave": {
-        const r = await setLeave({ employeeId: b.employeeId, fromDay: b.fromDay, toDay: b.toDay, note: b.note }, user.id);
-        return NextResponse.json({ ok: true, message: `سُجّلت إجازة ${countNoun(r.days, DAY)}، ولا يُخصم عنها${r.restDays > 0 ? `. وتُركت ${countNoun(r.restDays, DAY)} راحة` : ""}` });
+        const type = b.leaveType ?? "ANNUAL";
+        const r = await setLeave({ employeeId: b.employeeId, fromDay: b.fromDay, toDay: b.toDay, note: b.note, leaveType: type }, user.id);
+        const pay = type === "UNPAID" ? `ويُخصم أجر ${countNounGen(r.days, DAY)} من راتبه` : type === "SICK" ? "ولا يُخصم عنها ولا تُطرح من رصيده السنوي" : "ولا يُخصم عنها، وتُطرح من رصيده السنوي";
+        return NextResponse.json({ ok: true, message: `سُجّلت ${LEAVE_TYPE_LABEL[type]} ${countNoun(r.days, DAY)}، ${pay}${r.restDays > 0 ? `. وتُركت ${countNoun(r.restDays, DAY)} راحة` : ""}` });
       }
       case "leave-clear": {
         const n = await clearLeave({ employeeId: b.employeeId, fromDay: b.fromDay, toDay: b.toDay }, user.id);

@@ -8,7 +8,7 @@
  *
  * نقيّ: المالُ هللاتٌ صحيحة، والوقتُ دقائقُ صحيحة.
  */
-import type { AttendanceKind } from "@/db/schema";
+import type { AttendanceKind, LeaveType } from "@/db/schema";
 import { DAYS_PER_MONTH, divRound } from "./calc";
 import { countsAsLate, penaltyLabel, type AssessedViolation } from "./saudi-rules";
 
@@ -36,6 +36,8 @@ export interface DeductionAttendance {
   disrupted: boolean;
   penaltyWaived: boolean;
   note: string | null;
+  /** للإجازة: بلا أجرٍ يُخصم أجرُ يومها كالغياب (109). */
+  leaveType?: LeaveType | null;
 }
 
 export interface DeductionPenalty {
@@ -76,7 +78,8 @@ export function deductionItems(input: {
     (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) || (a.kind === "EARLY" && a.minutes !== null);
   /* بترتيب الأيّام — والمجموعُ لا يتغيّر بالترتيب */
   const timed = input.attendance.filter(counted);
-  const absent = input.attendance.filter((a) => a.kind === "ABSENT");
+  /* الغيابُ والإجازةُ بلا أجر: أجرُ اليوم — والمجموعُ يساوي القسيمة (`payslip` يجمعهما كذلك) */
+  const absent = input.attendance.filter((a) => a.kind === "ABSENT" || (a.kind === "LEAVE" && a.leaveType === "UNPAID"));
   const rate = input.rateMinor;
   const timeShares = rate === null ? null : splitShares(timed.map((a) => a.minutes ?? 0), (n) => (n === 0 ? 0 : divRound(rate * n, DAYS_PER_MONTH * input.shiftMinutes)));
   const dayShares = rate === null ? null : splitShares(absent.map(() => 1), (n) => (n === 0 ? 0 : divRound(rate * n, DAYS_PER_MONTH)));

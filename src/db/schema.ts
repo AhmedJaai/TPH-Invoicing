@@ -2636,6 +2636,8 @@ export const payrollAdjustments = pgTable("payroll_adjustments", {
 });
 
 export type AttendanceKind = "LATE" | "EARLY" | "ABSENT" | "LEAVE";
+/** نوعُ الإجازة (109) — والفارغُ سنويّة. */
+export type LeaveType = "ANNUAL" | "SICK" | "UNPAID";
 
 export const payrollAttendance = pgTable("payroll_attendance", {
   id: id(),
@@ -2648,6 +2650,8 @@ export const payrollAttendance = pgTable("payroll_attendance", {
   disrupted: boolean("disrupted").notNull().default(false),
   /** عفا صاحبُ العمل عن جزائه (085). */
   penaltyWaived: boolean("penalty_waived").notNull().default(false),
+  /** لنوع `LEAVE` وحده (109) — `null` سنويّة. */
+  leaveType: text("leave_type").$type<LeaveType>(),
   note: text("note"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),

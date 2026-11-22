@@ -368,6 +368,7 @@ export function LeaveForm({ employeeId, defaultDay }: { employeeId: string; defa
   const [fromDay, setFromDay] = useState(defaultDay);
   const [toDay, setToDay] = useState(defaultDay);
   const [note, setNote] = useState("");
+  const [leaveType, setLeaveType] = useState<"ANNUAL" | "SICK" | "UNPAID">("ANNUAL");
   const { busy, error, send } = useSend();
   const okDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
   const span = okDay(fromDay) && okDay(toDay) ? Math.round((Date.parse(`${toDay}T00:00:00Z`) - Date.parse(`${fromDay}T00:00:00Z`)) / 86_400_000) + 1 : 0;
@@ -376,8 +377,15 @@ export function LeaveForm({ employeeId, defaultDay }: { employeeId: string; defa
     <form className="space-y-3" onSubmit={async (e) => {
       e.preventDefault();
       if (!ready) return;
-      if (await send("/api/payroll/entry", { action: "leave", employeeId, fromDay, toDay, note })) setNote("");
+      if (await send("/api/payroll/entry", { action: "leave", employeeId, fromDay, toDay, note, leaveType })) setNote("");
     }}>
+      <fieldset className="flex flex-wrap gap-2" aria-label="نوع الإجازة">
+        {([["ANNUAL", "سنوية"], ["SICK", "مرضية"], ["UNPAID", "بلا أجر"]] as const).map(([v, t]) => (
+          <label key={v} className={`inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-sm sm:min-h-9 ${leaveType === v ? "border-accent bg-accent-soft font-bold" : "border-line"}`}>
+            <input type="radio" name="leave-type" value={v} checked={leaveType === v} onChange={() => setLeaveType(v)} className="accent-[var(--accent)]" />{t}
+          </label>
+        ))}
+      </fieldset>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[9.5rem_9.5rem_minmax(0,1fr)]">
         <label className={label}>من يوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={fromDay} onChange={(e) => { setFromDay(e.target.value); if (toDay < e.target.value) setToDay(e.target.value); }} required /></label>
         <label className={label}>إلى يوم<input type="date" dir="ltr" className={`${field} mt-1.5`} value={toDay} min={fromDay} onChange={(e) => setToDay(e.target.value)} required />
@@ -388,7 +396,10 @@ export function LeaveForm({ employeeId, defaultDay }: { employeeId: string; defa
       <ErrorLine error={error} />
       <div className="flex flex-wrap items-center gap-3">
         <ReadySubmit ready={ready} busy={busy} size="sm" missing={span > 60 ? "أطول من 60 يوماً. اكتبها على دفعتين." : "اختر أول الإجازة وآخرها، والآخر بعد الأول."}>سجّل الإجازة</ReadySubmit>
-        <p className="min-w-0 flex-1 basis-56 text-[11px] text-muted">لا يُخصم عنها، ولا يُقال «لم يسجّل حضوراً» فيها. وأيام راحته فيها تُترك كما هي.</p>
+        <p className="min-w-0 flex-1 basis-56 text-[11px] text-muted">
+          {leaveType === "UNPAID" ? "يُخصم أجر كل يوم عمل فيها (الراتب ÷ 30) بلا جزاء." : leaveType === "SICK" ? "لا يُخصم عنها ولا تُطرح من رصيده السنوي." : "لا يُخصم عنها، وتُطرح من رصيده السنوي."}
+          {" "}ولا يُقال «لم يسجّل حضوراً» فيها، وأيام راحته فيها تُترك كما هي.
+        </p>
       </div>
     </form>
   );

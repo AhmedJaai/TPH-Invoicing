@@ -100,5 +100,15 @@
 "سعر الوحدة من الفواتير لا يُصدَّق": "Invoice unit cost looks wrong",
 "سعر الوحدة المحسوب من فواتيرك يخالف تكلفة الكتالوج في فودكس ثلاثة أضعاف أو أكثر. الأرجح أن «ما في الوحدة» عند المورّد كُتب خطأ. وتكلفة المبيعات في «الربح» تأخذ سعر الفواتير، فيصغر الخطأ التكلفة أو يكبرها بالنسبة نفسها. صحّح العبوة أدناه، وإن كان الكتالوج هو القديم فصحّحه في فودكس.": "The unit cost from your invoices differs from the Foodics catalog cost by three times or more. Most likely the supplier pack contents were entered wrongly. Cost of sales in Profit uses the invoice cost, so the error shrinks or inflates cost by the same factor. Fix the pack below, or if the catalog is outdated, fix it in Foodics.",
 "من الفواتير {0} · في الكتالوج {1} · لكل {2}": "Invoices {0} · catalog {1} · per {2}",
-"أقل من هللة": "Less than a halala"
+"أقل من هللة": "Less than a halala",
+"سنوية": "Annual",
+"مرضية": "Sick",
+"بلا أجر": "Unpaid",
+"إجازة سنوية": "Annual leave",
+"إجازة مرضية": "Sick leave",
+"إجازة بلا أجر": "Unpaid leave",
+"يُخصم أجر كل يوم عمل فيها (الراتب ÷ 30) بلا جزاء.": "Each working day in it is deducted (salary ÷ 30) with no penalty.",
+"لا يُخصم عنها ولا تُطرح من رصيده السنوي.": "Not deducted and not taken from the annual balance.",
+"لا يُخصم عنها، وتُطرح من رصيده السنوي.": "Not deducted, and taken from the annual balance.",
+"ولا يُقال «لم يسجّل حضوراً» فيها، وأيام راحته فيها تُترك كما هي.": "It is not reported as a missed check-in, and rest days within it are left as they are."
 }

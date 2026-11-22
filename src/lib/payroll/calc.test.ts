@@ -211,3 +211,20 @@ describe("رصيد الإجازة السنويّة (م ١٠٩)", () => {
     expect(b.valueMinor).toBeNull();
   });
 });
+
+describe("نوع الإجازة (109)", () => {
+  it("بلا أجر يُخصم أجرُ يومها، والسنويّةُ والمرضيّةُ لا", () => {
+    const leave = (leaveType: "ANNUAL" | "SICK" | "UNPAID") => ({ kind: "LEAVE" as const, minutes: null, leaveType });
+    const s = payslip({ ...base, attendance: [leave("UNPAID"), leave("UNPAID"), leave("SICK"), leave("ANNUAL")] });
+    expect(s.leaveDays).toBe(4);
+    expect(s.unpaidLeaveDays).toBe(2);
+    /* ٣٠٠٠ ÷ ٣٠ × ٢ = ٢٠٠ */
+    expect(s.absenceMinor).toBe(20_000);
+    expect(payslip({ ...base, attendance: [leave("SICK"), leave("ANNUAL")] }).absenceMinor).toBe(0);
+  });
+
+  it("الإجازةُ القديمة بلا نوع سنويّة — لا يُخصم عنها", () => {
+    expect(payslip({ ...base, attendance: [{ kind: "LEAVE", minutes: null }] }).absenceMinor).toBe(0);
+  });
+});
+

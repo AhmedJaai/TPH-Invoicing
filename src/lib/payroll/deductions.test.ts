@@ -63,3 +63,20 @@ describe("خصمُ كلّ يوم", () => {
     expect(part.every((i) => i.wageMinor === 0 && i.penalty === null)).toBe(true);
   });
 });
+
+describe("الإجازة بلا أجر في قائمة الخصم", () => {
+  it("يومُها بأجر يومٍ، ومجموعُ القائمة يساوي القسيمة هللةً بهللة", () => {
+    const rate = 350_000;
+    const attendance = [
+      att("a", "2026-11-03", "ABSENT", null),
+      att("b", "2026-11-04", "LEAVE", null, { leaveType: "UNPAID" }),
+      att("c", "2026-11-05", "LEAVE", null, { leaveType: "SICK" }),
+    ];
+    const items = deductionItems({ kind: "MONTHLY", rateMinor: rate, shiftMinutes: 480, graceMinutes: 5, attendance, violations: [] });
+    expect(items.find((i) => i.id === "b")!.wageMinor).toBeGreaterThan(0);
+    expect(items.find((i) => i.id === "c")!.wageMinor).toBe(0);
+    const slip = payslip({ kind: "MONTHLY", salaryMinor: rate, days: null, weeksMinor: [], policy: { shiftMinutes: 480, graceMinutes: 5 }, adjustments: [], attendance, paidMinor: 0 });
+    expect(deductionTotal(items)).toBe(slip.absenceMinor);
+  });
+});
+

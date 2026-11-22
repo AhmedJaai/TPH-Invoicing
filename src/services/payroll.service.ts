@@ -15,7 +15,7 @@ import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appSettings, attendanceCheckins, employeeRates, employeeShiftPlans, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
-  type AttendanceKind, type CheckinVerdict, type PayrollAdjustmentKind, type PayrollLinkPurpose,
+  type AttendanceKind, type CheckinVerdict, type LeaveType, type PayrollAdjustmentKind, type PayrollLinkPurpose,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -163,7 +163,7 @@ export interface PayrollRow {
   shiftMinutes: number;
   slip: Payslip;
   adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date }[];
-  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean }[];
+  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean; leaveType: LeaveType | null }[];
   /** مخالفاتُ الشهر بجزائها من جدول اللائحة — من الحضور ومن المسجَّل بيده. */
   violations: (AssessedViolation & { source: "ATTENDANCE" | "MANUAL" })[];
   /** غيابٌ فوق عشرة أيّامٍ متّصلة — المادّة ٨٠، قرارٌ لا مبلغ. */
@@ -248,7 +248,7 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
           paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((sum, l) => sum + l.amountMinor, 0),
         }),
         adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt })),
-        attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived })),
+        attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived, leaveType: a.leaveType })),
         violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
         article80: regs?.article80 ?? [],
         weeks: myWeeks.map((w) => ({ id: w.id, weekStart: w.weekStart, minutes: w.minutes, amountMinor: w.amountMinor, note: w.note })),
@@ -578,7 +578,7 @@ const MINUTE_KINDS: ReadonlySet<AttendanceKind> = new Set(["LATE", "EARLY"]);
  * يومُ تأخيرٍ أو انصرافٍ مبكّر أو غيابٍ أو إجازة — يستبدل ما سُجّل لليوم نفسه بالنوع نفسه.
  * والغيابُ والإجازةُ لا يجتمعان في يوم، ولا يجتمعان مع تأخير.
  */
-export async function setAttendance(input: { employeeId: string; day: string; kind: AttendanceKind; minutes: number | null; note: string | null; disrupted?: boolean }, actorId: string | null, conn?: Conn): Promise<void> {
+export async function setAttendance(input: { employeeId: string; day: string; kind: AttendanceKind; minutes: number | null; note: string | null; disrupted?: boolean; leaveType?: LeaveType }, actorId: string | null, conn?: Conn): Promise<void> {
   const minutes = MINUTE_KINDS.has(input.kind) ? input.minutes : null;
   if (MINUTE_KINDS.has(input.kind) && !(minutes && minutes > 0)) throw new PayrollRefused("اكتب عدد الدقائق.");
   const run = async (t: Conn) => {
@@ -587,7 +587,7 @@ export async function setAttendance(input: { employeeId: string; day: string; ki
     const before = await t.update(payrollAttendance).set({ voidedAt: new Date() })
       .where(and(eq(payrollAttendance.employeeId, input.employeeId), eq(payrollAttendance.day, input.day), inArray(payrollAttendance.kind, clash), isNull(payrollAttendance.voidedAt)))
       .returning();
-    const [row] = await t.insert(payrollAttendance).values({ ...input, minutes, disrupted: input.kind === "LATE" && input.disrupted === true, source: "MANUAL", createdById: actorId }).returning({ id: payrollAttendance.id });
+    const [row] = await t.insert(payrollAttendance).values({ ...input, minutes, disrupted: input.kind === "LATE" && input.disrupted === true, leaveType: input.kind === "LEAVE" ? input.leaveType ?? "ANNUAL" : null, source: "MANUAL", createdById: actorId }).returning({ id: payrollAttendance.id });
     await recordAudit({ actorId, action: "PAYROLL_ATTENDANCE_SET", entityType: "payroll_attendance", entityId: row.id, before: before.length > 0 ? before : null, after: { ...input, minutes } }, t);
   };
   if (conn) await run(conn);
@@ -747,7 +747,7 @@ export const MAX_LEAVE_SPAN_DAYS = 60;
  * إجازةٌ من يومٍ إلى يوم — «إجازة» لكلّ يوم عملٍ فيها، لا يُخصم عنه ولا يُعدّ غياباً. أيّامُ الراحة
  * تُترك. يحلّ محلّ ما سُجّل لليوم من تأخيرٍ أو غياب (`setAttendance`)، ومعاملةٌ واحدة: كلُّها أو لا شيء.
  */
-export async function setLeave(input: { employeeId: string; fromDay: string; toDay: string; note: string | null }, actorId: string, conn: Conn = db): Promise<{ days: number; restDays: number }> {
+export async function setLeave(input: { employeeId: string; fromDay: string; toDay: string; note: string | null; leaveType?: LeaveType }, actorId: string, conn: Conn = db): Promise<{ days: number; restDays: number }> {
   if (input.toDay < input.fromDay) throw new PayrollRefused("آخر يوم في الإجازة قبل أولها.");
   const span = Math.round((Date.parse(`${input.toDay}T00:00:00Z`) - Date.parse(`${input.fromDay}T00:00:00Z`)) / 86_400_000) + 1;
   if (span > MAX_LEAVE_SPAN_DAYS) throw new PayrollRefused(`الإجازة أطول من ${MAX_LEAVE_SPAN_DAYS} يوماً. اكتبها على دفعتين.`);
@@ -761,7 +761,7 @@ export async function setLeave(input: { employeeId: string; fromDay: string; toD
     for (let i = 0; i < span; i++) {
       const day = addDays(input.fromDay, i);
       if (shiftOn(day, base, rules).off) { restDays++; continue; }
-      await setAttendance({ employeeId: emp.id, day, kind: "LEAVE", minutes: null, note: input.note ?? "إجازة" }, actorId, t);
+      await setAttendance({ employeeId: emp.id, day, kind: "LEAVE", minutes: null, note: input.note ?? LEAVE_TYPE_LABEL[input.leaveType ?? "ANNUAL"], leaveType: input.leaveType ?? "ANNUAL" }, actorId, t);
       days++;
     }
     if (days === 0) throw new PayrollRefused("كل هذه الأيام أيام راحته. لا شيء يُسجَّل.");
@@ -782,26 +782,29 @@ export async function clearLeave(input: { employeeId: string; fromDay: string; t
   });
 }
 
-export interface LeaveSpan { fromDay: string; toDay: string; days: number; note: string | null }
+export interface LeaveSpan { fromDay: string; toDay: string; days: number; note: string | null; leaveType: LeaveType }
+
+export const LEAVE_TYPE_LABEL: Record<LeaveType, string> = { ANNUAL: "إجازة سنوية", SICK: "إجازة مرضية", UNPAID: "إجازة بلا أجر" };
 
 /**
  * إجازاتُه من يومٍ فصاعداً، أيّاماً متّصلةً في سطر — أيّامُ الراحة بينها لا تقطعها.
  */
 export async function loadLeave(employeeId: string, fromDay: string, conn: Conn = db): Promise<LeaveSpan[]> {
-  const rows = await conn.select({ day: payrollAttendance.day, note: payrollAttendance.note }).from(payrollAttendance)
+  const rows = await conn.select({ day: payrollAttendance.day, note: payrollAttendance.note, leaveType: payrollAttendance.leaveType }).from(payrollAttendance)
     .where(and(eq(payrollAttendance.employeeId, employeeId), eq(payrollAttendance.kind, "LEAVE"), isNull(payrollAttendance.voidedAt), gte(payrollAttendance.day, fromDay)))
     .orderBy(payrollAttendance.day);
   return groupLeave(rows);
 }
 
-/** يجمع أيّامَ الإجازة سطوراً: يومٌ يلي سابقَه بثلاثة أيّامٍ أو أقلّ (راحةٌ بينهما) من السطر نفسه. */
-export function groupLeave(rows: readonly { day: string; note: string | null }[]): LeaveSpan[] {
+/** يجمع أيّامَ الإجازة سطوراً: يومٌ يلي سابقَه بثلاثة أيّامٍ أو أقلّ (راحةٌ بينهما) من السطر نفسه — والنوعُ نفسُه. */
+export function groupLeave(rows: readonly { day: string; note: string | null; leaveType?: LeaveType | null }[]): LeaveSpan[] {
   const spans: LeaveSpan[] = [];
   for (const r of rows) {
+    const type = r.leaveType ?? "ANNUAL";
     const last = spans[spans.length - 1];
-    if (last && r.day <= addDays(last.toDay, 3) && r.day > last.toDay) { last.toDay = r.day; last.days++; continue; }
+    if (last && last.leaveType === type && r.day <= addDays(last.toDay, 3) && r.day > last.toDay) { last.toDay = r.day; last.days++; continue; }
     if (last && r.day === last.toDay) continue;
-    spans.push({ fromDay: r.day, toDay: r.day, days: 1, note: r.note });
+    spans.push({ fromDay: r.day, toDay: r.day, days: 1, note: r.note, leaveType: type });
   }
   return spans;
 }
