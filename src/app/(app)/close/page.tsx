@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * يُفتح على الشهر المنقضي؛ والفحوصُ بخطواتها في `MonthClose`، والإقفالُ
  * بإقرار، والحزمةُ تُنزَّل للشهر المختار مقفلاً كان أو مفتوحاً (ويُقال ذلك).
  */
-export default async function ClosePage() {
+export default async function ClosePage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/close");
   if (!can(user.role, "month:close")) {
@@ -68,7 +68,9 @@ export default async function ClosePage() {
     );
   }
 
-  const selected = months.includes(previous) ? previous : months[0];
+  /* `?month=` يفتح شهرَه — بندُ «شهرٌ مفتوح بين أشهرٍ مقفلة» يحيل إليه، وكان يفتح الشهرَ الماضي دائماً */
+  const asked = (await searchParams).month;
+  const selected = asked && months.includes(asked) ? asked : months.includes(previous) ? previous : months[0];
   const report = buildMonthClose(selected === previous ? previousFacts : await gatherMonthFacts(selected));
   const status = closed.some((c) => c.month === selected) ? "CLOSED" : "OPEN";
 

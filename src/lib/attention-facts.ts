@@ -538,6 +538,12 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     statementMissing: (await latestStatementMissing())
       .map((m) => ({ ...m, key: statementMissingKey(m.slug, m.ref, m.day, m.amountMinor) }))
       .filter((m) => !silenced.has(m.key)),
+    /* شهرٌ فيه فواتير قبل آخر شهرٍ مقفل وهو مفتوح — يُكتب فيه بصمتٍ وما بعده مختوم */
+    monthsLeftOpen: (await db.execute<{ m: string }>(sql`
+      select distinct i.period_month as m from invoices i
+       where i.period_month < (select max(mc.month) from month_closes mc where mc.status = 'CLOSED')
+         and not exists (select 1 from month_closes mc where mc.month = i.period_month and mc.status = 'CLOSED')
+       order by 1`)).rows.map((r) => r.m),
     statementPaidMissing: (await loadSettlementComparisons())
       .flatMap((r) => r.comparison.oursOnly.filter((p) => !p.isCreditNote).map((p) => ({
         supplierName: r.supplierName, slug: r.slug, paymentId: p.paymentId, day: p.day,

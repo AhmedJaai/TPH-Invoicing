@@ -57,6 +57,7 @@ export const ATTENTION_IDS = [
   "statement-payment-missing",
   "backup-stale",
   "unit-cost-suspect",
+  "month-left-open",
   "files-wrong-month",
   "files-missing-in-drive",
   "future-invoices",

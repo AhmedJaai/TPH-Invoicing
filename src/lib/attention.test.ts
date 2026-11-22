@@ -548,6 +548,13 @@ describe("كشف المورّد يخالف دفترنا", () => {
     expect(item.href).toBe("/suppliers/BeCof");
   });
 
+  it("شهرٌ مفتوح بين أشهرٍ مقفلة — بندٌ يفتح إقفالَه", () => {
+    const [item] = buildAttention({ ...quiet, monthsLeftOpen: ["2026-07"] });
+    expect(item.id).toBe("month-left-open");
+    expect(item.href).toBe("/close?month=2026-07");
+    expect(item.needs).toBe("month:close");
+  });
+
   it("سعرُ وحدةٍ لا يُصدَّق — بندٌ يسمّي الصنفَ ونسبتَه ويفتح موضعَ التصحيح", () => {
     const [item] = buildAttention({ ...quiet, unitCostSuspects: [{ name: "مياه معدنية", ratio: 0.003 }] });
     expect(item.id).toBe("unit-cost-suspect");

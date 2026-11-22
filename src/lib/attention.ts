@@ -277,6 +277,8 @@ export interface AttentionFacts {
   sealDrift?: { checkedAt: string; findings: { month: string; figure: string; sealedMinor: number | null; nowMinor: number | null }[] } | null;
   /** رصيدُ القراءة الذكيّة دون حدّه في آخر فحص (`daily-checks.service.ts`). */
   aiBalanceLow?: { display: string; available: boolean; checkedAt: string } | null;
+  /** أشهرٌ فيها فواتير قبل آخر شهرٍ مقفل وهي مفتوحة. الغائبُ: لم يُسأل. */
+  monthsLeftOpen?: string[];
   /** سعرُ وحدةٍ من الفواتير يخالف كلفةَ الكتالوج أضعافاً — `ratio` الفواتيرُ ÷ الكتالوج (فحص الصباح، 108). */
   unitCostSuspects?: { name: string; ratio: number }[];
   /** النسخةُ الاحتياطيّة على جهاز المالك متأخّرة (`backup-status.service.ts`). الغائبُ: سليمة أو غير معروفة. */
@@ -1001,6 +1003,30 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: 1,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
+    });
+  }
+
+  /*
+    شهرٌ مفتوح بين أشهرٍ مقفلة: يُكتب فيه ويُعدَّل بلا قفل، وما بعده مختومٌ على أرقامه — يوليو ٢٠٢٦
+    بقي مفتوحاً ومايو ويونيو وأغسطس وسبتمبر مقفلة. وُجد بمراجعةٍ يدويّة فصار بنداً.
+  */
+  const leftOpen = f.monthsLeftOpen ?? [];
+  if (leftOpen.length > 0) {
+    out.push({
+      id: "month-left-open",
+      area: "DATA",
+      severity: "HIGH",
+      title: leftOpen.length === 1
+        ? `${formatMonth(leftOpen[0])} ما زال مفتوحاً وبعده أشهر مقفلة`
+        : `${countNoun(leftOpen.length, MONTH)} ما زالت مفتوحة وبعدها أشهر مقفلة`,
+      detail: `${leftOpen.map(formatMonth).join("، ")}: يمكن أن يُضاف فيه أو يُعدَّل بلا قفل، فتتغيّر أرقامه وضريبته بعد أن أُقفل ما بعده.`,
+      action: "افتحه في «إقفال الشهر» وراجع فحوصه ثم أقفله. وإن كان مفتوحاً عن قصد فاتركه.",
+      actionLabel: "افتح إقفاله",
+      href: `/close?month=${leftOpen[0]}`,
+      count: leftOpen.length,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: leftOpen.map((m) => ({ label: formatMonth(m), href: `/close?month=${m}` })),
+      needs: "month:close",
     });
   }
 
