@@ -73,27 +73,147 @@ export function needsDownload(
  * الجهاز يصحو على البطّاريّة دقائقَ ثمّ ينام (DarkWake)، فتنقطع النسخة في منتصفها.
  * فالجدولة كلَّ ساعة، والنصُّ يخرج بصمتٍ إن اكتمل اليومُ قبله. */
 
-export interface LastRun { lastSuccess?: string | null; successDay?: string | null; notifiedDay?: string | null }
+export type PartResult = { ok: boolean; detail: string };
 
-/** يُشغَّل إن لم تكتمل نسخةُ اليوم بعد، أو طُلب ذلك صراحةً. */
-export function shouldRun(last: LastRun, today: string, force: boolean): boolean {
-  return force || last.successDay !== today;
+export interface LastRun {
+  lastSuccess?: string | null;
+  successDay?: string | null;
+  notifiedDay?: string | null;
+  /** آخرُ نسخةٍ اكتملت أجزاؤها الأساسيّة (القاعدة والشيفرة والأسرار) — والدرايف مرآةٌ على حدة. */
+  lastCoreSuccess?: string | null;
+  day?: string | null;
+  results?: Record<string, PartResult>;
 }
+
+/**
+ * الأجزاءُ التي لا نسخةَ بدونها — القاعدةُ أوّلُها. والدرايف مرآةٌ تُزاد: تعذّرُها لا يجعل نسخةَ
+ * القاعدة ناقصة. كان كلُّ يومٍ «ناقصاً» ثلاثةً وعشرين يوماً لأنّ تفويضَ الدرايف أُلغي، فلم يُكنس
+ * يومٌ ولم يُعرف أنّ القاعدة نُسخت كلَّ يوم.
+ */
+export const CORE_PARTS = ["القاعدة", "الشيفرة", "الأسرار"] as const;
+
+/**
+ * ما يُشغَّل الآن: يومٌ جديد أو `--force` فكلُّها، وإلّا ما تعذّر منها اليومَ وحده — كان اليومُ
+ * الناقص يُعاد كلُّه كلَّ ساعة فتُنسخ القاعدةُ أربعَ عشرةَ مرّةً لأنّ الدرايف وحده متعذّر.
+ */
+export function pendingParts(last: LastRun, today: string, all: readonly string[], force: boolean): string[] {
+  if (force || last.day !== today || !last.results) return [...all];
+  return all.filter((n) => last.results?.[n]?.ok !== true);
+}
+
+/** أاكتملت الأجزاءُ الأساسيّة؟ */
+export function coreComplete(results: Readonly<Record<string, PartResult>>): boolean {
+  return CORE_PARTS.every((n) => results[n]?.ok === true);
+}
+
 
 /** إشعارٌ واحد في اليوم على الأكثر، ولا يُزعَج إلّا إن مضى على آخر نسخةٍ كاملة يومٌ ونصف. */
 export const ALERT_AFTER_MS = 36 * 60 * 60 * 1000;
+
+/**
+ * حالُ النسخة كما يقرؤها التطبيق (`job_state` · `backup:local`) — يكتبها النصُّ في آخر كلّ تشغيل.
+ * سطرٌ واحد بلا مالٍ ولا اسم: متى، وأيُّ الأجزاء تعذّر وسببُه.
+ */
+export interface BackupHeartbeat {
+  at: string;
+  day: string;
+  coreOk: boolean;
+  driveOk: boolean;
+  lastCoreSuccess: string | null;
+  lastFullSuccess: string | null;
+  failed: { part: string; detail: string }[];
+}
+
+export const BACKUP_HEARTBEAT_ROW = "backup:local";
+
+export function buildHeartbeat(now: Date, day: string, results: Readonly<Record<string, PartResult>>, last: LastRun): BackupHeartbeat {
+  const coreOk = coreComplete(results);
+  const driveOk = results["الدرايف"]?.ok === true;
+  return {
+    at: now.toISOString(),
+    day,
+    coreOk,
+    driveOk,
+    lastCoreSuccess: coreOk ? now.toISOString() : last.lastCoreSuccess ?? null,
+    lastFullSuccess: coreOk && driveOk ? now.toISOString() : last.lastSuccess ?? null,
+    failed: Object.entries(results).filter(([, r]) => !r.ok).map(([part, r]) => ({ part, detail: r.detail.slice(0, 200) })),
+  };
+}
+
+/** يُقرأ بحذر — صفٌّ كتبته نسخةٌ أقدم أو تالف يصير `null` («غير معروف») لا حالاً مخترَعة. */
+export function parseHeartbeat(raw: string | null | undefined): BackupHeartbeat | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<BackupHeartbeat>;
+    if (typeof v.at !== "string" || typeof v.day !== "string" || typeof v.coreOk !== "boolean" || typeof v.driveOk !== "boolean") return null;
+    return {
+      at: v.at, day: v.day, coreOk: v.coreOk, driveOk: v.driveOk,
+      lastCoreSuccess: typeof v.lastCoreSuccess === "string" ? v.lastCoreSuccess : null,
+      lastFullSuccess: typeof v.lastFullSuccess === "string" ? v.lastFullSuccess : null,
+      failed: Array.isArray(v.failed) ? v.failed.filter((f): f is { part: string; detail: string } => typeof f?.part === "string" && typeof f?.detail === "string") : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** متى تُعدّ النسخةُ متأخّرة: لا نسخةَ قاعدةٍ في يومين — الجهازُ قد يُغلق يوماً. */
+export const BACKUP_STALE_MS = 48 * 60 * 60 * 1000;
+/** والمرآةُ أوسعُ أجلاً: الأرشيفُ في الدرايف أصلاً، والمرآةُ نسخةٌ ثانية منه. */
+export const MIRROR_STALE_MS = 4 * 24 * 60 * 60 * 1000;
+
+export type BackupVerdict =
+  | { state: "UNKNOWN" }
+  | { state: "OK"; hb: BackupHeartbeat }
+  | { state: "CORE_STALE"; hb: BackupHeartbeat; sinceMs: number | null }
+  | { state: "MIRROR_STALE"; hb: BackupHeartbeat; sinceMs: number | null };
+
+/** حكمٌ واحد لصفحة الإعدادات و«يحتاج قرارك». */
+export function backupVerdict(hb: BackupHeartbeat | null, now: Date): BackupVerdict {
+  if (!hb) return { state: "UNKNOWN" };
+  const age = (iso: string | null) => (iso ? now.getTime() - new Date(iso).getTime() : null);
+  const core = age(hb.lastCoreSuccess);
+  if (core === null || core > BACKUP_STALE_MS) return { state: "CORE_STALE", hb, sinceMs: core };
+  const full = age(hb.lastFullSuccess);
+  if (full === null || full > MIRROR_STALE_MS) return { state: "MIRROR_STALE", hb, sinceMs: full };
+  return { state: "OK", hb };
+}
 export function shouldNotify(last: LastRun, today: string, now: Date): boolean {
   if (last.notifiedDay === today) return false;
   if (!last.lastSuccess) return true;
   return now.getTime() - new Date(last.lastSuccess).getTime() > ALERT_AFTER_MS;
 }
 
-/** أيّامٌ ناقصة تسبق آخرَ يومٍ كامل — أجزاؤها مكرَّرةٌ في الكامل بعدها، فتُحذف. */
+/**
+ * أيّامٌ فشلت نسختُها الأساسيّة وتسبق آخرَ يومٍ كامل — لا فيها ما ليس في الكامل بعدها، فتُكنس.
+ * ولا يُعدّ «فاشلاً» إلّا ما اسمُه تاريخ (`.DS_Store` كُنس مرّةً على أنّه يوم).
+ */
 export function failedDaysToPrune(days: readonly { day: string; ok: boolean }[]): string[] {
-  const lastOk = days.filter((d) => d.ok).map((d) => d.day).sort().at(-1);
+  const dated = days.filter((d) => DAY.test(d.day));
+  const lastOk = dated.filter((d) => d.ok).map((d) => d.day).sort().at(-1);
   if (!lastOk) return [];
-  return days.filter((d) => !d.ok && d.day < lastOk).map((d) => d.day).sort();
+  return dated.filter((d) => !d.ok && d.day < lastOk).map((d) => d.day).sort();
 }
+
+/**
+ * أاكتملت نسخةُ ذلك اليوم الأساسيّة؟ — من تقريره كما كُتب، بأيّ نسخةٍ من النصّ كتبته.
+ *
+ * ── الخطأ الذي كتب هذه الدالّة (٢٢ نوفمبر ٢٠٢٦) ──
+ * صار التقريرُ يحمل `coreOk`، وقُرئت التقاريرُ الأقدم بـ`ok` (القاعدةُ **والدرايف**) — والدرايفُ تعذّر
+ * منذ ٣١ أكتوبر، فعُدّت أيّامُ ١–٢١ نوفمبر «ناقصة» وكُنست ونسخُ القاعدة فيها سليمة. فالتقريرُ الأقدم
+ * يُحكم بأجزائه (`results`) لا بخلاصته، وما لا يُقرأ يُعدّ سليماً: الشكُّ لا يحذف.
+ */
+export function reportCoreOk(report: { ok?: unknown; coreOk?: unknown; results?: unknown } | null): boolean {
+  if (!report) return true;
+  if (typeof report.coreOk === "boolean") return report.coreOk;
+  if (report.results && typeof report.results === "object") {
+    return coreComplete(report.results as Record<string, PartResult>);
+  }
+  return report.ok !== false;
+}
+
+/** ما يُكنس لا يُمحى: يُنقل إلى `.trash/` ويبقى فيه هذه المدّة — كنسٌ خاطئ يُستردّ. */
+export const TRASH_KEEP_DAYS = 30;
 
 /**
  * رسالةُ الخطأ من مخرجات نصٍّ فرعيّ: سطرُ «✕» أو «Error» إن وُجد — لا آخرُ ثلاثة أسطر،

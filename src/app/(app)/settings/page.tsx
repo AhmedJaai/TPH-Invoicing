@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, BellRing, CalendarClock, Camera, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { Activity, BellRing, CalendarClock, Camera, Cpu, HardDrive, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
 import { CaptureLinks } from "@/components/capture-links";
 import { listLinks } from "@/services/capture.service";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
@@ -16,6 +16,7 @@ import { activeProviderName } from "@/lib/extraction";
 import { buildDataHealth, type HealthState } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { loadRecentServerErrors } from "@/services/server-errors.service";
+import { loadBackupVerdict } from "@/services/backup-status.service";
 import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
 import { monthlyShare } from "@/lib/cashflow";
 import { Callout, KeyValue, LinkButton, Meter, NoAccess, Section } from "@/components/ui";
@@ -61,7 +62,7 @@ export default async function SettingsPage() {
     );
   }
 
-  const [[f], rulesRows, health, expenseRows, serverErrorRows] = await Promise.all([
+  const [[f], rulesRows, health, expenseRows, serverErrorRows, backup] = await Promise.all([
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from suppliers where is_active)     as suppliers,
@@ -83,6 +84,7 @@ export default async function SettingsPage() {
     `).then((r) => r.rows),
     /* أعطابُ الخادم (107) — للمالك وحده، وقاعدةٌ بلا الجدول بعد لا تُسقط الصفحة */
     can(user.role, "audit:view") ? loadRecentServerErrors(7).catch(() => null) : Promise.resolve(null),
+    can(user.role, "audit:view") ? loadBackupVerdict().catch(() => null) : Promise.resolve(null),
   ]);
 
   const rules: BankRuleRow[] = rulesRows.map((r) => ({
@@ -320,6 +322,51 @@ export default async function SettingsPage() {
               </div>
             </div>
           </Section>
+
+          {backup !== null && (
+            <Section
+              id="backup"
+              title="النسخة الاحتياطية"
+              icon={HardDrive}
+              hint="تُنسخ القاعدة والشيفرة والأسرار كل يوم على حاسوبك في مجلد TPH-Backups، ومعها مرآة لملفات الدرايف. يُعاد ما تعذّر كل ساعة ما دام الحاسوب يعمل."
+            >
+              {backup.state === "UNKNOWN" ? (
+                <Callout tone="warn" title="حالها غير معروف">
+                  لم تُبلغ النسخة عن نفسها بعد. تُبلغ بعد أول تشغيل على حاسوبك، وهو كل ساعة ما دام الحاسوب يعمل.
+                </Callout>
+              ) : (
+                <div className="space-y-3">
+                  <dl className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-line bg-raised p-4">
+                      <dt className="text-[11px] text-muted">القاعدة والشيفرة والأسرار</dt>
+                      <dd className={`mt-1 text-sm font-bold ${backup.state === "CORE_STALE" ? "text-danger" : "text-ok"}`}>
+                        {backup.hb.lastCoreSuccess ? <T s="آخر نسخة {0}" a={[formatMoment(new Date(backup.hb.lastCoreSuccess))]} /> : "لم تكتمل بعد"}
+                      </dd>
+                    </div>
+                    <div className="rounded-xl border border-line bg-raised p-4">
+                      <dt className="text-[11px] text-muted">مرآة ملفات الدرايف</dt>
+                      <dd className={`mt-1 text-sm font-bold ${backup.hb.driveOk ? "text-ok" : "text-warn"}`}>
+                        {backup.hb.lastFullSuccess ? <T s="آخر نسخة كاملة {0}" a={[formatMoment(new Date(backup.hb.lastFullSuccess))]} /> : "لم تكتمل بعد"}
+                      </dd>
+                    </div>
+                    <div className="rounded-xl border border-line bg-raised p-4">
+                      <dt className="text-[11px] text-muted">آخر تشغيل</dt>
+                      <dd className="mt-1 text-sm font-bold">{formatMoment(new Date(backup.hb.at))}</dd>
+                    </div>
+                  </dl>
+                  {backup.hb.failed.length > 0 && (
+                    <Callout tone={backup.state === "CORE_STALE" ? "danger" : "warn"} title="ما تعذّر في آخر تشغيل">
+                      <ul className="space-y-1">
+                        {backup.hb.failed.map((x) => (
+                          <li key={x.part}><strong>{x.part}</strong>: <span dir="auto" className="break-words">{x.detail}</span></li>
+                        ))}
+                      </ul>
+                    </Callout>
+                  )}
+                </div>
+              )}
+            </Section>
+          )}
 
           {serverErrorRows !== null && (
             <Section

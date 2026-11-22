@@ -31,8 +31,9 @@ import type { drive_v3 } from "googleapis";
 import { Client } from "pg";
 import { driveForCli, getFileMeta, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import {
-  daysToPrune, disambiguate, errorSummary, failedDaysToPrune, GOOGLE_EXPORTS, isTransient, mirrorVersion,
-  needsDownload, safeSegment, shouldNotify, shouldRun, type LastRun,
+  BACKUP_HEARTBEAT_ROW, buildHeartbeat, coreComplete, daysToPrune, disambiguate, errorSummary, failedDaysToPrune,
+  GOOGLE_EXPORTS, isTransient, mirrorVersion, needsDownload, pendingParts, reportCoreOk, safeSegment, shouldNotify, TRASH_KEEP_DAYS,
+  type LastRun, type PartResult,
 } from "@/lib/ops/local-backup";
 import { lookup } from "node:dns/promises";
 import { todayInRiyadh } from "@/lib/riyadh-time";
@@ -152,8 +153,11 @@ type MirrorState = Record<string, MirrorEntry>;
 
 async function storedDrive(pg: Client): Promise<drive_v3.Drive> {
   return driveForCli(async () => {
+    /* تفويضُ المالك — هو من يملك الأرشيف — والأحدثُ صلاحيةً أوّلاً */
     const r = await pg.query<{ t: string }>(
-      "select refresh_token t from accounts where provider = 'google' and refresh_token is not null limit 1",
+      `select a.refresh_token t from accounts a join users u on u.id = a.user_id
+        where a.provider = 'google' and a.refresh_token is not null
+        order by (u.role = 'OWNER') desc, a.expires_at desc nulls last limit 1`,
     );
     return r.rows[0]?.t ?? null;
   });
@@ -276,23 +280,26 @@ const LAST_RUN = path.join(ROOT, "last-run.json");
 async function main() {
   mkdirSync(ROOT, { recursive: true });
   const last: LastRun & Record<string, unknown> = existsSync(LAST_RUN) ? JSON.parse(readFileSync(LAST_RUN, "utf8")) : {};
-  // تُستدعى كلَّ ساعة: يومٌ اكتمل لا يُعاد (إلّا بـ--force).
-  if (!shouldRun(last, DAY, process.argv.includes("--force"))) return;
-  if (!(await networkUp())) {
-    log("  لا شبكة — تُعاد المحاولة في الساعة التالية");
-    return;
-  }
-  mkdirSync(DAY_DIR, { recursive: true });
-  log(`— نسخة ${DAY} في ${DAY_DIR}`);
-
   const steps: [string, () => string | Promise<string>][] = [
     ["القاعدة", backupDatabase],
     ["الشيفرة", backupCode],
     ["الأسرار", backupSecrets],
     ["الدرايف", backupDrive],
   ];
-  const results: Record<string, { ok: boolean; detail: string }> = {};
+  // تُستدعى كلَّ ساعة: ما اكتمل اليومَ لا يُعاد (إلّا بـ--force)، وما تعذّر وحده يُعاد.
+  const pending = pendingParts(last, DAY, steps.map(([n]) => n), process.argv.includes("--force"));
+  if (pending.length === 0) return;
+  if (!(await networkUp())) {
+    log("  لا شبكة — تُعاد المحاولة في الساعة التالية");
+    return;
+  }
+  mkdirSync(DAY_DIR, { recursive: true });
+  log(`— نسخة ${DAY} في ${DAY_DIR}${pending.length < steps.length ? ` (يُعاد ما تعذّر: ${pending.join("، ")})` : ""}`);
+
+  /* ما اكتمل اليومَ يبقى — وجديدُ هذا التشغيل يُكتب فوقه */
+  const results: Record<string, PartResult> = last.day === DAY && last.results && pending.length < steps.length ? { ...last.results } : {};
   for (const [name, fn] of steps) {
+    if (!pending.includes(name)) continue;
     try {
       // القاعدة والدرايف عبر الشبكة؛ والمحاولة الثانية باتّصالٍ وتفويضٍ جديدين.
       const detail = await retry(name, fn);
@@ -304,43 +311,103 @@ async function main() {
     }
   }
 
-  const ok = Object.values(results).every((r) => r.ok);
-  writeFileSync(path.join(DAY_DIR, "report.json"), JSON.stringify({ day: DAY, at: new Date().toISOString(), ok, results }, null, 2));
+  const ok = Object.values(results).every((r) => r.ok) && steps.every(([n]) => results[n]);
+  const coreOk = coreComplete(results);
+  writeFileSync(path.join(DAY_DIR, "report.json"), JSON.stringify({ day: DAY, at: new Date().toISOString(), ok, coreOk, results }, null, 2));
 
-  // الكنس بعد نجاحٍ كامل وحده: يومٌ فاشل لا يحذف نسخةً سليمة.
-  if (ok) {
+  /*
+    الكنسُ بعد اكتمال القاعدة والشيفرة والأسرار — لا بعد اكتمال المرآة: تعذّرُ الدرايف وحده أبقى
+    كلَّ يومٍ ثلاثةً وعشرين يوماً (٢٫٢ جيجا). ويومٌ فاشلٌ في الأساس لا يحذف نسخةً سليمة.
+  */
+  if (coreOk) {
     const days = readdirSync(path.join(ROOT, "days")).map((day) => {
       const f = path.join(ROOT, "days", day, "report.json");
-      return { day, ok: existsSync(f) && JSON.parse(readFileSync(f, "utf8")).ok === true };
+      /* بلا تقرير: يومٌ لم يكتمل تشغيلُه الأوّل — يُعدّ ناقصاً إن كان اسمُه تاريخاً، وما سواه لا يُمسّ */
+      if (!existsSync(f)) return { day, ok: false };
+      let report: Parameters<typeof reportCoreOk>[0] = null;
+      try { report = JSON.parse(readFileSync(f, "utf8")); } catch { report = null; }
+      return { day, ok: reportCoreOk(report) };
     });
     for (const d of failedDaysToPrune(days)) {
-      rmSync(path.join(ROOT, "days", d), { recursive: true, force: true });
-      log(`  حُذفت نسخة ${d} الناقصة (بعدها نسخةٌ كاملة)`);
+      toTrash(d);
+      log(`  نُقلت نسخة ${d} الناقصة إلى .trash (بعدها نسخةٌ كاملة)`);
     }
     const kept = days.filter((d) => d.ok).map((d) => d.day);
     for (const d of daysToPrune(kept)) {
-      rmSync(path.join(ROOT, "days", d), { recursive: true, force: true });
-      log(`  حُذفت نسخة ${d} (خارج مدّة الحفظ)`);
+      toTrash(d);
+      log(`  نُقلت نسخة ${d} إلى .trash (خارج مدّة الحفظ)`);
     }
+    emptyOldTrash();
   }
 
   const now = new Date();
-  const alert = !ok && shouldNotify(last, DAY, now);
+  /* الإشعارُ على الأساس بأجله، وعلى المرآة إن طال تعذّرُها — مرّةً في اليوم */
+  const coreLast = coreOk ? now.toISOString() : last.lastCoreSuccess ?? null;
+  const alert = (!coreOk && shouldNotify({ ...last, lastSuccess: coreLast }, DAY, now))
+    || (coreOk && !ok && shouldNotify({ ...last, lastSuccess: last.lastSuccess ?? null }, DAY, now));
+  const heartbeat = buildHeartbeat(now, DAY, results, last);
   writeFileSync(LAST_RUN, JSON.stringify({
     lastAttempt: now.toISOString(),
     lastSuccess: ok ? now.toISOString() : last.lastSuccess ?? null,
     successDay: ok ? DAY : last.successDay ?? null,
+    lastCoreSuccess: coreLast,
     notifiedDay: alert ? DAY : last.notifiedDay ?? null,
     day: DAY, ok, results,
   }, null, 2));
-  log(`${ok ? "✓ اكتملت" : "✕ ناقصة — تُعاد في الساعة التالية"} — الحجم الكلّي ${mb(sizeOf(ROOT))}`);
+  log(`${ok ? "✓ اكتملت" : coreOk ? "✓ القاعدة والشيفرة والأسرار اكتملت · ✕ الدرايف يُعاد في الساعة التالية" : "✕ ناقصة — يُعاد ما تعذّر في الساعة التالية"} — الحجم الكلّي ${mb(sizeOf(ROOT))}`);
+  await reportToApp(heartbeat);
 
   if (alert) {
     const bad = Object.entries(results).filter(([, r]) => !r.ok).map(([n]) => n).join("، ");
-    const since = last.lastSuccess ? `آخر نسخة كاملة ${String(last.lastSuccess).slice(0, 10)}. ` : "";
+    const since = heartbeat.lastFullSuccess ? `آخر نسخة كاملة ${heartbeat.lastFullSuccess.slice(0, 10)}. ` : "";
     notify("نسخة ذا بوبليك هاوس ناقصة", `${since}تعذّر: ${bad}. التفصيل في ~/TPH-Backups/backup.log`);
   }
   if (!ok) process.exit(1);
+}
+
+/** الكنسُ نقلٌ لا محو — `.trash/<اليوم>` يبقى `TRASH_KEEP_DAYS` يوماً. */
+function toTrash(day: string): void {
+  const trash = path.join(ROOT, ".trash");
+  mkdirSync(trash, { recursive: true });
+  const dest = path.join(trash, `${day}__${DAY}`);
+  rmSync(dest, { recursive: true, force: true });
+  renameSync(path.join(ROOT, "days", day), dest);
+}
+
+/** ما مضى عليه في `.trash` أكثرُ من مدّته يُمحى — بيومِ نقله المكتوب في اسمه. */
+function emptyOldTrash(): void {
+  const trash = path.join(ROOT, ".trash");
+  if (!existsSync(trash)) return;
+  for (const name of readdirSync(trash)) {
+    const movedOn = name.split("__")[1];
+    if (!movedOn || !/^\d{4}-\d{2}-\d{2}$/.test(movedOn)) continue;
+    const ageDays = (Date.parse(`${DAY}T00:00:00Z`) - Date.parse(`${movedOn}T00:00:00Z`)) / 86_400_000;
+    if (ageDays > TRASH_KEEP_DAYS) {
+      rmSync(path.join(trash, name), { recursive: true, force: true });
+      log(`  مُحيت من .trash: ${name}`);
+    }
+  }
+}
+
+/**
+ * حالُ النسخة يصل التطبيقَ صفّاً واحداً في `job_state` (`backup:local`) — متى، وأيُّ جزءٍ تعذّر.
+ * كتابةٌ وحيدة في القاعدة ولا مالَ فيها؛ وبها يقول التطبيقُ «النسخة متأخّرة» بدل أن يُكتشف
+ * التعذّرُ بعد ثلاثةٍ وعشرين يوماً. وتعذّرُها لا يُسقط النسخة.
+ */
+async function reportToApp(hb: ReturnType<typeof buildHeartbeat>): Promise<void> {
+  const pg = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 15_000 });
+  try {
+    await pg.connect();
+    await pg.query(
+      `insert into job_state (name, fingerprint, ran_at) values ($1, $2, now())
+       on conflict (name) do update set fingerprint = excluded.fingerprint, ran_at = excluded.ran_at`,
+      [BACKUP_HEARTBEAT_ROW, JSON.stringify(hb)],
+    );
+  } catch (e) {
+    log(`  تعذّر إبلاغ التطبيق بحال النسخة: ${(e as Error).message}`);
+  } finally {
+    await pg.end().catch(() => {});
+  }
 }
 
 main().catch((e) => {

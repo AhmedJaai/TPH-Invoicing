@@ -45,6 +45,7 @@ const EXEMPT: Record<string, string> = {
   "verify-invariants.ts": "يحاول خرق القيود في معاملات تلغى — لا يكتب شيء",
   "restore-verify.ts": "يكتب في قاعدة يسمّيها الأمر صراحةً ويرفض غير الفارغة — لا يقرأ DATABASE_URL هدفاً",
   "find-statement-duplicates.ts": "قراءةٌ فقط في معاملة `read only` — القاعدةُ نفسها ترفض أيّ كتابة",
+  "backup-local.ts": "عملٌ مجدول بلا من يكتب الإقرار — كتابتُه الوحيدة صفُّ حاله في `job_state` (`backup:local`)، بلا مال",
 };
 
 /** وكلُّ مُعفًى يحمل في نصّه ما يقوله سببُه — وإلّا صار الإعفاءُ ادّعاءً. */
@@ -55,6 +56,7 @@ const EXEMPT_EVIDENCE: Record<string, RegExp> = {
   "verify-invariants.ts": /rollback/i,
   "restore-verify.ts": /rollback/i,
   "find-statement-duplicates.ts": /set transaction read only/,
+  "backup-local.ts": /insert into job_state \(name, fingerprint, ran_at\) values \(\$1, \$2, now\(\)\)[\s\S]*BACKUP_HEARTBEAT_ROW/,
 };
 
 describe("النصوص الكاتبة تحمل حارسها", () => {

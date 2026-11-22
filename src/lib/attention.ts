@@ -277,6 +277,8 @@ export interface AttentionFacts {
   sealDrift?: { checkedAt: string; findings: { month: string; figure: string; sealedMinor: number | null; nowMinor: number | null }[] } | null;
   /** رصيدُ القراءة الذكيّة دون حدّه في آخر فحص (`daily-checks.service.ts`). */
   aiBalanceLow?: { display: string; available: boolean; checkedAt: string } | null;
+  /** النسخةُ الاحتياطيّة على جهاز المالك متأخّرة (`backup-status.service.ts`). الغائبُ: سليمة أو غير معروفة. */
+  backupStale?: { core: boolean; lastCore: string | null; lastFull: string | null; reportedAt: string; failed: { part: string; detail: string }[] } | null;
   stockRecurringGaps?: { productId: string; name: string; kind: "SHORTAGE" | "OVER_AVAILABLE"; months: number; totalMinor: number; byWitness: boolean }[];
   /**
    * وثائقُ انتهت أو دخلت مهلةَ تذكيرها (`lib/obligations.ts`) — يكتبها صاحبُها بيده.
@@ -997,6 +999,35 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: 1,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
+    });
+  }
+
+  /*
+    النسخةُ الاحتياطيّة متأخّرة: تعذّرت ثلاثةً وعشرين يوماً بلا أن يعرف بها أحد — كانت تُكتب في سجلٍّ
+    على الجهاز وإشعارٍ يُغلق. فصارت بنداً هنا: القاعدةُ بعد يومين، ومرآةُ الدرايف بعد أربعة.
+  */
+  const bk = f.backupStale ?? null;
+  if (bk) {
+    const drive = bk.failed.find((x) => x.part === "الدرايف");
+    out.push({
+      id: "backup-stale",
+      area: "DATA",
+      severity: bk.core ? "CRITICAL" : "MEDIUM",
+      title: bk.core
+        ? `النسخة الاحتياطية للقاعدة متأخرة${bk.lastCore ? `: آخرها ${bk.lastCore}` : ""}`
+        : `نسخة ملفات الدرايف الاحتياطية متأخرة${bk.lastFull ? `: آخرها ${bk.lastFull}` : ""}`,
+      detail: bk.core
+        ? `لم تكتمل نسخة القاعدة على جهازك منذ أكثر من يومين (آخر تشغيل ${bk.reportedAt}).${bk.failed.length ? ` تعذّر: ${bk.failed.map((x) => `${x.part} (${x.detail.slice(0, 80)})`).join("، ")}.` : ""}`
+        : `القاعدة والشيفرة تُنسخان كل يوم، أما مرآة ملفات الدرايف على جهازك فمتعذّرة${drive ? `: ${drive.detail.slice(0, 120)}` : ""}.`,
+      action: bk.core
+        ? "افتح الحاسوب واتركه متصلاً بالإنترنت ساعة، فالنسخة تُعاد كل ساعة. وإن بقيت متأخرة فافتح ~/TPH-Backups/backup.log وأرسل آخر سطوره لمن يطوّر النظام."
+        : "ادخل إلى التطبيق بحساب المالك مرة واحدة ليتجدّد تفويض الدرايف، وستُستكمل المرآة في الساعة التالية.",
+      actionLabel: "اعرض حال النسخة",
+      href: "/settings#backup",
+      count: 1,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+      needs: "audit:view",
     });
   }
 

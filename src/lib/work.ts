@@ -20,6 +20,7 @@
  * القشرةُ لعدّادها، وتقرؤها الرئيسيةُ وصفحةُ «يحتاج قرارك» لمحتواهما،
  * فلا تُستعلَم القاعدةُ ثلاثاً عن الشيء نفسه.
  */
+import { loadBackupVerdict } from "@/services/backup-status.service";
 import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -51,13 +52,15 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
     /* فحوصُ الصباح تُقرأ ولا تُعاد: آخرُ ما وجده `/api/cron/daily` */
     loadSealDrift(), loadLowAiBalance(),
     loadDueTasks(),
+    /* حالُ النسخة الاحتياطيّة — صفٌّ واحد؛ وتعذّرُ قراءته «غير معروف» لا عطلُ الصفحة */
+    loadBackupVerdict().catch(() => ({ state: "UNKNOWN" as const })),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -100,6 +103,13 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       display: formatAiBalance({ known: true, cents: aiLow.cents, currency: aiLow.currency, available: aiLow.available }),
       available: aiLow.available,
       checkedAt: formatMoment(aiLow.checkedAt),
+    } : null,
+    backupStale: backup.state === "CORE_STALE" || backup.state === "MIRROR_STALE" ? {
+      core: backup.state === "CORE_STALE",
+      lastCore: backup.hb.lastCoreSuccess ? formatMoment(new Date(backup.hb.lastCoreSuccess)) : null,
+      lastFull: backup.hb.lastFullSuccess ? formatMoment(new Date(backup.hb.lastFullSuccess)) : null,
+      reportedAt: formatMoment(new Date(backup.hb.at)),
+      failed: backup.hb.failed,
     } : null,
   });
 });

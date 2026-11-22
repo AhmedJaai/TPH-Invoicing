@@ -65,5 +65,16 @@
 "في كشفه سداد أو إشعار دائن لم نسجّله. إن كان دفعة منك فسجّلها، وإن كان إشعاراً فسجّله على فاتورته:": "The statement shows a payment or credit note we have not recorded. If it is a payment of yours, record it; if a credit note, record it on its invoice:",
 "{0} · لا فواتير فيه": "{0} · no invoices in it",
 "إشعار دائن": "Credit note",
-"سداد": "Payment"
+"سداد": "Payment",
+"النسخة الاحتياطية": "Backup",
+"تُنسخ القاعدة والشيفرة والأسرار كل يوم على حاسوبك في مجلد TPH-Backups، ومعها مرآة لملفات الدرايف. يُعاد ما تعذّر كل ساعة ما دام الحاسوب يعمل.": "The database, code and secrets are copied daily to the TPH-Backups folder on your computer, along with a mirror of the Drive files. Anything that failed is retried hourly while the computer is on.",
+"حالها غير معروف": "Status unknown",
+"لم تُبلغ النسخة عن نفسها بعد. تُبلغ بعد أول تشغيل على حاسوبك، وهو كل ساعة ما دام الحاسوب يعمل.": "The backup has not reported yet. It reports after its first run on your computer, which happens hourly while the computer is on.",
+"القاعدة والشيفرة والأسرار": "Database, code and secrets",
+"آخر نسخة {0}": "Last copy {0}",
+"لم تكتمل بعد": "Not completed yet",
+"مرآة ملفات الدرايف": "Drive files mirror",
+"آخر نسخة كاملة {0}": "Last full copy {0}",
+"آخر تشغيل": "Last run",
+"ما تعذّر في آخر تشغيل": "What failed in the last run"
 }

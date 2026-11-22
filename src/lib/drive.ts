@@ -74,15 +74,37 @@ export function createOAuthClient(redirectUri?: string): OAuth2Client {
 export async function driveForCli(
   lookupStoredToken?: () => Promise<string | null>,
 ): Promise<drive_v3.Drive> {
-  const token = process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? (await lookupStoredToken?.()) ?? null;
-  if (!token) {
+  /*
+    ── المخزَّنُ أوّلاً، كما يقول التعليق ──
+    كان المتغيّرُ يُقدَّم على المخزَّن خلافَ ما كُتب أعلاه. وتفويضُ `.env` كُتب مرّةً بـ`drive:auth`
+    ولا يتجدّد، والمخزَّنُ يكتبه كلُّ دخولٍ إلى التطبيق. فلمّا أُلغي الأوّلُ (٣١ أكتوبر ٢٠٢٦) سقطت
+    نسخةُ الدرايف الاحتياطيّة كلَّ ساعة ثلاثةً وعشرين يوماً بـ`invalid_grant` والمخزَّنُ صالح.
+    فيُجرَّب كلُّ تفويضٍ بنداءٍ خفيف، والمردودُ يُترك إلى الذي بعده.
+  */
+  const candidates = [await lookupStoredToken?.() ?? null, process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? null]
+    .filter((t, i, all): t is string => t !== null && t !== "" && all.indexOf(t) === i);
+  if (candidates.length === 0) {
     throw new Error(
       "لا يوجد تفويض للدرايف. ادخل إلى التطبيق مرة واحدة، أو شغّل: npm run drive:auth",
     );
   }
-  const auth = createOAuthClient();
-  auth.setCredentials({ refresh_token: openToken(token) });
-  return google.drive({ version: "v3", auth });
+  let lastError: unknown = null;
+  for (const token of candidates) {
+    const auth = createOAuthClient();
+    auth.setCredentials({ refresh_token: openToken(token) });
+    const drive = google.drive({ version: "v3", auth });
+    try {
+      await drive.about.get({ fields: "user(emailAddress)" });
+      return drive;
+    } catch (e) {
+      lastError = e;
+      /* تفويضٌ مُلغى يُترك؛ وعطبُ الشبكة يُرمى — التفويضُ التالي لن يصلحه */
+      if (!/invalid_grant|invalid_client|unauthorized_client|401/i.test(String((e as Error)?.message ?? e))) throw e;
+    }
+  }
+  throw new Error(
+    `تفويض الدرايف مرفوض (${(lastError as Error)?.message ?? "invalid_grant"}). ادخل إلى التطبيق بحساب المالك مرة واحدة ليتجدّد، أو شغّل: npm run drive:auth`,
+  );
 }
 
 /** نسخة متزامنة تعتمد متغيّر البيئة وحده. */
