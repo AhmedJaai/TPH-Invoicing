@@ -35,5 +35,6 @@
   "ربما هي": "Possibly",
   "هي نفسها": "Same invoice",
   "أقررتَ أنهما واحد": "You confirmed they match",
-  "السبب: {0}": "Reason: {0}"
+  "السبب: {0}": "Reason: {0}",
+  "ربما هي {0} عندك ({1})": "Possibly your {0} ({1})"
 }

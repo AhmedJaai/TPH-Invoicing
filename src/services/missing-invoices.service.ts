@@ -30,6 +30,8 @@ export interface MissingInvoicesView {
    * كشف؛ وصفرٌ يعني أنّ الفجوة قد تكون أيّاماً بلا توريد.
    */
   invoicesInGap: Record<string, number>;
+  /** حركةُ فودكس بلا مقابل ولها فاتورةٌ عندنا يُرجَّح أنّها هي — بمعرّف الحركة. */
+  nearMiss: Record<string, { invoiceId: string; invoiceNumber: string; day: string }>;
   today: string;
 }
 
@@ -102,8 +104,15 @@ export async function loadMissingInvoices(): Promise<MissingInvoicesView> {
     invoicesInGap[`${g.supplier.id}:${g.from}`] = Number(row?.n ?? 0);
   }
 
+  /* «ربما هي فاتورة كذا عندك» — حتّى لا يُطلب من المورّد ما في الأرشيف برقمٍ آخر (`nearMisses`) */
+  const nearMiss: Record<string, { invoiceId: string; invoiceNumber: string; day: string }> = {};
+  for (const p of open) {
+    const n = witness.nearMisses.get(p.id);
+    if (n) nearMiss[p.id] = { invoiceId: n.invoice.id, invoiceNumber: n.invoice.invoiceNumber, day: n.invoice.day };
+  }
+
   return {
-    board, invoicesInGap,
+    board, invoicesInGap, nearMiss,
     unattributedFoodics: { count: unattributed.length, totalMinor: unattributed.reduce((s, p) => s + p.totalMinor, 0) },
     today,
   };

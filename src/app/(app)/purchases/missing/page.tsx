@@ -51,7 +51,7 @@ export default async function MissingInvoicesPage() {
     );
   }
 
-  const { board, unattributedFoodics, invoicesInGap } = await loadMissingInvoices();
+  const { board, unattributedFoodics, invoicesInGap, nearMiss } = await loadMissingInvoices();
   const leads: LeadRow[] = board.withLeads.flatMap((r) => r.invoices.map((i) => ({ ...i, supplier: r.supplier })));
   const payments = board.withLeads.flatMap((r) => r.payments.map((p) => ({ ...p, supplier: r.supplier })));
   const watched = board.withLeads.length + board.blind.length + board.clearCount + board.oneOffCount;
@@ -145,8 +145,13 @@ export default async function MissingInvoicesPage() {
               {
                 key: "witness", header: "من شهد", wrap: true,
                 cell: (l) => (
-                  <span className="flex flex-wrap gap-1.5">
+                  <span className="flex flex-wrap items-center gap-1.5">
                     {l.witnesses.map((w) => <Badge key={w} tone={l.witnesses.length > 1 ? "warn" : "muted"}>{WITNESS_LABEL[w]}</Badge>)}
+                    {l.foodicsPurchaseId && nearMiss[l.foodicsPurchaseId] && (
+                      <span className="text-xs text-ink-soft">
+                        <T s="ربما هي {0} عندك ({1})" a={[<bdi key="0" dir="ltr" className="font-mono">{nearMiss[l.foodicsPurchaseId].invoiceNumber}</bdi>, formatDay(nearMiss[l.foodicsPurchaseId].day)]} />
+                      </span>
+                    )}
                   </span>
                 ),
               },
