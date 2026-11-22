@@ -208,7 +208,12 @@ export interface VatReturnView {
   /** أشهرُ الفترة واحداً واحداً — يُري الشهرَ الشاذّ. والتقريبُ لكلّ شهرٍ فقد يخالف المجموعَ بهللة. */
   byMonth: VatMonthSlice[];
   /** إشعاراتٌ دائنة قُيّدت في الفترة — لا تُنقص ضريبةَ المدخلات هنا؛ تُعرض ليراها المحاسب. */
-  creditNotes: { count: number; amountMinor: number };
+  /**
+   * إشعاراتُ المورّدين في الفترة — والضريبةُ التي فيها بنسبة فواتيرها (`vatShareMinor`): ما خُصّص
+   * منها على فاتورةٍ ضريبتُها معروفة. وما لم يُخصَّص (على الحساب) أو فاتورتُه بلا ضريبةٍ مقروءة
+   * `unknownMinor` — لا يُقدَّر. **ولا تُطرح من الإقرار**: يحدّدها المحاسب، والرقمُ يُعطى له.
+   */
+  creditNotes: { count: number; invoiceCount: number; amountMinor: number; vatShareMinor: number; unknownMinor: number };
 }
 
 function quarterOf(period: VatPeriod): VatQuarter {
@@ -372,8 +377,20 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     };
   });
 
-  const [notes] = (await conn.execute<{ n: number; amount: number }>(sql`
-    select count(*)::int as n, coalesce(sum(p.amount_minor), 0)::int as amount
+  const [notes] = (await conn.execute<{ n: number; amount: number; vat_share: number; known_base: number; invoices: number }>(sql`
+    select count(*)::int as n, coalesce(sum(p.amount_minor), 0)::int as amount,
+           /* الإشعارُ على الحساب يخفّض أكثرَ من فاتورة — فالعددُ عددُ الفواتير لا الإشعارات */
+           (select count(distinct pa.invoice_id)::int from payment_allocations pa join payments q on q.id = pa.payment_id
+             where q.method = 'CREDIT_NOTE' and q.status not in ('REVERSED', 'VOID')
+               and (q.paid_at at time zone 'Asia/Riyadh')::date >= ${from}::date
+               and (q.paid_at at time zone 'Asia/Riyadh')::date < ${until}::date) as invoices,
+           /* بنسبة ضريبة الفاتورة إلى إجماليّها — تقريبٌ واحد لكلّ تخصيص */
+           coalesce(sum((select sum(round(pa.amount_minor::numeric * i.vat_minor / i.total_minor))
+                           from payment_allocations pa join invoices i on i.id = pa.invoice_id
+                          where pa.payment_id = p.id and i.vat_minor is not null and i.total_minor > 0)), 0)::int as vat_share,
+           coalesce(sum((select sum(pa.amount_minor)
+                           from payment_allocations pa join invoices i on i.id = pa.invoice_id
+                          where pa.payment_id = p.id and i.vat_minor is not null and i.total_minor > 0)), 0)::int as known_base
     from payments p
     where p.method = 'CREDIT_NOTE' and p.status not in ('REVERSED', 'VOID')
       and (p.paid_at at time zone 'Asia/Riyadh')::date >= ${from}::date
@@ -389,7 +406,11 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     filing: await loadVatFiling(quarter, conn),
     carriedFrom: carriedIn > 0 ? previousQuarter(quarter) : null,
     byMonth,
-    creditNotes: { count: notes?.n ?? 0, amountMinor: notes?.amount ?? 0 },
+    creditNotes: {
+      count: notes?.n ?? 0, invoiceCount: notes?.invoices ?? 0, amountMinor: notes?.amount ?? 0,
+      vatShareMinor: notes?.vat_share ?? 0,
+      unknownMinor: (notes?.amount ?? 0) - (notes?.known_base ?? 0),
+    },
   };
 }
 

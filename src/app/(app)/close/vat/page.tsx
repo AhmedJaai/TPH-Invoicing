@@ -300,7 +300,14 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
             )}
             {view.creditNotes.count > 0 && (
               <Callout tone="warn" icon={Receipt} title={`إشعارات دائنة في الفترة: ${riyalsText(view.creditNotes.amountMinor)}`}>
-                <T s="{0} خُفّض مبلغها المستحق بإشعار دائن، وضريبة الفاتورة الأصلية محسوبة هنا كاملة. يحدد المحاسب مقدار خفض ضريبة المدخلات بسبب الإشعار، فأطلعه على هذا السطر قبل التقديم." a={[countNoun(view.creditNotes.count, INVOICE)]} /></Callout>
+                <T s="{0} خُفّض مبلغها المستحق بإشعار دائن، وضريبة الفاتورة الأصلية محسوبة هنا كاملة. يحدد المحاسب مقدار خفض ضريبة المدخلات بسبب الإشعار، فأطلعه على هذا السطر قبل التقديم." a={[countNoun(view.creditNotes.invoiceCount, INVOICE)]} />
+                {view.creditNotes.vatShareMinor > 0 && (
+                  <p className="mt-2"><T s="الضريبة التي في هذه الإشعارات بنسبة فواتيرها: {0}، وهي ما يُتوقع أن يُخفَض من ضريبة المدخلات." a={[<strong key="0">{riyalsText(view.creditNotes.vatShareMinor)}</strong>]} /></p>
+                )}
+                {view.creditNotes.unknownMinor > 0 && (
+                  <p className="mt-1"><T s="ومنها {0} لم تُخصَّص على فاتورة ضريبتها معروفة، فضريبتها تُحسب من ورقة الإشعار نفسه." a={[<strong key="0">{riyalsText(view.creditNotes.unknownMinor)}</strong>]} /></p>
+                )}
+              </Callout>
             )}
             <Callout tone="info" icon={Receipt}>
               <T s="المبيعات هنا هي ما وصل إلى البنك: تسويات الشبكة وما أضفته من المبالغ الداخلة{0}. يُقدَّم الإقرار نفسه في بوابة الهيئة، وهذه الصفحة تعرض حسابه فقط." a={[r.output.cashGrossMinor > 0 ? "، ومعها النقد الذي أدخلته" : ". والنقد الذي لم يُودَع لا يظهر في الكشف، فأدخله في «نقد لم يُودَع» أدناه"]} /></Callout>
