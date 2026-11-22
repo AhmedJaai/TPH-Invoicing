@@ -277,6 +277,8 @@ export interface AttentionFacts {
   sealDrift?: { checkedAt: string; findings: { month: string; figure: string; sealedMinor: number | null; nowMinor: number | null }[] } | null;
   /** رصيدُ القراءة الذكيّة دون حدّه في آخر فحص (`daily-checks.service.ts`). */
   aiBalanceLow?: { display: string; available: boolean; checkedAt: string } | null;
+  /** سعرُ وحدةٍ من الفواتير يخالف كلفةَ الكتالوج أضعافاً — `ratio` الفواتيرُ ÷ الكتالوج (فحص الصباح، 108). */
+  unitCostSuspects?: { name: string; ratio: number }[];
   /** النسخةُ الاحتياطيّة على جهاز المالك متأخّرة (`backup-status.service.ts`). الغائبُ: سليمة أو غير معروفة. */
   backupStale?: { core: boolean; lastCore: string | null; lastFull: string | null; reportedAt: string; failed: { part: string; detail: string }[] } | null;
   stockRecurringGaps?: { productId: string; name: string; kind: "SHORTAGE" | "OVER_AVAILABLE"; months: number; totalMinor: number; byWitness: boolean }[];
@@ -999,6 +1001,31 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: 1,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
+    });
+  }
+
+  /*
+    سعرُ وحدةٍ من الفواتير يخالف الكتالوج أضعافاً — عبوةٌ كُتبت خطأً تدخل «الربح» تكلفةً أصغرَ أو أكبر
+    بالنسبة نفسها (ماءُ أوسكا ٣٣٠ ضعفاً). وُجد بفحصٍ يدويّ فصار فحصَ صباح.
+  */
+  const uc = f.unitCostSuspects ?? [];
+  if (uc.length > 0) {
+    const fmt = (r: number) => (r >= 1 ? `${Math.round(r)} أضعاف` : `${Math.round(1 / r)} أضعاف أقل`);
+    out.push({
+      id: "unit-cost-suspect",
+      area: "DATA",
+      severity: "HIGH",
+      title: uc.length === 1
+        ? `سعر وحدة ${uc[0].name} من الفواتير لا يُصدَّق`
+        : `${countNoun(uc.length, PRODUCT)} سعر وحدتها من الفواتير لا يُصدَّق`,
+      detail: "سعر الوحدة المحسوب من فواتيرها يخالف تكلفة الكتالوج في فودكس ثلاثة أضعاف أو أكثر. الأرجح أن «ما في الوحدة» عند المورّد كُتب خطأ، فتكلفة ما بيع منه في «الربح» أصغر أو أكبر بالنسبة نفسها.",
+      action: "افتح «المشترى والمباع»، وصحّح ما في الوحدة لكل صنف مورّد تحت السعر المخالف.",
+      actionLabel: "صحّح العبوات",
+      href: "/finance/stock#unit-cost",
+      count: uc.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: uc.slice(0, 8).map((x) => ({ label: x.name, sub: `سعر الفواتير ${fmt(x.ratio)} من الكتالوج`, href: "/finance/stock#unit-cost" })),
+      needs: "amounts:view",
     });
   }
 

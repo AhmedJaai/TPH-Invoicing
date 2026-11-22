@@ -1852,7 +1852,7 @@ export const monthSeals = pgTable("month_seals", {
  */
 export const dailyChecks = pgTable("daily_checks", {
   id: id(),
-  kind: text("kind").$type<"SEAL_DRIFT" | "AI_BALANCE">().notNull(),
+  kind: text("kind").$type<"SEAL_DRIFT" | "AI_BALANCE" | "UNIT_COST">().notNull(),
   checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
   payload: jsonb("payload").notNull(),
 }, (t) => [index("daily_checks_kind_idx").on(t.kind, t.checkedAt)]);

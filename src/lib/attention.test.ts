@@ -548,6 +548,14 @@ describe("كشف المورّد يخالف دفترنا", () => {
     expect(item.href).toBe("/suppliers/BeCof");
   });
 
+  it("سعرُ وحدةٍ لا يُصدَّق — بندٌ يسمّي الصنفَ ونسبتَه ويفتح موضعَ التصحيح", () => {
+    const [item] = buildAttention({ ...quiet, unitCostSuspects: [{ name: "مياه معدنية", ratio: 0.003 }] });
+    expect(item.id).toBe("unit-cost-suspect");
+    expect(item.title).toContain("مياه معدنية");
+    expect(item.href).toBe("/finance/stock#unit-cost");
+    expect(item.evidence[0].sub).toContain("أقل");
+  });
+
   it("ولا سدادَ غائباً لا بند", () => {
     expect(ids({ statementPaidMissing: [] })).not.toContain("statement-payment-missing");
   });

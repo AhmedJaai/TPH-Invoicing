@@ -11,7 +11,7 @@ import { balanceIsLow, type AiBalance } from "@/lib/ai/balance";
 import { fetchDeepseekBalance } from "@/lib/ai/deepseek";
 import type { Conn } from "./types";
 
-export type DailyCheckKind = "SEAL_DRIFT" | "AI_BALANCE";
+export type DailyCheckKind = "SEAL_DRIFT" | "AI_BALANCE" | "UNIT_COST";
 
 export async function recordDailyCheck(kind: DailyCheckKind, payload: unknown, conn: Conn = db): Promise<void> {
   await conn.insert(dailyChecks).values({ kind, payload, checkedAt: new Date() });
@@ -62,3 +62,28 @@ export async function loadLowAiBalance(now: Date = new Date(), conn: Conn = db):
   if (!b.known || !balanceIsLow(b)) return null;
   return { cents: b.cents, currency: b.currency, available: b.available, checkedAt: last.checkedAt };
 }
+
+/* ── سعرُ وحدةٍ لا يُصدَّق (108) ── */
+
+export interface UnitCostFinding { productId: string; name: string; invoiceRate: number; catalogRate: number }
+
+/** يحسب أصنافَ السعر المشكوك ويحفظها — يجري صباحاً لأنّه يقرأ بنودَ الفواتير كلَّها. */
+export async function checkUnitCosts(conn: Conn = db): Promise<UnitCostFinding[]> {
+  const { loadSuspectUnitCosts } = await import("./stock-balance.service");
+  const found = (await loadSuspectUnitCosts(conn)).map((x) => ({ productId: x.productId, name: x.name, invoiceRate: x.invoiceRate, catalogRate: x.catalogRate }));
+  await recordDailyCheck("UNIT_COST", { findings: found }, conn);
+  return found;
+}
+
+/** آخرُ ما وجده الفحص إن كان حديثاً — وفحصٌ أقدم من يومين لا يُنذر. */
+export async function loadUnitCostFindings(now: Date = new Date(), conn: Conn = db): Promise<{ findings: UnitCostFinding[]; checkedAt: Date } | null> {
+  const last = await latestDailyCheck("UNIT_COST", conn);
+  if (!last || now.getTime() - last.checkedAt.getTime() > AI_CHECK_FRESH_MS) return null;
+  const raw = get(last.payload, "findings");
+  const findings = Array.isArray(raw)
+    ? raw.filter((f): f is UnitCostFinding => typeof get(f, "productId") === "string" && typeof get(f, "name") === "string"
+      && typeof get(f, "invoiceRate") === "number" && typeof get(f, "catalogRate") === "number")
+    : [];
+  return findings.length > 0 ? { findings, checkedAt: last.checkedAt } : null;
+}
+

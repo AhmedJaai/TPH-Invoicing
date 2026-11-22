@@ -282,6 +282,8 @@ export interface DailyCronDeps {
    * في اليوم نفسه (إعادةُ GitHub) لا يوقظ أحداً مرّتين. وبلا مفتاحين لا سطرَ له.
    */
   pushBrief?: () => Promise<MorningPushResult>;
+  /** سعرُ وحدةٍ من الفواتير يخالف الكتالوج أضعافاً (`checkUnitCosts`، 108). */
+  checkUnitCosts?: () => Promise<{ name: string }[]>;
 }
 
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
@@ -326,6 +328,16 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
   parts.push(balance.known
     ? `رصيد القراءة الذكية ${formatAiBalance(balance)}${balanceIsLow(balance) ? " (ينفد)" : ""}`
     : `رصيد القراءة الذكية غير معروف: ${balance.reason}`);
+
+  if (deps.checkUnitCosts) {
+    const found = await deps.checkUnitCosts().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (found instanceof Error) {
+      ok = false;
+      parts.push(`تعذّر فحص أسعار الوحدات: ${found.message.split("\n")[0].slice(0, 160)}`);
+    } else {
+      parts.push(found.length === 0 ? "أسعار الوحدات من الفواتير توافق الكتالوج" : `سعر وحدة لا يُصدَّق: ${found.map((f) => f.name).join("، ")}`);
+    }
+  }
 
   if (written && deps.pushBrief) {
     /* الإشعارُ تابعٌ لا شرط: تعذُّره يُقال ولا يُسقط ما كُتب قبله */

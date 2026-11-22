@@ -15,6 +15,7 @@ import { workCount } from "@/lib/work";
 import { snapshotDay } from "@/lib/cron";
 import { withDeadline } from "@/lib/ai/deadline";
 import { runSealCheck } from "@/services/month-seal.service";
+import { checkUnitCosts } from "@/services/daily-checks.service";
 import { checkAiBalance } from "@/services/daily-checks.service";
 import { sendMorningPush } from "@/services/push.service";
 
@@ -46,5 +47,7 @@ export async function POST(request: Request) {
     checkAiBalance: () => withDeadline(12_000, () => checkAiBalance()),
     /* خاملٌ بلا `VAPID_*` — وإلّا فنداءٌ فارغ إلى كلّ جهازٍ مشترك */
     pushBrief: () => withDeadline(30_000, () => sendMorningPush()),
+    /* يقرأ بنودَ الفواتير كلَّها — صباحاً لا مع كلّ صفحة */
+    checkUnitCosts: () => withDeadline(60_000, () => checkUnitCosts()),
   }));
 }
