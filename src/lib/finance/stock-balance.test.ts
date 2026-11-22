@@ -116,3 +116,15 @@ describe("كم يكفي المخزون — من آخر عدّ", () => {
     expect(b.cover?.daysLeft).toBeNull();
   });
 });
+
+describe("سعر الوحدة من الفواتير يخالف الكتالوج", () => {
+  it("الماءُ بنصف هللة والكتالوجُ ٩٦ هللة — مشكوك؛ وفرقُ الضعف لا", async () => {
+    const { unitCostSuspect } = await import("./stock-balance");
+    expect(unitCostSuspect(290, 95_833)).toBe(true);
+    expect(unitCostSuspect(60_000, 11_500)).toBe(true);
+    expect(unitCostSuspect(7_500, 15_600)).toBe(false);
+    expect(unitCostSuspect(null, 15_600)).toBe(false);
+    expect(unitCostSuspect(0, 15_600)).toBe(false);
+  });
+});
+

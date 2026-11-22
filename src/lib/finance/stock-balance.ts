@@ -217,3 +217,20 @@ export function totalBalance(items: readonly BalanceItem[]): BalanceTotals {
     counted: counted.length, items: items.length,
   };
 }
+
+/**
+ * سعرُ الوحدة من الفواتير يخالف كلفةَ الكتالوج أضعافاً — مواصفةُ عبوةٍ خاطئةٌ على الأغلب.
+ *
+ * ماءٌ قيّدته الفواتيرُ ١١٩٬١٦٠ قارورةً بـ٦٩٠ ريالاً: نصفُ هللةٍ للقارورة والكتالوجُ ٩٦ هللة — عبوةٌ
+ * كُتبت «٢٤ × ٢٤» مكان «٢٤». وتكلفةُ المبيعات في «الربح» تأخذ سعرَ الفواتير قبل الكتالوج، فخطأُ
+ * العبوة يُصغّر تكلفةَ ما بِيع منه بالنسبة نفسها ويُكبر الربح. يُقال ولا يُصحَّح من نفسه: قد يكون
+ * الكتالوجُ هو القديم — والتصحيحُ مواصفةُ العبوة بيد صاحب المقهى.
+ */
+export const UNIT_COST_SUSPECT_RATIO = 3;
+
+export function unitCostSuspect(invoiceRate: number | null, catalogRate: number | null): boolean {
+  if (invoiceRate === null || catalogRate === null || invoiceRate <= 0 || catalogRate <= 0) return false;
+  const r = invoiceRate / catalogRate;
+  return r > UNIT_COST_SUSPECT_RATIO || r < 1 / UNIT_COST_SUSPECT_RATIO;
+}
+

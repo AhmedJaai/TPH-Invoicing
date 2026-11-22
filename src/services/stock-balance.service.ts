@@ -13,10 +13,10 @@ import { computeConsumption, type SoldLineInput } from "@/lib/inventory/consumpt
 import { summarisePurchases, type PurchaseLineInput } from "@/lib/inventory/purchases";
 import { indexRecipeVersions } from "@/lib/inventory/recipe";
 import { toCanonical } from "@/lib/inventory/units";
-import { buildBalanceItem, COVER_WINDOW_DAYS, totalBalance, type BalanceItem, type BalanceTotals, type RangeFigures } from "@/lib/finance/stock-balance";
+import { buildBalanceItem, COVER_WINDOW_DAYS, totalBalance, unitCostSuspect, type BalanceItem, type BalanceTotals, type RangeFigures } from "@/lib/finance/stock-balance";
 import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
-import { loadPurchaseLines, loadSoldForReport } from "./inventory.service";
+import { catalogCosts, latestInvoiceUnitCosts, loadPurchaseLines, loadSoldForReport } from "./inventory.service";
 import { loadRates } from "./profit.service";
 import { loadRecipeVersions } from "./recipe.service";
 import { loadCountAt, loadCountDays, type CountSource } from "./stock-flow.service";
@@ -184,3 +184,26 @@ export async function loadStockBalance(month: string | null, opts: { trendFor?: 
     trend,
   };
 }
+
+export interface SuspectUnitCost {
+  productId: string;
+  name: string;
+  baseUnit: StoredUnit;
+  /** بمِلّي‑الهللة لوحدة الأساس. */
+  invoiceRate: number;
+  catalogRate: number;
+}
+
+/** أصنافٌ سعرُ وحدتها من الفواتير يخالف الكتالوج أضعافاً (`unitCostSuspect`) — الأكبرُ مخالفةً أوّلاً. */
+export async function loadSuspectUnitCosts(conn: Conn = db): Promise<SuspectUnitCost[]> {
+  const stock = await conn.select({ id: products.id, name: products.nameAr, baseUnit: products.baseUnit })
+    .from(products).where(and(eq(products.isStockItem, true), eq(products.isActive, true)));
+  const units = new Map(stock.map((p) => [p.id, p.baseUnit] as const));
+  const [invoice, catalog] = await Promise.all([latestInvoiceUnitCosts(todayInRiyadh(), conn), catalogCosts(units, conn)]);
+  return stock.flatMap((p) => {
+    const i = invoice.get(p.id) ?? null;
+    const c = catalog.get(p.id) ?? null;
+    return unitCostSuspect(i, c) ? [{ productId: p.id, name: p.name, baseUnit: p.baseUnit, invoiceRate: i!, catalogRate: c! }] : [];
+  }).sort((a, b) => Math.abs(Math.log(b.invoiceRate / b.catalogRate)) - Math.abs(Math.log(a.invoiceRate / a.catalogRate)));
+}
+

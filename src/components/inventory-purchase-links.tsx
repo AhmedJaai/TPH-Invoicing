@@ -236,3 +236,18 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
     </div>
   );
 }
+
+/**
+ * أصنافُ مورّدين يُصحَّح ما في وحدتها — لصنفٍ سعرُ وحدته من الفواتير لا يُصدَّق (`/finance/stock`).
+ * كلُّ سطرٍ يفتح نموذجَه مباشرةً: هو مربوطٌ، والخطأ في العبوة لا في الربط.
+ */
+export function PackFixList({ rows, options, canEdit }: { rows: PurchaseLinkRow[]; options: StockItemOption[]; canEdit: boolean }) {
+  const [saved, setSaved] = useState<string | null>(null);
+  if (rows.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {saved && <p role="status" className="text-xs font-bold text-ok">{saved}</p>}
+      {rows.map((r) => <LinkRow key={r.supplierProductId} row={r} options={options} canEdit={canEdit} onSaved={setSaved} />)}
+    </div>
+  );
+}

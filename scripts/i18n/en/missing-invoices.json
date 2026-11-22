@@ -96,5 +96,9 @@
 "لم يُصرف منه في 4 أسابيع": "None used in 4 weeks",
 "نفد أو يكاد": "Out or nearly out",
 "{0}: يكفي {1} تقريباً — على الرف نحو {2}، ويُصرف منه {3} يومياً": "{0}: lasts about {1} — about {2} on the shelf, using {3} a day",
-"تقدير من آخر جرد: المعدود، وما اشتُري بعده، وما صرفته الوصفات بعده، ومتوسط صرف آخر أربعة أسابيع. فاتورة لم تُربط بصنفها تجعله يبدو أقل مما على الرف.": "Estimated from the last count: what was counted, what was bought after, what recipes used after, and the average use over the last four weeks. An invoice not linked to its item makes it look lower than what is on the shelf."
+"تقدير من آخر جرد: المعدود، وما اشتُري بعده، وما صرفته الوصفات بعده، ومتوسط صرف آخر أربعة أسابيع. فاتورة لم تُربط بصنفها تجعله يبدو أقل مما على الرف.": "Estimated from the last count: what was counted, what was bought after, what recipes used after, and the average use over the last four weeks. An invoice not linked to its item makes it look lower than what is on the shelf.",
+"سعر الوحدة من الفواتير لا يُصدَّق": "Invoice unit cost looks wrong",
+"سعر الوحدة المحسوب من فواتيرك يخالف تكلفة الكتالوج في فودكس ثلاثة أضعاف أو أكثر. الأرجح أن «ما في الوحدة» عند المورّد كُتب خطأ. وتكلفة المبيعات في «الربح» تأخذ سعر الفواتير، فيصغر الخطأ التكلفة أو يكبرها بالنسبة نفسها. صحّح العبوة أدناه، وإن كان الكتالوج هو القديم فصحّحه في فودكس.": "The unit cost from your invoices differs from the Foodics catalog cost by three times or more. Most likely the supplier pack contents were entered wrongly. Cost of sales in Profit uses the invoice cost, so the error shrinks or inflates cost by the same factor. Fix the pack below, or if the catalog is outdated, fix it in Foodics.",
+"من الفواتير {0} · في الكتالوج {1} · لكل {2}": "Invoices {0} · catalog {1} · per {2}",
+"أقل من هللة": "Less than a halala"
 }

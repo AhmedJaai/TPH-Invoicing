@@ -13,9 +13,13 @@ import { Callout, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAcce
 import { BALANCE_NOTE_LABEL, COVER_WARN_DAYS, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
 import { readableQuantity } from "@/lib/finance/quantity";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { formatDay, formatMonth } from "@/lib/riyadh-time";
+import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadFinanceAttentionFacts, stockGapKey } from "@/services/finance-attention.service";
-import { loadStockBalance } from "@/services/stock-balance.service";
+import { loadStockBalance, loadSuspectUnitCosts } from "@/services/stock-balance.service";
+import { loadPurchaseLinks, loadStockItemOptions } from "@/services/inventory-purchase-link.service";
+import { PackFixList } from "@/components/inventory-purchase-links";
+import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
+import { MILLI_MINOR } from "@/lib/money";
 import { loadFlowMonths } from "@/services/stock-flow.service";
 import { T } from "@/components/i18n/t";
 
@@ -46,7 +50,13 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
   const q = await searchParams;
   const months = await loadFlowMonths();
   const month = q.month && MONTH_RE.test(q.month) && months.includes(q.month) ? q.month : null;
-  const [b, attention] = await Promise.all([loadStockBalance(month), loadFinanceAttentionFacts()]);
+  const [b, attention, suspects, linkOptions] = await Promise.all([
+    loadStockBalance(month), loadFinanceAttentionFacts(), loadSuspectUnitCosts(), loadStockItemOptions(),
+  ]);
+  /* أصنافُ المورّدين وراء كلّ سعرٍ لا يُصدَّق — بعبواتها، لتُصحَّح هنا */
+  const suspectIds = new Set(suspects.map((x) => x.productId));
+  const packRows = suspects.length === 0 ? [] : (await loadPurchaseLinks("2020-01-01", todayInRiyadh(), linkOptions))
+    .filter((r) => r.productId !== null && suspectIds.has(r.productId));
   const t = b.totals;
   const param = month ?? "all";
   const recurring = attention.recurring;
@@ -211,6 +221,28 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         </Callout>
       )}
 
+      {/* سعرُ وحدةٍ من الفواتير يخالف الكتالوج أضعافاً — عبوةٌ كُتبت خطأً تُفسد التكلفة والربح */}
+      {suspects.length > 0 && (
+        <Section id="unit-cost" title="سعر الوحدة من الفواتير لا يُصدَّق" icon={Scale} count={suspects.length}
+          hint="سعر الوحدة المحسوب من فواتيرك يخالف تكلفة الكتالوج في فودكس ثلاثة أضعاف أو أكثر. الأرجح أن «ما في الوحدة» عند المورّد كُتب خطأ. وتكلفة المبيعات في «الربح» تأخذ سعر الفواتير، فيصغر الخطأ التكلفة أو يكبرها بالنسبة نفسها. صحّح العبوة أدناه، وإن كان الكتالوج هو القديم فصحّحه في فودكس.">
+          <ul className="mb-4 space-y-1 text-sm">
+            {suspects.map((x) => (
+              <li key={x.productId} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <strong>{x.name}</strong>
+                <span className="text-xs text-ink-soft">
+                  <T s="من الفواتير {0} · في الكتالوج {1} · لكل {2}" a={[
+                    <UnitCost key="0" rate={x.invoiceRate} unit={x.baseUnit} />,
+                    <UnitCost key="1" rate={x.catalogRate} unit={x.baseUnit} />,
+                    storedUnitLabel(displayBase(x.baseUnit)),
+                  ]} />
+                </span>
+              </li>
+            ))}
+          </ul>
+          <PackFixList rows={packRows} options={linkOptions} canEdit={can(user.role, "inventory:count")} />
+        </Section>
+      )}
+
       {/* ما ينفد خلال أسبوع — من آخر عدٍّ لا من كلّ ما اشتُري: يُطلب قبل أن ينفد */}
       {runningOut.length > 0 && (
         <Callout tone="warn" icon={Timer} className="mt-4" title={`${countNoun(runningOut.length, PRODUCT)} قد ينفد خلال أسبوع`}>
@@ -264,3 +296,21 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
     </PageShell>
   );
 }
+
+/** وحدةُ العرض: الكيلو للجرام واللترُ للمليلتر — سعرُ الجرام كسورُ هللة لا تُقرأ. */
+function displayBase(u: StoredUnit): StoredUnit {
+  return u === "G" ? "KG" : u === "ML" ? "L" : u;
+}
+
+/** سعرُ وحدة العرض بالهللات من مِلّي‑الهللة لوحدة الأساس. */
+function unitMinor(rateMilliMinor: number, u: StoredUnit): number {
+  const factor = u === "G" || u === "ML" ? 1000 : 1;
+  return Math.round((rateMilliMinor * factor) / MILLI_MINOR);
+}
+
+/** سعرُ الوحدة — وما دون الهللة يُقال «أقل من هللة» لا «0.00»: الصفرُ يُقرأ «مجّاناً». */
+function UnitCost({ rate, unit }: { rate: number; unit: StoredUnit }) {
+  const minor = unitMinor(rate, unit);
+  return minor === 0 ? <span>أقل من هللة</span> : <MaybeMoney minor={minor} />;
+}
+
