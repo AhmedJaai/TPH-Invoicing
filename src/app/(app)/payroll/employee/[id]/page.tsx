@@ -16,7 +16,7 @@ import {
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, endOfService, formatMinutes, hoursLabel, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
+import { ADJUSTMENT_LABEL, ANNUAL_LEAVE_DAYS, ANNUAL_LEAVE_DAYS_AFTER_FIVE, endOfService, formatLeaveDays, formatMinutes, hoursLabel, leaveBalance, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
 import { daysOffLabel, planOn, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
@@ -60,7 +60,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const workMonths = monthsBetween(employee.hiredOn.slice(0, 7), endMonth).reverse();
 
   const leaveFrom = deductionPeriod(deductionMonthOf(today)).from;
-  const [sheet, links, docs, open, checkins, history, leave] = await Promise.all([
+  const [sheet, links, docs, open, checkins, history, leave, allLeave] = await Promise.all([
     loadPayrollMonth(month),
     loadEmployeeLinks(id),
     loadEmployeeDocuments(id),
@@ -69,6 +69,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     loadCheckins(deductionPeriod(month).from, deductionPeriod(month).to),
     loadEmployeeHistory(id, workMonths.slice(0, 24)),
     loadLeave(id, leaveFrom),
+    /* كلُّ إجازةٍ منذ المباشرة — للرصيد السنويّ */
+    loadLeave(id, employee.hiredOn),
   ]);
   /* سجلُّ الدوام من تاريخ: الأحدثُ أوّلاً، والنافذُ اليوم معلَّم */
   const currentPlan = planOn(today, employee.plans);
@@ -95,6 +97,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const latestRate = rateFor(employee.rates, endMonth);
   const serviceDays = daysBetween(employee.hiredOn, employee.leftOn ?? today) + 1;
   const eos = latestRate !== null && employee.kind === "MONTHLY" ? endOfService(latestRate, serviceDays) : null;
+  const annual = employee.kind === "MONTHLY" ? leaveBalance(serviceDays, allLeave.reduce((s, l) => s + l.days, 0), latestRate) : null;
   const defaultDay = month === current ? today : `${month}-01`;
   /*
     الرصيدُ منذ المباشرة: ما استحقّه كلَّ شهرٍ مقابل ما وصله — زيادةُ شهرٍ لا تُنسى في الذي بعده.
@@ -460,6 +463,22 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      {annual && (
+        <Section id="leave-balance" title="رصيد الإجازة السنوية (تقدير)" icon={CalendarOff} hint={`بنظام العمل: ${ANNUAL_LEAVE_DAYS} يوماً عن كل سنة خدمة، و${ANNUAL_LEAVE_DAYS_AFTER_FIVE} بعد خمس سنوات، تُستحق بقدر ما مضى. والمأخوذ كل يوم سُجّل إجازة. والقيمة بأجر اليوم (الراتب ÷ 30).`}>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+            <Card><p className="text-xs text-muted">استحقّ منذ المباشرة</p><p className="mt-1 text-lg font-bold"><span className="nums">{formatLeaveDays(annual.accruedMilliDays)}</span> يوماً</p></Card>
+            <Card><p className="text-xs text-muted">أخذ</p><p className="mt-1 text-lg font-bold">{annual.takenDays === 0 ? "لم يأخذ إجازة" : countNoun(annual.takenDays, DAY)}</p></Card>
+            <Card>
+              <p className="text-xs text-muted">المتبقي له</p>
+              <p className={`mt-1 text-lg font-bold ${annual.balanceMilliDays < 0 ? "text-danger" : ""}`}><span className="nums">{formatLeaveDays(annual.balanceMilliDays)}</span> يوماً</p>
+              <p className="mt-0.5 text-[11px] text-muted">
+                {annual.valueMinor === null ? "قيمته غير معروفة: لا راتب مكتوب" : annual.balanceMilliDays < 0 ? <>أخذ أكثر مما استحق بقيمة <Money minor={-annual.valueMinor} /></> : <>قيمته <Money minor={annual.valueMinor} /></>}
+              </p>
+            </Card>
+          </div>
         </Section>
       )}
 

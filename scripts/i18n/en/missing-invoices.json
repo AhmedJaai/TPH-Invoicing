@@ -84,5 +84,11 @@
 "ومنها {0} لم تُخصَّص على فاتورة ضريبتها معروفة، فضريبتها تُحسب من ورقة الإشعار نفسه.": "Of these, {0} is not allocated to an invoice with known VAT, so its VAT comes from the credit note document itself.",
 "سجلّ القرار": "Decision history",
 "لم يُسجَّل على هذا السجل قرار بعد. كل تعديل أو إقرار أو سداد عليه يُكتب هنا باسم من فعله ووقته وسببه.": "No decision has been recorded on this record yet. Every change, approval or payment on it is written here with who did it, when, and why.",
-"السبب: {0}": "Reason: {0}"
+"السبب: {0}": "Reason: {0}",
+"رصيد الإجازة السنوية (تقدير)": "Annual leave balance (estimate)",
+"استحقّ منذ المباشرة": "Accrued since joining",
+"أخذ": "Taken",
+"لم يأخذ إجازة": "No leave taken",
+"المتبقي له": "Remaining",
+"قيمته غير معروفة: لا راتب مكتوب": "Value unknown: no salary recorded"
 }

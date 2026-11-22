@@ -388,6 +388,56 @@ export function endOfService(salaryMinor: number, serviceDays: number): { fullMi
   return { fullMinor, resignationMinor, years: Math.floor(years) };
 }
 
+/* ─────────────── رصيدُ الإجازة السنويّة ─────────────── */
+
+/**
+ * رصيدُ الإجازة السنويّة — تقديرٌ بنظام العمل (م ١٠٩): واحدٌ وعشرون يوماً عن كلّ سنة، وثلاثون
+ * بعد خمس سنواتٍ متّصلة، تُستحقّ بقدر ما مضى من الخدمة يوماً بيوم. والمأخوذُ كلُّ يومٍ سُجّل «إجازة».
+ *
+ * بالأجزاء من الألف من اليوم (عددٌ صحيح) ثمّ يُعرض بمنزلةٍ — و**قيمةُ الرصيد** بأجر اليوم (الراتب ÷ ٣٠)
+ * هللاتٍ: ما يُستحقّ له إن ترك العمل اليوم ورصيدُه قائم، أو ما عليه إن أخذ أكثر ممّا استحقّ.
+ *
+ * كان المسيّرُ يعرف الإجازةَ أيّاماً لا يُخصم عنها، ولا يقول كم بقي — فيُسأل الموظّفُ أو يُخمَّن.
+ */
+export const ANNUAL_LEAVE_DAYS = 21;
+export const ANNUAL_LEAVE_DAYS_AFTER_FIVE = 30;
+
+export interface LeaveBalance {
+  /** المستحقّ منذ المباشرة — بأجزاء الألف من اليوم. */
+  accruedMilliDays: number;
+  takenDays: number;
+  /** المتبقّي — سالبٌ: أخذ أكثر ممّا استحقّ. */
+  balanceMilliDays: number;
+  /** الحدُّ السنويّ الآن: ٢١ أو ٣٠. */
+  perYear: number;
+  /** قيمةُ المتبقّي بأجر اليوم — `null` بلا راتبٍ معروف. */
+  valueMinor: number | null;
+}
+
+export function leaveBalance(serviceDays: number, takenDays: number, salaryMinor: number | null): LeaveBalance {
+  const d = Math.max(0, serviceDays);
+  const firstFive = Math.min(d, FIVE_YEARS_DAYS);
+  const after = Math.max(0, d - FIVE_YEARS_DAYS);
+  const accruedMilliDays = Math.floor((firstFive * ANNUAL_LEAVE_DAYS * 1000) / 365) + Math.floor((after * ANNUAL_LEAVE_DAYS_AFTER_FIVE * 1000) / 365);
+  const balanceMilliDays = accruedMilliDays - Math.max(0, takenDays) * 1000;
+  return {
+    accruedMilliDays,
+    takenDays: Math.max(0, takenDays),
+    balanceMilliDays,
+    perYear: d > FIVE_YEARS_DAYS ? ANNUAL_LEAVE_DAYS_AFTER_FIVE : ANNUAL_LEAVE_DAYS,
+    /* أجرُ اليوم الراتبُ ÷ ٣٠، والرصيدُ بالألف — تقريبٌ واحد */
+    valueMinor: salaryMinor === null ? null : divRound(salaryMinor * balanceMilliDays, 30 * 1000),
+  };
+}
+
+/** «١٢٫٤ يوماً» — منزلةٌ واحدة، والسالبُ بإشارته. */
+export function formatLeaveDays(milliDays: number): string {
+  const tenths = Math.round(milliDays / 100);
+  const sign = tenths < 0 ? "−" : "";
+  const abs = Math.abs(tenths);
+  return `${sign}${Math.floor(abs / 10)}${abs % 10 ? `.${abs % 10}` : ""}`;
+}
+
 /* ─────────────── أثرُ الربط في قائمة الدخل ─────────────── */
 
 export type ReclassTarget = "SALARY" | "OTHER" | "PERSONAL" | "EXCLUDED";

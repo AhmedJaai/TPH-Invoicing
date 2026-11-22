@@ -181,3 +181,33 @@ describe("طولُ الدوام كما يُقرأ", () => {
     expect(hoursLabel(450)).toBe("7:30 ساعة");
   });
 });
+
+describe("رصيد الإجازة السنويّة (م ١٠٩)", () => {
+  it("سنةٌ كاملة = ٢١ يوماً، ونصفُها ١٠٫٥", async () => {
+    const { leaveBalance, formatLeaveDays } = await import("./calc");
+    expect(leaveBalance(365, 0, null).accruedMilliDays).toBe(21_000);
+    expect(formatLeaveDays(leaveBalance(365 / 2 + 0.5, 0, null).accruedMilliDays)).toBe("10.5");
+  });
+
+  it("بعد خمس سنوات ٣٠ يوماً عن كلّ سنة", async () => {
+    const { leaveBalance } = await import("./calc");
+    const b = leaveBalance(6 * 365, 0, null);
+    expect(b.accruedMilliDays).toBe(5 * 21_000 + 30_000);
+    expect(b.perYear).toBe(30);
+  });
+
+  it("المأخوذُ يُطرح، والقيمةُ بأجر اليوم (الراتب ÷ ٣٠)", async () => {
+    const { leaveBalance } = await import("./calc");
+    const b = leaveBalance(365, 6, 3000_00);
+    expect(b.balanceMilliDays).toBe(15_000);
+    expect(b.valueMinor).toBe(1500_00);
+  });
+
+  it("من أخذ أكثر ممّا استحقّ رصيدُه سالب، وبلا راتبٍ قيمتُه غير معروفة", async () => {
+    const { leaveBalance, formatLeaveDays } = await import("./calc");
+    const b = leaveBalance(30, 5, null);
+    expect(b.balanceMilliDays).toBeLessThan(0);
+    expect(formatLeaveDays(b.balanceMilliDays)).toBe("−3.3");
+    expect(b.valueMinor).toBeNull();
+  });
+});
