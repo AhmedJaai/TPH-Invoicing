@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { RecordHistory } from "@/components/record-history";
 import { BankBounce } from "@/components/bank-bounce";
 import { findBouncePartner } from "@/services/bank-bounce.service";
 import { db } from "@/db";
@@ -194,6 +195,13 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
             ))}
           </ul>
         </Section>
+      )}
+      {/* سجلُّ القرار: الحركةُ ودفعتُها — تصنيفُها ومطابقتُها وردُّها بفاعلها ووقتها */}
+      {can(user.role, "audit:view") && (
+        <RecordHistory
+          viewerId={user.id}
+          entities={[{ type: "bank_transaction", id: tx.id }, ...(tx.paymentId ? [{ type: "payment", id: tx.paymentId }] : [])]}
+        />
       )}
     </DetailFrame>
   );

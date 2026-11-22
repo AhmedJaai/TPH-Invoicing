@@ -81,5 +81,8 @@
 "إشعار دائن على حساب المورّد": "Credit note on the supplier account",
 "لإشعار لا يخص فاتورة واحدة: مرتجع من أكثر من فاتورة، أو خصم على الشهر. يُخصم من فواتيره المفتوحة بالأقدم أولاً، وما بقي يصير رصيداً لك عنده. لا يُعدّ مالاً خرج.": "For a credit note not tied to one invoice: a return across several invoices, or a monthly discount. It is applied to open invoices oldest first, and any remainder becomes credit with them. It does not count as money paid out.",
 "الضريبة التي في هذه الإشعارات بنسبة فواتيرها: {0}، وهي ما يُتوقع أن يُخفَض من ضريبة المدخلات.": "The VAT in these credit notes, in proportion to their invoices: {0}. This is what input VAT is expected to be reduced by.",
-"ومنها {0} لم تُخصَّص على فاتورة ضريبتها معروفة، فضريبتها تُحسب من ورقة الإشعار نفسه.": "Of these, {0} is not allocated to an invoice with known VAT, so its VAT comes from the credit note document itself."
+"ومنها {0} لم تُخصَّص على فاتورة ضريبتها معروفة، فضريبتها تُحسب من ورقة الإشعار نفسه.": "Of these, {0} is not allocated to an invoice with known VAT, so its VAT comes from the credit note document itself.",
+"سجلّ القرار": "Decision history",
+"لم يُسجَّل على هذا السجل قرار بعد. كل تعديل أو إقرار أو سداد عليه يُكتب هنا باسم من فعله ووقته وسببه.": "No decision has been recorded on this record yet. Every change, approval or payment on it is written here with who did it, when, and why.",
+"السبب: {0}": "Reason: {0}"
 }

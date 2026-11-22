@@ -13,11 +13,12 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { EmptyState, LinkTabs, NoAccess } from "@/components/ui";
 import { buttonClass } from "@/components/ui-tokens";
-import { ENTITY_LABEL, actionLabel, labelValue } from "@/lib/audit-labels";
+import { ENTITY_LABEL, actionLabel } from "@/lib/audit-labels";
 import { AUDIT_KIND_LABEL, KIND_PATTERN, LEARNED_ACTIONS, auditKind, isAuditKind, type AuditKind } from "@/lib/audit-kinds";
 import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
 import { auditActorName, isSystemAudit } from "@/lib/audit-actor";
+import { AuditDetail } from "@/components/record-history";
 
 export const dynamic = "force-dynamic";
 
@@ -61,27 +62,6 @@ const KIND_TONE: Record<AuditKind, string> = {
 };
 
 const SIZE = 60;
-
-function Detail({ value, label }: { value: unknown; label: string }) {
-  if (value === null || value === undefined || typeof value !== "object") return null;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
-    .slice(0, 12);
-  if (entries.length === 0) return null;
-  return (
-    <div>
-      <p className="mb-1 text-[11px] font-bold text-muted">{label}</p>
-      <dl className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
-        {entries.map(([k, v]) => (
-          <div key={k} className="contents text-[11px]">
-            <dt className="text-muted">{k.replace(/_/g, " ")}</dt>
-            <dd className="min-w-0 break-words text-ink-soft" dir="auto">{labelValue(v).slice(0, 240)}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
 
 function entityLink(entityType: string, entityId: string): React.ReactNode {
   /* قيدٌ جماعيّ («14 فاتورة») لا معرّفَ له يُفتح — يُقال نصّاً */
@@ -222,8 +202,8 @@ export default async function AuditTrailPage({
                                 التفاصيل
                               </summary>
                               <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
-                                <Detail value={r.before} label="قبل" />
-                                <Detail value={r.after} label={r.before ? "بعد" : "ما سُجّل"} />
+                                <AuditDetail value={r.before} label="قبل" />
+                                <AuditDetail value={r.after} label={r.before ? "بعد" : "ما سُجّل"} />
                               </div>
                             </details>
                           )}

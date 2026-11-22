@@ -14,6 +14,7 @@ import {
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
+import { RecordHistory } from "@/components/record-history";
 import { Money } from "@/components/money";
 import { LiveMoney } from "@/components/live-money";
 import {
@@ -644,6 +645,17 @@ export async function InvoiceView({
           )}
         </aside>
       </div>
+      {/* سجلُّ القرار: الفاتورةُ ومستندُها ودفعاتُها — مَن فعل ماذا ومتى ولماذا */}
+      {can(user.role, "audit:view") && (
+        <RecordHistory
+          viewerId={user.id}
+          entities={[
+            { type: "invoice", id: inv.id },
+            ...(doc ? [{ type: "document", id: doc.id }] : []),
+            ...p.allocations.map((a) => ({ type: "payment", id: a.paymentId })),
+          ]}
+        />
+      )}
     </DetailFrame>
   );
 }
