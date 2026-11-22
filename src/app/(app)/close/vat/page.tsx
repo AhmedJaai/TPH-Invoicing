@@ -16,7 +16,7 @@ import { loadCashCustody } from "@/services/app-settings.service";
 import { SectionBoundary } from "@/components/ui-client";
 import { WhyNumber } from "@/components/why-number";
 import { FiledQuartersSection } from "@/components/vat-compare";
-import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, TRANSACTION, countNoun, countNounGen } from "@/lib/arabic";
 import { INPUT_VAT_LABEL } from "@/lib/accountant-pack";
 import { currentMonthRiyadh, daysSinceRiyadh, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import {
@@ -174,8 +174,8 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 filing ? `قُدّم إقرار ${quarterLabel(quarter)} في ${formatDay(filing.filedOn)}${filing.reference ? `، ورقمه المرجعي ${filing.reference}` : ""}.`
                 : open ? "الفترة لم تنتهِ بعد، وسيزيد الرقم مع ما يُضاف."
                 : !quarterEnded ? `يُقدَّم مع ${quarterLabel(quarter)}، وآخر موعد له ${formatDay(deadline)}.`
-                : daysLeft >= 0 ? `آخر موعد لتقديم ${quarterLabel(quarter)} وسداده ${formatDay(deadline)}، أي بعد ${countNoun(daysLeft, DAY)}.`
-                : `فات موعد تقديم ${quarterLabel(quarter)} (${formatDay(deadline)}) منذ ${countNoun(-daysLeft, DAY)}. إن كنت قدّمته فسجّل ذلك.`
+                : daysLeft >= 0 ? `آخر موعد لتقديم ${quarterLabel(quarter)} وسداده ${formatDay(deadline)}، أي بعد ${countNounGen(daysLeft, DAY)}.`
+                : `فات موعد تقديم ${quarterLabel(quarter)} (${formatDay(deadline)}) منذ ${countNounGen(-daysLeft, DAY)}. إن كنت قدّمته فسجّل ذلك.`
               }
             >
               {can(user.role, "amounts:view") && (
@@ -192,7 +192,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
               icon={ArrowUpRight}
               label="ضريبة المدخلات"
               value={<Money minor={r.input.totalMinor} currency />}
-              sub={`من ${countNoun(r.input.invoices.count, INVOICE)}، وضريبة الرسوم، والحركات التي اخترتها من الكشف.`}
+              sub={`من ${countNounGen(r.input.invoices.count, INVOICE)}، وضريبة الرسوم، والحركات التي اخترتها من الكشف.`}
             />
           </div>
 
@@ -294,7 +294,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 )]} /></Callout>
             )}
             {r.input.selected.count > 0 && (
-              <Callout tone="warn" icon={FileWarning} title={`خصم بلا مستند لدينا: ${riyalsText(r.input.selected.vatMinor)} في ${countNoun(r.input.selected.count, TRANSACTION)}`}>
+              <Callout tone="warn" icon={FileWarning} title={`خصم بلا مستند لدينا: ${riyalsText(r.input.selected.vatMinor)} في ${countNounGen(r.input.selected.count, TRANSACTION)}`}>
                 الحركات التي اخترتها من المبالغ الخارجة في الكشف تدخل في الخصم دون فاتورة مرفوعة. عند الفحص تطلب الهيئة الفاتورة الضريبية لكل خصم، فاحتفظ بها، والأفضل أن ترفعها إلى النظام.
               </Callout>
             )}

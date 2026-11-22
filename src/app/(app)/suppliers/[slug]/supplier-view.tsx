@@ -29,7 +29,7 @@ import {
   type Grade,
 } from "@/lib/supplier-health";
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
-import { countNoun, DAY, INVOICE, LINE, MONTH, PRODUCT, TIME } from "@/lib/arabic";
+import { countNoun, countNounGen, DAY, INVOICE, LINE, MONTH, PRODUCT, TIME } from "@/lib/arabic";
 import { loadOpenInvoiceAges, loadSupplierBalances } from "@/services/supplier-balance.service";
 import { SupplierItemMerge } from "@/components/supplier-item-merge";
 import { similarItems } from "@/lib/items";
@@ -449,7 +449,7 @@ export async function SupplierView({
             </p>
             <p className="mt-2.5 text-xs leading-relaxed text-muted">
               {balance > 0
-                ? `عن ${countNoun(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعته له.`
+                ? `عن ${countNounGen(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعته له.`
                 : creditLeft > 0
                   ? "مبلغ دفعته له ولم تصلك فاتورته، وسيُخصم من فواتيره القادمة."
                   : !s.issuesInvoices && paidNet > 0
@@ -651,7 +651,7 @@ export async function SupplierView({
                       <dd className="mt-0.5 text-[11px] leading-relaxed text-muted">
                         {rel.averageDays === null
                           ? `يلزم ${countNoun(MIN_SETTLED_SAMPLE, INVOICE)} مسدّدة بدفعة معروفة، والمتوفر ${rel.sampleCount}`
-                          : `الوسيط من ${countNoun(rel.sampleCount, INVOICE)} · المتوسط ${countNoun(rel.averageDays, DAY)}${rel.prepaidCount > 0 ? ` · ${rel.prepaidCount} سبقها رصيد لك عنده` : ""}`}
+                          : `الوسيط من ${countNounGen(rel.sampleCount, INVOICE)} · المتوسط ${countNoun(rel.averageDays, DAY)}${rel.prepaidCount > 0 ? ` · ${rel.prepaidCount} سبقها رصيد لك عنده` : ""}`}
                       </dd>
                     </div>
                     <div className="min-w-0">

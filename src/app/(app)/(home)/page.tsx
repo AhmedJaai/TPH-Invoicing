@@ -21,7 +21,7 @@ import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
+import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
 import { previousMonth } from "@/lib/filing";
 import { addDays, currentMonthRiyadh, formatDay, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
 import { sinceYesterday } from "@/lib/since-yesterday";
@@ -192,7 +192,7 @@ export default async function HomePage() {
             sub={
               totals.owedMinor === 0
                 ? "لا يوجد على المقهى أي مبلغ مستحق الآن."
-                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNoun(oldestDays, DAY)}` : ""}`
+                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNounGen(oldestDays, DAY)}` : ""}`
             }
           >
             {/* دون ريالٍ تقريبٌ لا رصيد يُقال في الصفحة الأولى — يبقى في قائمة المورّدين بهللاته */}

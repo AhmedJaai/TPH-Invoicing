@@ -12,7 +12,7 @@ import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton, type OwedByMon
 import { Badge, buttonClass, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { countNoun, EMPLOYEE, TRANSFER } from "@/lib/arabic";
+import { countNoun, countNounGen, EMPLOYEE, TRANSFER } from "@/lib/arabic";
 import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
@@ -185,7 +185,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             {totals.dueMinor > 0 && (
               <div className="mt-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="font-bold">{settled === sheet.rows.length ? "اكتمل الشهر: وصل كل موظف مستحقه" : `اكتمل ${settled} من ${countNoun(sheet.rows.length, EMPLOYEE)}`}</span>
+                  <span className="font-bold">{settled === sheet.rows.length ? "اكتمل الشهر: وصل كل موظف مستحقه" : `اكتمل ${settled} من ${countNounGen(sheet.rows.length, EMPLOYEE)}`}</span>
                   <span className="nums text-muted">{Math.min(100, Math.floor((Math.min(totals.paidMinor, totals.dueMinor) * 100) / totals.dueMinor))}٪ مما يستحقونه</span>
                 </div>
                 <Meter value={Math.min(totals.paidMinor, totals.dueMinor)} max={totals.dueMinor} tone={settled === sheet.rows.length ? "ok" : "accent"} label="ما حُوّل مما يستحقه الموظفون" />

@@ -31,7 +31,7 @@ import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupingIdentity } from "@/lib/bank/pattern";
 import { CLASSIFICATION_VERSION } from "@/lib/bank/classification";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
-import { TRANSACTION, countNoun } from "@/lib/arabic";
+import { TRANSACTION, countNoun, countNounGen } from "@/lib/arabic";
 import type { TxCategory } from "@/lib/bank/rules";
 import { monthOf } from "@/lib/filing";
 
@@ -328,8 +328,8 @@ export async function POST(request: Request) {
   const derived = await deriveOpenMonths(rows.map((r) => monthOf(r.valueDate)), user.id);
 
   const parts = [`حُفظ «${party?.name}»`];
-  parts.push(`وطُبّق على ${countNoun(rows.length, TRANSACTION)}`);
-  if (derived.created > 0) parts.push(`وسُجّل مصروف عن ${countNoun(derived.created, TRANSACTION)}`);
+  parts.push(`وطُبّق على ${countNounGen(rows.length, TRANSACTION)}`);
+  if (derived.created > 0) parts.push(`وسُجّل مصروف عن ${countNounGen(derived.created, TRANSACTION)}`);
   if (result.conflicts.length > 0) {
     parts.push(`و${result.conflicts.length} من الأدلة تشير إلى جهة أخرى، فراجعها`);
   }

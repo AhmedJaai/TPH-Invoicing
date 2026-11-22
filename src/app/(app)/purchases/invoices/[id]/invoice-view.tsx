@@ -42,7 +42,7 @@ import { formatRiyals, formatRiyalsDisplay, TOTAL_ROUNDING_TOLERANCE_MINOR } fro
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { actionLabel } from "@/lib/audit-labels";
-import { ITEM, PAYMENT_RECORD, REASON, countNoun } from "@/lib/arabic";
+import { ITEM, PAYMENT_RECORD, REASON, countNoun, countNounGen } from "@/lib/arabic";
 import { txHref } from "@/lib/inspector";
 import { monthOf } from "@/lib/filing";
 import { T } from "@/components/i18n/t";
@@ -279,7 +279,7 @@ export async function InvoiceView({
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               <span><T s="الإجمالي {0}" a={[<b key="0" className="text-ink"><Money minor={inv.totalMinor} /></b>]} /></span>
               <span>
-                <T s="المسدّد {0}{1}" a={[<b key="0" className="text-ink"><Money minor={p.paidMinor} /></b>, p.allocations.length > 0 ? ` في ${countNoun(p.allocations.length, PAYMENT_RECORD)}` : " · لم يُسجَّل سداد"]} /></span>
+                <T s="المسدّد {0}{1}" a={[<b key="0" className="text-ink"><Money minor={p.paidMinor} /></b>, p.allocations.length > 0 ? ` في ${countNounGen(p.allocations.length, PAYMENT_RECORD)}` : " · لم يُسجَّل سداد"]} /></span>
             </p>
           </div>
         </div>

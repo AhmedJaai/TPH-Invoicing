@@ -20,7 +20,7 @@
 import type { CanonicalTransaction } from "./canonical";
 import { identitiesOf } from "./pattern";
 import type { TxKind } from "./taxonomy";
-import { countNoun, TIME } from "@/lib/arabic";
+import { countNoun, countNounGen, TIME } from "@/lib/arabic";
 
 export type Layer = "STRUCTURE" | "LEARNED" | "KEYWORD" | "AMOUNT" | "NONE";
 
@@ -194,7 +194,7 @@ export function classify(
       layer: "LEARNED",
       source: "MEMORY",
       ruleId: null,
-      reason: `${identity.label} أكّدتَه من قبل ${countNoun(known.confirmations, TIME)}`,
+      reason: `${identity.label} أكّدتَه من قبل ${countNounGen(known.confirmations, TIME)}`,
       merchantKey: identity.key,
     };
   }

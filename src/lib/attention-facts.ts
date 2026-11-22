@@ -18,7 +18,7 @@ import { detectAnomalies } from "./bank/lifecycle";
 import { pendingDecision } from "./bank/pending";
 import { needsContractSql } from "./supplier-policy-rules";
 import { loadOverdueBalances } from "@/services/supplier-balance.service";
-import { DAY, TIME, countNoun } from "./arabic";
+import { DAY, TIME, countNoun, countNounGen } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { latestStatementGaps, latestStatementMissing } from "@/services/statement-reconcile.service";
@@ -253,8 +253,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
     label: r.nameAr,
     sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
-      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم رصيدك عنده ${formatRiyalsDisplay(r.creditMinor)}`
-      : `أقدم دين منذ ${countNoun(r.oldestDays, DAY)}`,
+      ? `أقدم دين منذ ${countNounGen(r.oldestDays, DAY)} · بعد خصم رصيدك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      : `أقدم دين منذ ${countNounGen(r.oldestDays, DAY)}`,
     amountMinor: r.owedMinor,
   }));
 
@@ -481,7 +481,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     }),
     bouncedPayments: bounced.map((b) => ({
       label: supplierOfTx.get(b.outgoing.id) ?? (b.outgoing.party ?? "حوالة").slice(0, 45),
-      sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNoun(b.daysApart, DAY)}${
+      sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNounGen(b.daysApart, DAY)}${
         b.samePartyEvidence ? " من الطرف نفسه" : " (الطرف غير مطابق)"
       }`,
       amountMinor: b.outgoing.amountMinor,

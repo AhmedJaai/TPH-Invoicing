@@ -20,7 +20,7 @@ import { recordAudit } from "@/lib/audit";
 import { HandLinkRefused, linkHandPayment, loadHandPaymentLinks } from "./account-review.service";
 import { resyncBankExpenses } from "./expense.service";
 import { settleSupplierAccount } from "@/lib/allocation";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { INVOICE, countNoun, countNounGen } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { Conflict, NotFound, Refused } from "@/lib/domain-error";
 import type { Conn } from "./types";
@@ -423,7 +423,7 @@ async function settleAccounts(
     supplierBalanceAfter: left,
     message: invoiceCount === 0
       ? `سُجّل ${money(allocatedTotal + unappliedTotal)} على حساب المورّد، وبقي غير مخصّص لأنه لا فاتورة مفتوحة تقابله`
-      : `سُدّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أولاً (لا رقم فاتورة في الحوالة)`
+      : `سُدّد ${money(allocatedTotal)} على ${countNounGen(invoiceCount, INVOICE)} بالأقدم أولاً (لا رقم فاتورة في الحوالة)`
         + (unappliedTotal > 0 ? ` · ويبقى ${money(unappliedTotal)} غير مخصّص` : "")
         + ` · رصيد المورّد بعدها ${money(left)}`
         + (adopted > 0 ? ` · و${adopted} منها كانت مسجّلة من إيصالها، فلم تُسجَّل مرة ثانية` : ""),

@@ -1,5 +1,5 @@
 import { formatRiyalsDisplay } from "@/lib/money";
-import { DAY, ORDER, countNoun } from "@/lib/arabic";
+import { DAY, ORDER, countNoun, countNounGen } from "@/lib/arabic";
 import { redirect } from "next/navigation";
 import { CalendarDays, Clock, Coffee, CreditCard, Info, ShoppingBag, TrendingDown, TrendingUp, Utensils } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -193,7 +193,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
       <Section title="ما نقص من الإيراد" icon={Info} hint="وصفٌ لما حدث، وليس اتهاماً لأحد.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`خصمٌ على ${countNoun(a.leaks.discountedOrders, ORDER)}.`} />
+          <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`خصمٌ على ${countNounGen(a.leaks.discountedOrders, ORDER)}.`} />
           <Leak label="مبالغ أُعيدت للزبائن" minor={a.leaks.refundsMinor} sub={`مرتجعات: ${countNoun(a.leaks.refundOrders, ORDER)}.`} />
           <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
             <p className="text-[11px] font-bold text-muted">طلبات ملغاة</p>

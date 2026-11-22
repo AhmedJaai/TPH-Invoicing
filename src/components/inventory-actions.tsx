@@ -7,7 +7,7 @@ import { buttonClass } from "./ui";
 import { ConfirmAction, Sheet, toast } from "./ui-client";
 import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
 import { weekOf, type Week } from "@/lib/inventory/week";
-import { ITEM, PRODUCT, countNoun } from "@/lib/arabic";
+import { ITEM, PRODUCT, countNoun, countNounGen } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
 import { addDays, MS_PER_DAY } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
@@ -102,7 +102,7 @@ export function StartCount({
         <div className="min-w-0 flex-1 rounded-xl border border-line bg-sunken/60 px-4 py-2.5 text-center" aria-live="polite">
           <p className="text-[15px] font-bold leading-snug sm:text-base">{formatWeek(week.start, week.end)}</p>
           <p className="mt-0.5 text-[11px] text-muted">
-            {atLatest ? "آخر أسبوع مكتمل" : `قبل ${countNoun(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * MS_PER_DAY)), WEEK)}`}
+            {atLatest ? "آخر أسبوع مكتمل" : `قبل ${countNounGen(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * MS_PER_DAY)), WEEK)}`}
           </p>
         </div>
         <button

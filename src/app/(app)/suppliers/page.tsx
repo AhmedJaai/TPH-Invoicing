@@ -14,7 +14,7 @@ import {
   Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, type Column,
 } from "@/components/ui";
 import { AgeingBar, Figure } from "@/components/supplier-intel";
-import { SUPPLIER, countNoun, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic";
+import { SUPPLIER, countNoun, countNounGen, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic";
 import { buildInvoiceRequest, groupUnbackedBySupplier, invoiceRequestKey } from "@/lib/supplier-requests";
 import { loadInvoiceRequestMarks, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { RequestInvoiceLink } from "@/components/request-invoice-link";
@@ -349,7 +349,7 @@ export default async function SuppliersPage({
               tone={totals.owedMinor > 0 ? "warn" : undefined}
               value={<Money minor={totals.owedMinor} currency />}
               sub={totals.owedMinor > 0
-                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · عن ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعته لهم`
+                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · عن ${countNounGen(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعته لهم`
                 : "كل فاتورة مفتوحة يغطيها ما دفعته."}
             >
               <AgeingBar buckets={allBuckets} />
@@ -362,7 +362,7 @@ export default async function SuppliersPage({
                 href="/suppliers?view=overdue"
                 tone="danger"
                 value={<Money minor={overdueMinor} />}
-                sub={`عند ${countNoun(overdue.length, SUPPLIER)} · أقدمها منذ ${countNoun(oldestOverdue, DAY)}`}
+                sub={`عند ${countNounGen(overdue.length, SUPPLIER)} · أقدمها منذ ${countNounGen(oldestOverdue, DAY)}`}
               />
             )}
             {totals.creditLeftMinor > 0 && (
@@ -553,7 +553,7 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
         title="دفعات غير مربوطة بفواتير"
         icon={FileWarning}
         count={count}
-        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بدون فاتورة ضريبية لا يمكن خصم ضريبة المدخلات. والمورّد الذي لا يصدر فواتير يُطلب منه عقد توريد بدلاً منها، وتُحسب دفعته هنا كغيرها لأن المبلغ خرج فعلاً.`}
+        hint={`عند ${countNounGen(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بدون فاتورة ضريبية لا يمكن خصم ضريبة المدخلات. والمورّد الذي لا يصدر فواتير يُطلب منه عقد توريد بدلاً منها، وتُحسب دفعته هنا كغيرها لأن المبلغ خرج فعلاً.`}
         action={<LinkButton href="/suppliers" size="sm" variant="quiet">كل الحسابات</LinkButton>}
       >
         {groups.length === 0 ? (

@@ -28,7 +28,7 @@ import { recordAudit } from "@/lib/audit";
 import { PaymentTwinError, allocate, createPayment } from "@/services/payment.service";
 import { distributePartial, planHandPayments, type MarkPaidRest } from "@/lib/mark-paid-plan";
 import { CreditError, drawBankCredit, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { INVOICE, countNoun, countNounGen } from "@/lib/arabic";
 import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
@@ -354,7 +354,7 @@ async function handle(request: Request) {
     ...(partialMinor === null ? {} : { partial: true, leftMinor: openBeforeMinor - totalMinor }),
     message: (partialMinor === null
       ? `سُجّل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
-      : `سُجّل سداد جزئي بمبلغ ${formatRiyalsDisplay(totalMinor)} ريال على ${countNoun(marked, INVOICE)} (الأقدم أولاً) · والباقي ${formatRiyalsDisplay(openBeforeMinor - totalMinor)}`)
+      : `سُجّل سداد جزئي بمبلغ ${formatRiyalsDisplay(totalMinor)} ريال على ${countNounGen(marked, INVOICE)} (الأقدم أولاً) · والباقي ${formatRiyalsDisplay(openBeforeMinor - totalMinor)}`)
       + (drawnMinor > 0
         ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالة في الكشف لم تكن منسوبة إلى فاتورة (${drawnDays.map((d) => formatDay(d)).join("، ")})، فلم تُسجَّل مرتين`
         : ""),

@@ -11,7 +11,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { StatementQuickCheck, StatementReconcile } from "@/components/statement-reconcile";
 import { Callout, Monogram, NoAccess, buttonClass } from "@/components/ui";
-import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
+import { INVOICE, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
 import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
@@ -102,7 +102,7 @@ export default async function StatementsPage({
             ? `لا فواتير في ${formatMonth(missingMonth)} تُطلب لها كشوف`
             : missing.length === 0
             ? `وصلت كل كشوف ${formatMonth(missingMonth)}`
-            : `لم يصل كشف ${formatMonth(missingMonth)} من ${countNoun(missing.length, SUPPLIER)}`}
+            : `لم يصل كشف ${formatMonth(missingMonth)} من ${countNounGen(missing.length, SUPPLIER)}`}
         </h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
           {missing.length === 0 && !monthHasInvoices

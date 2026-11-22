@@ -29,7 +29,7 @@ import { recordAudit } from "@/lib/audit";
 import { planFor, type PlannedPayment } from "./reconcile.service";
 import type { Candidate } from "@/lib/bank/candidates";
 import { pickCandidate, recomputeMatches } from "./match-recompute.service";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { INVOICE, TRANSACTION, countNoun, countNounGen } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { Refused } from "@/lib/domain-error";
 import type { Conn } from "./types";
@@ -327,7 +327,7 @@ export async function confirmMatchesBulk(
     outcomes.push({
       transactionId: tx.id,
       ok: true,
-      reason: `أُكّد على ${countNoun(decided.allocations.length, INVOICE)}`
+      reason: `أُكّد على ${countNounGen(decided.allocations.length, INVOICE)}`
         + (unallocated > 0 ? ` · ويبقى ${formatRiyalsDisplay(unallocated)} غير مخصّص في حساب المورّد` : ""),
       paymentId,
       invoiceIds: decided.allocations.map((a) => a.invoiceId),

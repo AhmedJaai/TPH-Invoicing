@@ -1,4 +1,4 @@
-import { MONTH, PRODUCT, countNoun } from "@/lib/arabic";
+import { MONTH, PRODUCT, countNoun, countNounGen } from "@/lib/arabic";
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -30,9 +30,9 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** «فواتيرنا أكمل في 11 صنفاً، وفودكس في 28، ويتفقان في 13» — بلا «في لا أصناف» لما عددُه صفر */
 function sourcesSentence(t: { invoicesBetter: number; foodicsBetter: number; sourcesAgree: number }): string {
   const parts = [
-    t.invoicesBetter > 0 ? `فواتيرنا أكمل في ${countNoun(t.invoicesBetter, PRODUCT)}` : null,
-    t.foodicsBetter > 0 ? `فودكس أكمل في ${countNoun(t.foodicsBetter, PRODUCT)}` : null,
-    t.sourcesAgree > 0 ? `يتفقان في ${countNoun(t.sourcesAgree, PRODUCT)}` : null,
+    t.invoicesBetter > 0 ? `فواتيرنا أكمل في ${countNounGen(t.invoicesBetter, PRODUCT)}` : null,
+    t.foodicsBetter > 0 ? `فودكس أكمل في ${countNounGen(t.foodicsBetter, PRODUCT)}` : null,
+    t.sourcesAgree > 0 ? `يتفقان في ${countNounGen(t.sourcesAgree, PRODUCT)}` : null,
   ].filter(Boolean);
   return parts.length > 0 ? ` ${parts.join("، و")}.` : "";
 }

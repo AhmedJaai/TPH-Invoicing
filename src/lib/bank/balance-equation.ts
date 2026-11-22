@@ -1,4 +1,4 @@
-import { TRANSACTION, countNoun } from "@/lib/arabic";
+import { TRANSACTION, countNoun, countNounGen } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 /**
  * معادلة الكشف: **الرصيد الافتتاحي + الوارد − الصادر = الرصيد الختامي.**
@@ -187,7 +187,7 @@ function riyals(minor: number): string {
 /** جملةٌ عربية تصف الحال — تُعرَض كما هي. */
 export function describeReconciliation(r: AccountReconciliation): string {
   if (r.balance.status === "UNKNOWN") {
-    return `${r.explainedCount} من ${countNoun(r.totalCount, TRANSACTION)} مفسَّرة، ولا يمكن فحص المعادلة: ${r.balance.reason}`;
+    return `${r.explainedCount} من ${countNounGen(r.totalCount, TRANSACTION)} مفسَّرة، ولا يمكن فحص المعادلة: ${r.balance.reason}`;
   }
   if (r.reconciled) return `الحساب مطابق: ${countNoun(r.totalCount, TRANSACTION)}، والمعادلة صحيحة`;
   if (r.balance.status === "UNEXPLAINED") return r.balance.reason;

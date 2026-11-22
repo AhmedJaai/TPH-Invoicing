@@ -13,7 +13,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { ACTION_LABEL } from "@/lib/audit-labels";
 import { SYSTEM_ACTOR_NAME, isSystemAudit } from "@/lib/audit-actor";
-import { DAY, DOCUMENT, SUPPLIER, countNoun } from "@/lib/arabic";
+import { DAY, DOCUMENT, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
 import { can, type Role } from "@/lib/permissions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { loadOverdueBalances } from "./supplier-balance.service";
@@ -174,8 +174,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       at: new Date(`${todayInRiyadh()}T00:00:00+03:00`).toISOString(),
       kind: "OVERDUE",
       tone: "warn",
-      title: `${countNoun(overdue.length, SUPPLIER)} تأخر سدادهم أكثر من ${countNoun(60, DAY)}`,
-      body: `أقدم مبلغ مستحق منذ ${countNoun(oldest, DAY)}.`,
+      title: `${countNoun(overdue.length, SUPPLIER)} تأخر سدادهم أكثر من ${countNounGen(60, DAY)}`,
+      body: `أقدم مبلغ مستحق منذ ${countNounGen(oldest, DAY)}.`,
       /* من لا يعتمد الدفعة يفتح الحسابات — لا صفحةً تقول «خارج صلاحيتك» */
       href: can(user.role, "payment:approve") ? "/payments" : "/suppliers",
     });

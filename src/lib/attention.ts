@@ -1,5 +1,5 @@
 import {
-  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, type NounForms, EMPLOYEE, MONTH, COMPLAINT, MESSAGE,
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, TRANSFER, countNoun, countNounGen, type NounForms, EMPLOYEE, MONTH, COMPLAINT, MESSAGE,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import type { Capability } from "./permissions";
@@ -408,8 +408,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "VAT",
       severity: late || v.daysLeft <= 10 ? "HIGH" : "MEDIUM",
       title: late
-        ? `فات موعد إقرار ضريبة ${v.label} منذ ${countNoun(-v.daysLeft, DAY)}`
-        : `إقرار ضريبة ${v.label}: آخر موعد له ${formatDay(v.deadline)} (بعد ${countNoun(v.daysLeft, DAY)})`,
+        ? `فات موعد إقرار ضريبة ${v.label} منذ ${countNounGen(-v.daysLeft, DAY)}`
+        : `إقرار ضريبة ${v.label}: آخر موعد له ${formatDay(v.deadline)} (بعد ${countNounGen(v.daysLeft, DAY)})`,
       detail: late
         ? "إن كنت قدّمته فسجّل ذلك ليختفي هذا البند، وإلا فالتأخير عليه غرامة عند الهيئة."
         : "قدّمه وسدّد المبلغ عبر بوابة هيئة الزكاة والضريبة والجمارك. حسابه وما ينقصه في صفحة الإقرار.",
@@ -621,7 +621,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "overdue",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: `مورّدون تأخرت مستحقاتهم أكثر من ${countNoun(OVERDUE_DAYS, DAY)}`,
+      title: `مورّدون تأخرت مستحقاتهم أكثر من ${countNounGen(OVERDUE_DAYS, DAY)}`,
       detail: "التأخر الطويل يفسد شروط التوريد ويضعف موقفك في التفاوض.",
       action: "أضفها إلى دفعة أول الشهر.",
       actionLabel: "راجع المتأخرة",
@@ -944,7 +944,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "foodics-stale",
       area: "DATA",
       severity: days >= 3 ? "HIGH" : "MEDIUM",
-      title: days >= 1 ? `لم تُقرأ بيانات فودكس منذ ${countNoun(days, DAY)}` : "لم تُقرأ بيانات فودكس منذ أكثر من يوم",
+      title: days >= 1 ? `لم تُقرأ بيانات فودكس منذ ${countNounGen(days, DAY)}` : "لم تُقرأ بيانات فودكس منذ أكثر من يوم",
       detail: "آخر مزامنة ناجحة قديمة. مبيعات الأيام التي تلتها وصناديقها ليست في النظام، فأرقام «المالية» والجرد ناقصة بقدرها.",
       action: "اضغط «زامن الآن». وإن رفض فودكس المفتاح فقد أُلغي من «Authorized Apps»، فاطلب مفتاحاً جديداً.",
       actionLabel: "زامن فودكس",
@@ -1212,7 +1212,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "MEDIUM",
       title: shortages.length === 1
-        ? `«${shortages[0].name}» يخرج من المخزون أكثر مما تفسّره وصفته، منذ ${countNoun(shortages[0].months, MONTH)} على التوالي`
+        ? `«${shortages[0].name}» يخرج من المخزون أكثر مما تفسّره وصفته، منذ ${countNounGen(shortages[0].months, MONTH)} على التوالي`
         : `${countNoun(shortages.length, PRODUCT)} تخرج من المخزون أكثر مما تفسّره وصفاتها`,
       detail: "الفرق تكرر شهرين فأكثر، فيبعد أن يكون خطأ عدّ عابراً. قد يكون هدراً غير مسجّل، أو وصفة أقل من الكمية المستخدمة فعلاً (جرعة أكبر، أو ضبط الطحن)، أو تسرّباً. والبيانات وحدها لا تحدد السبب.",
       action: "راجع الوصفة: هل تطابق الكمية المستخدمة فعلاً؟ وسجّل الهدر حين يقع ليخرج من الفرق.",

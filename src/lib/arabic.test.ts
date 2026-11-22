@@ -114,3 +114,15 @@ describe("الصفةُ والفعلُ يتبعان العدد", () => {
     expect([1, 2, 4].map(mustBeResolved)).toEqual(["يجب حلّه", "يجب حلّهما", "يجب حلّها"]);
   });
 });
+
+describe("المثنّى بعد حرف جرّ", () => {
+  it("«عن فاتورتين» لا «عن فاتورتان»، والمنصوبُ أصلاً كما هو", async () => {
+    const { countNounGen, genitiveDual, INVOICE, SUPPLIER, DAY } = await import("./arabic");
+    expect(countNounGen(2, INVOICE)).toBe("فاتورتين");
+    expect(genitiveDual("مورّدان")).toBe("مورّدين");
+    expect(genitiveDual("عرضا سعر")).toBe("عرضي سعر");
+    expect(countNounGen(2, DAY)).toBe(countNounGen(2, DAY));
+    expect(countNounGen(3, INVOICE)).toBe("3 فواتير");
+    expect(countNounGen(1, SUPPLIER)).toBe(SUPPLIER.one);
+  });
+});

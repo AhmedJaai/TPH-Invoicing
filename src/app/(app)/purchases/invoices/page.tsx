@@ -21,7 +21,7 @@ import {
   OVERDUE_DAYS, PAGE_SIZE, PAID_LABEL, TAX_LABEL,
   describe as describeFilters, hasFilters, linkTo, parseFilters, type PaidFilter,
 } from "@/lib/invoice-filter";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { INVOICE, countNoun, countNounGen } from "@/lib/arabic";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { invoiceHref } from "@/lib/invoice-profile";
@@ -241,7 +241,7 @@ export default async function InvoicesPage({
               href={f.paid === "OPEN" ? undefined : linkTo(f, { paid: "OPEN" })}
               sub={
                 Number(t.openN) > 0
-                  ? `على ${countNoun(Number(t.openN), INVOICE)}. أما حساب كل مورّد بعد خصم رصيدك عنده ففي «المورّدون».`
+                  ? `على ${countNounGen(Number(t.openN), INVOICE)}. أما حساب كل مورّد بعد خصم رصيدك عنده ففي «المورّدون».`
                   : "لا شيء متبقٍ على الفواتير المعروضة."
               }
             />

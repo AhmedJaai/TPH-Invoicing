@@ -6,7 +6,7 @@ import { ChevronDown, CircleAlert, Lightbulb, SkipForward, Store, Wallet } from 
 import { Money } from "./money";
 import { Badge, DoneMark, Meter, Monogram, buttonClass, type Tone } from "./ui";
 import { BusyStatus, toast } from "./ui-client";
-import { countNoun, TRANSACTION } from "@/lib/arabic";
+import { countNoun, countNounGen, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
 import { suggestSuppliers } from "@/lib/supplier-suggest";
 import { SupplierPicker } from "./supplier-picker";
@@ -402,7 +402,7 @@ export function ReconcileQueue({
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button type="button" aria-busy={busy === "identify"} disabled={!ready || busy !== null} onClick={identify} className={buttonClass(group.supplierId ? "secondary" : "primary", "sm")}>
                   {group.items.length > 1
-                      ? `${ACT.defineGroup}، وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
+                      ? `${ACT.defineGroup}، وطبّقها على ${countNounGen(group.items.length, TRANSACTION)}`
                       : ACT.saveIdentityAndNext}
                 </button>
                 {!ready && kind === "SUPPLIER" && <span className="text-[11px] text-muted">اختر المورّد أولاً.</span>}

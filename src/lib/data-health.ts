@@ -1,4 +1,4 @@
-import { DAY, INVOICE, MONTH, SUPPLIER, TRANSACTION, countNoun } from "./arabic";
+import { DAY, INVOICE, MONTH, SUPPLIER, TRANSACTION, countNoun, countNounGen } from "./arabic";
 import { addDays, formatDay } from "./riyadh-time";
 /**
  * صحّة البيانات.
@@ -101,7 +101,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: lines,
     known: input.invoicesWithLines,
     total: input.invoices,
-    detail: `${input.invoicesWithLines} من ${countNoun(input.invoices, INVOICE)} لها بنود (${pct(lines)})`,
+    detail: `${input.invoicesWithLines} من ${countNounGen(input.invoices, INVOICE)} لها بنود (${pct(lines)})`,
     action: lines >= 0.95 ? undefined : "اقرأ محتوى باقي الفواتير، فبدون البنود لا يمكن تحليل الأصناف",
   });
 
@@ -113,7 +113,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: tax,
     known: input.invoicesWithTaxDetail,
     total: input.invoices,
-    detail: `${input.invoicesWithTaxDetail} من ${countNoun(input.invoices, INVOICE)} قُرئ تفصيلها الضريبي (${pct(tax)})`,
+    detail: `${input.invoicesWithTaxDetail} من ${countNounGen(input.invoices, INVOICE)} قُرئ تفصيلها الضريبي (${pct(tax)})`,
     action: tax >= 0.95 ? undefined : "باقي الفواتير حالتها غير معروفة لا غير صالحة، فاقرأ مستنداتها",
   });
 
@@ -128,7 +128,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.monthsWithInvoices === 0
         ? "لا أشهر بعد"
-        : `${input.monthsWithBank} من ${countNoun(input.monthsWithInvoices, MONTH)} له كشف بنك`,
+        : `${input.monthsWithBank} من ${countNounGen(input.monthsWithInvoices, MONTH)} له كشف بنك`,
     action: bank >= 0.95 ? undefined : "استورد كشف الحساب للأشهر الناقصة",
   });
 
@@ -158,7 +158,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.suppliersWithInvoices === 0
         ? "لا مورّدين بعد"
-        : `${input.suppliersWithStatements} من ${countNoun(input.suppliersWithInvoices, SUPPLIER)} وصلنا كشف حسابه`,
+        : `${input.suppliersWithStatements} من ${countNounGen(input.suppliersWithInvoices, SUPPLIER)} وصلنا كشف حسابه`,
     action: statements >= 0.95 ? undefined : "اطلب الكشوف من المورّدين، فهي وحدها تكشف أي فاتورة سُجّلت عليك ولم تصلك",
   });
 
@@ -191,7 +191,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
       coverage: cov,
       known: sales.days,
       total: expected,
-      detail: `${sales.days} من ${countNoun(expected, DAY)} منذ ${formatDay(sales.firstDay)} فيها مبيعات (${pct(cov)}) · آخرها ${formatDay(sales.lastDay)}`,
+      detail: `${sales.days} من ${countNounGen(expected, DAY)} منذ ${formatDay(sales.firstDay)} فيها مبيعات (${pct(cov)}) · آخرها ${formatDay(sales.lastDay)}`,
       action: stale
         ? "آخر مبيعات وصلت قبل أكثر من ثلاثة أيام، فزامن فودكس من «المالية ← المبيعات»"
         : cov >= 0.95 ? undefined : "الأيام الناقصة بلا مبيعات في فودكس: إن كان المقهى مفتوحاً فيها فزامن فودكس",
@@ -221,7 +221,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
       coverage: fresh ? 1 : 0.5,
       known: inv.counts,
       total: inv.counts,
-      detail: `${inv.counts === 1 ? "جرد معتمد واحد" : inv.counts === 2 ? "جردان معتمدان" : `${inv.counts} جرود معتمدة`}، آخرها ${formatDay(inv.lastDay)} (قبل ${countNoun(ageDays, DAY)})`,
+      detail: `${inv.counts === 1 ? "جرد معتمد واحد" : inv.counts === 2 ? "جردان معتمدان" : `${inv.counts} جرود معتمدة`}، آخرها ${formatDay(inv.lastDay)} (قبل ${countNounGen(ageDays, DAY)})`,
       action: fresh ? undefined : "مضى على آخر جرد أكثر من أربعين يوماً، فاعتمد جرداً جديداً لتُحسب تكلفة الشهر بالجرد",
     });
   }

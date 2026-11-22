@@ -12,7 +12,7 @@
  */
 
 import type { BalanceStatus } from "@/lib/bank/balance-equation";
-import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun, countNounGen } from "./arabic";
 import { formatDay, formatMonth } from "./riyadh-time";
 import { filingDeadline, periodKey, periodMonths, quarterLabel, quarterOfMonth } from "./vat-return";
 import { formatRiyalsDisplay } from "./money";
@@ -237,7 +237,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     const parts = [
       missingStatements === 0 ? null
       : facts.suppliersWithInvoices === 1 ? "لم يصل كشف حساب مورّد الشهر الوحيد"
-      : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشف حسابه`,
+      : `${missingStatements} من ${countNounGen(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشف حسابه`,
       differing > 0 ? `${countNoun(differing, SUPPLIER)} وصل كشف حسابه وفيه فروق مع سجلاتنا` : null,
     ].filter((x): x is string => x !== null);
     items.push({

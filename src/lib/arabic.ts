@@ -32,6 +32,23 @@ export function nounForm(n: number, f: NounForms): string {
 }
 
 /**
+ * المثنّى مجروراً: «فاتورتان» ← «فاتورتين»، و«عرضا سعر» ← «عرضي سعر». وما كُتب منصوباً أصلاً
+ * («مرّتين» · «يومين») يبقى كما هو.
+ */
+export function genitiveDual(two: string): string {
+  if (/ان$/.test(two)) return two.replace(/ان$/, "ين");
+  return two.replace(/^(\S+)ا(?= )/, "$1ي");
+}
+
+/**
+ * العددُ ومميّزه بعد حرف جرّ — «عن فاتورتين» لا «عن فاتورتان». كانت الصفحاتُ تكتب
+ * `عن ${countNoun(2, INVOICE)}` فتخرج «عن فاتورتان مفتوحة» في رأس حساب المورّد.
+ */
+export function countNounGen(n: number, f: NounForms): string {
+  return countNoun(n, { ...f, two: genitiveDual(f.two) });
+}
+
+/**
  * العدد ومميّزه معاً — ويُحذف العدد مع الواحد والاثنين لأنّ الصيغة
  * تحمله: «بند واحد» لا «١ بند واحد».
  */

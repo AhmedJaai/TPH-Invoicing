@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { CalendarCheck, CheckCircle2, ChevronUp, Coffee, Info, LogIn, LogOut, MapPin, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { countNoun, DAY_AGO, MINUTE } from "@/lib/arabic";
+import { countNoun, countNounGen, DAY_AGO, MINUTE } from "@/lib/arabic";
 import { clock12, nextKind, riyadhClock, trusted, VERDICT_LABEL } from "@/lib/payroll/attendance";
 import type { CheckinVerdict } from "@/db/schema";
 
@@ -106,7 +106,7 @@ export function AttendPanel({ token, recent: fromServer, today, shiftRange, shif
     const [h, m] = shiftStart.split(":").map(Number);
     const nowMin = Number(riyadhClock(now).slice(0, 2)) * 60 + Number(riyadhClock(now).slice(3, 5));
     const diff = h * 60 + m - nowMin;
-    if (diff > 0 && diff <= 120) shiftNote = `يبدأ دوامك بعد ${countNoun(diff, MINUTE)}`;
+    if (diff > 0 && diff <= 120) shiftNote = `يبدأ دوامك بعد ${countNounGen(diff, MINUTE)}`;
     else if (diff <= 0 && diff > -240) shiftNote = "بدأ دوامك — سجّل حضورك";
   }
 
