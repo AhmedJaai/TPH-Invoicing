@@ -90,5 +90,11 @@
 "أخذ": "Taken",
 "لم يأخذ إجازة": "No leave taken",
 "المتبقي له": "Remaining",
-"قيمته غير معروفة: لا راتب مكتوب": "Value unknown: no salary recorded"
+"قيمته غير معروفة: لا راتب مكتوب": "Value unknown: no salary recorded",
+"يكفي": "Lasts",
+"لم يُعدّ": "Not counted",
+"لم يُصرف منه في 4 أسابيع": "None used in 4 weeks",
+"نفد أو يكاد": "Out or nearly out",
+"{0}: يكفي {1} تقريباً — على الرف نحو {2}، ويُصرف منه {3} يومياً": "{0}: lasts about {1} — about {2} on the shelf, using {3} a day",
+"تقدير من آخر جرد: المعدود، وما اشتُري بعده، وما صرفته الوصفات بعده، ومتوسط صرف آخر أربعة أسابيع. فاتورة لم تُربط بصنفها تجعله يبدو أقل مما على الرف.": "Estimated from the last count: what was counted, what was bought after, what recipes used after, and the average use over the last four weeks. An invoice not linked to its item makes it look lower than what is on the shelf."
 }

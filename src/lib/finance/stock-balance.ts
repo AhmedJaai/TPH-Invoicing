@@ -55,7 +55,14 @@ export interface BalanceItemInput {
   toDate: RangeFigures;
   toCount: RangeFigures | null;
   count: { day: string; milli: number; source: "OURS" | "FOODICS" } | null;
+  /** آخرُ `COVER_WINDOW_DAYS` يوماً حتى آخر المدّة — معدّلُ الصرف اليوميّ. `null` لا يُحسب. */
+  recent?: RangeFigures | null;
 }
+
+/** نافذةُ معدّل الصرف: أربعةُ أسابيع — تحمل أيّامَ الأسبوع كلَّها مرّاتٍ متساوية. */
+export const COVER_WINDOW_DAYS = 28;
+/** يُنبَّه على ما يكفي أقلَّ من هذا — أسبوعٌ يكفي لطلب البنّ ووصوله. */
+export const COVER_WARN_DAYS = 7;
 
 export type BalanceNote =
   /** لا شراءَ معروفاً له من أيّ مصدر. */
@@ -96,6 +103,12 @@ export interface BalanceItem {
   lostMilli: number | null;
   lostMinor: number | null;
   notes: BalanceNote[];
+  /**
+   * كم يكفي — من آخر عدٍّ لا من «كلّ ما اشتُري»: المعدودُ + ما اشتُري بعده − ما صُرف بعده
+   * (`onShelfMilli`)، مقسوماً على صرف اليوم في آخر أربعة أسابيع. `null` بلا عدٍّ أو بلا صرفٍ معروف.
+   * تقديرٌ يُسمّى تقديراً — ويُبنى على العدّ لأنّ المشترى منذ البداية ناقصٌ في أصنافٍ كثيرة.
+   */
+  cover: { onShelfMilli: number; dailyUseMilli: number; daysLeft: number | null } | null;
 }
 
 /** الأكملُ من المصدرين حتى تاريخ: كمّيّتُه وقيمتُه. `null` لا يُعرَف من أيّهما. */
@@ -148,7 +161,19 @@ export function buildBalanceItem(i: BalanceItemInput): BalanceItem {
     lostMilli = null; lostMinor = null;
     notes.push("SUSPECT_ENTRY");
   }
+  /* ── كم يكفي: من آخر عدٍّ لا ضائعَ مشكوكٌ فيه ── */
+  let cover: BalanceItem["cover"] = null;
+  if (i.count !== null && i.toCount !== null && i.recent && i.recent.soldMilli !== null && !notes.includes("SUSPECT_ENTRY")) {
+    const boughtSince = end !== null && best(i.toCount) !== null ? end.milli - best(i.toCount)!.milli : null;
+    const usedSince = i.toDate.soldMilli !== null && i.toCount.soldMilli !== null ? i.toDate.soldMilli - i.toCount.soldMilli : null;
+    if (boughtSince !== null && usedSince !== null) {
+      const onShelfMilli = Math.max(0, i.count.milli + boughtSince - usedSince - (i.toDate.wasteMilli - i.toCount.wasteMilli));
+      const dailyUseMilli = Math.round(i.recent.soldMilli / COVER_WINDOW_DAYS);
+      cover = { onShelfMilli, dailyUseMilli, daysLeft: dailyUseMilli > 0 ? Math.floor(onShelfMilli / dailyUseMilli) : null };
+    }
+  }
   return {
+    cover,
     productId: i.productId, name: i.name, baseUnit: i.baseUnit, source,
     invoicesToDateMilli: i.toDate.invoicesMilli, foodicsToDateMilli: i.toDate.foodicsMilli,
     purchasedMilli: period.milli, purchasedMinor: period.minor,

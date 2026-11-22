@@ -87,3 +87,32 @@ it("الضائع والزائد لا يتقاصّان", () => {
   expect(t.foundMinor).toBe(-50_000);
   expect(totalBalance([buildBalanceItem(base)]).lostMinor).toBeNull();
 });
+
+describe("كم يكفي المخزون — من آخر عدّ", () => {
+  it("المعدودُ + ما اشتُري بعده − ما صُرف بعده، مقسوماً على صرف اليوم في أربعة أسابيع", () => {
+    /* عُدّ ١٢ كيلو، واشتُري بعده ١٠ (١٠٠−٩٠)، وصُرف ٥ (٨٠−٧٥) → ١٧ كيلو؛ وصُرف ٢٨ كيلو في ٢٨ يوماً → كيلو في اليوم */
+    const b = buildBalanceItem({
+      ...base,
+      toCount: r({ foodicsMilli: 90_000_000, soldMilli: 75_000_000 }),
+      count: { day: "2026-10-10", milli: 12_000_000, source: "OURS" },
+      recent: r({ soldMilli: 28_000_000 }),
+    });
+    expect(b.cover).toEqual({ onShelfMilli: 17_000_000, dailyUseMilli: 1_000_000, daysLeft: 17 });
+  });
+
+  it("بلا عدٍّ أو بلا صرفٍ معروف لا يُقال «يكفي»", () => {
+    expect(buildBalanceItem({ ...base, recent: r() }).cover).toBeNull();
+    expect(buildBalanceItem({
+      ...base, toCount: r({ foodicsMilli: 90_000_000, soldMilli: 75_000_000 }),
+      count: { day: "d", milli: 12_000_000, source: "OURS" }, recent: r({ soldMilli: null }),
+    }).cover).toBeNull();
+  });
+
+  it("لم يُصرف شيءٌ في أربعة أسابيع: الكمّيّةُ معروفة والأيّامُ غير معروفة", () => {
+    const b = buildBalanceItem({
+      ...base, toCount: r({ foodicsMilli: 90_000_000, soldMilli: 75_000_000 }),
+      count: { day: "d", milli: 12_000_000, source: "OURS" }, recent: r({ soldMilli: 0 }),
+    });
+    expect(b.cover?.daysLeft).toBeNull();
+  });
+});

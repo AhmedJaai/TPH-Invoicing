@@ -13,7 +13,7 @@ import { computeConsumption, type SoldLineInput } from "@/lib/inventory/consumpt
 import { summarisePurchases, type PurchaseLineInput } from "@/lib/inventory/purchases";
 import { indexRecipeVersions } from "@/lib/inventory/recipe";
 import { toCanonical } from "@/lib/inventory/units";
-import { buildBalanceItem, totalBalance, type BalanceItem, type BalanceTotals, type RangeFigures } from "@/lib/finance/stock-balance";
+import { buildBalanceItem, COVER_WINDOW_DAYS, totalBalance, type BalanceItem, type BalanceTotals, type RangeFigures } from "@/lib/finance/stock-balance";
 import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { loadPurchaseLines, loadSoldForReport } from "./inventory.service";
@@ -138,6 +138,8 @@ export async function loadStockBalance(month: string | null, opts: { trendFor?: 
   const toDate = from === null ? period : figures(data, BEGINNING, to);
   const toCount = countDay ? figures(data, BEGINNING, countDay) : null;
   const before = from === null ? null : figures(data, BEGINNING, addDays(from, -1));
+  /* صرفُ آخر أربعة أسابيع حتى آخر المدّة — لـ«كم يكفي» */
+  const recent = figures(data, addDays(to, -(COVER_WINDOW_DAYS - 1)), to);
   const empty: RangeFigures = { invoicesMilli: null, invoicesMinor: 0, foodicsMilli: null, foodicsMinor: 0, soldMilli: null, staffMilli: 0, wasteMilli: 0 };
 
   const items = data.stock.map((p) => {
@@ -147,6 +149,7 @@ export async function loadStockBalance(month: string | null, opts: { trendFor?: 
       period: period.get(p.id) ?? empty, before: before === null ? null : before.get(p.id) ?? empty, toDate: toDate.get(p.id) ?? empty,
       toCount: counted === undefined ? null : toCount?.get(p.id) ?? null,
       count: counted === undefined || countDay === null || count.source === null ? null : { day: countDay, milli: counted, source: count.source },
+      recent: recent.get(p.id) ?? null,
     });
   });
 

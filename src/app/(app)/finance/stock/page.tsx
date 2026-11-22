@@ -1,8 +1,8 @@
-import { MONTH, PRODUCT, countNoun, countNounGen } from "@/lib/arabic";
+import { DAY, MONTH, PRODUCT, countNoun, countNounGen } from "@/lib/arabic";
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Boxes, Info, Link2, PackageCheck, Scale, ShoppingCart, Utensils } from "lucide-react";
+import { Boxes, Info, Link2, PackageCheck, Scale, ShoppingCart, Timer, Utensils } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -10,7 +10,7 @@ import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { SignalControls } from "@/components/signal-controls";
 import { Callout, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
-import { BALANCE_NOTE_LABEL, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
+import { BALANCE_NOTE_LABEL, COVER_WARN_DAYS, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
 import { readableQuantity } from "@/lib/finance/quantity";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
@@ -119,12 +119,29 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       sortBy: (x) => (x.lostMinor === null ? null : Math.abs(x.lostMinor)),
     },
     {
+      key: "cover", header: "يكفي", numeric: true,
+      cell: (x) => (x.cover === null
+        ? <span className="text-[11px] text-muted">{x.count === null ? "لم يُعدّ" : "غير معروف"}</span>
+        : x.cover.daysLeft === null
+          ? <span className="text-[11px] text-muted">لم يُصرف منه في 4 أسابيع</span>
+          : <span className={`block ${x.cover.daysLeft < COVER_WARN_DAYS ? "font-bold text-warn" : ""}`}>
+              {x.cover.daysLeft === 0 ? "نفد أو يكاد" : countNoun(x.cover.daysLeft, DAY)}
+              <span className="nums block text-[10px] font-normal text-muted">{qty(x, x.cover.onShelfMilli)}</span>
+            </span>),
+      sortBy: (x) => x.cover?.daysLeft ?? null,
+      sortFirst: "asc",
+    },
+    {
       key: "notes", header: "ملاحظة", wrap: true, secondary: true,
       cell: (x) => (x.notes.length === 0 ? <span className="text-muted">—</span> : (
         <span className="flex flex-col items-start gap-0.5 text-[11px] text-warn">{x.notes.map((n) => <span key={n}>{BALANCE_NOTE_LABEL[n]}</span>)}</span>
       )),
     },
   ];
+
+  const runningOut = b.items
+    .filter((x) => x.cover?.daysLeft !== null && x.cover?.daysLeft !== undefined && x.cover.daysLeft < COVER_WARN_DAYS)
+    .sort((a, b2) => (a.cover!.daysLeft ?? 0) - (b2.cover!.daysLeft ?? 0));
 
   return (
     <PageShell
@@ -191,6 +208,20 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         <Callout tone="warn" icon={Info} className="mt-4" title={`${countNoun(short.length, PRODUCT)} بيع منها أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
           action={<LinkButton href="/finance/stock/links" size="sm">اربط البنود</LinkButton>}>
           هذا ليس خطأً من المقهى، بل مشتريات لم تدخل الحساب: فاتورة لم تُربط بصنفها، أو لم تُدخل في فودكس، أو بضاعة اشتُريت قبل الافتتاح. اربط بنود الفواتير لتكتمل الصورة.
+        </Callout>
+      )}
+
+      {/* ما ينفد خلال أسبوع — من آخر عدٍّ لا من كلّ ما اشتُري: يُطلب قبل أن ينفد */}
+      {runningOut.length > 0 && (
+        <Callout tone="warn" icon={Timer} className="mt-4" title={`${countNoun(runningOut.length, PRODUCT)} قد ينفد خلال أسبوع`}>
+          <ul className="mt-1 space-y-0.5">
+            {runningOut.map((x) => (
+              <li key={x.productId}>
+                <T s="{0}: يكفي {1} تقريباً — على الرف نحو {2}، ويُصرف منه {3} يومياً" a={[<strong key="0">{x.name}</strong>, x.cover!.daysLeft === 0 ? "أقل من يوم" : countNounGen(x.cover!.daysLeft!, DAY), <span key="2" className="nums">{qty(x, x.cover!.onShelfMilli)}</span>, <span key="3" className="nums">{qty(x, x.cover!.dailyUseMilli)}</span>]} />
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-ink-soft">تقدير من آخر جرد: المعدود، وما اشتُري بعده، وما صرفته الوصفات بعده، ومتوسط صرف آخر أربعة أسابيع. فاتورة لم تُربط بصنفها تجعله يبدو أقل مما على الرف.</p>
         </Callout>
       )}
 
