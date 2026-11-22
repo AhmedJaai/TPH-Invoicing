@@ -150,6 +150,17 @@ describe("شراء البضاعة يقدّم على التصنيف", () => {
     expect(out.goodsPurchases).toHaveLength(1);
   });
 
+  it("«شراء بضاعة» غرضُ التحويل الافتراضيّ في الأهلي — وتصنيفُ صاحب المقهى بيده يغلبه", () => {
+    const txs = [
+      tx({ id: "salary", category: "SALARY", classificationSource: "HUMAN", description: "الوليد محمد علي بامخشب BEN ID:1129311518 شراء بضاعة" }),
+      tx({ id: "other", category: "OTHER", classificationSource: "HUMAN", description: "حوالات تحت الطلب MUHAMMAD ZAHID شراء بضاعة" }),
+      tx({ id: "learned", category: "SALARY", classificationSource: "MEMORY", description: "محمد ابوبكر شراء بضاعة" }),
+    ];
+    const out = deriveFromBank(txs);
+    expect(out.candidates.map((c) => c.bankTransactionId)).toEqual(["salary", "other"]);
+    expect(out.goodsPurchases.map((g) => g.bankTransactionId)).toEqual(["learned"]);
+  });
+
   it("الراتب الصريح يبقى مصروفاً", () => {
     const out = deriveFromBank([
       tx({ id: "s", category: "SALARY", description: "البراء الجعيدي BV:رواتب شهرية" }),

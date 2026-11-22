@@ -19,6 +19,7 @@
  * نقيّ: لا قاعدةَ هنا. المال هللاتٌ صحيحة.
  */
 import { DAY, countNoun } from "@/lib/arabic";
+import { recognizePos } from "@/lib/bank/pos";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { formatDay } from "@/lib/riyadh-time";
 
@@ -66,6 +67,19 @@ export interface ExcludedRow {
 
 /** ضريبةُ الرسوم مبلغُها هو الضريبة، وتُخصَم في الإقرار (`vat-return.ts`) — ليست مصروفاً. */
 export const RECOVERABLE_VAT: ReadonlySet<TxCategory> = new Set<TxCategory>(["POS_VAT", "BANK_VAT"]);
+
+/**
+ * أهذا المصروفُ ضريبةَ رسومٍ تُخصم في الإقرار؟ — بابُه، أو المصنِّفُ نفسُه لسطرٍ قُيّد «رسماً».
+ *
+ * ضريبةُ رسوم الشبكة في صيغة `REFERENCE` (`VS` · `VM` · `VV` · `AV`) كانت تُصنَّف رسماً حتى
+ * أُصلح المصنِّف (٦ أكتوبر ٢٠٢٦)، وما قُيّد قبله باقٍ «رسماً» ولا يُعاد تصنيفُه بالكتابة. الإقرارُ
+ * يقرؤه بالمصنِّف (`vat-return.service.ts`) فيخصمه، وقائمةُ الدخل كانت تعدّه مصروفاً — الريالُ
+ * نفسُه خُصم ضريبةً وحُسب تكلفة. قيس على نسخة الإنتاج: أغسطس ١٥٤٫٢٣ · سبتمبر ١٦٥٫٤٨ · أكتوبر ٩٫٦٠.
+ */
+export function isRecoverableVat(category: TxCategory, description: string | null | undefined): boolean {
+  if (RECOVERABLE_VAT.has(category)) return true;
+  return category === "POS_FEE" && recognizePos(description, "DEBIT")?.kind === "POS_VAT";
+}
 
 /** سدادٌ لهيئة الزكاة والضريبة: تسويةُ ضريبةٍ جُمعت من الزبائن، لا مصروفُ تشغيل. */
 export function isTaxSettlement(...texts: (string | null | undefined)[]): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPnl, isTaxSettlement, monthsBetween, ownerPaidDeduction, spreadShare, type PnlInput } from "./pnl";
+import { buildPnl, isRecoverableVat, isTaxSettlement, monthsBetween, ownerPaidDeduction, spreadShare, type PnlInput } from "./pnl";
 
 const base: PnlInput = {
   month: "2026-06", open: false,
@@ -130,5 +130,25 @@ describe("ما سُدّد به فاتورةٌ عبر موظّف (084)", () => {
     ] });
     expect(p.lines.find((l) => l.id === "excluded")?.amountMinor).toBe(1_879);
     expect(p.lines.find((l) => l.id === "excluded-purchases")?.amountMinor).toBe(100_000);
+  });
+});
+
+describe("isRecoverableVat — ضريبةُ الرسوم ليست مصروفاً ولو قُيّدت «رسماً»", () => {
+  it("بابُها ضريبة: لا مصروف", () => {
+    expect(isRecoverableVat("POS_VAT", "81140155-260610-POS VS VA T 44770")).toBe(true);
+    expect(isRecoverableVat("BANK_VAT", null)).toBe(true);
+  });
+
+  it("سطرُ «VS/VM/VV» قُيّد رسماً قبل إصلاح المصنِّف (أغسطس–أكتوبر ٢٠٢٦) يُقرأ بالمصنِّف: ضريبة", () => {
+    expect(isRecoverableVat("POS_FEE", "REFERENCE : 81140155 VS26 0811 000000")).toBe(true);
+    expect(isRecoverableVat("POS_FEE", "REFERENCE : 81140155 VV26 0811 000000")).toBe(true);
+    expect(isRecoverableVat("POS_FEE", "REFERENCE : 81140155 VM26 0811 000000")).toBe(true);
+  });
+
+  it("الرسمُ نفسُه («FS/FV/FM») يبقى مصروفاً", () => {
+    expect(isRecoverableVat("POS_FEE", "REFERENCE : 81140155 FS26 0811 000000")).toBe(false);
+    expect(isRecoverableVat("POS_FEE", "81140155-260610-POS FV Fe es 44770")).toBe(false);
+    expect(isRecoverableVat("POS_FEE", null)).toBe(false);
+    expect(isRecoverableVat("UTILITY", "REFERENCE : 81140155 VS26 0811 000000")).toBe(false);
   });
 });

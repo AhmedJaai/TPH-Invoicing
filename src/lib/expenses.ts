@@ -48,6 +48,8 @@ export interface BankTx {
   amountMinor: number;
   direction: "DEBIT" | "CREDIT";
   category: TxCategory;
+  /** مَن صنّفها — `HUMAN` صاحبُ المقهى بيده. غيابُه يعامَل كتصنيفٍ مستنتَج. */
+  classificationSource?: string | null;
 }
 
 /**
@@ -89,6 +91,20 @@ export const GOODS_PURCHASE_MARKERS: readonly string[] = [
 export function looksLikeGoodsPurchase(...texts: (string | null | undefined)[]): boolean {
   const blob = texts.filter(Boolean).join(" ").toLowerCase();
   return GOODS_PURCHASE_MARKERS.some((m) => blob.includes(m.toLowerCase()));
+}
+
+/**
+ * أيُستبعَد قيدُ الحركة مصروفاً لأنّ وصفها «شراء بضاعة»؟ — لا حين صنّفها صاحبُ المقهى بيده.
+ *
+ * «شراء بضاعة» غرضُ التحويل الافتراضيّ في الأهلي: يحمله كلُّ سدادٍ لمورّد تقريباً، وكلُّ راتبٍ
+ * أو أجرةٍ حُوّلت من «الأهلي إي كورب». فكان يُسقط من قائمة الدخل ما صنّفه أحمد بنفسه راتباً أو
+ * «أخرى» — ولا فاتورةَ له في المشتريات ولا سدادَ مورّدٍ مطابَقاً، فلا يُحسب في أيّ باب. قيس على
+ * نسخة الإنتاج (٢٣ نوفمبر ٢٠٢٦): تسعُ حركاتٍ بـ‏٩٬٠٢٨ ريالاً، منها راتبُ الوليد لأغسطس (٢٬٢٠٠)
+ * وقد وزّعه أحمد في المسيّر. والاستبعادُ يبقى للتصنيف المستنتَج (قاعدةٌ تعلّمت اسم شخصٍ هو مورّدٌ
+ * وموظّف — أصلُ هذا الحارس).
+ */
+export function excludedAsGoodsPurchase(tx: Pick<BankTx, "description" | "beneficiaryRaw" | "classificationSource">): boolean {
+  return tx.classificationSource !== "HUMAN" && looksLikeGoodsPurchase(tx.description, tx.beneficiaryRaw);
 }
 
 export function periodOf(d: Date): string {
@@ -140,7 +156,7 @@ export function deriveFromBank(
     if (alreadyRecorded.has(tx.id)) continue;
     if (tx.amountMinor === 0) continue;
 
-    if (looksLikeGoodsPurchase(tx.description, tx.beneficiaryRaw)) {
+    if (excludedAsGoodsPurchase(tx)) {
       goodsPurchases.push({
         bankTransactionId: tx.id,
         label: tx.beneficiaryRaw?.trim() || tx.description?.trim() || "",

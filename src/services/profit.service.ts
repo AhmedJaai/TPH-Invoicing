@@ -28,7 +28,7 @@ import { indexRecipeVersions, type RecipeVersionInput } from "@/lib/inventory/re
 import { toCanonical } from "@/lib/inventory/units";
 import { assertMonthsOpen } from "./month-guard";
 import {
-  buildPnl, isTaxSettlement, monthsBetween, ownerPaidDeduction, RECOVERABLE_VAT, spreadShare,
+  buildPnl, isRecoverableVat, isTaxSettlement, monthsBetween, ownerPaidDeduction, spreadShare,
   type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs,
 } from "@/lib/finance/pnl";
 import { suspectCountJump } from "@/lib/finance/stock-flow";
@@ -438,7 +438,7 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
   for (const r of rows.rows) {
     if (!isTxCategory(r.category)) continue;
     const source = r.source === "INVOICE" ? "INVOICE" as const : r.source === "MANUAL" ? "MANUAL" as const : "BANK" as const;
-    if (RECOVERABLE_VAT.has(r.category)) {
+    if (isRecoverableVat(r.category, r.description)) {
       excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "ضريبة رسوم تُخصم في الإقرار الضريبي" });
     } else if (r.category === "GOVERNMENT" && isTaxSettlement(r.description, r.beneficiary, r.label)) {
       excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة والجمارك (تسوية ضريبية، لا مصروف)" });

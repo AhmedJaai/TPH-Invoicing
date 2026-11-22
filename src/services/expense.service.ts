@@ -18,7 +18,7 @@ import {
   deriveFromBank,
   bankExpenseLabel,
   isExpenseCategory,
-  looksLikeGoodsPurchase,
+  excludedAsGoodsPurchase,
   matchRecurring,
   unrecordedFromBank,
   type BankTx,
@@ -66,6 +66,7 @@ async function loadBankForExpenses(month?: string, conn: Conn = db): Promise<{ t
       amountMinor: bankTransactions.amountMinor,
       direction: bankTransactions.direction,
       category: bankTransactions.category,
+      classificationSource: bankTransactions.classificationSource,
     })
     .from(bankTransactions)
     .where(
@@ -88,6 +89,7 @@ async function loadBankForExpenses(month?: string, conn: Conn = db): Promise<{ t
     amountMinor: r.amountMinor,
     direction: r.direction as "DEBIT" | "CREDIT",
     category: r.category,
+    classificationSource: r.classificationSource,
   }));
   return { txs, already };
 }
@@ -256,6 +258,7 @@ export async function resyncBankExpenses(
       occurredOn: expenses.occurredOn,
       txId: bankTransactions.id,
       category: bankTransactions.category,
+      classificationSource: bankTransactions.classificationSource,
       direction: bankTransactions.direction,
       description: bankTransactions.description,
       beneficiaryRaw: bankTransactions.beneficiaryRaw,
@@ -273,7 +276,7 @@ export async function resyncBankExpenses(
   const remove = open.filter((r) =>
     r.direction !== "DEBIT"
     || !isExpenseCategory(r.category)
-    || looksLikeGoodsPurchase(r.description, r.beneficiaryRaw));
+    || excludedAsGoodsPurchase(r));
   const removeIds = new Set(remove.map((r) => r.expenseId));
   /* البابُ والاسمُ يتبعان الحركة — والاسمُ لا يكتبه أحدٌ بيده للمصروف البنكيّ */
   const update = open
@@ -308,6 +311,7 @@ export async function resyncBankExpenses(
         description: bankTransactions.description, beneficiaryRaw: bankTransactions.beneficiaryRaw,
         amountMinor: bankTransactions.amountMinor, direction: bankTransactions.direction,
         category: bankTransactions.category,
+        classificationSource: bankTransactions.classificationSource,
       })
       .from(bankTransactions)
       .where(inArray(bankTransactions.id, [...scope.transactionIds]));
