@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { RecordHistory } from "@/components/record-history";
 import { isUntaxedInvoice, UNTAXED_HINT, UNTAXED_LABEL } from "@/lib/invoice-tax-display";
 import { SupplierQrLine } from "@/components/supplier-qr";
 import { SectionBoundary } from "@/components/ui-client";
@@ -1090,6 +1091,8 @@ export async function SupplierView({
           )}
         </aside>
       </div>
+      {/* سجلُّ القرار على المورّد نفسه: إنشاؤه، ودمجُه، وتعديلُ اسمه وحسابه وشروطه — بفاعلها ووقتها وسببها */}
+      {can(user.role, "audit:view") && <RecordHistory viewerId={user.id} entities={[{ type: "supplier", id: s.id }]} />}
     </DetailFrame>
   );
 }

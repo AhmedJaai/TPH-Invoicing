@@ -7,10 +7,11 @@ import { db } from "@/db";
 import { foodicsSuppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import {
-  comparePurchases, suggestSupplierLinks,
-  type InvoiceSide, type PurchaseComparison, type PurchaseSide, type SupplierLinkSuggestion,
+  applyOwnerPairs, comparePurchases, nearMisses, parseOwnerPairKey, suggestSupplierLinks,
+  type InvoiceSide, type NearMiss, type PurchaseComparison, type PurchaseSide, type SupplierLinkSuggestion,
 } from "@/lib/foodics/purchase-compare";
 import { INVENTORY_TX, INVENTORY_TX_POSTED } from "@/lib/foodics/types";
+import { loadFoodicsSilenced } from "@/services/foodics-takings.service";
 
 export interface FoodicsSupplierRow {
   id: string;
@@ -32,10 +33,12 @@ export interface PurchaseWitness {
   returns: { reference: string; businessDate: string; supplierName: string | null; totalMinor: number }[];
   /** حركاتُ شراءٍ لم تُرحَّل بعد في فودكس — مسوّداتٌ لا يُقارَن بها. */
   drafts: number;
+  /** «ربما هي نفسها» لكلّ حركةٍ بلا مقابل — اقتراحٌ يُقرّه إنسان. */
+  nearMisses: Map<string, NearMiss>;
 }
 
 export async function loadPurchaseWitness(): Promise<PurchaseWitness> {
-  const [purchases, invoices, suppliers, ours] = await Promise.all([
+  const [purchases, invoices, suppliers, ours, ownerPairs] = await Promise.all([
     db.execute<{
       id: string; reference: string; type: number; status: number; business_date: string; foodics_supplier_id: string | null;
       supplier_name: string | null; linked_supplier_id: string | null; invoice_number: string | null; invoice_date: string | null; total_minor: number;
@@ -61,6 +64,7 @@ export async function loadPurchaseWitness(): Promise<PurchaseWitness> {
        order by count(fp.id) desc, fs.name
     `),
     db.execute<{ id: string; name: string; name_en: string | null }>(sql`select id, name_ar as name, name_en from suppliers order by name_ar`),
+    loadFoodicsSilenced("foodics-purchase"),
   ]);
 
   const posted = purchases.rows.filter((p) => Number(p.status) === INVENTORY_TX_POSTED);
@@ -76,9 +80,12 @@ export async function loadPurchaseWitness(): Promise<PurchaseWitness> {
     id: i.id, supplierId: i.supplier_id, supplierName: i.supplier_name, invoiceNumber: i.invoice_number, day: i.day, totalMinor: Number(i.total_minor),
   }));
 
-  const comparison = comparePurchases(side, invoiceSide);
+  /* ما أقرّه صاحبُ المقهى «هي نفسها» يخرج من «بلا مقابل» في كلّ شاشة — هنا، لا في كلٍّ منها */
+  const pairs = [...ownerPairs].flatMap((k) => parseOwnerPairKey(k) ?? []);
+  const comparison = applyOwnerPairs(comparePurchases(side, invoiceSide), pairs);
   return {
     comparison,
+    nearMisses: nearMisses(comparison.onlyFoodics, comparison.onlyOurs),
     suggestions: suggestSupplierLinks(comparison, invoiceSide),
     foodicsSuppliers: suppliers.rows.map((s) => ({
       id: s.id, name: s.name, linkedSupplierId: s.supplier_id, linkedSupplierName: s.linked_name,

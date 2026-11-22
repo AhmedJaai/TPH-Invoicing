@@ -78,7 +78,9 @@ export type MatchBasis =
    * مورّدُ فودكس غيرُ مربوط، وفاتورةٌ واحدةٌ لا غيرُها عندنا بمبلغها بالهللة في يومها أو قريباً منه.
    * «مورد حبوب قهوة» حمل فواتيرَ «أفال» قبل أن يُنشأ «Aval» في فودكس — ولا يُربط، فهو اسمٌ جامع.
    */
-  | "DAY_AMOUNT";
+  | "DAY_AMOUNT"
+  /** أقرّ صاحبُ المقهى أنّهما واحد («هي نفسها») — بعد أن عُرض عليه `nearMisses`. */
+  | "OWNER";
 
 export interface MatchedPair {
   purchase: PurchaseSide;
@@ -360,4 +362,70 @@ export function suggestSupplierLinks(comparison: Pick<PurchaseComparison, "match
     out.push(c);
   }
   return out;
+}
+
+/*
+  «ربما هي نفسها» — حركةٌ في فودكس وفاتورةٌ عندنا بقيا بلا مقابل، والمورّدُ واحدٌ والمبلغُ واحد، وبينهما
+  أكثرُ من `DATE_WINDOW_DAYS` وحتّى أسبوعين، ورقماهما مختلفان: «ZED» تُدخَل في فودكس برقم التسليم
+  (INV03176) بعد أسبوعٍ من فاتورتها (S16608). لا تُطابَق آلياً — المبلغُ المتكرّر (حليبٌ كلَّ أسبوعٍ بالسعر
+  نفسه) يجعل المسافةَ وحدها دليلاً ضعيفاً — فتُعرض اقتراحاً ويُقرّها إنسان (`applyOwnerPairs`).
+*/
+export const NEAR_MISS_DAYS = 14;
+
+export interface NearMiss { invoice: InvoiceSide; days: number }
+
+/** لكلّ حركةٍ مرشّحٌ واحدٌ لا غيرُه، ولا يرشَّح لغيرها — وإلّا فلا اقتراح. */
+export function nearMisses(onlyFoodics: readonly PurchaseSide[], onlyOurs: readonly InvoiceSide[]): Map<string, NearMiss> {
+  const candidates = new Map<string, InvoiceSide[]>();
+  const claimedBy = new Map<string, number>();
+  for (const p of onlyFoodics) {
+    if (p.linkedSupplierId === null) continue;
+    const near = onlyOurs.filter((i) => i.supplierId === p.linkedSupplierId && within(p.totalMinor - i.totalMinor) && daysOff(p, i) <= NEAR_MISS_DAYS);
+    candidates.set(p.id, near);
+    for (const i of near) claimedBy.set(i.id, (claimedBy.get(i.id) ?? 0) + 1);
+  }
+  const out = new Map<string, NearMiss>();
+  for (const p of onlyFoodics) {
+    const near = candidates.get(p.id) ?? [];
+    if (near.length === 1 && claimedBy.get(near[0].id) === 1) out.set(p.id, { invoice: near[0], days: daysOff(p, near[0]) });
+  }
+  return out;
+}
+
+/** ما أقرّه صاحبُ المقهى «هي نفسها» يخرج من القائمتين إلى المتطابقات — والزوجُ الذي غاب أحدُ طرفيه يُترك. */
+export function applyOwnerPairs(c: PurchaseComparison, pairs: readonly { purchaseId: string; invoiceId: string }[]): PurchaseComparison {
+  if (pairs.length === 0) return c;
+  const purchases = new Map(c.onlyFoodics.map((p) => [p.id, p]));
+  const invoices = new Map(c.onlyOurs.map((i) => [i.id, i]));
+  const matched = [...c.matched];
+  const usedP = new Set<string>();
+  const usedI = new Set<string>();
+  for (const { purchaseId, invoiceId } of pairs) {
+    const p = purchases.get(purchaseId);
+    const i = invoices.get(invoiceId);
+    if (!p || !i || usedP.has(p.id) || usedI.has(i.id)) continue;
+    usedP.add(p.id);
+    usedI.add(i.id);
+    const gapMinor = p.totalMinor - i.totalMinor;
+    matched.push({
+      purchase: p, invoice: i, basis: "OWNER", gapMinor, agrees: within(gapMinor), numberConfirms: (() => { const k = normaliseInvoiceNumber(p.invoiceNumber); return k !== "" && k === normaliseInvoiceNumber(i.invoiceNumber); })(),
+      supplierConflict: p.linkedSupplierId !== null && p.linkedSupplierId !== i.supplierId,
+    });
+  }
+  return {
+    ...c,
+    matched,
+    onlyFoodics: c.onlyFoodics.filter((p) => !usedP.has(p.id)),
+    onlyOurs: c.onlyOurs.filter((i) => !usedI.has(i.id)),
+  };
+}
+
+/** مفتاحُ «هي نفسها» في `alert_resolutions` — تحت بادئة `foodics-purchase` فيُردّ بـ«أعد التنبيه» كغيره. */
+export function ownerPairKey(purchaseId: string, invoiceId: string): string {
+  return `foodics-purchase:pair-${purchaseId}~${invoiceId}`;
+}
+
+export function parseOwnerPairKey(key: string): { purchaseId: string; invoiceId: string } | null {
+  const m = /^foodics-purchase:pair-([^~]+)~(.+)$/.exec(key);
+  return m ? { purchaseId: m[1], invoiceId: m[2] } : null;
 }

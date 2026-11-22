@@ -155,7 +155,7 @@ describe("errorSummary", () => {
 
 describe("النسخة الثانية خارج القرص", () => {
   it("الأسرارُ لا تخرج إلّا بطلبٍ صريح", () => {
-    expect(copyEntries(["db", "code", "secrets", "memory", "report.json"], false)).toEqual(["db", "code", "memory", "report.json"]);
+    expect(copyEntries(["db", "code", "secrets", "memory", "report.json"], false)).toEqual(["db", "memory", "report.json"]);
     expect(copyEntries(["db", "secrets"], true)).toEqual(["db", "secrets"]);
   });
 });

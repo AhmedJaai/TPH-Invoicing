@@ -21,7 +21,7 @@ import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
+import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, WARNING, countNoun, countNounGen, doesNotBlock } from "@/lib/arabic";
 import { previousMonth } from "@/lib/filing";
 import { addDays, currentMonthRiyadh, formatDay, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
 import { sinceYesterday } from "@/lib/since-yesterday";
@@ -97,6 +97,9 @@ export default async function HomePage() {
 
   const { totals } = balances;
   const owedSince = sinceYesterday(totals.owedMinor, snap ? snap.owedMinor : undefined, yesterday);
+  /* رصيدٌ مضى عليه أكثرُ من ثلاثة أيّام لا يُقال «يكفي» بلا تاريخه — ما خرج بعده لا يعرفه */
+  const cashDay = cash?.asOf ? String(cash.asOf).slice(0, 10) : null;
+  const cashStale = cashDay !== null && cashDay < addDays(todayInRiyadh(), -3);
   const cashSince = cash ? sinceYesterday(cash.balanceMinor, snap ? snap.cashMinor : undefined, yesterday) : null;
   /* اللقطةُ تعدّ ما يراه المالك — ولغيره عددٌ آخر، فلا يُقارَن بها */
   const attentionSince = user.role === "OWNER" ? sinceYesterday(attention.length, snap ? snap.attentionCount : undefined, yesterday) : null;
@@ -234,10 +237,14 @@ export default async function HomePage() {
               value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
               sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : cash.asOf ? `آخر رصيد معروف · ${formatDay(cash.asOf)}` : "آخر رصيد معروف"}
             >
-              {cashSince && <SinceYesterdayLine s={cashSince} kind="money" />}
+              {cashSince && <SinceYesterdayLine s={cashSince} kind="money" quietWithoutSnapshot />}
               {cash.balanceMinor !== null && week && week.totalMinor > 0 && (
                 cash.balanceMinor >= week.totalMinor ? (
-                  <p className="text-xs text-ink-soft"><T s="يكفي لمدفوعات هذا الأسبوع، ويتبقى {0}" a={[<Money key="0" minor={cash.balanceMinor - week.totalMinor} />]} /></p>
+                  <p className="text-xs text-ink-soft">
+                    {cashStale && cashDay
+                      ? <T s="على رصيد {0}: يكفي لمدفوعات هذا الأسبوع، ويتبقى {1}. وما خرج بعده لا يعرفه النظام." a={[formatDay(cashDay), <Money key="1" minor={cash.balanceMinor - week.totalMinor} />]} />
+                      : <T s="يكفي لمدفوعات هذا الأسبوع، ويتبقى {0}" a={[<Money key="0" minor={cash.balanceMinor - week.totalMinor} />]} />}
+                  </p>
                 ) : (
                   <p className="text-xs font-bold text-danger"><T s="لا يكفي لمدفوعات هذا الأسبوع، وينقصه {0}" a={[<Money key="0" minor={week.totalMinor - cash.balanceMinor} />]} /></p>
                 )
@@ -266,7 +273,7 @@ export default async function HomePage() {
             ) : undefined
           }
         >
-          {attentionSince && !start.knowsNothing && <div className="-mt-1 mb-2"><SinceYesterdayLine s={attentionSince} kind="count" /></div>}
+          {attentionSince && !start.knowsNothing && <div className="-mt-1 mb-2"><SinceYesterdayLine s={attentionSince} kind="count" quietWithoutSnapshot /></div>}
           {attention.length > 0 ? (
             <>
               <TaskList items={top} />
@@ -405,6 +412,11 @@ async function CloseCard({ month: runMonth }: { month: string }) {
             <Badge tone="danger" dot>{blockers === 1 ? "عائق واحد" : blockers === 2 ? "عائقان" : `${blockers} عوائق`}</Badge>
           ) : month === current ? (
             <Badge tone="accent" dot>يُقفل بعد آخر يوم</Badge>
+          ) : p.report.warnings.length > 0 ? (
+            /* «اجتاز ٦ من ٩» بجانب «جاهز» بلا تفسير يُقرأ تناقضاً — فالباقي يُسمّى: تنبيهاتٌ لا تمنع */
+            <Badge tone="accent" dot>
+              <T s="جاهز · {0} {1}" a={[countNoun(p.report.warnings.length, WARNING), doesNotBlock(p.report.warnings.length)]} />
+            </Badge>
           ) : (
             <Badge tone="accent" dot>جاهز للإقفال</Badge>
           )}

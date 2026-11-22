@@ -8,9 +8,15 @@ import type { SinceYesterday } from "@/lib/since-yesterday";
  * «زاد ١٬٢٠٠٫٠٠ منذ صباح أمس · لقطة ٢٣ أكتوبر» تحت الرقم — من لقطة أمس (`daily_figures`).
  * و«زاد/نقص» بالكلمة لا بإشارةٍ تنقلب في سطرٍ من اليمين. ولا لقطةَ: «غير معروف» بسببه، لا صفر.
  */
-export function SinceYesterdayLine({ s, kind }: { s: SinceYesterday; kind: "money" | "count" }) {
+export function SinceYesterdayLine({ s, kind, quietWithoutSnapshot = false }: {
+  s: SinceYesterday;
+  kind: "money" | "count";
+  /** غيابُ لقطة أمس يُقال مرّةً في الصفحة (تحت الرقم الأوّل) لا تحت كلّ رقم — ثلاثُ جملٍ متطابقة ضجيج. */
+  quietWithoutSnapshot?: boolean;
+}) {
   const day = formatDay(s.day);
   const cls = "text-[11px] leading-relaxed text-muted";
+  if (!s.known && s.reason === "no-snapshot" && quietWithoutSnapshot) return null;
   if (!s.known) {
     return (
       <p className={cls}>

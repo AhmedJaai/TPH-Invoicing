@@ -238,7 +238,8 @@ export function isTransient(message: string): boolean {
  * **إلّا الأسرار** (`secrets/`) — كلماتُ المرور والمفاتيح لا تخرج من الجهاز إلّا بطلبٍ صريح
  * (`BACKUP_COPY_SECRETS=1`).
  */
+/** ما يُنسخ خارج القرص: الأسرارُ بطلبٍ وحده، والشيفرةُ لا (نسختُها الثانية على GitHub) — فيبقى يومُ iCloud نحو ٤٠ م.ب لا ١٠٠. */
 export function copyEntries(names: readonly string[], withSecrets: boolean): string[] {
-  return names.filter((n) => withSecrets || n !== "secrets");
+  return names.filter((n) => n !== "code" && (withSecrets || n !== "secrets"));
 }
 

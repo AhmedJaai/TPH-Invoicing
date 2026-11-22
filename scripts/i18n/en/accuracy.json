@@ -28,5 +28,12 @@
   "الصادر من {0}": "Money out of {0}",
   "عند الإقفال {0} · الآن {1}": "At close {0} · now {1}",
   "ضريبة المخرجات": "Output VAT",
-  "ضريبة المدخلات": "Input VAT"
+  "ضريبة المدخلات": "Input VAT",
+  "جاهز · {0} {1}": "Ready · {0} {1}",
+  "على رصيد {0}: يكفي لمدفوعات هذا الأسبوع، ويتبقى {1}. وما خرج بعده لا يعرفه النظام.": "On the {0} balance: covers this week's payments, leaving {1}. Anything paid after that date is unknown.",
+  "· {0} · المبلغ نفسه، وبينهما {1}": "· {0} · same amount, {1} apart",
+  "ربما هي": "Possibly",
+  "هي نفسها": "Same invoice",
+  "أقررتَ أنهما واحد": "You confirmed they match",
+  "السبب: {0}": "Reason: {0}"
 }

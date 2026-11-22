@@ -14,7 +14,7 @@ import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { milliToDecimal } from "@/lib/inventory/units";
-import type { InvoiceSide, MatchBasis, MatchedPair, PurchaseSide } from "@/lib/foodics/purchase-compare";
+import { ownerPairKey, type InvoiceSide, type MatchBasis, type MatchedPair, type PurchaseSide } from "@/lib/foodics/purchase-compare";
 import { loadPairLines, loadPurchaseWitness, type FoodicsSupplierRow } from "@/services/foodics-compare.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { loadFoodicsSilenced } from "@/services/foodics-takings.service";
@@ -31,6 +31,7 @@ const BASIS: Record<MatchBasis, string> = {
   NUMBER: "برقم الفاتورة",
   NUMBER_TAIL: "بآخر أرقام الفاتورة",
   DAY_AMOUNT: "بالمبلغ واليوم، ومورّد فودكس غير مربوط",
+  OWNER: "أقررتَ أنهما واحد",
 };
 
 
@@ -285,8 +286,37 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
             { key: "number", header: "رقم الفاتورة في فودكس", cell: (p) => <bdi dir="ltr" className="font-mono text-xs">{p.invoiceNumber ?? "—"}</bdi> },
             { key: "ref", header: "مرجع فودكس", secondary: true, cell: (p) => <bdi dir="ltr" className="font-mono text-xs text-muted">{p.reference}</bdi> },
             { key: "linked", header: "المورّد", secondary: true, cell: (p) => (p.linkedSupplierId ? <Badge tone="ok">مربوط</Badge> : <Badge>غير مربوط</Badge>) },
+            /* «ربما هي نفسها»: فاتورتُنا الوحيدة لمورّدها بمبلغها نفسه في أسبوعين، ورقمُها آخر (`nearMisses`) */
+            { key: "near", header: "ربما هي", wrap: true, cell: (p) => {
+              const n = w.nearMisses.get(p.id);
+              if (!n) return <span className="text-xs text-muted">—</span>;
+              return (
+                <span className="text-xs">
+                  <Link href={invoiceHref(n.invoice.id)} className="font-bold text-accent hover:underline"><bdi dir="ltr" className="font-mono">{n.invoice.invoiceNumber}</bdi></Link>
+                  <span className="ms-1 text-muted"><T s="· {0} · المبلغ نفسه، وبينهما {1}" a={[formatDay(n.invoice.day), countNoun(n.days, DAY)]} /></span>
+                </span>
+              );
+            } },
             { key: "total", header: "الإجمالي", numeric: true, cell: (p) => <Money minor={p.totalMinor} /> },
-            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (p: PurchaseSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={purchaseKey(p.id)} dismissLabel="ليست فاتورة متوقعة" snoozeDays={30} /></span> }] : []),
+            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (p: PurchaseSide) => {
+              const n = w.nearMisses.get(p.id);
+              return (
+                <span className="flex flex-wrap gap-1">
+                  {n && (
+                    <PostAction
+                      url="/api/signal"
+                      body={{ key: ownerPairKey(p.id, n.invoice.id), action: "dismiss", note: `هي فاتورة ${n.invoice.invoiceNumber}` }}
+                      undo={{ body: { key: ownerPairKey(p.id, n.invoice.id), action: "reopen" } }}
+                      variant="quiet"
+                      done={`قُرنت بفاتورة ${n.invoice.invoiceNumber}`}
+                    >
+                      هي نفسها
+                    </PostAction>
+                  )}
+                  <SignalControls signalKey={purchaseKey(p.id)} dismissLabel="ليست فاتورة متوقعة" snoozeDays={30} />
+                </span>
+              );
+            } }] : []),
           ]}
         />
       </Section>

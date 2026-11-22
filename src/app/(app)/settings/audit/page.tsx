@@ -202,8 +202,8 @@ export default async function AuditTrailPage({
                                 التفاصيل
                               </summary>
                               <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
-                                <AuditDetail value={r.before} label="قبل" />
-                                <AuditDetail value={r.after} label={r.before ? "بعد" : "ما سُجّل"} />
+                                <AuditDetail value={r.before} compare={r.after} label="قبل" />
+                                <AuditDetail value={r.after} compare={r.before ?? undefined} label={r.before ? "بعد" : "ما سُجّل"} />
                               </div>
                             </details>
                           )}

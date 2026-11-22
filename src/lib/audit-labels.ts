@@ -268,3 +268,75 @@ export function actionLabel(action: string): string {
   const labels: Readonly<Record<string, string>> = ACTION_LABEL;
   return labels[action] ?? action;
 }
+
+/*
+  تفاصيلُ القرار مقروءةً — كانت تُعرض مفاتيحُها كما كتبتها الخدمات: `shiftMinutes 480` و«خصّص 432630»
+  (هللاتٌ تُقرأ ريالات، فيظنّ القارئُ أنّه دفع أربعمئة ألف). فالمالُ بالريال، والمفتاحُ الإنجليزيّ باسمه،
+  والمعرّفاتُ الداخليّة لا تُعرض، وفي التعديل يُعرض ما تغيّر وحده.
+*/
+const KEY_LABEL: Record<string, string> = {
+  name: "الاسم", nameAr: "الاسم", phone: "الجوال", iban: "الآيبان", nationalId: "رقم الهويّة", jobTitle: "المسمّى",
+  bankBeneficiaryId: "رقم المستفيد في البنك", hiredOn: "تاريخ التعيين", leftOn: "تاريخ الترك",
+  shiftStart: "بداية الدوام", shiftMinutes: "مدّة الدوام (دقيقة)", lateGraceMinutes: "سماح التأخير (دقيقة)",
+  daysOff: "أيّام الراحة", leave: "الإجازة", leaveType: "نوع الإجازة", minutes: "الدقائق",
+  note: "ملاحظة", notes: "ملاحظات", description: "الوصف", label: "الاسم", purpose: "الغرض", kind: "النوع",
+  category: "الباب", source: "المصدر", decision: "القرار", verdict: "الحكم", auto: "آلياً", model: "النموذج",
+  confidence: "الثقة", invoiceNumber: "رقم الفاتورة", invoiceDate: "تاريخ الفاتورة", documentKind: "نوع المستند",
+  fileName: "اسم الملفّ", folderName: "المجلّد", supplierNameAr: "اسم المورّد", supplierNameEn: "الاسم الإنجليزيّ",
+  beneficiaryName: "المستفيد", taxStatus: "الحال الضريبيّة", inputVatStatus: "ضريبة المدخلات",
+  periodMonth: "الشهر", month: "الشهر", fromMonth: "من شهر", toMonth: "إلى شهر", day: "اليوم", fromDay: "من يوم",
+  periodStart: "بداية الفترة", periodEnd: "نهاية الفترة", accountNumber: "رقم الحساب", bank: "البنك",
+  qty: "الكمّيّة", pricingBasis: "أساس السعر", problem: "المشكلة", sellerVatNumber: "الرقم الضريبيّ للبائع",
+  buyerVatNumber: "الرقم الضريبيّ للمشتري", sellerVat: "الرقم الضريبيّ للبائع", buyerVat: "الرقم الضريبيّ للمشتري",
+  sellerCrNumber: "السجلّ التجاريّ للبائع", buyerNameAr: "اسم المشتري", openingBalance: "الرصيد الافتتاحيّ",
+  closingBalance: "الرصيد الختاميّ", totalAmount: "الإجمالي المقروء", subtotalAmount: "قبل الضريبة (مقروء)",
+  vatAmount: "الضريبة المقروءة", discountAmount: "الخصم المقروء", chargesAmount: "الرسوم المقروءة",
+  totalMinor: "الإجمالي", subtotalMinor: "قبل الضريبة", vatMinor: "الضريبة", discountMinor: "الخصم",
+  chargesMinor: "الرسوم", amountMinor: "المبلغ", rateMinor: "الأجر", profitMinor: "الربح",
+  unitPriceMinor: "سعر الوحدة", listUnitPriceMinor: "سعر القائمة", lineTotalMinor: "قيمة السطر",
+  classifiedAmountMinor: "المبلغ المصنَّف", penaltyWaived: "أُعفي من الخصم", closed: "مقفل",
+};
+
+/** مفاتيحُ قيمتُها هللاتٌ ولا يدلّ اسمُها على ذلك — من `match-confirm` و`match-undo`. */
+const MONEY_KEYS = new Set(["خصّص", "خُصِّص", "بقي غير مخصّص", "بقي غير مخصَّص", "مبلغ تحرّر"]);
+const HALALA_SUFFIX = /\s*(\((هللة|هللات)\)|_?بالهللات|_?بالهللة|بالهللات|بالهللة)\s*$/;
+const HIDDEN_KEY = /(^id$|Id$|_id$|^identity_key$|^external_id$|^operation_ref$|^classification_version$|^createdAt$|^updatedAt$|^createdById$|^voidedById$|^lines$|^statementLines$|^manualCorrections$|^driveFileId$)/;
+
+export function isMoneyKey(key: string): boolean {
+  return /Minor$|_minor$/.test(key) || HALALA_SUFFIX.test(key) || MONEY_KEYS.has(key);
+}
+
+export function auditKeyLabel(key: string): string {
+  return KEY_LABEL[key] ?? key.replace(HALALA_SUFFIX, "").replace(/_/g, " ").trim();
+}
+
+function riyals(minor: number): string {
+  const sign = minor < 0 ? "-" : "";
+  const abs = Math.abs(minor);
+  const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${sign}${whole}.${String(abs % 100).padStart(2, "0")} ريال`;
+}
+
+export function auditValueText(key: string, value: unknown): string {
+  if (typeof value === "number" && Number.isInteger(value) && isMoneyKey(key)) return riyals(value);
+  if (typeof value === "boolean") return value ? "نعم" : "لا";
+  if (Array.isArray(value) && value.every((v) => v === null || typeof v !== "object")) {
+    return value.map((v) => labelValue(v)).join("، ");
+  }
+  return labelValue(value);
+}
+
+export interface AuditEntry { key: string; label: string; text: string }
+
+/** ما يُعرض من «قبل» أو «بعد». و`other` الطرفُ الآخر: إن كان فيُعرض ما اختلف بينهما وحده (ما لم يختلف شيء). */
+export function auditEntries(value: unknown, other?: unknown, max = 12): AuditEntry[] {
+  if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) return [];
+  const rec = value as Record<string, unknown>;
+  const otherRec = other && typeof other === "object" && !Array.isArray(other) ? (other as Record<string, unknown>) : null;
+  const visible = Object.entries(rec)
+    .filter(([k, v]) => !HIDDEN_KEY.test(k) && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0));
+  const changed = otherRec ? visible.filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(otherRec[k])) : visible;
+  return (changed.length > 0 ? changed : visible)
+    .slice(0, max)
+    .map(([k, v]) => ({ key: k, label: auditKeyLabel(k), text: auditValueText(k, v).slice(0, 240) }));
+}

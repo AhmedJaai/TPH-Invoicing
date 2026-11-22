@@ -1,3 +1,4 @@
+import { RecordHistory } from "@/components/record-history";
 import { TEAM_APP_NAME } from "@/lib/team-app";
 import { DAY, countNoun } from "@/lib/arabic";
 import Link from "next/link";
@@ -511,6 +512,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           </details>
         </Section>
       )}
+      {/* سجلُّ القرار على الموظّف: أجرُه وحسابُه ودوامُه وإجازاتُه — بفاعلها ووقتها */}
+      {can(user.role, "audit:view") && <RecordHistory viewerId={user.id} entities={[{ type: "employee", id }]} />}
     </PageShell>
   );
 }

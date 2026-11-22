@@ -1,3 +1,4 @@
+import { RecordHistory } from "@/components/record-history";
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -72,6 +73,8 @@ export default async function CountReportPage({
         today={todayInRiyadh()}
         initialStep={isStepId(step) ? step : null}
       />
+      {/* سجلُّ القرار على الجرد: فتحُه وإقرارُه وإعادةُ فتحه */}
+      {can(user.role, "audit:view") && <RecordHistory viewerId={user.id} entities={[{ type: "inventory_count", id }]} />}
     </PageShell>
   );
 }

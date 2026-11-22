@@ -11,7 +11,7 @@ import { and, desc, eq, inArray, or, type SQL } from "drizzle-orm";
 import { Bot, History, UserRound } from "lucide-react";
 import { db } from "@/db";
 import { auditLogs, users } from "@/db/schema";
-import { actionLabel, labelValue } from "@/lib/audit-labels";
+import { actionLabel, auditEntries } from "@/lib/audit-labels";
 import { auditActorName, isSystemAudit } from "@/lib/audit-actor";
 import { T } from "@/components/i18n/t";
 
@@ -22,21 +22,18 @@ const WHEN = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", {
 /** حقولُ السبب كما تكتبها الخدماتُ في `after` — تُرفع فوق التفاصيل: «لماذا» أوّلُ ما يُسأل. */
 const REASON_KEYS = ["السبب", "سبب", "reason", "الملاحظة"];
 
-/** ما قبل وما بعد — مقروءاً. يُستعمل هنا وفي «سجل التدقيق». */
-export function AuditDetail({ value, label }: { value: unknown; label: string }) {
-  if (value === null || value === undefined || typeof value !== "object") return null;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
-    .slice(0, 12);
+/** ما قبل وما بعد — مقروءاً (`auditEntries`). و`compare` الطرفُ الآخر: يُعرض ما تغيّر وحده. يُستعمل هنا وفي «سجل التدقيق». */
+export function AuditDetail({ value, label, compare }: { value: unknown; label: string; compare?: unknown }) {
+  const entries = auditEntries(value, compare);
   if (entries.length === 0) return null;
   return (
     <div>
       <p className="mb-1 text-[11px] font-bold text-muted">{label}</p>
       <dl className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
-        {entries.map(([k, v]) => (
-          <div key={k} className="contents text-[11px]">
-            <dt className="text-muted">{k.replace(/_/g, " ")}</dt>
-            <dd className="min-w-0 break-words text-ink-soft" dir="auto">{labelValue(v).slice(0, 240)}</dd>
+        {entries.map((e) => (
+          <div key={e.key} className="contents text-[11px]">
+            <dt className="text-muted">{e.label}</dt>
+            <dd className="min-w-0 break-words text-ink-soft" dir="auto">{e.text}</dd>
           </div>
         ))}
       </dl>
@@ -118,8 +115,8 @@ export async function RecordHistory({
                       التفاصيل
                     </summary>
                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
-                      <AuditDetail value={r.before} label="قبل" />
-                      <AuditDetail value={r.after} label={r.before ? "بعد" : "ما سُجّل"} />
+                      <AuditDetail value={r.before} compare={r.after} label="قبل" />
+                      <AuditDetail value={r.after} compare={r.before ?? undefined} label={r.before ? "بعد" : "ما سُجّل"} />
                     </div>
                   </details>
                 )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  comparePurchases, normaliseInvoiceNumber, suggestSupplierLinks,
+  applyOwnerPairs, comparePurchases, nearMisses, normaliseInvoiceNumber, suggestSupplierLinks,
   type InvoiceSide, type PurchaseSide,
 } from "./purchase-compare";
 
@@ -256,5 +256,46 @@ describe("اقتراحُ ربط المورّد من الفواتير لا من �
   });
   it("حركةٌ واحدة لا تكفي", () => {
     expect(suggestSupplierLinks(comparePurchases([purchase()], [invoice()]), [invoice()])).toEqual([]);
+  });
+});
+
+describe("«ربما هي نفسها» — المورّدُ والمبلغُ واحد والتاريخُ أبعدُ من ثلاثة أيّام", () => {
+  /* ZED: فاتورة S16608 يوم ٨ نوفمبر، وفي فودكس INV03176 يوم ١٦ — ٨ أيّام، فلا تطابقٌ آليّ */
+  const zedP = purchase({ id: "p-zed", invoiceNumber: "INV03176", linkedSupplierId: "zed", businessDate: "2026-11-18", invoiceDate: "2026-11-16", totalMinor: 7_360 });
+  const zedI = invoice({ id: "i-zed", supplierId: "zed", invoiceNumber: "S16608", day: "2026-11-08", totalMinor: 7_360 });
+  /* حركةٌ سابقةٌ متطابقة تُدخل المورّدَ في مدّة فودكس — وإلّا فالفاتورةُ خارج المقارنة */
+  const earlierP = purchase({ id: "p-old", reference: "PUR-0", invoiceNumber: "S16000", linkedSupplierId: "zed", businessDate: "2026-09-01", invoiceDate: "2026-09-01", totalMinor: 5_000 });
+  const earlierI = invoice({ id: "i-old", supplierId: "zed", invoiceNumber: "S16000", day: "2026-09-01", totalMinor: 5_000 });
+
+  it("لا يُطابَق آلياً، ويُقترح مرشّحاً واحداً ببعد أيّامه", () => {
+    const c = comparePurchases([earlierP, zedP], [earlierI, zedI]);
+    expect(c.matched.map((m) => m.purchase.id)).toEqual(["p-old"]);
+    const m = nearMisses(c.onlyFoodics, c.onlyOurs);
+    expect(m.get("p-zed")).toEqual({ invoice: zedI, days: 8 });
+  });
+
+  it("مرشّحان بالمبلغ نفسه (حليبٌ كلَّ أسبوع) — لا اقتراح", () => {
+    const other = invoice({ id: "i-zed-2", supplierId: "zed", invoiceNumber: "S16583", day: "2026-11-06", totalMinor: 7_360 });
+    expect(nearMisses([zedP], [zedI, other]).size).toBe(0);
+  });
+
+  it("فاتورةٌ واحدة ترشَّح لحركتين — لا اقتراح لأيٍّ منهما", () => {
+    const twin = purchase({ ...zedP, id: "p-zed-2", reference: "PUR-2" });
+    expect(nearMisses([zedP, twin], [zedI]).size).toBe(0);
+  });
+
+  it("مورّدٌ غيرُ مربوط، أو مبلغٌ آخر، أو أكثرُ من أسبوعين — لا اقتراح", () => {
+    expect(nearMisses([{ ...zedP, linkedSupplierId: null }], [zedI]).size).toBe(0);
+    expect(nearMisses([zedP], [{ ...zedI, totalMinor: 7_500 }]).size).toBe(0);
+    expect(nearMisses([zedP], [{ ...zedI, day: "2026-10-30" }]).size).toBe(0);
+  });
+
+  it("ما أقرّه المالك يخرج من القائمتين إلى المتطابقات متّفقاً، وزوجٌ غاب طرفُه يُترك", () => {
+    const c = comparePurchases([earlierP, zedP], [earlierI, zedI]);
+    const after = applyOwnerPairs(c, [{ purchaseId: "p-zed", invoiceId: "i-zed" }, { purchaseId: "p-gone", invoiceId: "i-zed" }]);
+    expect(after.onlyFoodics).toHaveLength(0);
+    expect(after.onlyOurs).toHaveLength(0);
+    expect(after.matched).toHaveLength(2);
+    expect(after.matched[1]).toMatchObject({ basis: "OWNER", agrees: true, gapMinor: 0, numberConfirms: false });
   });
 });
