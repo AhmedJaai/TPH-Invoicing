@@ -189,6 +189,8 @@ function ShiftLine({ row }: { row: ShiftRow }) {
   const [fromDay, setFromDay] = useState(row.today);
   /* المحرّرُ مفتوحٌ حين يُكتب وحده — بعد الحفظ يُطوى إلى سطرٍ يلخّص الأيّام */
   const [editingWeek, setEditingWeek] = useState(false);
+  /* تغيّر المعتادُ والأيّامُ المخصّصة بوقتها القديم — لا تُحفظ حتى يختار المالك: تبقى أو تتبع المعتاد */
+  const [keepWeek, setKeepWeek] = useState(false);
   const { busy, error, send } = useSend();
   const minutes = start && end ? shiftLength(start, end) : null;
   /* يومٌ مخصَّص مكتوبٌ نصفُه، أو بطولٍ لا يُقبل */
@@ -199,7 +201,10 @@ function ShiftLine({ row }: { row: ShiftRow }) {
   });
   const dirty = start !== row.shiftStart || end !== row.shiftEnd || grace !== String(row.lateGraceMinutes) || daysOff !== row.daysOff || weekKey(week) !== weekKey(initialWeek) || fromDay !== row.today;
   const validDay = /^\d{4}-\d{2}-\d{2}$/.test(fromDay);
-  const valid = ((!start && !end) || minutes !== null) && badDays.length === 0 && (!custom || Boolean(start) || weekKey(week) === "[]") && validDay;
+  const staleDays = custom && !keepWeek && (start !== row.shiftStart || end !== row.shiftEnd) && weekKey(week) !== "[]" && weekKey(week) === weekKey(initialWeek)
+    ? Object.entries(week).filter(([i, v]) => v.start && v.end && !daysOff.includes(i)).sort(([a], [b]) => Number(a) - Number(b))
+    : [];
+  const valid = ((!start && !end) || minutes !== null) && badDays.length === 0 && (!custom || Boolean(start) || weekKey(week) === "[]") && validDay && staleDays.length === 0;
   const setDay = (i: number, patch: Partial<{ start: string; end: string }>) => setWeek((w) => ({ ...w, [i]: { ...(w[i] ?? { start: "", end: "" }), ...patch } }));
   const toggle = (d: number) => setDaysOff((x) => (x.includes(String(d)) ? x.replace(String(d), "") : [...x, String(d)].sort().join("")));
   return (
@@ -225,7 +230,7 @@ function ShiftLine({ row }: { row: ShiftRow }) {
         <label className={label}>يسري من<input type="date" dir="ltr" className={`${field} mt-1 ${validDay ? "" : "border-danger"}`} value={fromDay} onChange={(e) => setFromDay(e.target.value)} aria-label={`يسري دوام ${row.name} من`} required /></label>
         <span className="col-span-2 flex flex-col items-stretch gap-1 sm:order-none sm:col-span-1">
           <ReadySubmit ready={dirty && valid} busy={busy} size="sm" variant={dirty ? "primary" : "secondary"}
-            missing={badDays.length > 0 ? "أكمل وقت الأيام المخصّصة أو امسحه." : !valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
+            missing={staleDays.length > 0 ? "اختر أولاً: الأيام المخصّصة تتبع الدوام الجديد أو تبقى بوقتها." : badDays.length > 0 ? "أكمل وقت الأيام المخصّصة أو امسحه." : !valid ? "اكتب البداية والنهاية معاً، والنهاية بعد البداية بساعة إلى 16 ساعة." : "لم يتغيّر شيء منذ آخر حفظ."}>
             {busy ? "يُحفظ…" : dirty ? "احفظ" : "محفوظ"}
           </ReadySubmit>
         </span>
@@ -296,6 +301,19 @@ function ShiftLine({ row }: { row: ShiftRow }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-accent-line bg-accent-soft/40 px-3 py-2 text-xs">
           <span className="min-w-0 flex-1"><strong>تغيير قادم من {formatDay(row.upcoming.fromDay)}:</strong> <span className="nums">{row.upcoming.summary}</span></span>
           <PostAction url="/api/payroll/employee" body={{ action: "shift-plan-remove", id: row.id, fromDay: row.upcoming.fromDay }} variant="quiet" done="أُلغي التغيير القادم">ألغِ التغيير</PostAction>
+        </div>
+      )}
+      {staleDays.length > 0 && (
+        <div role="alert" className="mt-2 rounded-lg border border-warn/30 bg-warn-bg px-3 py-2 text-xs">
+          <p className="font-bold text-ink">
+            غيّرتَ الدوام المعتاد، و{staleDays.map(([i]) => WEEKDAY_LABEL[Number(i)]).join(" و")} {staleDays.length > 1 ? "ما زالت" : "ما زال"} بوقتها القديم
+            (<span className="nums">{staleDays.map(([i, v]) => `${WEEKDAY_LABEL[Number(i)]} ${shiftRange(v.start, shiftLength(v.start, v.end) ?? 0)}`).join("، ")}</span>) — فيُحسب فيها تأخيرٌ أو خروجٌ مبكّر بذلك الوقت.
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass("primary", "sm")} onClick={() => { setWeek({}); setCustom(false); setEditingWeek(false); }}>كل الأيام بالدوام الجديد</button>
+            <button type="button" className={buttonClass("secondary", "sm")} onClick={() => setEditingWeek(true)}>عدّل الأيام</button>
+            <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setKeepWeek(true)}>أبقِها بوقتها</button>
+          </div>
         </div>
       )}
       {badDays.length > 0 && <p className="mt-1.5 text-[11px] font-bold text-danger">دوام {badDays.map((i) => WEEKDAY_LABEL[i]).join(" و")}: اكتب البداية والنهاية، والنهاية بعد البداية بساعة إلى 16 ساعة.</p>}

@@ -88,6 +88,22 @@ describe("saveShift — نافذٌ من تاريخ", { timeout: 90_000 }, () => 
       expect(voided.voidedAt).not.toBeNull();
     }));
 
+  it("تغييرٌ «من اليوم» يُعيد حسابَ ما حُسب اليومَ بالدوام القديم", () =>
+    withRollback(async (tx) => {
+      const me = await someone(tx);
+      const id = await barista(tx);
+      /* دخل ٧:٥٥ صباحاً وخرج ٤:١٦ عصراً، فحُسب خروجٌ مبكّر بدوام ٤ عصراً */
+      await tx.insert(attendanceCheckins).values({ employeeId: id, kind: "IN", at: new Date(`${TODAY}T04:55:00Z`), day: TODAY, verdict: "IN_PLACE" });
+      await tx.insert(attendanceCheckins).values({ employeeId: id, kind: "OUT", at: new Date(`${TODAY}T13:16:00Z`), day: TODAY, verdict: "IN_PLACE" });
+      await tx.insert(payrollAttendance).values({ employeeId: id, day: TODAY, kind: "EARLY", minutes: 464, source: "CHECKIN" });
+
+      const saved = await saveShift(id, shift("07:00", TODAY), me, TODAY, tx);
+      expect(saved.recalculated).toBe(1);
+      const rows = await tx.select({ kind: payrollAttendance.kind, minutes: payrollAttendance.minutes }).from(payrollAttendance)
+        .where(and(eq(payrollAttendance.employeeId, id), isNull(payrollAttendance.voidedAt)));
+      expect(rows).toEqual([{ kind: "LATE", minutes: 55 }]); // المبكّرُ أُلغي، والتأخيرُ بالدوام الجديد حُسب
+    }));
+
   it("تاريخٌ بعد خروجه أو أبعد من سنة يُرفض", () =>
     withRollback(async (tx) => {
       const me = await someone(tx);

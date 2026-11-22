@@ -647,8 +647,8 @@ const PLAN_REACH_DAYS = 366;
  * الدوامُ: من الساعة كم إلى كم، وأيّامُ الراحة، ووقتُ أيّام الأسبوع — نافذاً من يومٍ يختاره المالك
  * (106)، والسماحُ للموظّف كلّه. ما قبل اليوم يبقى بدوامه: أوّلُ تغييرٍ بتاريخ يحفظ الدوامَ السابق
  * سطراً من يوم المباشرة. وصفُّ الموظّف يُساير الدوامَ النافذ اليوم.
- * وتغييرٌ بتاريخٍ مضى يُعيد حسابَ ما حُسب من الحضور في فترة الخصم الجارية منذ ذلك اليوم
- * (`recalcFromCheckins`)، وأوّلُ ضبطٍ لبداية الدوام يحسب ما سُجّل ولم يُحسب (`backfillFromCheckins`).
+ * وتغييرٌ من اليوم أو قبله يُعيد حسابَ ما حُسب من الحضور في فترة الخصم الجارية منذ ذلك اليوم
+ * (`recalcFromCheckins`)، ويحسب ما سُجّل ولم يُحسب (`backfillFromCheckins`).
  */
 export async function saveShift(employeeId: string, input: ShiftInput, actorId: string, today = todayInRiyadh(), conn: Conn = db): Promise<ShiftSaved> {
   const fromDay = input.fromDay ?? today;
@@ -685,9 +685,9 @@ export async function saveShift(employeeId: string, input: ShiftInput, actorId: 
       after: { ...input, fromDay, week },
     }, t);
 
-    const recalculated = fromDay < today ? await recalcFromCheckins(t, employeeId, fromDay, actorId, today) : 0;
-    const firstSet = !before.shiftStart && input.shiftStart && fromDay <= today;
-    const found = firstSet || fromDay < today ? await backfillFromCheckins(t, employeeId, today) : { late: 0, early: 0 };
+    /* «من اليوم» يشمل ما حُسب اليومَ قبل الحفظ — دخولُ الصباح حُكم عليه بالدوام القديم */
+    const recalculated = fromDay <= today ? await recalcFromCheckins(t, employeeId, fromDay, actorId, today) : 0;
+    const found = fromDay <= today ? await backfillFromCheckins(t, employeeId, today) : { late: 0, early: 0 };
     return { ...found, recalculated };
   });
 }
