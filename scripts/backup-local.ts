@@ -31,8 +31,8 @@ import type { drive_v3 } from "googleapis";
 import { Client } from "pg";
 import { driveForCli, getFileMeta, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import {
-  BACKUP_HEARTBEAT_ROW, buildHeartbeat, coreComplete, daysToPrune, disambiguate, errorSummary, failedDaysToPrune,
-  GOOGLE_EXPORTS, isTransient, mirrorVersion, needsDownload, pendingParts, reportCoreOk, safeSegment, shouldNotify, TRASH_KEEP_DAYS,
+  BACKUP_HEARTBEAT_ROW, CORE_PARTS, buildHeartbeat, coreComplete, daysToPrune, disambiguate, errorSummary, failedDaysToPrune,
+  GOOGLE_EXPORTS, isTransient, mirrorVersion, needsDownload, pendingParts, reportCoreOk, copyEntries, safeSegment, shouldNotify, TRASH_KEEP_DAYS,
   type LastRun, type PartResult,
 } from "@/lib/ops/local-backup";
 import { lookup } from "node:dns/promises";
@@ -338,6 +338,8 @@ async function main() {
       log(`  نُقلت نسخة ${d} إلى .trash (خارج مدّة الحفظ)`);
     }
     emptyOldTrash();
+    /* تُنسخ حين أُخذت نسخةُ القاعدة في هذا التشغيل — لا كلَّ ساعةٍ يُعاد فيها الدرايفُ وحده */
+    if (pending.some((n) => (CORE_PARTS as readonly string[]).includes(n))) copyOffDisk();
   }
 
   const now = new Date();
@@ -363,6 +365,28 @@ async function main() {
     notify("نسخة ذا بوبليك هاوس ناقصة", `${since}تعذّر: ${bad}. التفصيل في ~/TPH-Backups/backup.log`);
   }
   if (!ok) process.exit(1);
+}
+
+/**
+ * النسخةُ الثانية: يومُ اليوم يُنسخ إلى `BACKUP_COPY_ROOT` (بلا الأسرار إلّا بطلب)، ويُكنس هناك بقاعدة
+ * الحفظ نفسها. وتعذّرُها يُقال سطراً ولا يجعل النسخةَ الأولى ناقصة.
+ */
+function copyOffDisk(): void {
+  const root = process.env.BACKUP_COPY_ROOT;
+  if (!root) return;
+  try {
+    const dest = path.join(root, "days", DAY);
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dest, { recursive: true });
+    for (const name of copyEntries(readdirSync(DAY_DIR), process.env.BACKUP_COPY_SECRETS === "1")) {
+      cpSync(path.join(DAY_DIR, name), path.join(dest, name), { recursive: true });
+    }
+    const kept = readdirSync(path.join(root, "days")).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+    for (const d of daysToPrune(kept)) rmSync(path.join(root, "days", d), { recursive: true, force: true });
+    log(`✓ النسخة الثانية: ${dest}`);
+  } catch (e) {
+    log(`✕ النسخة الثانية في ${root}: ${(e as Error).message}`);
+  }
 }
 
 /** الكنسُ نقلٌ لا محو — `.trash/<اليوم>` يبقى `TRASH_KEEP_DAYS` يوماً. */

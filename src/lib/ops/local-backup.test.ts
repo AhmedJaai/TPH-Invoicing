@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   daysToPrune, disambiguate, errorSummary, failedDaysToPrune, isTransient, mirrorVersion, needsDownload, safeSegment,
-  shouldNotify, pendingParts, coreComplete, buildHeartbeat, parseHeartbeat, backupVerdict, reportCoreOk,
+  shouldNotify, pendingParts, coreComplete, buildHeartbeat, parseHeartbeat, backupVerdict, reportCoreOk, copyEntries,
 } from "./local-backup";
 
 function range(from: string, n: number): string[] {
@@ -152,3 +152,11 @@ describe("errorSummary", () => {
     expect(isTransient("relation \"x\" does not exist")).toBe(false);
   });
 });
+
+describe("النسخة الثانية خارج القرص", () => {
+  it("الأسرارُ لا تخرج إلّا بطلبٍ صريح", () => {
+    expect(copyEntries(["db", "code", "secrets", "memory", "report.json"], false)).toEqual(["db", "code", "memory", "report.json"]);
+    expect(copyEntries(["db", "secrets"], true)).toEqual(["db", "secrets"]);
+  });
+});
+

@@ -231,3 +231,14 @@ export function errorSummary(output: string): string {
 export function isTransient(message: string): boolean {
   return /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|EPIPE|socket hang up|Connection terminated|timeout|invalid authentication credentials|\b5\d\d\b|rate ?limit/i.test(message);
 }
+
+/**
+ * النسخةُ الثانية خارج القرص (`BACKUP_COPY_ROOT` — مجلّدٌ في iCloud Drive أو قرصٌ خارجيّ): نسخُ الأيّام
+ * كلُّها على قرصٍ واحد بلا Time Machine، فعطبُه يذهب بها جميعاً. ما يُنسخ إليها: كلُّ ما في مجلّد اليوم
+ * **إلّا الأسرار** (`secrets/`) — كلماتُ المرور والمفاتيح لا تخرج من الجهاز إلّا بطلبٍ صريح
+ * (`BACKUP_COPY_SECRETS=1`).
+ */
+export function copyEntries(names: readonly string[], withSecrets: boolean): string[] {
+  return names.filter((n) => withSecrets || n !== "secrets");
+}
+
