@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { loadUnitCostFindings } from "@/services/daily-checks.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleHelp, FileSpreadsheet, Info, Lock, Scale, Snowflake, TrendingUp } from "lucide-react";
@@ -82,7 +83,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const stored = await loadStoredReading(month, view);
+  const [stored, unitCosts] = await Promise.all([loadStoredReading(month, view), loadUnitCostFindings().catch(() => null)]);
   const p = view.pnl;
   const c = view.input.cogs;
   const canClose = can(user.role, "month:close");
@@ -109,6 +110,13 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <Callout tone="warn" icon={Snowflake} className="mt-4" title="تغيّرت البيانات منذ تجميد هذا التقرير"
           action={canClose ? <PostAction url="/api/finance/freeze" body={{ month }} done="أُعيد تجميد التقرير">أعد تجميده بأرقام اليوم</PostAction> : undefined}>
           هذه الأرقام كما جُمّدت، لكن حسابها اليوم مختلف بسبب فاتورة وصلت متأخرة، أو إضافة أدخلتها، أو ربط تغيّر. يبقى التقرير المجمّد كما هو حتى تعيد تجميده.
+        </Callout>
+      )}
+      {/* سعرُ وحدةٍ لا يُصدَّق يدخل تكلفةَ المبيعات — يُقال فوق الرقم لا يُكتم (فحص الصباح، 108) */}
+      {unitCosts && unitCosts.findings.length > 0 && (
+        <Callout tone="warn" icon={Info} className="mt-4" title="تكلفة المبيعات فيها أصناف سعرها من الفواتير لا يُصدَّق"
+          action={<LinkButton href="/finance/stock#unit-cost" size="sm">صحّح العبوات</LinkButton>}>
+          <T s="{0}: سعر وحدتها من الفواتير يخالف كتالوج فودكس ثلاثة أضعاف أو أكثر، والأرجح أن العبوة كُتبت خطأ. فتكلفة ما بيع منها هنا أصغر أو أكبر من الحقيقة حتى تُصحَّح." a={[<strong key="0">{unitCosts.findings.map((f) => f.name).join("، ")}</strong>]} />
         </Callout>
       )}
       {view.closed && !view.frozenAt && canClose && (

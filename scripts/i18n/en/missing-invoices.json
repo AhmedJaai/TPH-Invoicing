@@ -110,5 +110,8 @@
 "يُخصم أجر كل يوم عمل فيها (الراتب ÷ 30) بلا جزاء.": "Each working day in it is deducted (salary ÷ 30) with no penalty.",
 "لا يُخصم عنها ولا تُطرح من رصيده السنوي.": "Not deducted and not taken from the annual balance.",
 "لا يُخصم عنها، وتُطرح من رصيده السنوي.": "Not deducted, and taken from the annual balance.",
-"ولا يُقال «لم يسجّل حضوراً» فيها، وأيام راحته فيها تُترك كما هي.": "It is not reported as a missed check-in, and rest days within it are left as they are."
+"ولا يُقال «لم يسجّل حضوراً» فيها، وأيام راحته فيها تُترك كما هي.": "It is not reported as a missed check-in, and rest days within it are left as they are.",
+"تكلفة المبيعات فيها أصناف سعرها من الفواتير لا يُصدَّق": "Cost of sales includes items with an implausible invoice unit cost",
+"صحّح العبوات": "Fix the packs",
+"{0}: سعر وحدتها من الفواتير يخالف كتالوج فودكس ثلاثة أضعاف أو أكثر، والأرجح أن العبوة كُتبت خطأ. فتكلفة ما بيع منها هنا أصغر أو أكبر من الحقيقة حتى تُصحَّح.": "{0}: their invoice unit cost differs from the Foodics catalog by three times or more, most likely a wrongly entered pack. Their cost of sales here is too low or too high until fixed."
 }
