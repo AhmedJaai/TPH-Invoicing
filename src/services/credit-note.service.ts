@@ -10,11 +10,12 @@
  * كشفٌ ولا إيصال، ولا تُعدّ مالاً خرج.
  */
 import { eq, sql } from "drizzle-orm";
-import { invoices } from "@/db/schema";
+import { invoices, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay } from "@/lib/riyadh-time";
 import { allocate, createPayment } from "./payment.service";
+import { applySupplierCredit } from "./supplier-credit.service";
 import type { Tx } from "./types";
 
 export class CreditNoteRefused extends Error {
@@ -124,4 +125,87 @@ export async function recordCreditNote(
     },
   }, tx);
   return { paymentId, remainingMinor: outstanding - input.amountMinor };
+}
+
+/**
+ * إشعارٌ دائن على حساب المورّد — لا على فاتورةٍ بعينها.
+ *
+ * مرتجعُ بضاعةٍ من أكثر من فاتورة، أو خصمُ كمّيّةٍ على الشهر، أو تعويضٌ عن تالف: المورّدُ يُصدر إشعاراً
+ * واحداً على الحساب. وكان لا يُقيَّد إلّا على فاتورة (`recordCreditNote`) — «وما لا يُخصَّص منه لم يُبنَ
+ * بعد» — فيبقى المستحقُّ أعلى ممّا يطالب به المورّدُ نفسُه.
+ *
+ * دفعةٌ بطريقة `CREDIT_NOTE` بلا فاتورة، ثمّ تُخصم من فواتيره المفتوحة **بالأقدم أوّلاً** (`applySupplierCredit`
+ * بقرار إنسان)، وما بقي «رصيدٌ لك عنده» يُخصم من فاتورته القادمة. ولا يُعدّ مالاً خرج ولا ينتظر بنكاً.
+ */
+export async function recordAccountCreditNote(
+  tx: Tx,
+  input: {
+    supplierId: string; amountMinor: number; issuedOn: string; reference: string | null; reason: string | null;
+    acknowledgeDuplicate?: boolean;
+  },
+  actorId: string,
+): Promise<{ paymentId: string; appliedMinor: number; creditLeftMinor: number }> {
+  if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
+    throw new CreditNoteRefused("يجب أن يكون مبلغ الإشعار أكبر من صفر");
+  }
+  const [sup] = await tx
+    .select({ id: suppliers.id, name: suppliers.nameAr, mergedInto: suppliers.mergedIntoId })
+    .from(suppliers).where(eq(suppliers.id, input.supplierId)).for("update");
+  if (!sup) throw new CreditNoteRefused("المورّد غير موجود. حدّث الصفحة");
+  if (sup.mergedInto) throw new CreditNoteRefused("هذا المورّد دُمج في غيره، فسجّل الإشعار على المورّد الباقي");
+
+  /* إشعارٌ يشبهه على حساب المورّد نفسه — بمرجعه، أو بمبلغه ويومه. يُسأل ويمضي بإقرار. */
+  if (!input.acknowledgeDuplicate) {
+    const label = creditNoteLabel(input.reference);
+    const [same] = (await tx.execute<{ amount_minor: number; day: string; label: string | null }>(sql`
+      select p.amount_minor, to_char(p.paid_at at time zone 'UTC', 'YYYY-MM-DD') as day, p.beneficiary_name_raw as label
+        from payments p
+       where p.supplier_id = ${sup.id}
+         and p.method = 'CREDIT_NOTE'
+         and p.status not in ('REVERSED', 'VOID')
+         and (
+           (${input.reference}::text is not null and p.beneficiary_name_raw = ${label})
+           or (p.amount_minor = ${input.amountMinor} and p.paid_at = ${`${input.issuedOn}T00:00:00Z`}::timestamptz)
+         )
+       limit 1
+    `)).rows;
+    if (same) {
+      throw new CreditNoteRefused(
+        `على حساب ${sup.name} إشعار مسجّل يشبهه (${formatRiyalsDisplay(Number(same.amount_minor))} بتاريخ ${formatDay(same.day)}`
+        + `${same.label && same.label !== "إشعار دائن" ? ` · ${same.label}` : ""})، وإن كان هذا إشعاراً آخر فأكّد ذلك ثم سجّله`,
+        true,
+      );
+    }
+  }
+
+  const paymentId = await createPayment(tx, {
+    supplierId: sup.id,
+    paidAt: new Date(`${input.issuedOn}T00:00:00Z`),
+    amountMinor: input.amountMinor,
+    method: "CREDIT_NOTE",
+    beneficiaryNameRaw: creditNoteLabel(input.reference),
+    appliesToMonth: input.issuedOn.slice(0, 7),
+    acknowledgeTwin: true,
+  });
+  const out = await applySupplierCredit(tx, sup.id, { forwardDays: null, paymentIds: [paymentId] });
+  const creditLeftMinor = input.amountMinor - out.appliedMinor;
+
+  await recordAudit({
+    actorId,
+    action: "PAYMENT_CREDIT_NOTE_RECORDED",
+    entityType: "supplier",
+    entityId: sup.id,
+    before: null,
+    after: {
+      المورّد: sup.name,
+      "الإشعار بالهللات": input.amountMinor,
+      "خُصم من فواتيره بالهللات": out.appliedMinor,
+      "بقي رصيداً لك بالهللات": creditLeftMinor,
+      المرجع: input.reference,
+      السبب: input.reason,
+      التاريخ: input.issuedOn,
+      الدفعة: paymentId,
+    },
+  }, tx);
+  return { paymentId, appliedMinor: out.appliedMinor, creditLeftMinor };
 }

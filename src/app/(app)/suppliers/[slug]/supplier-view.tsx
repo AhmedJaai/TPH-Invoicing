@@ -45,6 +45,7 @@ import { SUPPLIER_CATEGORY_LABEL, pastDueOf, whatsappHref } from "@/lib/supplier
 import { formatRiyals } from "@/lib/money";
 import { AccountReview } from "@/components/account-review";
 import { SupplierSettleCredit } from "@/components/supplier-settle-credit";
+import { CreditNoteForm } from "@/components/credit-note-form";
 import { SupplierHandDuplicates } from "@/components/hand-duplicate";
 import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
@@ -474,6 +475,8 @@ export async function SupplierView({
                 <SupplierSettleCredit supplierId={s.id} />
               </Suspense>
             )}
+            {/* إشعارٌ على الحساب لا على فاتورة — مرتجعٌ من أكثر من فاتورة أو خصمٌ على الشهر */}
+            {canApprove && <CreditNoteForm supplierId={s.id} today={todayInRiyadh()} />}
 
             {balance > 0 && (
               <div className="mt-5">

@@ -15,7 +15,11 @@ import { T } from "@/components/i18n/t";
  * ليس سداداً: لم يخرج مال. يُنقص ما بقي على الفاتورة ويبقى في سجلّ سدادها
  * «إشعار دائن»، ولا يُطابَق بحوالة. والخادمُ يرفض ما يتجاوز المتبقّي.
  */
-export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today: string }) {
+export function CreditNoteForm(props: { invoiceId: string; today: string } | { supplierId: string; today: string }) {
+  const { today } = props;
+  /* على فاتورةٍ بعينها، أو على حساب المورّد — يُخصم بالأقدم أوّلاً وما بقي رصيدٌ له */
+  const target = "invoiceId" in props ? { invoiceId: props.invoiceId } : { supplierId: props.supplierId };
+  const onAccount = "supplierId" in props;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -30,7 +34,9 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-accent hover:underline sm:min-h-0">
-        <T s="{0}وصل إشعار دائن؟ (مرتجع أو خصم)" a={[<ReceiptText key="0" className="h-3.5 w-3.5" aria-hidden />]} /></button>
+        {onAccount
+          ? <T s="{0}سجّل إشعاراً دائناً على حسابه (مرتجع أو خصم)" a={[<ReceiptText key="0" className="h-3.5 w-3.5" aria-hidden />]} />
+          : <T s="{0}وصل إشعار دائن؟ (مرتجع أو خصم)" a={[<ReceiptText key="0" className="h-3.5 w-3.5" aria-hidden />]} />}</button>
     );
   }
 
@@ -40,7 +46,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
     setBusy(true);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/credit-note", {
-      invoiceId,
+      ...target,
       amount: amount.trim(),
       issuedOn,
       ...(reference.trim() ? { reference: reference.trim() } : {}),
@@ -68,9 +74,11 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       onSubmit={(e) => { e.preventDefault(); void save(duplicate); }}
       className="mt-4 animate-rise rounded-xl border border-line bg-raised p-4"
     >
-      <p className="text-xs font-bold">إشعار دائن على هذه الفاتورة</p>
+      <p className="text-xs font-bold">{onAccount ? "إشعار دائن على حساب المورّد" : "إشعار دائن على هذه الفاتورة"}</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        يُنقص المبلغ المتبقي على الفاتورة، ولا يُعدّ مالاً خرج، ولا ينتظر كشف بنك.
+        {onAccount
+          ? "لإشعار لا يخص فاتورة واحدة: مرتجع من أكثر من فاتورة، أو خصم على الشهر. يُخصم من فواتيره المفتوحة بالأقدم أولاً، وما بقي يصير رصيداً لك عنده. لا يُعدّ مالاً خرج."
+          : "يُنقص المبلغ المتبقي على الفاتورة، ولا يُعدّ مالاً خرج، ولا ينتظر كشف بنك."}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="المبلغ (ريال)" required>

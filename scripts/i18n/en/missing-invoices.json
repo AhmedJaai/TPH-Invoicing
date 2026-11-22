@@ -76,5 +76,8 @@
 "مرآة ملفات الدرايف": "Drive files mirror",
 "آخر نسخة كاملة {0}": "Last full copy {0}",
 "آخر تشغيل": "Last run",
-"ما تعذّر في آخر تشغيل": "What failed in the last run"
+"ما تعذّر في آخر تشغيل": "What failed in the last run",
+"{0}سجّل إشعاراً دائناً على حسابه (مرتجع أو خصم)": "{0}Record a credit note on their account (return or discount)",
+"إشعار دائن على حساب المورّد": "Credit note on the supplier account",
+"لإشعار لا يخص فاتورة واحدة: مرتجع من أكثر من فاتورة، أو خصم على الشهر. يُخصم من فواتيره المفتوحة بالأقدم أولاً، وما بقي يصير رصيداً لك عنده. لا يُعدّ مالاً خرج.": "For a credit note not tied to one invoice: a return across several invoices, or a monthly discount. It is applied to open invoices oldest first, and any remainder becomes credit with them. It does not count as money paid out."
 }

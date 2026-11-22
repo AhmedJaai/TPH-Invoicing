@@ -35,9 +35,9 @@ export const UNBACKED_FLOOR_MINOR = 100;
  * لم يصدر. فيدخل الكلّ، ويُحمَل `issuesInvoices` مع الصفّ كي تتبعه
  * **صياغةُ الطلب** وحدها.
  */
-export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
+export async function loadUnbackedPayments(conn: Conn = db): Promise<UnbackedPayment[]> {
   const rows = (
-    await db.execute<{
+    await conn.execute<{
       id: string; supplier_id: string | null; name_ar: string | null; slug: string | null;
       d: string; amount_minor: number; unbacked: number; tx: string | null; issues: boolean | null;
       drive_file_id: string | null; phone: string | null;
@@ -54,6 +54,8 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
         left join suppliers s on s.id = p.supplier_id
         left join documents d on d.id = p.document_id
        where p.status not in ('REVERSED','VOID','ADVANCE')
+         /* الإشعارُ الدائن على الحساب لم يخرج له مال — رصيدٌ لك لا «دفعةٌ بلا فاتورة» */
+         and p.method <> 'CREDIT_NOTE'
          /*
            مورّد أعلن صاحب المقهى أنّه لا يصدر فواتير، وعقده عندنا أو لا
            يطلب منه عقد — دفعاته بلا فاتورة حاله المعلنة لا عمل باق.
