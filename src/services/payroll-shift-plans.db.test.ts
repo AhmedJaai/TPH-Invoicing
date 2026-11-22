@@ -128,7 +128,7 @@ describe("setLeave — إجازةٌ من يومٍ إلى يوم", { timeout: 90_
       expect(rows).toEqual([
         { day: "2026-11-26", kind: "LEAVE" }, { day: "2026-11-28", kind: "LEAVE" }, { day: "2026-11-29", kind: "LEAVE" },
       ]);
-      expect(await loadLeave(id, "2026-11-01", tx)).toEqual([{ fromDay: "2026-11-26", toDay: "2026-11-29", days: 3, note: "إجازة سنوية" }]);
+      expect(await loadLeave(id, "2026-11-01", tx)).toEqual([{ fromDay: "2026-11-26", toDay: "2026-11-29", days: 3, note: "إجازة سنوية", leaveType: "ANNUAL" }]);
 
       /* مرّتين = مرّة */
       await setLeave({ employeeId: id, fromDay: "2026-11-26", toDay: "2026-11-29", note: "إجازة سنوية" }, me, tx);
@@ -155,4 +155,18 @@ describe("setLeave — إجازةٌ من يومٍ إلى يوم", { timeout: 90_
       /* الخميس ٣ → السبت ٥ ديسمبر: الجمعةُ صارت دواماً، والسبتُ راحة */
       expect(await setLeave({ employeeId: id, fromDay: "2026-12-03", toDay: "2026-12-05", note: null }, me, tx)).toEqual({ days: 2, restDays: 1 });
     }));
+
+  it("نوعُ الإجازة يُحفظ، والسنويّةُ وبلا أجرٍ المتلاصقتان سطران لا سطر", () =>
+    withRollback(async (tx) => {
+      const me = await someone(tx);
+      const id = await barista(tx);
+      await setLeave({ employeeId: id, fromDay: "2026-11-26", toDay: "2026-11-26", note: null }, me, tx);
+      await setLeave({ employeeId: id, fromDay: "2026-11-28", toDay: "2026-11-28", note: null, leaveType: "UNPAID" }, me, tx);
+      const spans = await loadLeave(id, "2026-11-01", tx);
+      expect(spans.map((s) => [s.fromDay, s.leaveType, s.note])).toEqual([
+        ["2026-11-26", "ANNUAL", "إجازة سنوية"],
+        ["2026-11-28", "UNPAID", "إجازة بلا أجر"],
+      ]);
+    }));
 });
+
