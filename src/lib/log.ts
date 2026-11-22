@@ -45,7 +45,14 @@ export function describeError(e: unknown): ErrorFacts {
   const own = typeof err.message === "string" ? scrubMessage(err.message) : "";
   /* سببُ القاعدة أدلُّ من «Failed query»: يُلحَق برسالته، مقصوصاً مثلها */
   const why = typeof cause?.message === "string" ? scrubMessage(cause.message) : "";
-  const message = (why && why !== own ? `${own} ← ${why}` : own).slice(0, MAX_MESSAGE) || "خطأ بلا رسالة";
+  /*
+    والسببُ أوّلاً حين الرسالةُ استعلامٌ فاشل: «Failed query» ونصُّ الاستعلام يملآن الخانات كلَّها
+    فيُقصّ السببُ — وجدها سجلُّ الأعطال الدائم (107): صفحتان سقطتا ولا يُعرف لماذا. والاستعلامُ
+    سطرُه الأوّل وحده: يكفي لمعرفة موضعه.
+  */
+  const failedQuery = own.startsWith("Failed query");
+  const query = failedQuery ? own.replace(/\s+/g, " ").slice(0, 160) : own;
+  const message = (why && why !== own ? (failedQuery ? `${why} ← ${query}` : `${own} ← ${why}`) : own).slice(0, MAX_MESSAGE) || "خطأ بلا رسالة";
   return {
     ...(typeof err.name === "string" && err.name !== "Error" ? { name: err.name } : {}),
     ...(code ? { code } : {}),

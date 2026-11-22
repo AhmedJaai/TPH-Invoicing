@@ -539,6 +539,18 @@ describe("كشف المورّد يخالف دفترنا", () => {
     expect(got).toContain("statement-ledger-gap");
     expect(got).not.toContain("statement-invoice-missing");
   });
+
+  it("سدادٌ لم يقيّده المورّد في كشفه — بندٌ بالمبلغ يفتح صفحتَه", () => {
+    const [item] = buildAttention({ ...quiet, statementPaidMissing: [{ supplierName: "بيكوف", slug: "BeCof", paymentId: "p1", day: "2026-10-02", amountMinor: 690_00, method: "BANK_TRANSFER", periodTo: "2026-10-20" }] });
+    expect(item.id).toBe("statement-payment-missing");
+    expect(item.title).toContain("بيكوف");
+    expect(item.amountMinor).toBe(690_00);
+    expect(item.href).toBe("/suppliers/BeCof");
+  });
+
+  it("ولا سدادَ غائباً لا بند", () => {
+    expect(ids({ statementPaidMissing: [] })).not.toContain("statement-payment-missing");
+  });
 });
 
 describe("موعد إقرار الضريبة", () => {

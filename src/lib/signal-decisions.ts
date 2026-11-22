@@ -29,6 +29,7 @@ export const SIGNAL_PREFIXES = [
   "price-rise",
   "statement-gap",
   "statement-missing",
+  "statement-paid",
   "vat-risk",
   "payroll-tx",
 ] as const;
@@ -54,6 +55,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "price-rise": "ارتفاع سعر صنف عند مورّده",
   "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
   "statement-missing": "فاتورة في كشف المورّد ليست عندنا",
+  "statement-paid": "سداد لم يقيّده المورّد في كشفه",
   "vat-risk": "ضريبة فاتورة لا تُخصم",
   "payroll-tx": "حوالة راتب ليست لموظف",
 };
@@ -70,6 +72,11 @@ export function priceRiseKey(supplierId: string, normalizedDescription: string, 
 /** فاتورةٌ في كشفه ليست عندنا — بمرجعها ويومها ومبلغها: إن تغيّر شيءٌ منها عاد السؤال. */
 export function statementMissingKey(slug: string, ref: string | null, day: string, amountMinor: number): string {
   return `statement-missing:${encodeURIComponent(slug).slice(0, 80)}:${encodeURIComponent(ref ?? "-").slice(0, 60)}:${day}:${amountMinor}`;
+}
+
+/** سدادٌ لم يقيّده المورّد — بالدفعة وكشفِه: كشفٌ أحدث يعيد السؤال إن بقيت غائبة عنه. */
+export function statementPaidKey(paymentId: string, statementId: string): string {
+  return `statement-paid:${paymentId.slice(0, 60)}:${statementId.slice(0, 60)}`;
 }
 
 export function statementGapKey(slug: string, day: string, theirsMinor: number, oursMinor: number): string {

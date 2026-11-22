@@ -55,6 +55,8 @@ import { ACTION_LABEL } from "@/lib/audit-labels";
 import { MIN_SETTLED_SAMPLE, ageOwed, ageTone } from "@/lib/supplier-intel";
 import { txHref } from "@/lib/inspector";
 import { latestStatementDiscrepancies } from "@/services/statement-reconcile.service";
+import { loadSettlementComparisons } from "@/services/statement-payments.service";
+import { PAYMENT_METHOD_LABEL } from "@/lib/statement-payments";
 import { T } from "@/components/i18n/t";
 
 
@@ -143,7 +145,7 @@ export async function SupplierView({
 
   const [
     statsRes, balRows, ages, findingsRaw, intel, atStatementRes, invoicesAtStatementRes, why,
-    recent, statementRes, paymentRes,
+    recent, statementRes, paymentRes, settlementRows,
   ] = await Promise.all([
     db.execute<Record<string, number | string | null>>(sql`
       select
@@ -230,10 +232,12 @@ export async function SupplierView({
           .limit(60)
       : Promise.resolve([]),
     /* كشوفُه ودفعاتُه تُجلَب مهما كان اللسان: عددُها يظهر على اللسانين */
-    db.execute<{ id: string; ps: string; pe: string; closing: number | null; lines: number; matched: number }>(sql`
+    db.execute<{ id: string; ps: string; pe: string; closing: number | null; lines: number; invoice_lines: number; matched: number }>(sql`
       select st.id, st.period_start::text as ps, st.period_end::text as pe, st.closing_balance_minor as closing,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched
+             /* مقامُ «طُوبق» فواتيرُ الكشف لا أسطرُ السداد فيه */
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.debit_minor > 0) as invoice_lines,
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED' and sl.debit_minor > 0) as matched
         from statements st
        where st.supplier_id = ${s.id}
        order by st.period_end desc
@@ -259,7 +263,13 @@ export async function SupplierView({
            limit 60
         `)
       : Promise.resolve(null),
+    /* دائنُ آخر كشفه مقابلَ ما دفعناه — سطراً بسطر */
+    showAmounts ? loadSettlementComparisons([s.id]) : Promise.resolve([]),
   ]);
+  /* دائنُ كشفه مقابلَ ما دفعناه (`lib/statement-payments.ts`) — لآخر كشفٍ وحده، كأسباب الفرق */
+  const settlement = settlementRows[0]?.comparison ?? null;
+  const paidNotCredited = settlement?.oursOnly ?? [];
+  const creditedUnknown = settlement?.theirsOnly ?? [];
   const statementRows = statementRes.rows;
   const paymentRows = paymentRes?.rows ?? [];
 
@@ -520,7 +530,7 @@ export async function SupplierView({
                 {paidAfterStatement > 0 && <> <T s=" · ودفعت له بعد تاريخ كشفه {0}" a={[<Money key="0" minor={paidAfterStatement} />]} /></>}
                 {account.allocatedAfterStatementMinor ? <> <T s=" · وخُصّص بعده على فواتير أقدم من الكشف {0}" a={[<Money key="0" minor={account.allocatedAfterStatementMinor} />]} /></> : null}
               </p>
-              {why && (why.missing.length + why.ambiguous.length + why.priceDiffs.length + why.notInStatement.length > 0) && (
+              {why && (why.missing.length + why.ambiguous.length + why.priceDiffs.length + why.notInStatement.length + paidNotCredited.length + creditedUnknown.length > 0) && (
                 <div className="mt-3 space-y-2.5 border-t border-line-soft pt-3 text-xs">
                   <p className="font-bold"><T s="أسباب الفرق، من كشفه حتى {0}" a={[formatDay(why.periodEnd)]} /></p>
                   {why.missing.length > 0 && (
@@ -574,6 +584,32 @@ export async function SupplierView({
                           <li key={n.invoiceId} className="flex justify-between gap-3">
                             <span><Link href={invoiceHref(n.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{n.invoiceNumber}</bdi></Link> · {formatDay(n.day)}</span>
                             <Money minor={n.amountMinor} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {paidNotCredited.length > 0 && (
+                    <div>
+                      <p className="text-warn">دفعتها له في مدة كشفه ولم يقيّدها فيه. اطلب منه أن يقيّدها قبل أن تسدّد رصيده:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {paidNotCredited.map((p) => (
+                          <li key={p.paymentId} className="flex justify-between gap-3">
+                            <span>{formatDay(p.day)} · {PAYMENT_METHOD_LABEL[p.method] ?? p.method}</span>
+                            <Money minor={p.amountMinor} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {creditedUnknown.length > 0 && (
+                    <div>
+                      <p className="text-ink-soft">في كشفه سداد أو إشعار دائن لم نسجّله. إن كان دفعة منك فسجّلها، وإن كان إشعاراً فسجّله على فاتورته:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {creditedUnknown.map((t, i) => (
+                          <li key={i} className="flex justify-between gap-3">
+                            <span>{t.kind === "CREDIT_NOTE" ? "إشعار دائن" : "سداد"} · {formatDay(t.line.day)}{t.line.ref ? <> · <bdi className="nums">{t.line.ref}</bdi></> : null}</span>
+                            <Money minor={t.line.amountMinor} />
                           </li>
                         ))}
                       </ul>
@@ -886,7 +922,9 @@ export async function SupplierView({
                         <span className="block text-[13px] font-bold">{formatRange(st.ps.slice(0, 10), st.pe.slice(0, 10))}</span>
                         <span className="block text-[11px] text-muted">
                           {Number(st.lines) > 0
-                            ? `${countNoun(Number(st.lines), LINE)} · طُوبق منها ${Number(st.matched)}`
+                            ? Number(st.invoice_lines) > 0
+                              ? `${countNoun(Number(st.invoice_lines), INVOICE)} · طُوبق منها ${Number(st.matched)}`
+                              : `${countNoun(Number(st.lines), LINE)} · لا فواتير فيه`
                             : "لم تُقرأ أسطره بعد، طابقه ليقرأها النظام."}
                         </span>
                       </span>

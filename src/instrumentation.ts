@@ -39,4 +39,21 @@ export const onRequestError: Instrumentation.onRequestError = async (err, reques
     /* رسالة Drizzle تُلحق `params:` بقيم الإدخال — مبالغ وأسماء — و`describeError` يقصّها */
     ...describeError(err),
   });
+  /*
+    ويُحفظ في القاعدة — السجلُّ يُحفظ ساعةً. في Node وحده (القاعدةُ لا تُبلَغ من Edge)، وباستيرادٍ
+    متأخّر كي لا يجرّ ملفُّ الإقلاع القاعدةَ إلى كلّ بيئة. والحفظُ لا يرمي (`recordServerError`).
+  */
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  try {
+    const { recordServerError } = await import("@/services/server-errors.service");
+    await recordServerError({
+      source: "REQUEST",
+      route: context.routePath,
+      method: request.method,
+      digest: typeof digest === "string" ? digest : null,
+      ...describeError(err),
+    });
+  } catch {
+    /* الحفظُ لا يُسقط الطلب */
+  }
 };

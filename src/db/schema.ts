@@ -2589,6 +2589,26 @@ export const employeeShiftPlans = pgTable("employee_shift_plans", {
   createdAt: now(),
 }, (t) => [uniqueIndex("employee_shift_plans_from_idx").on(t.employeeId, t.fromDay)]);
 
+/**
+ * أعطابُ الخادم (107) — صفٌّ لكلّ عطبٍ بمفتاحه (المسارُ والنوعُ والرسالة)، يزيد عدُّه بتكراره.
+ * سجلُّ Vercel يُحفظ ساعةً؛ هذا يبقى. يكتبه `server-errors.service.ts` وحده ولا يرمي أبداً.
+ */
+export const serverErrors = pgTable("server_errors", {
+  fingerprint: text("fingerprint").primaryKey(),
+  source: text("source").$type<"REQUEST" | "ROUTE">().notNull(),
+  route: text("route"),
+  method: text("method"),
+  name: text("name"),
+  code: text("code"),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  lastRef: text("last_ref"),
+  lastDigest: text("last_digest"),
+  occurrences: integer("occurrences").notNull().default(1),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("server_errors_last_seen_idx").on(t.lastSeen)]);
+
 /** الراتبُ من شهرٍ يبدأ منه — للشهريّ راتبُ الشهر، وللجزئيّ أجرُ الساعة. */
 export const employeeRates = pgTable("employee_rates", {
   id: id(),

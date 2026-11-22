@@ -18,6 +18,8 @@ describe("describeError", () => {
     const e = Object.assign(new Error("Failed query: insert …\nparams: 1,2"), { cause });
     expect(describeError(e)).toMatchObject({ code: "23505" });
     expect(describeError(e).message).toContain("duplicate key");
+    /* السببُ أوّلاً — نصُّ استعلامٍ طويل كان يقصّه */
+    expect(describeError(e).message.startsWith(String(cause.message))).toBe(true);
     expect(describeError(e).message).not.toContain("params");
   });
 

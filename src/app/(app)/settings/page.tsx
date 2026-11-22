@@ -15,6 +15,7 @@ import { PageShell } from "@/components/page-shell";
 import { activeProviderName } from "@/lib/extraction";
 import { buildDataHealth, type HealthState } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
+import { loadRecentServerErrors } from "@/services/server-errors.service";
 import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
 import { monthlyShare } from "@/lib/cashflow";
 import { Callout, KeyValue, LinkButton, Meter, NoAccess, Section } from "@/components/ui";
@@ -60,7 +61,7 @@ export default async function SettingsPage() {
     );
   }
 
-  const [[f], rulesRows, health, expenseRows] = await Promise.all([
+  const [[f], rulesRows, health, expenseRows, serverErrorRows] = await Promise.all([
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from suppliers where is_active)     as suppliers,
@@ -80,6 +81,8 @@ export default async function SettingsPage() {
       select id, label, category::text as category, amount_minor, cadence, is_active, starts_on
         from recurring_expenses order by amount_minor desc
     `).then((r) => r.rows),
+    /* أعطابُ الخادم (107) — للمالك وحده، وقاعدةٌ بلا الجدول بعد لا تُسقط الصفحة */
+    can(user.role, "audit:view") ? loadRecentServerErrors(7).catch(() => null) : Promise.resolve(null),
   ]);
 
   const rules: BankRuleRow[] = rulesRows.map((r) => ({
@@ -317,6 +320,35 @@ export default async function SettingsPage() {
               </div>
             </div>
           </Section>
+
+          {serverErrorRows !== null && (
+            <Section
+              id="errors"
+              title="أعطال الخادم"
+              icon={ShieldAlert}
+              count={serverErrorRows.length}
+              hint="ما تعطّل في الخادم في آخر سبعة أيام، محفوظاً هنا لأن سجل الاستضافة يُمحى بعد ساعة. العطل نفسه يُعدّ ولا يتكرر سطره. أرسل المرجع لمن يطوّر النظام."
+            >
+              {serverErrorRows.length === 0 ? (
+                <p className="text-sm text-ink-soft">لا عطل في آخر سبعة أيام.</p>
+              ) : (
+                <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
+                  {serverErrorRows.map((r) => (
+                    <li key={r.fingerprint} className="px-4 py-3">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <bdi dir="ltr" className="min-w-0 break-all text-[13px] font-bold">{r.method ? `${r.method} ` : ""}{r.route ?? "—"}</bdi>
+                        <span className="shrink-0 text-[11px] text-muted">
+                          <T s="{0} مرة · آخرها {1}" a={[<span key="0" className="nums">{r.occurrences}</span>, formatMoment(r.lastSeen)]} />
+                        </span>
+                      </div>
+                      <p dir="auto" className="mt-1 break-words text-xs text-ink-soft">{r.message}</p>
+                      {r.lastRef && <p className="mt-1 text-[11px] text-muted"><T s="المرجع {0}" a={[<bdi key="0" dir="ltr" className="nums">{r.lastRef}</bdi>]} /></p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+          )}
         </div>
       </div>
     </PageShell>

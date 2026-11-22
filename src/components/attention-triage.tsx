@@ -91,6 +91,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "missing-statements": FileClock,
   "statement-ledger-gap": Scale,
   "statement-invoice-missing": FileQuestion,
+  "statement-payment-missing": FileQuestion,
   "files-wrong-month": FolderInput,
   "files-missing-in-drive": FolderX,
   "future-invoices": CalendarX,

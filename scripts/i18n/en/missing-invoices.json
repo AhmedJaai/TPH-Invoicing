@@ -55,5 +55,15 @@
 "فواتيره": "Its invoices",
 "أُدخلت في فودكس": "Entered in Foodics",
 "في كشف المورّد": "In the supplier statement",
-"لا مورّد في هذا الشهر يصدر كشف حساب، فلا كشف يُنتظر": "No supplier this month issues statements, so none is awaited"
+"لا مورّد في هذا الشهر يصدر كشف حساب، فلا كشف يُنتظر": "No supplier this month issues statements, so none is awaited",
+"أعطال الخادم": "Server errors",
+"ما تعطّل في الخادم في آخر سبعة أيام، محفوظاً هنا لأن سجل الاستضافة يُمحى بعد ساعة. العطل نفسه يُعدّ ولا يتكرر سطره. أرسل المرجع لمن يطوّر النظام.": "What failed on the server in the last seven days, kept here because the hosting log is wiped after an hour. The same failure is counted, not repeated. Send the reference to whoever develops the system.",
+"لا عطل في آخر سبعة أيام.": "No failures in the last seven days.",
+"{0} مرة · آخرها {1}": "{0} times · last {1}",
+"المرجع {0}": "Reference {0}",
+"دفعتها له في مدة كشفه ولم يقيّدها فيه. اطلب منه أن يقيّدها قبل أن تسدّد رصيده:": "You paid these within the statement period but the supplier did not record them. Ask them to record them before you settle the balance:",
+"في كشفه سداد أو إشعار دائن لم نسجّله. إن كان دفعة منك فسجّلها، وإن كان إشعاراً فسجّله على فاتورته:": "The statement shows a payment or credit note we have not recorded. If it is a payment of yours, record it; if a credit note, record it on its invoice:",
+"{0} · لا فواتير فيه": "{0} · no invoices in it",
+"إشعار دائن": "Credit note",
+"سداد": "Payment"
 }

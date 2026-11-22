@@ -6,7 +6,7 @@
  */
 import { pgErrorCode } from "@/lib/pg-error";
 import "@/lib/zod-ar";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";
 import { describeError, logEvent } from "@/lib/log";
@@ -14,6 +14,7 @@ import { DomainError, FailWithError } from "@/lib/domain-error";
 
 export { FailWithError };
 import { consume, RateLimitedError } from "./rate-limit.service";
+import { recordServerError } from "./server-errors.service";
 
 export { RateLimitedError };
 
@@ -111,7 +112,14 @@ export function failWith(e: unknown, route: string): NextResponse {
   if (own) return NextResponse.json({ error: own }, { status: 400 });
   const ref = crypto.randomUUID().slice(0, 8);
   /* سطرٌ واحد بالمرجع نفسه — بلا `params:`: قيمُ الإدخال (مبالغُ وأسماء) لا تدخل السجلّ */
-  logEvent("route-error", { route, ref, ...describeError(e) });
+  const facts = describeError(e);
+  logEvent("route-error", { route, ref, ...facts });
+  /* والمرجعُ الذي تقوله الشاشة يُقرأ بعد ساعة: يُحفظ بعد الردّ (`after`) — ولا يرمي */
+  try {
+    after(() => recordServerError({ source: "ROUTE", route, ref, ...facts }));
+  } catch {
+    /* خارج طلب (اختبار): لا شيء يُحفظ */
+  }
   return NextResponse.json(
     { error: `حدث خطأ في الخادم. حاول مرة أخرى، وإن تكرر فاذكر المرجع ${ref}`, ref },
     { status: 500 },

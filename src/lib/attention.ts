@@ -181,6 +181,8 @@ export interface AttentionFacts {
   statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number; key?: string }[];
   /** فواتيرُ في آخر كشف المورّد ليست عندنا — ولو لم يُقرأ رصيدُه الختاميّ. */
   statementMissing?: { supplierName: string; slug: string; ref: string | null; day: string; amountMinor: number; unclear: boolean; key?: string }[];
+  /** سدادٌ قيّدناه في مدّة آخر كشفٍ للمورّد ولم يرد فيه (`lib/statement-payments.ts`). الغائبُ: لم يُسأل. */
+  statementPaidMissing?: { supplierName: string; slug: string; paymentId: string; day: string; amountMinor: number; method: string; periodTo: string; key?: string }[];
 
   /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
   misplacedFiles?: { label: string; sub: string; href: string }[];
@@ -1400,6 +1402,41 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         amountMinor: m.amountMinor,
         href: `/suppliers/${encodeURIComponent(m.slug)}?tab=statements`,
         signalKey: m.key,
+      })),
+    });
+  }
+
+  /*
+    سدادٌ خرج للمورّد في مدّة كشفه ولم يقيّده فيه: رصيدُه الذي يطالب به فيه مالٌ وصله، ومن
+    يسدّد الكشفَ كما هو يدفعه مرّتين. كان الكشفُ يُقابَل بفواتيرنا وحدها، والدائنُ رصيداً واحداً.
+  */
+  const paidMissing = f.statementPaidMissing ?? [];
+  if (paidMissing.length > 0) {
+    const total = paidMissing.reduce((s, p) => s + p.amountMinor, 0);
+    const suppliersCount = new Set(paidMissing.map((p) => p.slug)).size;
+    const one = paidMissing[0];
+    out.push({
+      id: "statement-payment-missing",
+      area: "SUPPLIERS",
+      severity: "HIGH",
+      title: paidMissing.length === 1
+        ? `دفعت لـ${one.supplierName} ${formatRiyalsDisplay(one.amountMinor)} ولم تظهر في كشفه`
+        : suppliersCount === 1
+          ? `${countNoun(paidMissing.length, PAYMENT)} لـ${one.supplierName} لم تظهر في كشفه`
+          : `${countNoun(paidMissing.length, PAYMENT)} لم يقيّدها مورّدوها في كشوفهم`,
+      detail: "خرجت في مدة كشف المورّد ولا يقابلها سداد فيه، فرصيده الذي يطالبك به يشمل مالاً وصله. وما دفعته في آخر أسبوع من الكشف لا يُسأل عنه، فقد يكون في الطريق.",
+      action: "أرسل له إيصال الحوالة واطلب أن يقيّدها، ولا تسدّد رصيد كشفه كما هو قبل ذلك.",
+      actionLabel: "افتح صفحة المورّد",
+      href: `/suppliers/${encodeURIComponent(one.slug)}`,
+      count: paidMissing.length,
+      amountMinor: total,
+      impact: { kind: "UNATTRIBUTED", amountMinor: total },
+      evidence: paidMissing.slice(0, 10).map((p) => ({
+        label: p.supplierName,
+        sub: `دُفعت ${formatDay(p.day)} · كشفه حتى ${formatDay(p.periodTo)}`,
+        amountMinor: p.amountMinor,
+        href: `/suppliers/${encodeURIComponent(p.slug)}`,
+        signalKey: p.key,
       })),
     });
   }

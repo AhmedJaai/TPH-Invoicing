@@ -22,10 +22,11 @@ import { DAY, TIME, countNoun } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { latestStatementGaps, latestStatementMissing } from "@/services/statement-reconcile.service";
+import { loadSettlementComparisons } from "@/services/statement-payments.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, vatRiskKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
 import { annualImpactMinor, isRealMove, trackPrices } from "./price-watch";
 import { addDays } from "./riyadh-time";
 
@@ -537,6 +538,14 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     statementMissing: (await latestStatementMissing())
       .map((m) => ({ ...m, key: statementMissingKey(m.slug, m.ref, m.day, m.amountMinor) }))
       .filter((m) => !silenced.has(m.key)),
+    statementPaidMissing: (await loadSettlementComparisons())
+      .flatMap((r) => r.comparison.oursOnly.filter((p) => !p.isCreditNote).map((p) => ({
+        supplierName: r.supplierName, slug: r.slug, paymentId: p.paymentId, day: p.day,
+        amountMinor: p.amountMinor, method: p.method, periodTo: r.periodTo,
+        key: statementPaidKey(p.paymentId, r.statementId),
+      })))
+      .filter((p) => !silenced.has(p.key))
+      .sort((a, b) => b.amountMinor - a.amountMinor),
     statementGaps: (await latestStatementGaps())
       .map((g) => ({ ...g, key: statementGapKey(g.slug, g.day, g.theirsMinor, g.oursMinor) }))
       .filter((g) => !silenced.has(g.key)),
