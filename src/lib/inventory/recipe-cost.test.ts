@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  declaredCostDisagrees, packUnitCostMilliMinor, recipeCost, type CostedIngredient,
+  declaredCostDisagrees, marginBeforeVat, packUnitCostMilliMinor, recipeCost, type CostedIngredient,
 } from "./recipe-cost";
 import { parseCatalogFile } from "./foodics-catalog";
 import { toMinor } from "./foodics-catalog";
@@ -196,5 +196,13 @@ describe("الكلفة بقاعدة الاستهلاك نفسها", () => {
     const cost = recipeCost([{ ...coffee, packMilli: null, packCostMinor: null, invoiceRateMilliMinor: 11_500 }], { preferInvoice: true });
     expect(cost.costMinor).toBe(230);
     expect(cost.unknown).toEqual([]);
+  });
+});
+
+describe("marginBeforeVat", () => {
+  it("يطرح الكلفة من السعر بلا ضريبة لا من الشامل", () => {
+    expect(marginBeforeVat(400, 96)).toBe(252);        // ماء: ٤ شاملة ← ٣٫٤٨ − ٠٫٩٦
+    expect(marginBeforeVat(1900, 238)).toBe(1414);     // لاتيه: ١٦٫٥٢ − ٢٫٣٨
+    expect(marginBeforeVat(10100, 8800)).toBeLessThan(0); // كيس إثيوبيا خاسر
   });
 });

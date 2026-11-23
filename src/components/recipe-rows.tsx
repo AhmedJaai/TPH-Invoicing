@@ -10,7 +10,7 @@ import { ConfirmAction } from "./ui-client";
 import { unitChoices } from "@/lib/inventory/units";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { isSinceBeginning } from "@/lib/inventory/recipe";
-import { COST_REASON_LABEL } from "@/lib/inventory/recipe-cost";
+import { COST_REASON_LABEL, marginBeforeVat } from "@/lib/inventory/recipe-cost";
 import type { RecipeRow } from "@/services/recipe.service";
 import { T } from "@/components/i18n/t";
 
@@ -92,7 +92,7 @@ export function RecipeRows({
           <p className="min-w-0 flex-1">
             {byCatalog
               ? <><T s="التكلفة معروضة {0}، وهي التكلفة المعيارية المسجّلة في فودكس." a={[<strong key="0" className="text-ink">بتكلفة الكتالوج</strong>]} /></>
-              : <><T s="التكلفة معروضة {0} لكل مكوّن، أي بما دفعته فعلاً، وما ليست له فاتورة يُحسب بتكلفة الكتالوج. لذلك قد تختلف عما يظهر بالكتالوج وحده." a={[<strong key="0" className="text-ink">بآخر فاتورة</strong>]} /></>}
+              : <><T s="التكلفة معروضة {0} لكل مكوّن، أي بما دفعته فعلاً، وما ليست له فاتورة يُحسب بتكلفة الكتالوج. لذلك قد تختلف عما يظهر بالكتالوج وحده. والسعر شامل الضريبة، والهامش من السعر بلا ضريبة." a={[<strong key="0" className="text-ink">بآخر فاتورة</strong>]} /></>}
           </p>
           <button type="button" onClick={() => setByCatalog((v) => !v)} aria-pressed={byCatalog} className={buttonClass("secondary", "sm")}>
             {byCatalog ? "اعرضها بآخر فاتورة" : "اعرضها بتكلفة الكتالوج"}
@@ -108,7 +108,7 @@ export function RecipeRows({
           <span>المكوّنات</span>
           <span className="text-end">التكلفة</span>
           <span className="text-end">السعر</span>
-          <span className="text-end">الفرق</span>
+          <span className="text-end">الهامش بلا ضريبة</span>
         </div>
         {visible.length === 0 && (
           <p className="px-5 py-10 text-center text-sm text-muted"><T s="لا وصفة تطابق «{0}»." a={[query]} /></p>
@@ -157,7 +157,7 @@ export function RecipeRows({
                       const cost = costOf(row);
                       return cost === null || row.priceMinor === null
                         ? <span className="font-normal text-muted">—</span>
-                        : <Money minor={row.priceMinor - cost} />;
+                        : (() => { const m = marginBeforeVat(row.priceMinor, cost); return <span className={m < 0 ? "text-danger" : undefined}><Money minor={m} /></span>; })();
                     })()}
                   </span>
                 </button>

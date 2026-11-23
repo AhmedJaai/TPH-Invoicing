@@ -22,6 +22,7 @@ import { fromCanonical, MILLI, sameUnitFamily, toCanonical } from "./units";
 import { ingredientForSale } from "./consumption";
 import { DEFAULT_YIELD_MILLI } from "./recipe";
 import type { StoredUnit } from "@/lib/unit-conversion";
+import { vatInsideGross } from "@/lib/vat";
 
 /** بم سُعِّر المكوّن — يُعلَن مع الرقم، فلا يتغيّر الأساسُ صامتاً. */
 export type CostBasis = "INVOICE" | "CATALOG";
@@ -163,4 +164,15 @@ export function declaredCostDisagrees(
   if (recipeCostMinor === null || declaredMinor === null || declaredMinor <= 0) return false;
   const gap = Math.abs(declaredMinor - recipeCostMinor);
   return Math.round((gap * 10_000) / declaredMinor) >= DECLARED_COST_GAP_BP;
+}
+
+/**
+ * هامشُ الصنف: سعرُه **بلا ضريبة** ناقصاً كلفةَ وصفته.
+ *
+ * أسعارُ فودكس شاملةُ الضريبة (طلبُ ١٩ ريالاً ضريبتُه ٢٫٤٨ وإجماليّه ١٩) — وكان عمودُ «الفرق» يطرح
+ * الكلفةَ من السعر الشامل، فيزيد كلَّ هامشٍ بـ١٥٪ من السعر: الماءُ ٣٫٠٤ وهو ٢٫٥٢، وكيسُ إثيوبيا
+ * بـ١٠١ يبدو رابحاً ١٣ وهو خاسرٌ (٨٧٫٨٣ بلا ضريبة وكلفتُه ٨٨). والضريبةُ للهيئة لا للمقهى.
+ */
+export function marginBeforeVat(priceGrossMinor: number, costMinor: number): number {
+  return priceGrossMinor - vatInsideGross(priceGrossMinor) - costMinor;
 }
