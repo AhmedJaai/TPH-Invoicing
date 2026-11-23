@@ -136,6 +136,7 @@ export default async function ExpensesPage({
     source: r.source,
     bankTransactionId: r.bankTransactionId,
     recurringExpenseId: r.recurringExpenseId,
+    paidFrom: r.paidFrom,
   });
 
   /*
@@ -268,7 +269,7 @@ export default async function ExpensesPage({
                         <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                             <bdi>{formatDay(e.occurredOn)}</bdi>
-                            <SourceBadge source={e.source} />
+                            <SourceBadge source={e.source} paidFrom={e.paidFrom} />
                             <span className="font-bold text-ink"><Money minor={e.amountMinor} /></span>
                             {e.bankTransactionId && (
                               <Link href={txHref(e.bankTransactionId)} className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">الحركة</Link>
@@ -398,7 +399,7 @@ export default async function ExpensesPage({
                 key: "source", header: "المصدر", secondary: true,
                 cell: (e) => (
                   <span className="inline-flex flex-wrap items-center gap-1">
-                    <SourceBadge source={e.source} />
+                    <SourceBadge source={e.source} paidFrom={e.paidFrom} />
                     {e.recurringExpenseId && <Badge tone="info">مرتبط بمصروف متوقع</Badge>}
                   </span>
                 ),
@@ -429,8 +430,12 @@ const SOURCE_TONE: Record<Expense["source"], Tone | undefined> = {
   MANUAL: "accent",
 };
 
-function SourceBadge({ source }: { source: Expense["source"] }) {
-  return <Badge tone={SOURCE_TONE[source]}>{SOURCE_LABEL[source]}</Badge>;
+const PAID_FROM_LABEL: Record<"TILL" | "OWNER" | "OTHER", string> = { TILL: "نقداً من الصندوق", OWNER: "من حسابي", OTHER: "إدخال يدوي" };
+
+/** المصروفُ اليدويّ يُسمّى بمن دفعه (110) — «نقداً من الصندوق» غيرُ «من حسابي». */
+function SourceBadge({ source, paidFrom }: { source: Expense["source"]; paidFrom?: Expense["paidFrom"] }) {
+  const label = source === "MANUAL" && paidFrom ? PAID_FROM_LABEL[paidFrom] : SOURCE_LABEL[source];
+  return <Badge tone={SOURCE_TONE[source]}>{label}</Badge>;
 }
 
 function Hero({

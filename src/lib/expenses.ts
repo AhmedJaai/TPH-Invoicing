@@ -26,6 +26,8 @@ export interface Expense {
   source: ExpenseSource;
   bankTransactionId?: string | null;
   recurringExpenseId?: string | null;
+  /** من أين دُفع اليدويّ (110) — `null` لم يُقَل. */
+  paidFrom?: "TILL" | "OWNER" | "OTHER" | null;
 }
 
 export interface RecurringExpense {
