@@ -10,7 +10,7 @@ import { parseRiyals } from "@/lib/money";
 import { drivePathFor, monthOf, resolveReceiptFiling } from "@/lib/filing";
 import {
   buildCashFileName,
-  buildInvoiceFileName,
+  buildDeliveryNoteFileName, buildInvoiceFileName,
   buildReceiptFileName,
   buildStatementFileName,
 } from "@/lib/naming";
@@ -139,6 +139,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
         x.documentKind === "SIMPLIFIED_INVOICE" ||
         x.documentKind === "QUOTATION" ||
         x.documentKind === "PROFORMA" ||
+        x.documentKind === "DELIVERY_NOTE" ||
         x.documentKind === "STATEMENT"
           ? x.documentKind
           : "UNKNOWN",
@@ -258,6 +259,8 @@ export function runPipeline(input: PipelineInput): PipelineResult {
           amountMinor: amountForName,
           extension: ext,
         });
+      } else if (slug && invoiceNumber && x.documentKind === "DELIVERY_NOTE") {
+        proposedFileName = buildDeliveryNoteFileName({ date: invoiceDate, slug, invoiceNumber, amountMinor: amountForName, extension: ext });
       } else if (slug && invoiceNumber) {
         proposedFileName = buildInvoiceFileName({
           date: invoiceDate,

@@ -10,6 +10,7 @@ export const DOCUMENT_KIND_LABEL: Record<string, string> = {
   STATEMENT: "كشف حساب",
   QUOTATION: "عرض سعر",
   PROFORMA: "فاتورة مبدئية",
+  DELIVERY_NOTE: "سند تسليم",
   RECEIPT: "إيصال سداد",
   CASH_RECEIPT: "إيصال نقدي",
   CONTRACT: "عقد",

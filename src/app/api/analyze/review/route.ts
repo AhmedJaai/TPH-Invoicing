@@ -20,6 +20,8 @@ const Body = z.object({
   vat: Text(40),
   total: Text(40),
   discount: Text(40),
+  /* نوعُ الورقة كما صنّفه من يرفعها — من قائمةٍ مغلقة */
+  documentKind: z.enum(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "DELIVERY_NOTE", "QUOTATION", "PROFORMA"]).optional(),
 }).strict();
 
 export async function POST(request: Request) {

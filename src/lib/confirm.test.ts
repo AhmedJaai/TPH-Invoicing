@@ -128,3 +128,10 @@ describe("reviewConfirmed", () => {
     expect(r.findings.some((f) => f.code === "SUPPLIER_WITHOUT_CONTRACT")).toBe(true);
   });
 });
+
+describe("سند التسليم لا يصير فاتورة", () => {
+  it("يُؤرشَف ولا يُنشئ قيد فاتورة", () => {
+    const r = reviewConfirmed({ ...validInvoice, documentKind: "DELIVERY_NOTE" }, { companyVat: COMPANY_VAT });
+    expect(r.canCreateInvoice).toBe(false);
+  });
+});

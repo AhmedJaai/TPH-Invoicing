@@ -12,6 +12,7 @@ export const DOCUMENT_KINDS = [
   "STATEMENT",
   "QUOTATION",
   "PROFORMA",
+  "DELIVERY_NOTE",
   "RECEIPT",
   "CASH_RECEIPT",
   "CONTRACT",
@@ -73,6 +74,7 @@ export const extractionSchema = z.object({
         "SIMPLIFIED_INVOICE فاتورة مبسطة بلا رقم ضريبي للمشتري. " +
         "STATEMENT كشف حساب يجمع عدة عمليات. " +
         "QUOTATION عرض سعر. PROFORMA فاتورة مبدئية. " +
+        "DELIVERY_NOTE سند تسليم أو أمر توريد أو إشعار طلب (Delivery note / Order) بلا عنوان «فاتورة ضريبية» — رقمه رقم طلب لا رقم فاتورة. " +
         "RECEIPT إيصال تحويل بنكي. CASH_RECEIPT إيصال نقدي ورقي.",
     ),
 

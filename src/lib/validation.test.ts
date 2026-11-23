@@ -327,3 +327,18 @@ describe("رسائل المبالغ بمنزلتين", () => {
     expect(r.findings.find((f) => f.variant === "ROUNDING")?.message).toContain("660.10");
   });
 });
+
+describe("سند التسليم (أمر التوريد)", () => {
+  it("يُحفظ ولا يُقيَّد: تنبيهٌ لا مانع، ولا حكم ضريبي", () => {
+    const r = validateInvoice({
+      kind: "DELIVERY_NOTE", invoiceNumber: "S16796",
+      sellerVat: null, buyerVat: null,
+      subtotalMinor: 8_000, vatMinor: 1_200, totalMinor: 9_200,
+    }, ctx);
+    const f = r.findings.map((x) => x.code);
+    expect(f).toContain(ISSUE.DELIVERY_NOTE);
+    expect(f).not.toContain(ISSUE.NOT_A_TAX_INVOICE);
+    expect(r.findings.some((x) => x.severity === "BLOCKER")).toBe(false);
+    expect(r.taxStatus).toBe("NOT_APPLICABLE");
+  });
+});

@@ -200,6 +200,7 @@ export const documentKindEnum = pgEnum("document_kind", [
   "STATEMENT",
   "QUOTATION",          // عرض سعر — لا يُقيَّد
   "PROFORMA",           // مبدئية — لا تُقيَّد
+  "DELIVERY_NOTE",      // سند تسليم أو أمر توريد — يُحفظ ولا يُقيَّد (113)
   "RECEIPT",
   "CASH_RECEIPT",
   "CONTRACT",

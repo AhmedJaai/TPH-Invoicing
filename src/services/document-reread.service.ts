@@ -182,7 +182,7 @@ export async function rereadDocument(opts: {
     fillFromFileName(x, doc.fileName, outcome.evidence?.provenance);
     const list = await loadSupplierRecords();
     const matched = matchSupplier(list, { sellerVatNumber: x.sellerVatNumber, supplierNameAr: x.supplierNameAr, supplierNameEn: x.supplierNameEn });
-    const kind = (["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA", "RECEIPT", "CASH_RECEIPT"] as const)
+    const kind = (["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA", "DELIVERY_NOTE", "RECEIPT", "CASH_RECEIPT"] as const)
       .find((k) => k === x.documentKind) ?? "UNKNOWN";
     await db.transaction(async (t) => {
       await t.update(documents).set({

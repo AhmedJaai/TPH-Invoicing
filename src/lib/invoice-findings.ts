@@ -181,7 +181,7 @@ export function evaluateInvoice(
     {
       kind:
         kind === "TAX_INVOICE" || kind === "SIMPLIFIED_INVOICE" ||
-        kind === "QUOTATION" || kind === "PROFORMA" || kind === "STATEMENT"
+        kind === "QUOTATION" || kind === "PROFORMA" || kind === "DELIVERY_NOTE" || kind === "STATEMENT"
           ? kind
           : "UNKNOWN",
       invoiceNumber: invoice.invoiceNumber,

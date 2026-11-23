@@ -110,5 +110,6 @@
   "109_leave_type.sql": "d179d0860a6e4dd2b13c502a803a1f8158371dfd299860870c5b5168ccf14930",
   "110_expense_paid_from.sql": "2aaae3cee221867053edd3ff1bbdf80b99f724eba2dfc43be91c7d2baf6ffe7d",
   "111_budgets.sql": "c9e7bf072271901aaea6ac363c37c4babeb204211e2fda02a8d5d73a60eeefb1",
-  "112_counterparty_names.sql": "18a5288bcb6a1a027cd48bac671d66a7c0c73a8354d9a5ae3b1f16c9e91edc7b"
+  "112_counterparty_names.sql": "18a5288bcb6a1a027cd48bac671d66a7c0c73a8354d9a5ae3b1f16c9e91edc7b",
+  "113_delivery_note.sql": "a11cbdfcd4fd829be7c0000c59cfa6add140bbbdcb6fb54fcbb9256c2d111807"
 }

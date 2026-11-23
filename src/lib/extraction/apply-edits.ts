@@ -12,6 +12,8 @@ export interface ReviewEdits {
   total?: string;
   /** الخصمُ قبل الضريبة كما كتبه الإنسان — «٠» أو فراغٌ مقصود: لا خصم */
   discount?: string;
+  /** نوعُ المستند كما صنّفه الإنسان — «سند تسليم» بدل «فاتورة» مثلاً (أحمد، ٢٤ نوفمبر ٢٠٢٦) */
+  documentKind?: ExtractionResult["documentKind"];
 }
 
 /** ما كتبه الإنسان فوق ما قرأه النموذج — وثقتُه كاملة، فلا يبقى «راجِعه» على ما صحّحه. */
@@ -43,6 +45,7 @@ export function applyEdits(x: ExtractionResult, e: ReviewEdits): ExtractionResul
       out.subtotalAmount = formatRiyals(gross - typed);
     }
   }
+  if (e.documentKind && e.documentKind !== x.documentKind) out.documentKind = e.documentKind;
   if (out.vatAmount !== x.vatAmount || out.totalAmount !== x.totalAmount || out.discountAmount !== x.discountAmount) out.confidence.amounts = 1;
   return out;
 }

@@ -20,6 +20,7 @@ export type DocumentNameKind =
   | "CASH"
   | "PROFORMA"
   | "QUOTATION"
+  | "DELIVERY_NOTE"
   | "LEDGER"
   | "SALES_INVOICE";
 
@@ -40,6 +41,7 @@ const TYPE_TOKENS: Record<string, DocumentNameKind> = {
   proformainvoice: "PROFORMA",
   proforma: "PROFORMA",
   quotation: "QUOTATION",
+  deliverynote: "DELIVERY_NOTE",
   "quotation-draft": "QUOTATION",
   salesinvoice: "SALES_INVOICE",
   customerpayment: "RECEIPT",
@@ -285,6 +287,14 @@ export function buildInvoiceFileName(
   o: BuildOptions & { slug: string; invoiceNumber: string },
 ): string {
   const base = `${o.date}_${safeToken(o.slug)}_Invoice_${safeToken(o.invoiceNumber)}_SAR${formatRiyals(o.amountMinor)}`;
+  return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
+}
+
+/** سندُ التسليم باسمه — لا «Invoice»: الاسمُ يقول ما في الملفّ. */
+export function buildDeliveryNoteFileName(
+  o: BuildOptions & { slug: string; invoiceNumber: string },
+): string {
+  const base = `${o.date}_${safeToken(o.slug)}_DeliveryNote_${safeToken(o.invoiceNumber)}_SAR${formatRiyals(o.amountMinor)}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 

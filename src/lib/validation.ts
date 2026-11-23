@@ -27,7 +27,7 @@ export interface Finding {
 }
 
 export interface InvoiceCandidate {
-  kind: "TAX_INVOICE" | "SIMPLIFIED_INVOICE" | "QUOTATION" | "PROFORMA" | "STATEMENT" | "UNKNOWN";
+  kind: "TAX_INVOICE" | "SIMPLIFIED_INVOICE" | "QUOTATION" | "PROFORMA" | "DELIVERY_NOTE" | "STATEMENT" | "UNKNOWN";
   invoiceNumber?: string | null;
   sellerVat?: string | null;
   buyerVat?: string | null;
@@ -107,8 +107,14 @@ export function validateInvoice(
   const threshold = context.confidenceThreshold ?? 0.8;
 
   // عرض السعر والمبدئية ليسا فاتورة — يمنعان القيد تماماً.
-  const isNotInvoice = candidate.kind === "QUOTATION" || candidate.kind === "PROFORMA";
-  if (isNotInvoice) findings.push(finding(ISSUE.NOT_A_TAX_INVOICE));
+  /*
+    سندُ التسليم (أمر التوريد) ليس فاتورة، لكنّه ورقةٌ تُحفظ: يُؤرشَف ولا يُقيَّد — وتأتي فاتورتُه
+    الضريبيّة بعده. كانت سنداتُ ZED تُقيَّد فواتيرَ بجانب فواتيرها فتُعدّ التوريدةُ مرّتين (٢٤ نوفمبر ٢٠٢٦).
+  */
+  const isDeliveryNote = candidate.kind === "DELIVERY_NOTE";
+  const isNotInvoice = candidate.kind === "QUOTATION" || candidate.kind === "PROFORMA" || isDeliveryNote;
+  if (isDeliveryNote) findings.push(finding(ISSUE.DELIVERY_NOTE));
+  else if (isNotInvoice) findings.push(finding(ISSUE.NOT_A_TAX_INVOICE));
 
   const hasNumber = Boolean(candidate.invoiceNumber?.trim());
   if (!hasNumber && !isNotInvoice) findings.push(finding(ISSUE.MISSING_INVOICE_NUMBER));

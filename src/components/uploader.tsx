@@ -130,12 +130,16 @@ const KIND_LABEL: Record<string, string> = {
   STATEMENT: "كشف حساب",
   QUOTATION: "عرض سعر",
   PROFORMA: "فاتورة مبدئية",
+  DELIVERY_NOTE: "سند تسليم",
   RECEIPT: "إيصال سداد",
   CASH_RECEIPT: "إيصال نقدي",
   CONTRACT: "عقد",
   UTILITY: "مرافق وحكومي",
   UNKNOWN: "غير محدّد",
 };
+
+/** ما يُصحَّح نوعُه عند الرفع — الفاتورةُ وما يشبهها في الورق */
+const RECLASSIFIABLE: ReadonlySet<string> = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "DELIVERY_NOTE", "QUOTATION", "PROFORMA"]);
 
 /** أسماءُ الثقة كما يكتبها مسارُ القراءة (`pipeline.ts`) — عربيّةٌ لا مفاتيح. */
 const LOW = {
@@ -647,6 +651,7 @@ export function Uploader({
         vat: sent.vat,
         total: sent.total,
         discount: sent.discount,
+        documentKind: sent.documentKind || undefined,
       });
       setItems((prev) => prev.map((x) => {
         if (x.id !== id || x.state !== "done") return x;
@@ -1732,9 +1737,21 @@ function ReviewCard({
     <article className="overflow-clip rounded-2xl border border-accent-line bg-raised shadow-lifted animate-rise">
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line-soft px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">
-            {KIND_LABEL[r.documentKind] ?? r.documentKind}
-          </span>
+          {/* نوعُ الورقة يصحّحه من يرفعها: سندُ التسليم (أمرُ التوريد) يُحفظ ولا يُقيَّد فاتورة */}
+          {RECLASSIFIABLE.has(r.documentKind) && !item.archiving ? (
+            <select
+              aria-label="نوع المستند"
+              value={r.documentKind}
+              onChange={(e) => onEdit("documentKind", e.target.value)}
+              className="min-h-11 shrink-0 rounded-full border border-line bg-sunken px-2 text-[11px] font-bold text-ink-soft sm:min-h-7"
+            >
+              {[...RECLASSIFIABLE].map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+            </select>
+          ) : (
+            <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">
+              {KIND_LABEL[r.documentKind] ?? r.documentKind}
+            </span>
+          )}
           <bdi dir="ltr" className="truncate font-mono text-xs text-ink-soft" title={item.fileName}>{item.fileName}</bdi>
         </div>
         <span className="flex items-center gap-2">

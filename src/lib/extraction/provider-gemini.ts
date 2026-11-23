@@ -43,7 +43,7 @@ export const GEMINI_SCHEMA = {
     documentKind: {
       type: "STRING",
       enum: [
-        "TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA",
+        "TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA", "DELIVERY_NOTE",
         "RECEIPT", "CASH_RECEIPT", "CONTRACT", "UTILITY", "UNKNOWN",
       ],
       description: "نوع المستند",
