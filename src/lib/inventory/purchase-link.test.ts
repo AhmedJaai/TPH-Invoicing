@@ -69,3 +69,22 @@ describe("حرف x في الاسم ليس علامة ضرب", () => {
     expect(guessPackSpec("Max 12X330ml")).toEqual({ packSize: "12", contentQuantity: "330", contentUnit: "ML" });
   });
 });
+
+describe("suggestStockItem — الأوصافُ المشتركة لا تقترح (مراجعة ٢٣ نوفمبر ٢٠٢٦)", () => {
+  const options = [
+    { id: "blend", nameAr: "Blend fusion", aliases: ["[100051] Blend Fusion – Medium Roast 1 KG / بلند فيوجن – وسط"] },
+    { id: "decaf", nameAr: "Colombia decaf", aliases: ["قصب السكر - كولومبيا kg شوكولاته مرة ,لوز محمص ,الدبس الأسود"] },
+    { id: "guji", nameAr: "Ethiopia guji", aliases: ["[100791] Ethiopia Guji – Medium Roast 1 KG / إثيوبيا قوجي – وسط"] },
+    { id: "grapes", nameAr: "Colombia grabes", aliases: ["كولومبي عنب", "عنب"] },
+  ];
+  it("«Medium Roast · وسط» وحدها لا تجعل «Brazil Teera» خلطةً أخرى", () => {
+    expect(suggestStockItem("[100411] Brazil Teera – Medium Roast 1 KG / برازيل تيرا – وسط 1 كجم", options)).toBeNull();
+  });
+  it("«أسود» وحدها لا تجعل ميزاناً بُنّاً", () => {
+    expect(suggestStockItem("ميزان تايمور بيتك ٦ اسود (2.00 حبة)", options)).toBeNull();
+  });
+  it("الاسمُ المميِّز ما زال يقترح", () => {
+    expect(suggestStockItem("Ethiopia Guji – [100791] / Medium Roast 1 KG إثيوبيا قوجي – وسط كجم 1", options)?.id).toBe("guji");
+    expect(suggestStockItem("كولومبي عنب 1 كيلو", options)?.id).toBe("grapes");
+  });
+});
