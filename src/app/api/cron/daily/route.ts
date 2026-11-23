@@ -19,9 +19,13 @@ import { checkUnitCosts } from "@/services/daily-checks.service";
 import { refreshBudgetFindings } from "@/services/budget.service";
 import { checkAiBalance } from "@/services/daily-checks.service";
 import { sendMorningPush } from "@/services/push.service";
+import { foodicsConfigured } from "@/lib/foodics/client";
+import { fetchFoodicsCatalog } from "@/services/foodics-sync.service";
+import { importParsedCatalog } from "@/services/catalog-import.service";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /** الأرقامُ الآن من مصادرها الواحدة — «يحتاج قرارك» كما يعدّه الشريطُ للمالك. */
 async function gatherDayFigures(): Promise<DayFigures> {
@@ -51,5 +55,9 @@ export async function POST(request: Request) {
     /* يقرأ بنودَ الفواتير كلَّها — صباحاً لا مع كلّ صفحة */
     checkUnitCosts: () => withDeadline(60_000, () => checkUnitCosts()),
     checkBudgets: () => withDeadline(60_000, () => refreshBudgetFindings()),
+    /* وصفاتُ فودكس كلَّ صباح (أحمد، ٢٤ نوفمبر ٢٠٢٦: «الوصفات المفروض يسحبها كل يوم») — تسري من اليوم، والماضي لا يُمسّ */
+    refreshCatalog: foodicsConfigured()
+      ? () => withDeadline(45_000, async () => (await importParsedCatalog(await fetchFoodicsCatalog(), { effectiveFrom: todayInRiyadh(), actorId, dryRun: false })).recipes)
+      : undefined,
   }));
 }

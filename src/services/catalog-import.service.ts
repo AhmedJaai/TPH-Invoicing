@@ -480,21 +480,30 @@ async function writeRecipes(
       continue;
     }
 
-    if (human.has(menuId)) {
-      out.recipes.skippedHuman++;
-      out.changes.push({
-        sku: productSku, name: group[0].productName, action: "SKIPPED",
-        detail: "وصفته مكتوبة يدوياً، فلم تُستبدل",
-      });
-      continue;
-    }
-
     const ingredients = [];
     let missing: string | null = null;
     for (const l of group) {
       const productId = itemIdBySku.get(l.itemSku) ?? await findItemBySku(l.itemSku, tx);
       if (!productId) { missing = l.itemName || l.itemSku; break; }
       ingredients.push({ productId, quantityMilli: l.quantityMilli, unit: l.unit });
+    }
+
+    /*
+      الوصفةُ اليدويّة تبقى ما بقيت وصفةُ فودكس كما قرأناها آخرَ مرّة — فإن تغيّرت في فودكس بعدها
+      فالأحدثُ فودكس، وتُعتمد من تاريخ القراءة. كانت تبقى أبداً: «قهوة اليوم» يدويّةٌ على الأوغندي
+      وفودكس صار يصرف المارقو منذ ١٨ نوفمبر ٢٠٢٦، فصرف التطبيقُ أوغندياً لم يُستعمل (أحمد، ٢٤ نوفمبر).
+    */
+    let foodicsChanged = false;
+    if (human.has(menuId)) {
+      foodicsChanged = missing === null && await foodicsChangedSince(menuId, ingredients, tx);
+      if (!foodicsChanged) {
+        out.recipes.skippedHuman++;
+        out.changes.push({
+          sku: productSku, name: group[0].productName, action: "SKIPPED",
+          detail: "وصفته مكتوبة يدوياً، ولم تتغيّر في فودكس منذ آخر قراءة، فلم تُستبدل",
+        });
+        continue;
+      }
     }
     if (missing !== null) {
       out.blocked.push({
@@ -525,7 +534,9 @@ async function writeRecipes(
         activate: true,
         actorId: input.actorId,
         source: CATALOG_SOURCE,
-        note: `مستوردة من كتالوج فودكس — ${group.length} مكوّناً`,
+        note: foodicsChanged
+          ? `مستوردة من كتالوج فودكس — تغيّرت فيه بعد تعديلها يدوياً، فاعتُمدت — ${group.length} مكوّناً`
+          : `مستوردة من كتالوج فودكس — ${group.length} مكوّناً`,
       }, tx);
       out.recipes.written++;
     } catch (e) {
@@ -570,6 +581,37 @@ async function humanWrittenRecipes(tx: Conn): Promise<Set<string>> {
        and coalesce(v.source, 'HUMAN') <> ${CATALOG_SOURCE}
   `);
   return new Set(rows.rows.map((r) => String(r.product_id)));
+}
+
+/**
+ * أتغيّرت وصفةُ فودكس عن آخر نسخةٍ قُرئت منه لهذا الصنف؟ — وبلا قراءةٍ سابقة لا يُعرف، فلا.
+ */
+async function foodicsChangedSince(
+  menuProductId: string,
+  ingredients: readonly { productId: string; quantityMilli: number; unit: string }[],
+  tx: Conn,
+): Promise<boolean> {
+  const last = await tx.execute<{ id: string }>(sql`
+    select v.id from recipe_versions v join recipes r on r.id = v.recipe_id
+     where r.product_id = ${menuProductId} and v.source = ${CATALOG_SOURCE}
+     order by v.effective_from desc, v.version desc limit 1
+  `);
+  const id = last.rows[0]?.id;
+  if (!id) return false;
+  const rows = await tx.execute<{ product_id: string; quantity_milli: string; unit: string }>(sql`
+    select product_id, quantity_milli, unit from recipe_ingredients where recipe_version_id = ${id}
+  `);
+  return !sameIngredients(rows.rows, ingredients);
+}
+
+const ingredientKey = (p: string, q: number | string, u: string) => `${p}|${Number(q)}|${u}`;
+function sameIngredients(
+  rows: readonly { product_id: string; quantity_milli: string; unit: string }[],
+  ingredients: readonly { productId: string; quantityMilli: number; unit: string }[],
+): boolean {
+  if (rows.length !== ingredients.length) return false;
+  const have = new Set(rows.map((r) => ingredientKey(String(r.product_id), r.quantity_milli, String(r.unit))));
+  return ingredients.every((i) => have.has(ingredientKey(i.productId, i.quantityMilli, i.unit)));
 }
 
 /** أمكوّناتُ النسخة القائمة الآن هي هذه بعينها؟ */

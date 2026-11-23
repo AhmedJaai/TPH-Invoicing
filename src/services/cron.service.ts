@@ -286,6 +286,8 @@ export interface DailyCronDeps {
   checkUnitCosts?: () => Promise<{ name: string }[]>;
   /** بابٌ تجاوز ميزانيةَ الشهر الجاري (`refreshBudgetFindings`، 111). */
   checkBudgets?: () => Promise<{ label: string }[]>;
+  /** وصفاتُ فودكس وأصنافُه تُقرأ كلَّ صباح — ما تغيّر فيه يسري من اليوم (`importParsedCatalog`). */
+  refreshCatalog?: () => Promise<{ written: number; skippedHuman: number; unchanged: number; blocked: number }>;
 }
 
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
@@ -348,6 +350,17 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
       parts.push(`تعذّر فحص الميزانية: ${over.message.split("\n")[0].slice(0, 160)}`);
     } else if (over.length > 0) {
       parts.push(`تجاوز الميزانية: ${over.map((f) => f.label).join("، ")}`);
+    }
+  }
+
+  if (deps.refreshCatalog) {
+    const r = await deps.refreshCatalog().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (r instanceof Error) {
+      ok = false;
+      parts.push(`تعذّرت قراءة وصفات فودكس: ${r.message.split("\n")[0].slice(0, 160)}`);
+    } else {
+      parts.push(r.written > 0 ? `وصفات فودكس: تغيّرت ${r.written} فسرت من اليوم` : "وصفات فودكس كما هي");
+      if (r.blocked > 0) parts.push(`ووصفات لم تُقرأ (${r.blocked})`);
     }
   }
 
