@@ -104,7 +104,8 @@ describe("الأصل الثابت", () => {
       sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
       subtotalMinor: 350_000, vatMinor: 52_500, totalMinor: 402_500,
     }, ctx);
-    expect(r.isFixedAsset).toBe(true);
+    /* المبلغُ يقترح ولا يحكم: الوسمُ بيد إنسان (٢٤ نوفمبر ٢٠٢٦) */
+    expect(r.isFixedAsset).toBe(false);
     expect(codes(r)).toContain(ISSUE.POSSIBLE_FIXED_ASSET);
   });
 
@@ -217,8 +218,9 @@ describe("المجهول لا يصير صفراً", () => {
       { companyVat: COMPANY },
     );
     expect(r.taxStatus).toBe("VALID");
-    // ٤٦٠٬٠٠٠ − ٦٠٬٠٠٠ = ٤٠٠٬٠٠٠ هللة، فوق حدّ الرسملة ٣٠٠٬٠٠٠
-    expect(r.isFixedAsset).toBe(true);
+    // ٤٦٠٬٠٠٠ − ٦٠٬٠٠٠ = ٤٠٠٬٠٠٠ هللة، فوق حدّ الرسملة ٣٠٠٬٠٠٠ — تنبيهٌ لا وسم
+    expect(r.isFixedAsset).toBe(false);
+    expect(r.findings.map((f) => f.code)).toContain(ISSUE.POSSIBLE_FIXED_ASSET);
   });
 
   it("بلا إجمالي معلوم لا يحكم بالرسملة", () => {

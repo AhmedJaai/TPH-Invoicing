@@ -196,7 +196,7 @@ describe("مورد بلا فواتير", () => {
 describe("الأصل الثابت", () => {
   it("ينبّه فوق ٣٬٠٠٠ ريال ولا يمنع الأرشفة", () => {
     const r = run({ subtotalAmount: "3500.00", vatAmount: "525.00", totalAmount: "4025.00" });
-    expect(r.isFixedAsset).toBe(true);
+    expect(r.isFixedAsset).toBe(false); /* تنبيهٌ لا وسم — الوسمُ بيد إنسان */
     expect(codes(r)).toContain(ISSUE.POSSIBLE_FIXED_ASSET);
     expect(r.canArchive).toBe(true);
   });

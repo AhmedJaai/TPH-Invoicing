@@ -89,7 +89,7 @@ describe("reviewConfirmed", () => {
       { ...validInvoice, subtotalMinor: 400_000, vatMinor: 60_000, totalMinor: 460_000 },
       { companyVat: COMPANY_VAT },
     );
-    expect(r.isFixedAsset).toBe(true);
+    expect(r.isFixedAsset).toBe(false); /* تنبيهٌ لا وسم — الوسمُ بيد إنسان */
   });
 
   it("الإيصال لا يخضع للفحص الضريبي، ويقبل بلا رقم فاتورة", () => {

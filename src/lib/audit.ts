@@ -42,6 +42,7 @@ export type AuditAction =
   | "INVOICE_FIELDS_CORRECTED"
   /* كمّيّةُ بندٍ قرأها النموذج خطأً — وسعرُ وحدته يتبعها، ومجموعُه لا يتغيّر */
   | "INVOICE_LINE_CORRECTED"
+  | "INVOICE_FIXED_ASSET_SET"
   | "INVOICE_REPLACED"
   /* نسخةٌ مكرّرة دُمجت في أختها — أُسقطت وعاد سدادها رصيداً */
   | "INVOICE_MERGED"

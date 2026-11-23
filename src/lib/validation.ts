@@ -250,10 +250,14 @@ export function validateInvoice(
       ? (subtotalKnown ? subtotalMinor : totalMinor - vatMinor)
       : totalMinor;
   // بلا إجمالي معلوم لا يُحكم بالرسملة — الجهل لا يُترجم «لا»
-  const isFixedAsset = totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
-  if (isFixedAsset) {
+  /*
+    المبلغُ يقترح ولا يحكم: كان ما فوق ٣٬٠٠٠ يُوسَم أصلاً فيخرج من تكلفة المبيعات بلا إقرار — فخرجت
+    أكوابٌ وبنٌّ واشتراكٌ (٢٤ نوفمبر ٢٠٢٦). فيُنبَّه هنا، والوسمُ بيد إنسان من صفحة الفاتورة.
+  */
+  const isFixedAsset = false;
+  if (totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR) {
     findings.push(finding(ISSUE.POSSIBLE_FIXED_ASSET, {
-      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة 3,000. راجع هل هي معدّة تُستهلك بالاستخدام`,
+      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة 3,000. إن كانت معدّة تُستهلك بالاستخدام فاجعلها أصلاً ثابتاً من صفحة الفاتورة، وإلا فهي مشتريات`,
     }));
   }
 

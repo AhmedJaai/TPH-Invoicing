@@ -129,7 +129,7 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
     buyerVat: r?.buyerVatNumber?.trim() || null,
     taxStatus: review.taxStatus,
     inputVatStatus: review.inputVatStatus,
-    isFixedAsset: review.isFixedAsset,
+    /* «أصلٌ ثابت» حكمُ إنسان (`setInvoiceFixedAsset`) — لا يمحوه إحلالُ ورقتها */
   }).where(eq(invoices.id, old.id));
   await replaceLines(tx, { invoiceId: old.id, supplierId: doc.supplierId, invoiceDate, subtotalMinor, lines: r?.lines ?? [] });
 

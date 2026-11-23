@@ -316,3 +316,32 @@ export async function correctInvoiceLine(
   }, tx);
   return { changed: true as const, ...next, lineTotalMinor: total };
 }
+
+/**
+ * «أصلٌ ثابت» أو «بضاعة» — حكمُ إنسان على الفاتورة، يُكتب ويُتراجع عنه.
+ *
+ * كان كلُّ ما صافيه فوق ٣٬٠٠٠ يُوسَم أصلاً بالمبلغ وحده فيخرج من تكلفة المبيعات، ولا زرَّ يرفعه: أكوابُ
+ * الكوب الذهبي وبنُّ الغربيّة واشتراكُ فودكس — نحو ٣٢٬٥٠٠ ريال خرجت من تكلفة مايو–سبتمبر (٢٤ نوفمبر ٢٠٢٦).
+ * فالمبلغُ يقترح، وهذا يُقرّ. والشهرُ المقفل يُفتح أوّلاً: الوسمُ يغيّر ربحه.
+ */
+export async function setInvoiceFixedAsset(
+  tx: Tx,
+  input: { invoiceId: string; isFixedAsset: boolean; reason: string | null },
+  actorId: string,
+): Promise<{ changed: boolean }> {
+  const [inv] = await tx.select({ id: invoices.id, periodMonth: invoices.periodMonth, isFixedAsset: invoices.isFixedAsset, number: invoices.invoiceNumber })
+    .from(invoices).where(eq(invoices.id, input.invoiceId)).for("update");
+  if (!inv) throw new InvoiceCorrectionRefused("الفاتورة غير موجودة. حدّث الصفحة.", 404);
+  if (inv.isFixedAsset === input.isFixedAsset) return { changed: false };
+  await assertMonthsOpen(tx, [inv.periodMonth]);
+  await tx.update(invoices).set({ isFixedAsset: input.isFixedAsset }).where(eq(invoices.id, inv.id));
+  await recordAudit({
+    actorId,
+    action: "INVOICE_FIXED_ASSET_SET",
+    entityType: "invoice",
+    entityId: inv.id,
+    before: { التصنيف: inv.isFixedAsset ? "أصل ثابت" : "مشتريات" },
+    after: { التصنيف: input.isFixedAsset ? "أصل ثابت" : "مشتريات", السبب: input.reason },
+  }, tx);
+  return { changed: true };
+}

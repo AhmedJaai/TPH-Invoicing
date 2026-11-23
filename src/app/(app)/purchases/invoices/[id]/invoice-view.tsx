@@ -47,6 +47,7 @@ import { ITEM, PAYMENT_RECORD, REASON, countNoun, countNounGen } from "@/lib/ara
 import { txHref } from "@/lib/inspector";
 import { monthOf } from "@/lib/filing";
 import { T } from "@/components/i18n/t";
+import { PostAction } from "@/components/post-action";
 
 
 /**
@@ -524,7 +525,24 @@ export async function InvoiceView({
                   {INPUT_VAT_LABEL[inv.inputVatStatus] ?? inv.inputVatStatus}
                 </span>
               </Row>
-              {inv.isFixedAsset && <Row label="التصنيف"><span className="text-warn">أصل ثابت (يُرسمَل)</span></Row>}
+              <Row label="التصنيف">
+                <span className="flex flex-wrap items-center gap-2">
+                  {inv.isFixedAsset
+                    ? <span className="text-warn">أصل ثابت (يُرسمَل، خارج تكلفة المبيعات)</span>
+                    : <span>مشتريات (تدخل تكلفة المبيعات)</span>}
+                  {canEdit && !monthClosed && (
+                    <PostAction
+                      url="/api/invoice-fixed-asset"
+                      body={{ invoiceId: inv.id, isFixedAsset: !inv.isFixedAsset }}
+                      undo={{ body: { invoiceId: inv.id, isFixedAsset: inv.isFixedAsset } }}
+                      variant="quiet"
+                      done={inv.isFixedAsset ? "صارت مشتريات" : "صارت أصلاً ثابتاً"}
+                    >
+                      {inv.isFixedAsset ? "ليست أصلاً: بضاعة أو مستلزمات" : "اجعلها أصلاً ثابتاً"}
+                    </PostAction>
+                  )}
+                </span>
+              </Row>
               {inv.carriedForwardFrom && <Row label="مُرحّلة من">{formatMonth(inv.carriedForwardFrom)}</Row>}
             </dl>
 
