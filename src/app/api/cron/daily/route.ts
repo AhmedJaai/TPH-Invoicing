@@ -16,6 +16,7 @@ import { snapshotDay } from "@/lib/cron";
 import { withDeadline } from "@/lib/ai/deadline";
 import { runSealCheck } from "@/services/month-seal.service";
 import { checkUnitCosts } from "@/services/daily-checks.service";
+import { refreshBudgetFindings } from "@/services/budget.service";
 import { checkAiBalance } from "@/services/daily-checks.service";
 import { sendMorningPush } from "@/services/push.service";
 
@@ -49,5 +50,6 @@ export async function POST(request: Request) {
     pushBrief: () => withDeadline(30_000, () => sendMorningPush()),
     /* يقرأ بنودَ الفواتير كلَّها — صباحاً لا مع كلّ صفحة */
     checkUnitCosts: () => withDeadline(60_000, () => checkUnitCosts()),
+    checkBudgets: () => withDeadline(60_000, () => refreshBudgetFindings()),
   }));
 }

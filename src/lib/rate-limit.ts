@@ -157,6 +157,7 @@ export const RULES: Record<string, RateLimitRule> = {
   product: { limit: 200, windowSeconds: 3600 },
   expense: { limit: 60, windowSeconds: 3600 },
   "expense-actual": { limit: 30, windowSeconds: 3600 },
+  budget: { limit: 60, windowSeconds: 3600 },
   /*
     تحليلُ الذكاء يستهلك رصيد المزوّد — نداءٌ لكلّ مورّد. والحدّ يتّسع
     لتحليل كلّ المورّدين مرّتين في الساعة، ولا يتّسع لحلقةٍ عالقة.

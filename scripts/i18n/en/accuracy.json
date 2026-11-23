@@ -60,5 +60,21 @@
   "لم يُقَس": "Not measured",
   "من تدين له أكثر أولاً": "Largest balance first",
   "الترتيب المقترح": "Suggested order",
-  "مبلغ أو اسم أو نص من الكشف": "Amount, name or statement text"
+  "مبلغ أو اسم أو نص من الكشف": "Amount, name or statement text",
+  "تجاوز الميزانية": "Over budget",
+  "أسرع من الميزانية": "Ahead of budget",
+  "قارب الحد": "Near the limit",
+  "ضمن الميزانية": "Within budget",
+  "اكتب ميزانية الشهر": "Set this month's budget",
+  "عدّل الميزانية": "Edit budget",
+  "لا ميزانية مكتوبة لهذا الشهر.": "No budget set for this month.",
+  "احفظ": "Save",
+  "ريال شهرياً": "SAR per month",
+  "بلا ميزانية": "No budget",
+  "يبقى {0}": "{0} left",
+  "تجاوز بـ{0}": "Over by {0}",
+  "من {0}": "of {0}",
+  "حصة ما مضى من الشهر {0}": "Month-to-date share {0}",
+  "لا يُعرف ما صُرف بعد": "Spending not known yet",
+  "يسري ما تكتبه من {0}، وما كان قبله يبقى في السجل. اترك الحقل فارغاً واحفظ لإلغاء ميزانية الباب.": "What you enter applies from {0}; earlier values stay in the record. Leave a field empty and save to remove that budget."
 }

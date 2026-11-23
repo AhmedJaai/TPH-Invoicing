@@ -281,6 +281,8 @@ export interface AttentionFacts {
   monthsLeftOpen?: string[];
   /** سعرُ وحدةٍ من الفواتير يخالف كلفةَ الكتالوج أضعافاً — `ratio` الفواتيرُ ÷ الكتالوج (فحص الصباح، 108). */
   unitCostSuspects?: { name: string; ratio: number }[];
+  /** أبوابٌ تجاوزت ميزانيةَ الشهر الجاري (111). */
+  budgetOver?: { label: string; budgetMinor: number; actualMinor: number }[];
   /** النسخةُ الاحتياطيّة على جهاز المالك متأخّرة (`backup-status.service.ts`). الغائبُ: سليمة أو غير معروفة. */
   backupStale?: { core: boolean; lastCore: string | null; lastFull: string | null; reportedAt: string; failed: { part: string; detail: string }[] } | null;
   stockRecurringGaps?: { productId: string; name: string; kind: "SHORTAGE" | "OVER_AVAILABLE"; months: number; totalMinor: number; byWitness: boolean }[];
@@ -1051,6 +1053,27 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: uc.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: uc.slice(0, 8).map((x) => ({ label: x.name, sub: `سعر الفواتير ${fmt(x.ratio)} من الكتالوج`, href: "/finance/stock#unit-cost" })),
+      needs: "amounts:view",
+    });
+  }
+
+  /* بابٌ تجاوز ميزانيةَ الشهر الجاري — حدٌّ كتبه صاحبُ المقهى لنفسه، فتجاوزُه قرارٌ يُسأل عنه */
+  const bo = f.budgetOver ?? [];
+  if (bo.length > 0) {
+    const over = bo.reduce((s, b) => s + (b.actualMinor - b.budgetMinor), 0);
+    out.push({
+      id: "budget-over",
+      area: "PAYMENTS",
+      severity: "MEDIUM",
+      title: bo.length === 1 ? `«${bo[0].label}» تجاوز ميزانية الشهر` : `${bo.length} أبواب تجاوزت ميزانية الشهر`,
+      detail: "ما صُرف هذا الشهر في هذا الباب أكثر من الحد الذي كتبته له.",
+      action: "افتح الميزانية في «الربح»: إن كان الصرف في محله فارفع الحد، وإلا فابحث عما زاد في مصروفات الشهر.",
+      actionLabel: "افتح الميزانية",
+      href: "/finance#budget",
+      count: bo.length,
+      amountMinor: over,
+      impact: { kind: "BLOCKED", amountMinor: over },
+      evidence: bo.slice(0, 8).map((b) => ({ label: b.label, amountMinor: b.actualMinor - b.budgetMinor, sub: "فوق الميزانية" })),
       needs: "amounts:view",
     });
   }

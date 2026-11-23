@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  PiggyBank,
   Activity, ArrowDown, ArrowLeft, Ban, Banknote, BatteryLow, Boxes, CalendarClock, CalendarX, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, ScanSearch, ShieldAlert, Sparkles, Stamp, TrendingUp, TriangleAlert, Undo2, Unlink, Users, Zap, type LucideIcon, FileQuestion, MessageSquareText, Inbox } from "lucide-react";
 import { Money, Prose } from "./money";
 import { SignalControls } from "./signal-controls";
@@ -94,6 +95,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "statement-payment-missing": FileQuestion,
   "backup-stale": FileQuestion,
   "unit-cost-suspect": FileQuestion,
+  "budget-over": PiggyBank,
   "month-left-open": FileQuestion,
   "files-wrong-month": FolderInput,
   "files-missing-in-drive": FolderX,

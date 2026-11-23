@@ -284,6 +284,8 @@ export interface DailyCronDeps {
   pushBrief?: () => Promise<MorningPushResult>;
   /** سعرُ وحدةٍ من الفواتير يخالف الكتالوج أضعافاً (`checkUnitCosts`، 108). */
   checkUnitCosts?: () => Promise<{ name: string }[]>;
+  /** بابٌ تجاوز ميزانيةَ الشهر الجاري (`refreshBudgetFindings`، 111). */
+  checkBudgets?: () => Promise<{ label: string }[]>;
 }
 
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
@@ -336,6 +338,16 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
       parts.push(`تعذّر فحص أسعار الوحدات: ${found.message.split("\n")[0].slice(0, 160)}`);
     } else {
       parts.push(found.length === 0 ? "أسعار الوحدات من الفواتير توافق الكتالوج" : `سعر وحدة لا يُصدَّق: ${found.map((f) => f.name).join("، ")}`);
+    }
+  }
+
+  if (deps.checkBudgets) {
+    const over = await deps.checkBudgets().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (over instanceof Error) {
+      ok = false;
+      parts.push(`تعذّر فحص الميزانية: ${over.message.split("\n")[0].slice(0, 160)}`);
+    } else if (over.length > 0) {
+      parts.push(`تجاوز الميزانية: ${over.map((f) => f.label).join("، ")}`);
     }
   }
 

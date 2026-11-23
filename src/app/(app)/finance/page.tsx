@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SectionBoundary } from "@/components/ui-client";
 import { Fragment } from "react";
 import { loadUnitCostFindings } from "@/services/daily-checks.service";
 import Link from "next/link";
@@ -18,6 +20,7 @@ import { currentMonthRiyadh, formatDay, formatMoment, formatMonth } from "@/lib/
 import { loadPnlSeries, type PnlView } from "@/services/profit.service";
 import { loadStoredReading } from "@/services/finance-reading.service";
 import { T } from "@/components/i18n/t";
+import { BudgetSection } from "@/components/budget-section";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +240,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           </Card>
         </div>
       </Section>
+
+      <SectionBoundary what="الميزانية">
+        <Suspense fallback={null}>
+          <BudgetSection month={month} canEdit={can(user.role, "expense:edit")} />
+        </Suspense>
+      </SectionBoundary>
 
       <Section title="الأشهر جنباً إلى جنب" icon={TrendingUp} hint="الشريط المخطط ربحٌ ينقصه عنصر، فلا تقارنه بالصافي.">
         <ProfitTrend months={series.map(trendOf)} active={month} hrefOf={(m) => `/finance?month=${m}`} />

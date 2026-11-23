@@ -2,13 +2,13 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ١٠٥
+## الجداول — ١٠٦
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` `month_seals` · `job_state` `daily_figures` `daily_checks` `push_subscriptions`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
-`audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`
+`audit_logs` `rate_limits` `ai_usage` `expenses` `budget_lines` · `obligations` `app_settings`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
 `adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices` `vat_filings` `vat_period_inputs`
@@ -152,6 +152,7 @@
 | `108_daily_check_unit_cost.sql` | `daily_checks.kind` يقبل `UNIT_COST` — فحصُ الصباح لسعر الوحدة من الفواتير مقابل الكتالوج — إضافةٌ خالصة |
 | `109_leave_type.sql` | `payroll_attendance.leave_type` (`ANNUAL` · `SICK` · `UNPAID`، والفارغُ سنويّة) — بلا أجرٍ يُخصم يومُه، والمرضيّةُ لا تُطرح من الرصيد السنويّ — إضافةٌ خالصة |
 | `110_expense_paid_from.sql` | `expenses.paid_from` (`TILL` · `OWNER` · `OTHER`، والفارغُ لم يُقَل) — ما صُرف من نقد الصندوق يُطرح ممّا سجّله فودكس نقداً — إضافةٌ خالصة |
+| `111_budgets.sql` | `budget_lines` — ميزانيةُ الشهر لكلّ باب (`COGS` أو باب مصروف)، التعديلُ صفٌّ جديد يسري من شهر، والفارغُ يُلغي — إضافةٌ خالصة |
 | `104_count_parts.sql` | `inventory_count_lines.count_parts` — العدُّ بخاناته (كرتون · حبّة · كيلو · جرام) كما كُتب، بجانب مجموعه — إضافةٌ خالصة |
 | `100_team_board.sql` | «TPH Team»: `team_board` (مرجعُ النظافة والطحنات والوصفات والبن والإعلانات — لا مهامّ) و`team_requests` (اقتراحُ تعديل · إجازة · تبديل · تالف، لا يُنفَّذ إلّا بإقرار) — إضافةٌ خالصة |
 | `099_employee_shifts.sql` | `employee_shifts` — الدوامُ المخصَّص: وقتٌ لكلّ يومٍ من الأسبوع، أو ليومٍ بعينه أو راحتُه؛ اليومُ بعينه يغلب يومَ الأسبوع ويغلب الأصل — إضافةٌ خالصة |

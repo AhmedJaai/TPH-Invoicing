@@ -38,6 +38,7 @@ import { loadRecurringAnomalies } from "@/services/recurring-watch.service";
 import { loadDueObligations } from "@/services/obligation.service";
 import { loadDueTasks } from "@/services/task.service";
 import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service";
+import { loadBudgetFindings } from "@/services/budget.service";
 import { loadFinanceAttentionFacts } from "@/services/finance-attention.service";
 import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { loadRepeatDeliveries } from "@/services/repeat-delivery.service";
@@ -53,7 +54,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts, budgets] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
@@ -64,6 +65,8 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     loadBackupVerdict().catch(() => ({ state: "UNKNOWN" as const })),
     /* فحصُ الصباح لأسعار الوحدات — صفٌّ واحد يُقرأ (108) */
     loadUnitCostFindings().catch(() => null),
+    /* تجاوزُ الميزانية — محفوظٌ من فحص الصباح وآخر حفظ (111) */
+    loadBudgetFindings().catch(() => []),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -108,6 +111,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       checkedAt: formatMoment(aiLow.checkedAt),
     } : null,
     unitCostSuspects: unitCosts ? unitCosts.findings.map((f) => ({ name: f.name, ratio: f.invoiceRate / f.catalogRate })) : [],
+    budgetOver: budgets.map((b) => ({ label: b.label, budgetMinor: b.budgetMinor, actualMinor: b.actualMinor })),
     backupStale: backup.state === "CORE_STALE" || backup.state === "MIRROR_STALE" ? {
       core: backup.state === "CORE_STALE",
       lastCore: backup.hb.lastCoreSuccess ? formatMoment(new Date(backup.hb.lastCoreSuccess)) : null,

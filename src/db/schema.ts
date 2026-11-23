@@ -1005,6 +1005,20 @@ export const expenses = pgTable("expenses", {
   index("expenses_event_idx").on(t.eventKey),
 ]);
 
+/**
+ * ميزانيةُ الشهر لكلّ باب (111) — `COGS` أو بابُ مصروف. التعديلُ صفٌّ جديد، والساري آخرُ ما يسري
+ * قبل الشهر (`lib/finance/budget.ts`). و`amountMinor` الفارغُ «لا ميزانية من هذا الشهر».
+ */
+export const budgetLines = pgTable("budget_lines", {
+  id: id(),
+  line: text("line").notNull(),
+  amountMinor: integer("amount_minor"),
+  effectiveFrom: text("effective_from").notNull(),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("budget_lines_line_idx").on(t.line, t.effectiveFrom)]);
+
 /* ──────────────────── الفروع والحسابات ──────────────────── */
 
 /**

@@ -108,5 +108,6 @@
   "107_server_errors.sql": "61ea801513ea19c4c57bfd1f862fb594522337ad4d6704b8d845ab763630c32f",
   "108_daily_check_unit_cost.sql": "a19a1f1c64551ef851b4d019bc264add9a1af2e1e5584cbe7920531f93956e0a",
   "109_leave_type.sql": "d179d0860a6e4dd2b13c502a803a1f8158371dfd299860870c5b5168ccf14930",
-  "110_expense_paid_from.sql": "2aaae3cee221867053edd3ff1bbdf80b99f724eba2dfc43be91c7d2baf6ffe7d"
+  "110_expense_paid_from.sql": "2aaae3cee221867053edd3ff1bbdf80b99f724eba2dfc43be91c7d2baf6ffe7d",
+  "111_budgets.sql": "c9e7bf072271901aaea6ac363c37c4babeb204211e2fda02a8d5d73a60eeefb1"
 }

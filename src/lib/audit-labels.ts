@@ -93,6 +93,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   SUPPLIER_VAT_LEARNED: "تعلّم الرقم الضريبي للمورّد",
   PRODUCT_UNLINKED: "فكّ ربط صنف",
   EXPENSE_ADDED: "إضافة مصروف",
+  BUDGET_SET: "تعديل ميزانية الشهر",
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
   EXPENSE_REACTIVATED: "إعادة تفعيل مصروف متكرّر",
   INVOICE_PAID_BY_OWNER: "سداد فاتورة من حساب المالك",
