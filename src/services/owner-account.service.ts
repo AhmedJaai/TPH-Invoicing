@@ -94,3 +94,32 @@ export async function setOwnerPaymentSource(paymentId: string, fromTransfers: bo
     return true;
   });
 }
+
+/**
+ * سدادٌ قُيّد «تحويلاً بنكيّاً» ولا حركةَ في الكشف تشهد له → «من مال المالك».
+ *
+ * باقي فاتورة أكواب مايو (١٥٢٫٣٧ من ١٣٬٥٠٦٫٧٥) قُيّد تحويلاً بنكيّاً، ولا خصمَ بقدره في الكشف — دفعه
+ * أحمد من ماله مع الباقي (٢٤ نوفمبر ٢٠٢٦). فلا يُحوَّل ما شهد له البنك، ولا في شهرٍ مقفل؛ والتخصيصُ كما هو.
+ */
+export async function convertToOwnerPayment(paymentId: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (t) => {
+    const [row] = await t
+      .select({ id: payments.id, month: sql<string>`to_char(${payments.paidAt} at time zone 'Asia/Riyadh', 'YYYY-MM')`, amountMinor: payments.amountMinor })
+      .from(payments)
+      .where(and(eq(payments.id, paymentId), eq(payments.method, "BANK_TRANSFER"), notInArray(payments.status, ["REVERSED", "VOID"]),
+        sql`not exists (select 1 from bank_transactions b where b.matched_payment_id = ${payments}.id)`))
+      .limit(1);
+    if (!row) return false;
+    await assertMonthsOpen(t, [row.month]);
+    await t.update(payments).set({ method: "OWNER_ACCOUNT", fromOwnerTransfers: false }).where(eq(payments.id, paymentId));
+    await recordAudit({
+      actorId,
+      action: "OWNER_PAYMENT_SOURCE_SET",
+      entityType: "payment",
+      entityId: paymentId,
+      before: { الطريقة: "تحويل بنكي بلا حركة في الكشف" },
+      after: { الطريقة: "من مال المالك الخاص", المبلغ_بالهللات: row.amountMinor },
+    }, t);
+    return true;
+  });
+}
