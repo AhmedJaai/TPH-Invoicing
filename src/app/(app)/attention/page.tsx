@@ -77,13 +77,13 @@ export default async function AttentionPage({
   if (wantedItem && !inLens(wantedItem, lens)) lens = "all";
   const list = ordered.filter((i) => inLens(i, lens));
   /* ما حُسم خرج — فالتالي كما كان حين فُتح، لا رأسُ القائمة */
-  const { selected, resolved } = landing(list, wanted, params.then);
+  const { selected, resolved, gone } = landing(list, wanted, params.then);
 
   /*
     على الحاسوب تُعرَض القائمة والتفصيل معاً. وعلى الجوّال لا يتّسعان:
     فمن اختار بنداً يرى بندَه وحده، وفوقه بابُ الرجوع والتنقّل.
   */
-  const picked = Boolean(wantedItem) || resolved;
+  const picked = Boolean(wantedItem) || resolved || gone;
 
   const shell = (children: React.ReactNode) => (
     <PageShell
@@ -170,6 +170,10 @@ export default async function AttentionPage({
             {resolved && (
               <p role="status" className="mb-3 flex animate-rise items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-2.5 text-xs font-bold text-ok">
                 <T s="{0}تمّ البتّ في البند السابق وخرج من القائمة، وهذا هو البند التالي." a={[<CircleCheck key="0" className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />]} /></p>
+            )}
+            {gone && (
+              <p role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-line bg-sunken/60 px-4 py-2.5 text-xs font-bold text-ink-soft">
+                <T s="{0}البند الذي فتحته لم يعد ينتظر شيئاً. هذا أهم ما بقي." a={[<CircleCheck key="0" className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />]} /></p>
             )}
             <ItemDetail
               key={selected.id}

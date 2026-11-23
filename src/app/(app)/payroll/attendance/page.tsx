@@ -92,13 +92,13 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     { key: "name", header: "الموظف", primary: true, cell: (b) => <span><span className="font-bold">{b.employee.name}</span><span className="block text-[11px] text-muted">{b.employee.kind === "PART_TIME" ? "جزئي" : dayShiftRange(b.shift) ? <span className="nums">{dayShiftRange(b.shift)}</span> : b.shift.off ? "" : "بلا وقت دوام"}{!b.workday && b.employee.kind === "MONTHLY" && " · يوم راحته"}</span></span> },
     {
       key: "in", header: "الحضور",
-      cell: (b) => b.ins.length === 0 ? <span className="text-muted">—</span> : (
+      cell: (b) => b.ins.length === 0 ? <span className="text-muted">لم يسجّل</span> : (
         <span className="flex flex-wrap gap-1">{b.ins.map((c) => <Badge key={c.id} tone={trusted(c.verdict) || c.review === "ACCEPTED" ? "ok" : "warn"}><span className="nums" dir="ltr">{riyadhClock(c.at)}</span> · {VERDICT_LABEL[c.verdict]}</Badge>)}</span>
       ),
     },
     {
       key: "out", header: "الانصراف",
-      cell: (b) => b.outs.length === 0 ? <span className="text-muted">—</span> : (
+      cell: (b) => b.outs.length === 0 ? <span className="text-muted">لم يسجّل</span> : (
         <span className="flex flex-wrap gap-1">{b.outs.map((c) => <Badge key={c.id} tone={trusted(c.verdict) || c.review === "ACCEPTED" ? "ok" : "warn"}><span className="nums" dir="ltr">{riyadhClock(c.at)}</span></Badge>)}</span>
       ),
     },

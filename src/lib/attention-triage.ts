@@ -178,12 +178,17 @@ export function landing<T extends { id: string }>(
   list: readonly T[],
   wanted: string | undefined,
   then: string | undefined,
-): { selected: T | null; resolved: boolean } {
+): { selected: T | null; resolved: boolean; gone: boolean } {
   const hit = wanted ? list.find((i) => i.id === wanted) : undefined;
-  if (hit) return { selected: hit, resolved: false };
-  const resolved = Boolean(wanted);
+  if (hit) return { selected: hit, resolved: false, gone: false };
+  /*
+    «تمّ البتّ» لمن جاء من فعلٍ (`then` يحمله رابطُ «حُلّ وانتقل») — لا لرابطٍ قديم أو إشعارٍ
+    مضى بندُه: كان `/review` يفتح على «تمّ البتّ في البند السابق» ولم يُبَتّ في شيء. فذاك «لم يعد قائماً».
+  */
+  const resolved = Boolean(wanted) && then !== undefined;
+  const gone = Boolean(wanted) && then === undefined;
   const next = then ? list.find((i) => i.id === then) : undefined;
-  return { selected: next ?? list[0] ?? null, resolved };
+  return { selected: next ?? list[0] ?? null, resolved, gone };
 }
 
 export function lensHref(lens: Lens): string {

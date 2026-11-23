@@ -50,5 +50,15 @@
   "ولفاتورة مورّد: افتحها واختر «نقداً من الصندوق».": "For a supplier invoice: open it and choose «Cash from the till».",
   "سجّلها مدفوعة نقداً من الصندوق": "Mark paid in cash from the till",
   "من مالك الخاص، لا يظهر في كشف المقهى. ستظهر لك معاينة قبل الحفظ.": "From your own money; not on the café statement. You'll see a preview before saving.",
-  "من نقد المبيعات في الصندوق. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك.": "From sales cash in the till. Deducted from Foodics cash that never reached the bank."
+  "من نقد المبيعات في الصندوق. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك.": "From sales cash in the till. Deducted from Foodics cash that never reached the bank.",
+  "{0}البند الذي فتحته لم يعد ينتظر شيئاً. هذا أهم ما بقي.": "{0}The item you opened no longer needs anything. Here is the most important one left.",
+  "لم يسجّل": "Not recorded",
+  "لا مستحق": "Nothing owed",
+  "لا فواتير": "No invoices",
+  "لا رسوم": "No fee",
+  "لم يُحوَّل": "Not transferred",
+  "لم يُقَس": "Not measured",
+  "من تدين له أكثر أولاً": "Largest balance first",
+  "الترتيب المقترح": "Suggested order",
+  "مبلغ أو اسم أو نص من الكشف": "Amount, name or statement text"
 }

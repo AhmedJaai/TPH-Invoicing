@@ -243,7 +243,7 @@ export default async function BankPage({
                   name="q"
                   type="search"
                   defaultValue={search?.text ?? ""}
-                  placeholder="ابحث في كل الحركات: بالمبلغ أو الاسم أو نص البنك"
+                  placeholder="مبلغ أو اسم أو نص من الكشف"
                   aria-label="ابحث في كل الحركات بالمبلغ أو الاسم أو نص البنك"
                   dir="auto"
                   className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"

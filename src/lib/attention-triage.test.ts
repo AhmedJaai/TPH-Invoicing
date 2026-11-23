@@ -110,18 +110,24 @@ describe("المال المعلّق بحسب نوعه", () => {
 describe("landing — بعد الحسم إلى التالي", () => {
   const list = [{ id: "a" }, { id: "b" }, { id: "c" }];
   it("يفتح المطلوب ما دام في الطابور", () => {
-    expect(landing(list, "b", "c")).toEqual({ selected: { id: "b" }, resolved: false });
+    expect(landing(list, "b", "c")).toEqual({ selected: { id: "b" }, resolved: false, gone: false });
   });
   it("المطلوب حسم وخرج: تاليه كما كان حين فتح، ويقال ذلك", () => {
-    expect(landing([{ id: "a" }, { id: "c" }], "b", "c")).toEqual({ selected: { id: "c" }, resolved: true });
+    expect(landing([{ id: "a" }, { id: "c" }], "b", "c")).toEqual({ selected: { id: "c" }, resolved: true, gone: false });
   });
   it("وتاليه حسم أيضاً: أوّل القائمة", () => {
-    expect(landing([{ id: "a" }], "b", "c")).toEqual({ selected: { id: "a" }, resolved: true });
+    expect(landing([{ id: "a" }], "b", "c")).toEqual({ selected: { id: "a" }, resolved: true, gone: false });
   });
   it("بلا طلب: أوّل القائمة ولا خبر حسم", () => {
-    expect(landing(list, undefined, undefined)).toEqual({ selected: { id: "a" }, resolved: false });
+    expect(landing(list, undefined, undefined)).toEqual({ selected: { id: "a" }, resolved: false, gone: false });
   });
   it("الطابور فرغ: لا شيء", () => {
-    expect(landing([], "b", "c")).toEqual({ selected: null, resolved: true });
+    expect(landing([], "b", "c")).toEqual({ selected: null, resolved: true, gone: false });
+  });
+});
+
+describe("رابطٌ قديمٌ لبندٍ مضى — لا يُقال «تمّ البتّ»", () => {
+  it("بلا `then` البندُ «لم يعد قائماً» لا «بُتّ فيه»", () => {
+    expect(landing([{ id: "a" }], "unclassified-bank", undefined)).toEqual({ selected: { id: "a" }, resolved: false, gone: true });
   });
 });
