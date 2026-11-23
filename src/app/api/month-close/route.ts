@@ -21,7 +21,7 @@ import { can } from "@/lib/permissions";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
-import { WARNING, countNoun } from "@/lib/arabic";
+import { WARNING, countNoun, countNounGen } from "@/lib/arabic";
 import { formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { describeError, logEvent } from "@/lib/log";
 import { freezePnl } from "@/services/profit.service";
@@ -256,6 +256,6 @@ async function handle(request: Request) {
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${formatMonth(body.month)}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
+    message: `أُقفل ${formatMonth(body.month)}${report.warnings.length ? ` مع إقرارك ب${countNounGen(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
   });
 }
