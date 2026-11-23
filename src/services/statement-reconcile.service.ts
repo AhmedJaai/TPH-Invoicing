@@ -404,6 +404,15 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
        and i.invoice_date between ${new Date(from.getTime() - PAD_MS)} and ${new Date(to.getTime() + PAD_MS)}`)).rows
     .map((o) => ({ invoiceId: o.id, invoiceNumber: o.num, invoiceDate: new Date(`${o.d}T00:00:00Z`), totalMinor: Number(o.total), subtotalMinor: o.sub === null ? null : Number(o.sub), grossMinor: o.gross === null ? null : Number(o.gross) }));
 
+  /*
+    ما طابقه كشفٌ آخر من المورّد ورد هناك — كما في `reconcileStatementForImport`. كشفُ أفال
+    لـ٢٥ أكتوبر يذكر المفتوحَ وحده من ١٢ أغسطس، فكانت ثماني فواتير مسدَّدةٍ واردةٍ في كشفَي
+    أغسطس وسبتمبر تُقال «لم ترد في كشفه» (١٢٬٢٨٩٫٤٨).
+  */
+  const inOtherStatements = new Set((await conn.execute<{ id: string }>(sql`
+    select distinct sl.matched_invoice_id as id from statement_lines sl join statements st on st.id = sl.statement_id
+     where st.supplier_id = ${supplierId} and st.id <> ${st.id} and sl.matched_invoice_id is not null`)).rows.map((r) => r.id));
+
   const kept = stored.filter((l) => l.status === "MATCHED" && l.invoiceId);
   const keptIds = new Set(kept.map((l) => l.invoiceId!));
   const live = reconcileStatement(
@@ -436,9 +445,9 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
       if (!o || amountAgrees(o, theirs)) return [];
       return [{ ref: g.map((p) => p.ref).filter(Boolean).join("، ") || null, day: day(g[0].d), theirsMinor: theirs, oursMinor: o.totalMinor, invoiceId: inv, invoiceNumber: o.invoiceNumber }];
     }),
-    /* في مدّته وحدها — النافذةُ الموسَّعة للمطابقة لا للدعوى */
+    /* في مدّته وحدها — النافذةُ الموسَّعة للمطابقة لا للدعوى — وما لم يرد في كشفٍ آخر له */
     notInStatement: ours
-      .filter((o) => !claimed.has(o.invoiceId) && o.invoiceDate >= from && o.invoiceDate <= to)
+      .filter((o) => !claimed.has(o.invoiceId) && !inOtherStatements.has(o.invoiceId) && o.invoiceDate >= from && o.invoiceDate <= to)
       .map((o) => ({ invoiceId: o.invoiceId, invoiceNumber: o.invoiceNumber, day: day(o.invoiceDate), amountMinor: o.totalMinor })),
   };
 }
