@@ -48,7 +48,8 @@ export async function loadBudgetView(month: string): Promise<BudgetView> {
   const day = Number(todayInRiyadh().slice(8, 10));
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const nowBudgets = effectiveBudgets(rows, currentMonthRiyadh());
+  /* النموذجُ يبدأ بالساري في الشهر المعروض — ويُكتب منه: ميزانيةُ أكتوبر تُكتب وأنت تنظر إلى أكتوبر */
+  const nowBudgets = effectiveBudgets(rows, month);
   return {
     month,
     open,

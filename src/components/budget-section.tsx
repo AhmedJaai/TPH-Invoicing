@@ -5,7 +5,7 @@ import { BudgetEditor } from "@/components/budget-editor";
 import { T } from "@/components/i18n/t";
 import { BUDGET_LINES, budgetLabel, loadBudgetView } from "@/services/budget.service";
 import type { BudgetState } from "@/lib/finance/budget";
-import { currentMonthRiyadh, formatMonth } from "@/lib/riyadh-time";
+import { formatMonth } from "@/lib/riyadh-time";
 
 const STATE: Record<BudgetState, { label: string; tone: Tone }> = {
   OVER: { label: "تجاوز الميزانية", tone: "danger" },
@@ -27,7 +27,7 @@ export async function BudgetSection({ month, canEdit }: { month: string; canEdit
         {v.lines.length === 0 ? "اكتب ميزانية الشهر" : "عدّل الميزانية"}
       </summary>
       <div className="mt-3">
-        <BudgetEditor fromMonth={currentMonthRiyadh()} fromLabel={formatMonth(currentMonthRiyadh())} lines={BUDGET_LINES.map((l) => ({ line: l, label: budgetLabel(l), currentMinor: v.current[l] ?? null }))} />
+        <BudgetEditor fromMonth={month} fromLabel={formatMonth(month)} lines={BUDGET_LINES.map((l) => ({ line: l, label: budgetLabel(l), currentMinor: v.current[l] ?? null }))} />
       </div>
     </details>
   ) : null;
