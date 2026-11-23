@@ -472,5 +472,7 @@ export function absenceLineLabel(s: { absentDays: number; unpaidLeaveDays: numbe
   if (parts.length === 0) return null;
   const title = s.absentDays > 0 && s.unpaidLeaveDays > 0 ? "أجر أيام الغياب والإجازة بلا أجر"
     : s.absentDays > 0 ? "أجر أيام الغياب" : "أجر أيام الإجازة بلا أجر";
-  return `${title} (${parts.join("، ")})`;
+  /* نوعٌ واحد: العنوانُ يسمّيه فيكفي العدد */
+  const detail = parts.length === 2 ? parts.join("، ") : countNoun(s.absentDays + s.unpaidLeaveDays, DAY);
+  return `${title} (${detail})`;
 }
