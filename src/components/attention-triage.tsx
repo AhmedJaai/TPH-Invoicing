@@ -332,11 +332,10 @@ function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Le
           )}
         </div>
 
-        {signal && (
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-soft">
-            <Prose text={item.detail} />
-          </p>
-        )}
+        {/* سببُ البند تحت عنوانه دائماً — كان العملُ الترتيبيّ عنواناً وحده، فلا يُعرف لماذا ظهر حتّى يُفتح */}
+        <p className={`mt-1 text-xs leading-relaxed text-ink-soft ${signal ? "line-clamp-2" : "line-clamp-1"}`}>
+          <Prose text={item.detail} />
+        </p>
 
         <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted">
           <span>{AREA_LABEL[item.area]}</span>
@@ -352,8 +351,8 @@ function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Le
           )}
         </p>
 
-        {/* فعلُ الإشارة بضغطةٍ واحدة — وما يُحسم هنا فعلُه الصفُّ نفسه */}
-        {signal && !inPlace && (
+        {/* فعلُ البند بضغطةٍ واحدة بجانبه — لكلّ بند، لا للإشارة وحدها؛ وما يُحسم هنا فعلُه الصفُّ نفسه */}
+        {!inPlace && item.href && (
           <Link href={item.href} className={`${buttonClass("subtle", "sm")} mt-2`}>
             {item.actionLabel ?? "افتح السجلات"}
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />

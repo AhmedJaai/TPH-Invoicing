@@ -152,10 +152,6 @@ export default async function HomePage() {
         </>
       }
     >
-      {!start.knowsNothing && (
-        <WhatsNew allowed={NEWS_CAPABILITIES.filter((c) => can(user.role, c))} />
-      )}
-
       {start.incomplete && (
         <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
           <h2 id="start-title" className="flex items-center gap-2 text-base font-bold">
@@ -183,8 +179,13 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── الأرقامُ الأربعة: كلٌّ جوابُ سؤال، وكلٌّ يفتح موضعه ── */}
+      {/*
+        على الجوّال «ما يحتاج قرارك» قبل الأرقام: كان يقع بعد ثلاث شاشات (الجديد ثمّ أربعة أرقام)،
+        وسؤالُ الصباح «ماذا أفعل اليوم؟» جوابُه القائمة. وعلى الشاشة الواسعة الترتيبُ كما كان.
+      */}
+      <div className="flex flex-col">
       {!start.knowsNothing && (
+        <div className="order-2 mt-10 lg:order-1 lg:mt-0">
         <StatGrid>
           <KeyFigure
             icon={Store}
@@ -257,9 +258,10 @@ export default async function HomePage() {
             </Suspense>
           </SectionBoundary>
         </StatGrid>
+        </div>
       )}
 
-      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+      <div className="order-1 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 lg:order-2 lg:mt-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         {/* ── ما ينتظر قرارك ── */}
         <Section
           title="ما يحتاج قرارك"
@@ -324,6 +326,14 @@ export default async function HomePage() {
           )}
         </div>
       </div>
+      </div>
+
+      {/* «الجديد في النظام» آخرَ الصفحة — خبرٌ عن التطبيق لا عملٌ ينتظر، فلا يسبق القائمة */}
+      {!start.knowsNothing && (
+        <div className="mt-10">
+          <WhatsNew allowed={NEWS_CAPABILITIES.filter((c) => can(user.role, c))} />
+        </div>
+      )}
     </PageShell>
   );
 }
