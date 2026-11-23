@@ -77,6 +77,11 @@ export function statementMissingKey(slug: string, ref: string | null, day: strin
 }
 
 /** سدادٌ لم يقيّده المورّد — بالدفعة وكشفِه: كشفٌ أحدث يعيد السؤال إن بقيت غائبة عنه. */
+/** بندُ فاتورةٍ سعرُ وحدته ضعفا المعتاد أو نصفُه — كمّيّةٌ أو وحدةٌ قُرئت خطأً على الأرجح. */
+export function qtyOutlierKey(lineId: string): string {
+  return `qty-outlier:${lineId.slice(0, 80)}`;
+}
+
 /** سطرُ دائنٍ في كشف المورّد لا نعرفه — بكشفه ويومه ومبلغه. */
 export function statementCreditKey(statementId: string, day: string, amountMinor: number): string {
   return `statement-credit:${statementId.slice(0, 60)}:${day}:${amountMinor}`;

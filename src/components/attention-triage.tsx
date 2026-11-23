@@ -97,6 +97,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "unit-cost-suspect": FileQuestion,
   "budget-over": PiggyBank,
   "statement-credit-unrecorded": ReceiptText,
+  "line-qty-misread": ScanSearch,
   "month-left-open": FileQuestion,
   "files-wrong-month": FolderInput,
   "files-missing-in-drive": FolderX,

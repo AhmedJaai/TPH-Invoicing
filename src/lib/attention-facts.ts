@@ -26,7 +26,7 @@ import { loadSettlementComparisons } from "@/services/statement-payments.service
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, statementCreditKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, qtyOutlierKey, statementCreditKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
 import { annualImpactMinor, isRealMove, trackPrices } from "./price-watch";
 import { addDays } from "./riyadh-time";
 
@@ -550,6 +550,33 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       ما قيّده المورّدُ في كشفه دائناً ولا نعرفه — إشعارٌ دائن (مالٌ لك عنده) أو سدادٌ لم نسجّله. وُجد
       في «أفال»: إشعارُ ١٬٩٩٨٫٧٠ «Reversal of INV/2026/00080» يظهر في صفحة المورّد وحدها.
     */
+    /*
+      بندٌ سعرُ وحدته ضعفا المعتاد عند مورّده للصنف نفسه أو نصفُه — قراءةٌ خاطئة للكمّيّة أو الوحدة
+      على الأرجح: نادك «٦ × ٢٢٫٧٥» وهي ١٥ عبوةً بـ٩٫١٠. كان يُرى في «تحليل الأسعار» وحده. وفي
+      الأشهر المفتوحة وحدها — المقفلُ لا يُصحَّح فيه شيء.
+    */
+    qtyMisreads: (await db.execute<{ id: string; invoice_id: string; invoice_number: string; supplier: string; description: string; up: number; med: number }>(sql`
+      with med as (
+        select supplier_product_id sp, percentile_cont(0.5) within group (order by unit_price_minor) m
+          from invoice_lines
+         where supplier_product_id is not null and unit_price_minor > 0
+           and coalesce(pricing_basis, '') not in ('QTY_UNREAD', 'INCONSISTENT')
+         group by 1 having count(*) >= 3)
+      select l.id, i.id as invoice_id, i.invoice_number, s.name_ar as supplier, l.description, l.unit_price_minor as up, med.m::int as med
+        from invoice_lines l
+        join med on med.sp = l.supplier_product_id
+        join invoices i on i.id = l.invoice_id
+        join suppliers s on s.id = i.supplier_id
+       where l.unit_price_minor > 0 and coalesce(l.pricing_basis, '') <> 'QTY_UNREAD'
+         and (l.unit_price_minor >= 2 * med.m or l.unit_price_minor * 2 <= med.m)
+         and not exists (select 1 from month_closes mc where mc.month = i.period_month and mc.status = 'CLOSED')
+         /* ما صحّحه إنسانٌ بالقلم لا يُسأل عنه — معتادُ نادك نفسُه قراءةٌ خاطئة في الأشهر المقفلة */
+         and not exists (select 1 from audit_logs a where a.action = 'INVOICE_LINE_CORRECTED' and a.entity_id = i.id and a.after->>'lineId' = l.id)
+       order by i.invoice_date desc
+       limit 40
+    `)).rows
+      .map((r) => ({ lineId: r.id, invoiceId: r.invoice_id, invoiceNumber: r.invoice_number, supplierName: r.supplier, description: r.description, unitMinor: Number(r.up), usualMinor: Number(r.med), key: qtyOutlierKey(r.id) }))
+      .filter((r) => !silenced.has(r.key)),
     statementCreditUnrecorded: settlements
       .flatMap((r) => r.comparison.theirsOnly.map((t) => ({
         supplierName: r.supplierName, slug: r.slug, day: t.line.day, ref: t.line.ref, amountMinor: t.line.amountMinor,

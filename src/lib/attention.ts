@@ -183,6 +183,8 @@ export interface AttentionFacts {
   statementMissing?: { supplierName: string; slug: string; ref: string | null; day: string; amountMinor: number; unclear: boolean; key?: string }[];
   /** سدادٌ قيّدناه في مدّة آخر كشفٍ للمورّد ولم يرد فيه (`lib/statement-payments.ts`). الغائبُ: لم يُسأل. */
   statementPaidMissing?: { supplierName: string; slug: string; paymentId: string; day: string; amountMinor: number; method: string; periodTo: string; key?: string }[];
+  /** بندُ فاتورةٍ في شهرٍ مفتوح سعرُ وحدته ضعفا المعتاد أو نصفُه. */
+  qtyMisreads?: { lineId: string; invoiceId: string; invoiceNumber: string; supplierName: string; description: string; unitMinor: number; usualMinor: number; key?: string }[];
   /** سطرٌ دائنٌ في كشف المورّد لا نعرفه — إشعارٌ دائن أو سدادٌ لم نسجّله. */
   statementCreditUnrecorded?: { supplierName: string; slug: string; day: string; ref: string | null; amountMinor: number; creditNote: boolean; key?: string }[];
 
@@ -1523,6 +1525,32 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     دائنٌ في كشف المورّد لا نعرفه: إشعارٌ دائن مالٌ لك عنده لم يُخصم ممّا تدين به، وسدادٌ لم نسجّله
     يجعل ما تدين به في سجلاتنا أكبر. وُجد في «أفال» يدوياً (٢٣ نوفمبر ٢٠٢٦) فصار بنداً.
   */
+  const misreads = f.qtyMisreads ?? [];
+  if (misreads.length > 0) {
+    const one = misreads[0];
+    out.push({
+      id: "line-qty-misread",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: misreads.length === 1
+        ? `بند «${one.description.slice(0, 40)}» في فاتورة ${one.invoiceNumber} قُرئت كميته خطأً على الأرجح`
+        : `${misreads.length} بنود فواتير قُرئت كمياتها أو وحداتها خطأً على الأرجح`,
+      detail: "سعر الوحدة فيها ضعفا ما يدفعه المقهى عادةً لهذا الصنف عند مورّده أو نصفه. الأرجح أن القراءة الآلية أخذت عدد الكرتون مكان عدد الحبات أو العكس، فتخطئ كمية المخزون وسعر الوحدة.",
+      action: "افتح الفاتورة وقارنها بالورقة، وصحّح الكمية بالقلم بجانب البند. المجموع يبقى كما هو.",
+      actionLabel: "افتح الفاتورة",
+      href: `/purchases/invoices/${encodeURIComponent(one.invoiceId)}#lines`,
+      count: misreads.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: misreads.slice(0, 10).map((m) => ({
+        label: `${m.supplierName} · ${m.invoiceNumber}`,
+        sub: `${m.description.slice(0, 50)} · ${formatRiyalsDisplay(m.unitMinor)} للوحدة والمعتاد ${formatRiyalsDisplay(m.usualMinor)}`,
+        href: `/purchases/invoices/${encodeURIComponent(m.invoiceId)}#lines`,
+        signalKey: m.key,
+      })),
+      needs: "amounts:view",
+    });
+  }
+
   const theirCredits = f.statementCreditUnrecorded ?? [];
   if (theirCredits.length > 0) {
     const total = theirCredits.reduce((s, c) => s + c.amountMinor, 0);
