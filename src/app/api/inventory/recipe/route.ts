@@ -10,7 +10,7 @@ import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo, failWith } from "@/services/guard";
 import {
-  RecipeLockedError, activateRecipeVersion, correctRecipeVersion, deleteRecipe,
+  RecipeLockedError, activateRecipeVersion, correctRecipeVersion, deleteRecipe, moveRecipeVersionStart,
   saveRecipeVersion, type IngredientDraft,
 } from "@/services/recipe.service";
 import { decimalToMilli } from "@/lib/inventory/units";
@@ -33,7 +33,7 @@ const IngredientBody = z.object({
 type IngredientBody = z.infer<typeof IngredientBody>;
 
 const Body = z.object({
-  action: z.enum(["save", "activate", "correct", "delete"]).optional(),
+  action: z.enum(["save", "activate", "correct", "delete", "move-start"]).optional(),
   versionId: z.string().trim().min(1).max(64).optional(),
   menuProductId: z.string().trim().min(1).max(64).optional(),
   effectiveFrom: z.string().max(10).optional(),
@@ -67,6 +67,11 @@ export async function POST(request: Request) {
     }
 
     if (!body.menuProductId) return NextResponse.json({ error: "لم تحدّد الصنف المباع" }, { status: 400 });
+
+    if (body.action === "move-start") {
+      const r = await moveRecipeVersionStart({ menuProductId: body.menuProductId, effectiveFrom: body.effectiveFrom ?? "", actorId: user.id });
+      return NextResponse.json({ ok: true, ...r, message: `صارت النسخة ${r.version} تسري من ${r.from} بدل ${r.was}، وأُغلقت سابقتها قبله.` });
+    }
 
     if (body.action === "delete") {
       const gone = await deleteRecipe(body.menuProductId, user.id);

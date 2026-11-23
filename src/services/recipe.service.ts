@@ -812,3 +812,50 @@ export async function restoreStockItem(
     return { name: String(row.name_ar) };
   });
 }
+
+/**
+ * بدايةُ النسخة السارية تُقدَّم إلى يومٍ أسبق — حين بدأ التغييرُ فعلاً قبل أن نقرأه.
+ *
+ * فودكس غيّر «V60 كولومبي» إلى الناتشرل يوم وصوله من كوهي (١٥ نوفمبر ٢٠٢٦)، ولم يُقرأ الكتالوجُ إلّا
+ * يوم ٢٣، فصرف التطبيقُ المارقو ثمانيةَ أيّام. والحفظُ يرفض نسخةً قبل السارية — بحقّ — فهذا بابٌ ضيّق:
+ * السابقةُ تنتهي قبل اليوم الجديد، والساريةُ تبدأ منه، ولا يُقبل إن كان في الأيّام التي يتغيّر حسابُها
+ * جردٌ مقفَل، ولا إلى يومٍ لا يبقى للسابقة بعده يوم.
+ */
+export async function moveRecipeVersionStart(
+  input: { menuProductId: string; effectiveFrom: string; actorId: string },
+  conn: Conn = db,
+): Promise<{ version: number; from: string; was: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.effectiveFrom)) throw new Error("اكتب التاريخ بصيغة YYYY-MM-DD");
+  return conn.transaction(async (tx) => {
+    const [cur] = (await tx.execute<{ id: string; version: number; recipe_id: string; effective_from: string }>(sql`
+      select v.id, v.version, v.recipe_id, v.effective_from from recipe_versions v join recipes r on r.id = v.recipe_id
+       where r.product_id = ${input.menuProductId} and v.status = 'ACTIVE' and v.effective_to is null limit 1
+    `)).rows;
+    if (!cur) throw new Error("لا نسخة سارية لهذا الصنف");
+    if (input.effectiveFrom >= cur.effective_from) throw new Error(`النسخة السارية تبدأ ${cur.effective_from}. اختر يوماً قبله`);
+    const [prev] = (await tx.execute<{ id: string; effective_from: string }>(sql`
+      select id, effective_from from recipe_versions
+       where recipe_id = ${cur.recipe_id} and status = 'ACTIVE' and effective_to is not null and effective_to < ${cur.effective_from}
+       order by effective_to desc limit 1
+    `)).rows;
+    if (prev && input.effectiveFrom <= prev.effective_from) throw new Error(`النسخة السابقة تبدأ ${prev.effective_from}، فلا يبقى لها يوم. اختر يوماً بعده`);
+    const [locked] = (await tx.execute<{ period_start: string; period_end: string }>(sql`
+      select period_start, period_end from inventory_counts
+       where status = 'FINALISED' and period_end >= ${input.effectiveFrom} and period_start < ${cur.effective_from} limit 1
+    `)).rows;
+    if (locked) throw new RecipeLockedError(String(locked.period_start), String(locked.period_end));
+
+    const dayBefore = isoDay(new Date(Date.parse(`${input.effectiveFrom}T00:00:00Z`) - 86_400_000));
+    if (prev) await tx.update(recipeVersions).set({ effectiveTo: dayBefore }).where(eq(recipeVersions.id, prev.id));
+    await tx.update(recipeVersions).set({ effectiveFrom: input.effectiveFrom }).where(eq(recipeVersions.id, cur.id));
+    await recordAudit({
+      actorId: input.actorId,
+      action: "RECIPE_VERSION_CORRECTED",
+      entityType: "recipe_version",
+      entityId: cur.id,
+      before: { يسري_من: cur.effective_from },
+      after: { يسري_من: input.effectiveFrom, السبب: "بدأ التغيير فعلاً قبل قراءته" },
+    }, tx);
+    return { version: Number(cur.version), from: input.effectiveFrom, was: cur.effective_from };
+  });
+}
