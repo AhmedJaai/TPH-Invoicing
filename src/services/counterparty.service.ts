@@ -20,6 +20,10 @@ import type { TxCategory } from "@/lib/bank/rules";
 import { fromCategory } from "@/lib/bank/apply";
 import { isConflict, isExclusive } from "@/lib/bank/evidence-uniqueness";
 
+
+/** اسمٌ مؤقّت لجهةٍ لم يُقرأ اسمُها بعد — يُرقّى حين يظهر الاسم في حركةٍ لاحقة. */
+export const UNNAMED_COUNTERPARTY = "جهة بلا اسم";
+
 export type { EvidenceKind } from "@/lib/bank/evidence-uniqueness";
 import type { EvidenceKind } from "@/lib/bank/evidence-uniqueness";
 
@@ -152,15 +156,26 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
       id: counterpartyId,
       displayName: input.displayName?.trim()
         || first.beneficiary?.trim()
-        || "جهة بلا اسم",
+        || UNNAMED_COUNTERPARTY,
       kind: input.kind,
       supplierId: input.supplierId ?? null,
       createdById: input.userId,
     });
   } else {
+    /*
+      الاسمُ يُكتب عند الإنشاء من أوّل حركة، وقد لا تحمل اسماً (رسومٌ، أو كشفٌ قديم بلا عمود المستفيد)
+      ثمّ يُقرأ الاسم في حركةٍ لاحقة. كان يبقى «جهة بلا اسم» أبداً — فظهر عمّالٌ
+      في الرواتب بلا اسم وهو مكتوبٌ في الكشف. فالمؤقّتُ وحده يُرقّى؛ الاسمُ الذي كتبه إنسانٌ لا يُمسّ.
+    */
+    const named = input.displayName?.trim() || input.transactions.map((t) => t.beneficiary?.trim()).find(Boolean) || null;
     await w
       .update(counterparties)
-      .set({ kind: input.kind, supplierId: input.supplierId ?? null, updatedAt: new Date() })
+      .set({
+        kind: input.kind,
+        supplierId: input.supplierId ?? null,
+        updatedAt: new Date(),
+        ...(named ? { displayName: sql`case when ${counterparties.displayName} = ${UNNAMED_COUNTERPARTY} then ${named} else ${counterparties.displayName} end` } : {}),
+      })
       .where(eq(counterparties.id, counterpartyId));
   }
 
