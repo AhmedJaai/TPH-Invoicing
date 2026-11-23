@@ -60,6 +60,7 @@ export const ATTENTION_IDS = [
   "budget-over",
   "statement-credit-unrecorded",
   "line-qty-misread",
+  "foodics-unconsumed",
   "month-left-open",
   "files-wrong-month",
   "files-missing-in-drive",

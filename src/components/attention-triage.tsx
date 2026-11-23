@@ -98,6 +98,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "budget-over": PiggyBank,
   "statement-credit-unrecorded": ReceiptText,
   "line-qty-misread": ScanSearch,
+  "foodics-unconsumed": ScanSearch,
   "month-left-open": FileQuestion,
   "files-wrong-month": FolderInput,
   "files-missing-in-drive": FolderX,

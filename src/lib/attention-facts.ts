@@ -26,7 +26,7 @@ import { loadSettlementComparisons } from "@/services/statement-payments.service
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, qtyOutlierKey, statementCreditKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, qtyOutlierKey, statementCreditKey, foodicsUnsoldKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
 import { annualImpactMinor, isRealMove, trackPrices } from "./price-watch";
 import { addDays } from "./riyadh-time";
 
@@ -576,6 +576,30 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
        limit 40
     `)).rows
       .map((r) => ({ lineId: r.id, invoiceId: r.invoice_id, invoiceNumber: r.invoice_number, supplierName: r.supplier, description: r.description, unitMinor: Number(r.up), usualMinor: Number(r.med), key: qtyOutlierKey(r.id) }))
+      .filter((r) => !silenced.has(r.key)),
+    /*
+      صنفٌ يُشترى ولا يصرفه فودكس عند البيع: منتجُه أو إضافتُه في فودكس بلا مكوّنات، فجردُه
+      لا ينقص أبداً ومقارنةُ الاستهلاك عمياءُ عنه. وُجد يدوياً (٢٣ نوفمبر ٢٠٢٦): الكيكُ والكوكيز والماء
+      والحليبُ النباتيّ — ١٨ ألف ريال في ستّين يوماً. ولا يُقال إلّا وصرفُ فودكس حيٌّ (قرأناه هذا الأسبوع).
+    */
+    foodicsUnconsumed: (await db.execute<{ id: string; name: string; bought: string; invoices: number }>(sql`
+      with seen as (select max(business_date) as last from foodics_item_moves where kind = 8)
+      select p.id, p.name_ar as name, sum(l.line_total_minor)::bigint as bought, count(distinct i.id)::int as invoices
+        from products p
+        join supplier_products sp on sp.product_id = p.id
+        join invoice_lines l on l.supplier_product_id = sp.id
+        join invoices i on i.id = l.invoice_id
+        cross join seen
+       where p.is_stock_item and p.is_active and p.foodics_item_sku is not null
+         and seen.last >= to_char((now() at time zone 'Asia/Riyadh') - interval '7 days', 'YYYY-MM-DD')
+         and i.invoice_date >= now() - interval '60 days'
+         and not exists (select 1 from foodics_item_moves m where m.kind = 8 and m.sku = p.foodics_item_sku
+                          and m.business_date >= to_char((now() at time zone 'Asia/Riyadh') - interval '45 days', 'YYYY-MM-DD'))
+       group by p.id, p.name_ar
+       order by 3 desc
+       limit 40
+    `)).rows
+      .map((r) => ({ productId: r.id, name: r.name, boughtMinor: Number(r.bought), invoices: Number(r.invoices), key: foodicsUnsoldKey(r.id) }))
       .filter((r) => !silenced.has(r.key)),
     statementCreditUnrecorded: settlements
       .flatMap((r) => r.comparison.theirsOnly.map((t) => ({

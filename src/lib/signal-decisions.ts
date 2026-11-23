@@ -33,6 +33,7 @@ export const SIGNAL_PREFIXES = [
   "statement-credit",
   "vat-risk",
   "payroll-tx",
+  "foodics-unsold",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -58,6 +59,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "statement-missing": "فاتورة في كشف المورّد ليست عندنا",
   "statement-paid": "سداد لم يقيّده المورّد في كشفه",
   "statement-credit": "إشعار دائن أو سداد في كشف المورّد لم نسجّله",
+  "foodics-unsold": "صنف يُشترى ولا يصرفه فودكس عند البيع",
   "vat-risk": "ضريبة فاتورة لا تُخصم",
   "payroll-tx": "حوالة راتب ليست لموظف",
 };
@@ -80,6 +82,11 @@ export function statementMissingKey(slug: string, ref: string | null, day: strin
 /** بندُ فاتورةٍ سعرُ وحدته ضعفا المعتاد أو نصفُه — كمّيّةٌ أو وحدةٌ قُرئت خطأً على الأرجح. */
 export function qtyOutlierKey(lineId: string): string {
   return `qty-outlier:${lineId.slice(0, 80)}`;
+}
+
+/** صنفُ مخزونٍ يُشترى ولا يصرفه فودكس عند البيع — منتجُه أو إضافتُه بلا مكوّنات. بالصنف. */
+export function foodicsUnsoldKey(productId: string): string {
+  return `foodics-unsold:${productId.slice(0, 80)}`;
 }
 
 /** سطرُ دائنٍ في كشف المورّد لا نعرفه — بكشفه ويومه ومبلغه. */

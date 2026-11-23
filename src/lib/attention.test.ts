@@ -741,3 +741,17 @@ describe("رسائل الفريق من TPH Team", () => {
     expect(many.title).toBe("3 رسائل جديدة من الفريق، منها شكويان");
   });
 });
+
+describe("صنفٌ يُشترى ولا يصرفه فودكس", () => {
+  it("يُقال بمجموع ما اشتُري ويُسكَت صنفاً صنفاً، ولا يُقال بلا أصناف", () => {
+    expect(ids({ foodicsUnconsumed: [] })).not.toContain("foodics-unconsumed");
+    const [item] = buildAttention({ ...quiet, foodicsUnconsumed: [
+      { productId: "p1", name: "تشيز مدريد", boughtMinor: 693_000, invoices: 29, key: "foodics-unsold:p1" },
+      { productId: "p2", name: "حليب شوفان", boughtMinor: 23_478, invoices: 3, key: "foodics-unsold:p2" },
+    ] });
+    expect(item.id).toBe("foodics-unconsumed");
+    expect(item.count).toBe(2);
+    expect(item.detail).toContain("7,164.78");
+    expect(item.evidence?.map((e) => e.signalKey)).toEqual(["foodics-unsold:p1", "foodics-unsold:p2"]);
+  });
+});

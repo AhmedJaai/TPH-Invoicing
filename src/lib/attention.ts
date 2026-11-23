@@ -184,6 +184,7 @@ export interface AttentionFacts {
   /** سدادٌ قيّدناه في مدّة آخر كشفٍ للمورّد ولم يرد فيه (`lib/statement-payments.ts`). الغائبُ: لم يُسأل. */
   statementPaidMissing?: { supplierName: string; slug: string; paymentId: string; day: string; amountMinor: number; method: string; periodTo: string; key?: string }[];
   /** بندُ فاتورةٍ في شهرٍ مفتوح سعرُ وحدته ضعفا المعتاد أو نصفُه. */
+  foodicsUnconsumed?: { productId: string; name: string; boughtMinor: number; invoices: number; key?: string }[];
   qtyMisreads?: { lineId: string; invoiceId: string; invoiceNumber: string; supplierName: string; description: string; unitMinor: number; usualMinor: number; key?: string }[];
   /** سطرٌ دائنٌ في كشف المورّد لا نعرفه — إشعارٌ دائن أو سدادٌ لم نسجّله. */
   statementCreditUnrecorded?: { supplierName: string; slug: string; day: string; ref: string | null; amountMinor: number; creditNote: boolean; key?: string }[];
@@ -1546,6 +1547,32 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         sub: `${m.description.slice(0, 50)} · ${formatRiyalsDisplay(m.unitMinor)} للوحدة والمعتاد ${formatRiyalsDisplay(m.usualMinor)}`,
         href: `/purchases/invoices/${encodeURIComponent(m.invoiceId)}#lines`,
         signalKey: m.key,
+      })),
+      needs: "amounts:view",
+    });
+  }
+
+  const unconsumed = f.foodicsUnconsumed ?? [];
+  if (unconsumed.length > 0) {
+    const total = unconsumed.reduce((s, u) => s + u.boughtMinor, 0);
+    out.push({
+      id: "foodics-unconsumed",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: unconsumed.length === 1
+        ? `«${unconsumed[0].name}» يُشترى ولا يصرفه فودكس حين يُباع`
+        : `${unconsumed.length} أصناف تُشترى ولا يصرفها فودكس حين تُباع`,
+      detail: `اشترى المقهى منها ${formatRiyalsDisplay(total)} ريال في ستين يوماً، ولم يصرف فودكس منها شيئاً في 45 يوماً. المنتج أو الإضافة التي تبيعها في فودكس ليس فيها هذا الصنف مكوّناً، فلا ينقص مخزونه ولا تظهر كلفته.`,
+      action: "في فودكس: القائمة ← المنتجات (أو خيارات الإضافات)، افتح ما يبيع هذا الصنف وأضفه في «المكونات» بكميته. وما لا يُباع أصلاً أسكته بسببه.",
+      actionLabel: "افتح المشترى والمباع",
+      href: "/finance/stock",
+      count: unconsumed.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: unconsumed.slice(0, 12).map((u) => ({
+        label: u.name,
+        sub: `اشتُري بـ${formatRiyalsDisplay(u.boughtMinor)} ريال في ${u.invoices} فاتورة · لم يُصرف في فودكس`,
+        href: "/finance/stock",
+        signalKey: u.key,
       })),
       needs: "amounts:view",
     });
