@@ -274,8 +274,13 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
    * والمقارنة داخل المورّد الواحد عمداً — الانتقال من مورّد غالٍ إلى رخيص ليس «انخفاض سعر».
    */
   /* «علمتُ» على صنفٍ يُخرجه من البند حتى يرتفع سعرُه ثانيةً (`priceRiseKey`) */
+  /*
+    كلُّ القرارات لا بادئاتٌ مسمّاة: كانت ثلاثاً (price-rise · statement-gap · statement-missing)، فما
+    أُسكت من «إشعارٍ دائن» أو «سدادٍ لم يقيّده» أو «كمّيّةٍ قُرئت خطأً» يُحفظ ولا يُطبَّق — عاد إشعارُ
+    أفال المستردّ بعد أن أُسكت بسببه (٢٣ نوفمبر ٢٠٢٦). والجدولُ صغير: صفٌّ لكلّ قرار.
+  */
   const silenced = silencedKeys((await db.execute<{ key: string; decision: string }>(sql`
-    select key, decision from alert_resolutions where key like 'price-rise:%' or key like 'statement-gap:%' or key like 'statement-missing:%'`)).rows, todayInRiyadh());
+    select key, decision from alert_resolutions`)).rows, todayInRiyadh());
   const supplierNames = new Map((await db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)).map((r) => [r.id, r.name]));
   const recentFrom = addDays(today, -PRICE_RISE_RECENT_DAYS);
   const rises = trackPrices(q6, today)
