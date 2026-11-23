@@ -128,6 +128,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "credit-note": { limit: 120, windowSeconds: 3600 },
   /* دمجُ صيغة صنفٍ بأصله — صنفاً صنفاً من صفحة المورّد */
   "supplier-item-merge": { limit: 200, windowSeconds: 3600 },
+  "supplier-item-unmerge": { limit: 200, windowSeconds: 3600 },
   /* قيدُ الناقصة من كشف المورّد — كشفاً كشفاً */
   "statement-invoices": { limit: 60, windowSeconds: 3600 },
   /* تُستدعى مع كلّ تعديلٍ في بطاقة الرفع — بلا نموذج */

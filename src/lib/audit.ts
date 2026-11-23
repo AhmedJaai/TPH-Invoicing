@@ -52,6 +52,7 @@ export type AuditAction =
   | "PRODUCT_LINKED"
   /* صيغةٌ أخرى لصنف المورّد نفسه — بنودُها نُقلت إليه (056) */
   | "SUPPLIER_ITEM_MERGED"
+  | "SUPPLIER_ITEM_UNMERGED"
   /* حوالةٌ أُعيد توزيعُها بالأقدم أوّلاً — بتخصيصها قبلُ وبعد */
   | "PAYMENT_REALLOCATED"
   /* فواتيرُ قُيِّدت من سطور كشف المورّد بلا ملفّ (057) */

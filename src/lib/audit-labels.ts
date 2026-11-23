@@ -88,6 +88,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   STATEMENT_RECONCILED: "مطابقة كشف مورّد",
   PRODUCT_LINKED: "ربط صنف معياري",
   SUPPLIER_ITEM_MERGED: "دمج صيغة صنف في الصنف الأصلي",
+  SUPPLIER_ITEM_UNMERGED: "فصل صيغة صنف دُمجت خطأً",
   PAYMENT_REALLOCATED: "إعادة توزيع حوالة على الأقدم أولاً",
   STATEMENT_INVOICES_RECORDED: "تسجيل فواتير من كشف المورّد",
   SUPPLIER_VAT_LEARNED: "تعلّم الرقم الضريبي للمورّد",

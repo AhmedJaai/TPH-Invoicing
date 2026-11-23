@@ -10,9 +10,10 @@
  * - يرث الأصلُ ربطَ الجرد إن لم يكن له، ويُردّ الدمجُ إن كانا مربوطين بصنفين مختلفين.
  * - يُحذف صنفُ الصيغة (فهرسٌ لا مال)، ويُكتب الدمجُ في السجلّ بالمعاملة نفسها.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { invoiceLines, products, supplierItemAliases, supplierProducts } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { normalizeItem } from "@/lib/items";
 import type { Tx } from "./types";
 
 export class ItemMergeRefused extends Error {
@@ -91,4 +92,60 @@ export async function mergeSupplierItems(
   }, tx);
 
   return { linesMoved: moved.length };
+}
+
+/**
+ * فصلُ صيغةٍ دُمجت خطأً — الدمجُ قرارٌ، وكلُّ قرارٍ يُتراجَع عنه.
+ *
+ * وقع (٧ أكتوبر ٢٠٢٦): أُقرّ أنّ «Crunchy Chocolate Cake L» من غاناش هي «Cheesecake Date Brulee L»،
+ * فاجتمع صنفان ثمنُهما مختلف (١٣٢ و١٠٠) تحت صنفٍ واحد، ولم يكن في النظام ما يفكّهما.
+ *
+ * الوصفُ المطبوع لم يُمسّ عند الدمج، فبنودُ الصيغة تُعرف منه (`normalizeItem`) — لا من المفتاح الذي غُيّر.
+ * فتُعاد إلى صنفٍ لها بلا ربطٍ بالجرد (الربطُ الموروث كان للأصل)، وتُحذف الصيغة فلا يُكتب بها ما يأتي بعدها،
+ * ويُكتب الفصلُ في السجلّ بالمعاملة نفسها.
+ */
+export async function unmergeSupplierItem(
+  tx: Tx,
+  input: { supplierId: string; alias: string },
+  actorId: string,
+): Promise<{ linesMoved: number; displayName: string }> {
+  const [row] = await tx.select({ id: supplierItemAliases.id, canonical: supplierItemAliases.canonicalNormalized })
+    .from(supplierItemAliases)
+    .where(and(eq(supplierItemAliases.supplierId, input.supplierId), eq(supplierItemAliases.aliasNormalized, input.alias)))
+    .for("update");
+  if (!row) throw new ItemMergeRefused("هذه الصيغة ليست مدموجة. حدّث الصفحة.", 404);
+
+  const [canonicalSp] = await tx.select({ displayName: supplierProducts.displayName })
+    .from(supplierProducts)
+    .where(and(eq(supplierProducts.supplierId, input.supplierId), eq(supplierProducts.normalizedDescription, row.canonical)));
+
+  const candidates = await tx.select({ id: invoiceLines.id, description: invoiceLines.description })
+    .from(invoiceLines)
+    .where(and(eq(invoiceLines.supplierId, input.supplierId), eq(invoiceLines.normalizedDescription, row.canonical)));
+  const mine = candidates.filter((l) => normalizeItem(l.description) === input.alias);
+  const displayName = mine[0]?.description.trim() || input.alias;
+
+  await tx.delete(supplierItemAliases).where(eq(supplierItemAliases.id, row.id));
+
+  if (mine.length > 0) {
+    await tx.insert(supplierProducts)
+      .values({ supplierId: input.supplierId, normalizedDescription: input.alias, displayName })
+      .onConflictDoNothing({ target: [supplierProducts.supplierId, supplierProducts.normalizedDescription] });
+    const [sp] = await tx.select({ id: supplierProducts.id }).from(supplierProducts)
+      .where(and(eq(supplierProducts.supplierId, input.supplierId), eq(supplierProducts.normalizedDescription, input.alias)));
+    await tx.update(invoiceLines)
+      .set({ normalizedDescription: input.alias, supplierProductId: sp.id })
+      .where(inArray(invoiceLines.id, mine.map((l) => l.id)));
+  }
+
+  await recordAudit({
+    actorId,
+    action: "SUPPLIER_ITEM_UNMERGED",
+    entityType: "supplier",
+    entityId: input.supplierId,
+    before: { الصيغة: displayName, كانت_مدموجةً_في: canonicalSp?.displayName ?? row.canonical },
+    after: { صارت_صنفاً_مستقلاً: displayName, البنود_المنقولة: mine.length },
+  }, tx);
+
+  return { linesMoved: mine.length, displayName };
 }

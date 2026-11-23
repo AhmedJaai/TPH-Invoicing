@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Merge } from "lucide-react";
+import { Merge, Split } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -87,5 +87,65 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
       </div>
       {error && <p role="alert" className="mt-1.5 text-xs text-danger">{error}</p>}
     </div>
+  );
+}
+
+/**
+ * «ليس هو» — فصلُ صيغةٍ دُمجت في هذا الصنف خطأً.
+ *
+ * تعود بنودُها صنفاً مستقلّاً بلا ربطٍ بالجرد، ويُكتب باسمها ما يأتي بعد اليوم. يُسأل قبل الفصل
+ * لأنّ تاريخ السعر يتفرّق من جديد.
+ */
+export function SupplierItemUnmerge({ supplierId, alias, name, into }: {
+  supplierId: string;
+  alias: string;
+  name: string;
+  into: string;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function unmerge() {
+    setBusy(true);
+    setError(null);
+    const r = await postJson<{ message: string }>("/api/supplier-item-unmerge", { supplierId, alias });
+    setBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    toast({ tone: "ok", title: `«${name}» صار صنفاً مستقلاً`, body: r.data.message });
+    setConfirming(false);
+    router.refresh();
+  }
+
+  return (
+    <span className="relative z-10 mt-1 block text-[11px] text-muted">
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span><T s="يُجمع معه: {0}" a={[<bdi key="0" className="font-medium text-ink-soft" dir="auto">{name}</bdi>]} /></span>
+        {!confirming ? (
+          <button type="button" onClick={() => setConfirming(true)} className="inline-flex min-h-11 items-center gap-1 font-medium text-accent hover:underline sm:min-h-6">
+            <Split className="h-3 w-3" aria-hidden />
+            ليس هو؟ افصله
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={unmerge} disabled={busy} aria-busy={busy} className={buttonClass("danger", "sm")}>
+              {busy ? "يفصل…" : <T s="نعم، افصله عن «{0}»" a={[into]} />}
+            </button>
+            <button type="button" onClick={() => { setConfirming(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
+              إلغاء
+            </button>
+          </>
+        )}
+      </span>
+      {confirming && !busy && (
+        <span className="mt-1 block leading-relaxed text-ink-soft">
+          <T s="ستعود بنود «{0}» صنفاً مستقلاً بلا ربط بالجرد، فاربطه بعدها بصنفه الصحيح." a={[name]} /></span>
+      )}
+      {error && <span role="alert" className="mt-1 block text-xs text-danger">{error}</span>}
+    </span>
   );
 }

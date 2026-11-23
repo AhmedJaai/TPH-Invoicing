@@ -7,12 +7,13 @@ import Link from "next/link";
 import { PriceStateCell } from "@/components/price-state";
 import { isRealMove } from "@/lib/price-watch";
 import { notFound, redirect } from "next/navigation";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   Banknote, CalendarClock, FileText, History, Printer, Scale, ScrollText, Sparkles, Store, Tags, Timer,
 } from "lucide-react";
 import { db } from "@/db";
-import { invoices, suppliers } from "@/db/schema";
+import { invoiceLines, invoices, supplierItemAliases, suppliers } from "@/db/schema";
+import { normalizeItem } from "@/lib/items";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
@@ -32,7 +33,7 @@ import {
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
 import { countNoun, countNounGen, DAY, INVOICE, LINE, MONTH, PRODUCT, TIME } from "@/lib/arabic";
 import { loadOpenInvoiceAges, loadSupplierBalances } from "@/services/supplier-balance.service";
-import { SupplierItemMerge } from "@/components/supplier-item-merge";
+import { SupplierItemMerge, SupplierItemUnmerge } from "@/components/supplier-item-merge";
 import { similarItems } from "@/lib/items";
 import { loadSupplierIntel, type TimelineEvent } from "@/services/supplier-intel.service";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
@@ -317,6 +318,21 @@ export async function SupplierView({
       ? db.select({ name: suppliers.nameAr, slug: suppliers.slug }).from(suppliers).where(eq(suppliers.id, s.mergedIntoId)).then((r) => r[0] ?? null)
       : Promise.resolve(null),
   ]);
+  /* صيغٌ دُمجت في أصنافه — تُعرض تحت أصلها بزرّ فصلٍ، فالدمجُ الخاطئ لا يبقى بلا رجعة */
+  const mergedAliases = new Map<string, { alias: string; name: string }[]>();
+  if (tab === "prices" && canAnalyze) {
+    const aliasRows = await db.select({ alias: supplierItemAliases.aliasNormalized, canonical: supplierItemAliases.canonicalNormalized })
+      .from(supplierItemAliases).where(eq(supplierItemAliases.supplierId, s.id));
+    if (aliasRows.length > 0) {
+      const descs = await db.selectDistinct({ canonical: invoiceLines.normalizedDescription, description: invoiceLines.description })
+        .from(invoiceLines)
+        .where(and(eq(invoiceLines.supplierId, s.id), inArray(invoiceLines.normalizedDescription, [...new Set(aliasRows.map((a) => a.canonical))])));
+      for (const a of aliasRows) {
+        const name = descs.find((d) => d.canonical === a.canonical && normalizeItem(d.description) === a.alias)?.description.trim() ?? a.alias;
+        mergedAliases.set(a.canonical, [...(mergedAliases.get(a.canonical) ?? []), { alias: a.alias, name }]);
+      }
+    }
+  }
   const canApprove = can(user.role, "payment:approve");
   const findings: FindingView[] = findingsRaw.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
@@ -852,6 +868,9 @@ export async function SupplierView({
                         <span className="block truncate font-bold" dir="auto">{p.displayName}</span>
                         <span className="block text-[11px] font-normal text-muted">
                           <T s="اشتريته {0} · آخر مرة {1}" a={[countNoun(p.purchases, TIME), formatDay(p.lastDate)]} /></span>
+                        {canAnalyze && (mergedAliases.get(p.normalized) ?? []).map((a) => (
+                          <SupplierItemUnmerge key={a.alias} supplierId={s.id} alias={a.alias} name={a.name} into={p.displayName} />
+                        ))}
                         {canAnalyze && (
                           <SupplierItemMerge
                             supplierId={s.id}
