@@ -228,3 +228,13 @@ describe("نوع الإجازة (109)", () => {
   });
 });
 
+
+describe("سطر الأيام التي لم تُعمل", () => {
+  it("يسمّي الإجازة بلا أجر — كانت تُخصم ولا يظهر لها سطر", async () => {
+    const { absenceLineLabel } = await import("./calc");
+    expect(absenceLineLabel({ absentDays: 0, unpaidLeaveDays: 0 })).toBeNull();
+    expect(absenceLineLabel({ absentDays: 0, unpaidLeaveDays: 7 })).toContain("أجر أيام الإجازة بلا أجر");
+    expect(absenceLineLabel({ absentDays: 2, unpaidLeaveDays: 0 })).toContain("أجر أيام الغياب (غياب");
+    expect(absenceLineLabel({ absentDays: 1, unpaidLeaveDays: 3 })).toMatch(/^أجر أيام الغياب والإجازة بلا أجر \(غياب .+، إجازة بلا أجر .+\)$/);
+  });
+});

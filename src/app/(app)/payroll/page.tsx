@@ -12,7 +12,7 @@ import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton, type OwedByMon
 import { Badge, buttonClass, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { countNoun, countNounGen, EMPLOYEE, TRANSFER } from "@/lib/arabic";
+import { countNoun, countNounGen, DAY, EMPLOYEE, TRANSFER } from "@/lib/arabic";
 import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
@@ -30,7 +30,8 @@ function deductionText(r: PayrollRow): string {
     if (a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT") parts.push(`${ADJUSTMENT_LABEL[a.kind]} ${formatRiyalsDisplay(a.amountMinor)}`);
   }
   if (s.lateMinutes + s.earlyMinutes > 0) parts.push(`تأخير ${s.lateMinutes + s.earlyMinutes} دقيقة`);
-  if (s.absentDays > 0) parts.push(`غياب ${s.absentDays} يوم`);
+  if (s.absentDays > 0) parts.push(`غياب ${countNoun(s.absentDays, DAY)}`);
+  if (s.unpaidLeaveDays > 0) parts.push(`إجازة بلا أجر ${countNoun(s.unpaidLeaveDays, DAY)}`);
   if (s.penaltiesMinor > 0) parts.push(`جزاءات اللائحة ${formatRiyalsDisplay(s.penaltiesMinor)}`);
   if (s.warnings > 0) parts.push(`${s.warnings} إنذار`);
   return parts.join(" · ");

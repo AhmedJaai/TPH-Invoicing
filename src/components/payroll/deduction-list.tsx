@@ -68,14 +68,14 @@ function Line({ item: i, canEdit, salaryKnown }: { item: DeductionRow; canEdit: 
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-56">
           <p className="text-sm font-bold">
-            {i.employeeName && <>{i.employeeName} · </>}{KIND[i.kind]}{byMinutes && i.minutes !== null && <> <span className="nums">{i.minutes}</span> دقيقة</>}
+            {i.employeeName && <>{i.employeeName} · </>}{i.kind === "LEAVE" && i.leaveType === "UNPAID" ? "إجازة بلا أجر" : KIND[i.kind]}{byMinutes && i.minutes !== null && <> <span className="nums">{i.minutes}</span> دقيقة</>}
           </p>
           <p className="text-[11px] text-muted">
             {dayLabel(i.day)} · {i.source === "CHECKIN" ? "من تسجيل الحضور" : "سجّلته بيدك"}{i.disrupted ? " · عطّل زملاءه" : ""}{i.note && i.source === "MANUAL" ? ` · ${i.note}` : ""}
           </p>
         </div>
         <div className="shrink-0 text-end text-sm">
-          {i.kind === "LEAVE" ? <span className="text-xs text-muted">لا يُخصم</span>
+          {i.kind === "LEAVE" && i.leaveType !== "UNPAID" ? <span className="text-xs text-muted">لا يُخصم</span>
             : i.withinGrace ? <span className="text-xs text-muted">في حدود السماح، لا يُخصم</span>
             : total === null ? <span className="text-xs text-muted">{salaryKnown ? "غير معروف" : "الراتب غير مكتوب"}</span>
             : <span className="font-bold"><span className="text-muted">− </span><Money minor={total} /></span>}

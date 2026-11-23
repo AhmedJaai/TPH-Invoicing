@@ -9,7 +9,7 @@ import { PrintButton } from "@/components/print-button";
 import { BrandMark } from "@/components/icons";
 import { LinkButton, NoAccess } from "@/components/ui";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, PURPOSE_LABEL } from "@/lib/payroll/calc";
+import { absenceLineLabel, ADJUSTMENT_LABEL, PURPOSE_LABEL } from "@/lib/payroll/calc";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadPayrollMonth } from "@/services/payroll.service";
@@ -36,7 +36,7 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
     ...row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `+ ${money(a.amountMinor)}`]),
     ...row.adjustments.filter((a) => a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `− ${money(a.amountMinor)}`]),
     ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`أجر دقائق التأخير والانصراف (${countNoun(s.lateMinutes + s.earlyMinutes, MINUTE)})`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
-    ...(s.absentDays > 0 ? [[`أجر أيام الغياب (${countNoun(s.absentDays, DAY)})`, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
+    ...(absenceLineLabel(s) ? [[absenceLineLabel(s)!, `− ${money(s.absenceMinor)}`] as [string, string]] : []),
     ...row.violations.filter((v) => !v.waived).map((v): [string, string] => [
       `${v.detail} ${formatDay(v.day)} — البند ${v.code} من لائحة تنظيم العمل، المرة ${ORDINAL[Math.min(v.occurrence, 4) - 1]}: ${penaltyLabel(v.penalty)}`,
       v.amountMinor === null ? "—" : v.amountMinor === 0 ? "إنذار" : `− ${money(v.amountMinor)}`,

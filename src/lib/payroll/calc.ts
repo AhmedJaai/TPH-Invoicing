@@ -15,6 +15,7 @@
  */
 import type { AttendanceKind, LeaveType, PayrollAdjustmentKind, PayrollLinkPurpose } from "@/db/schema";
 import { isoDay } from "@/lib/riyadh-time";
+import { DAY, countNoun } from "@/lib/arabic";
 
 export const DAYS_PER_MONTH = 30;
 
@@ -455,4 +456,21 @@ export function reclassTarget(txCategory: "SALARY" | "PERSONAL", purpose: Payrol
   const target: ReclassTarget = purpose === "SALARY" || purpose === "ADVANCE" || purpose === "LOAN" ? "SALARY"
     : purpose === "EXPENSE" ? "OTHER" : purpose === "PERSONAL" ? "PERSONAL" : "EXCLUDED";
   return target === txCategory ? null : target;
+}
+
+/**
+ * اسمُ سطر «أجر الأيّام التي لم تُعمل» في القسيمة — الغيابُ والإجازةُ بلا أجر في `absenceMinor` معاً.
+ *
+ * كانت القسيمة لا تذكر إلّا الغياب، فإجازةُ موظّفٍ بلا أجر (٢٣ نوفمبر ٢٠٢٦) خُصم أجرُها ولم يظهر
+ * سطرُه: راتبٌ ٢٬٨٠٠ ومستحقٌّ ٢٬١٤٦٫٦٧ بلا سبب. `null` إن لم يكن يومٌ منهما.
+ */
+export function absenceLineLabel(s: { absentDays: number; unpaidLeaveDays: number }): string | null {
+  const parts = [
+    s.absentDays > 0 ? `غياب ${countNoun(s.absentDays, DAY)}` : null,
+    s.unpaidLeaveDays > 0 ? `إجازة بلا أجر ${countNoun(s.unpaidLeaveDays, DAY)}` : null,
+  ].filter((p): p is string => p !== null);
+  if (parts.length === 0) return null;
+  const title = s.absentDays > 0 && s.unpaidLeaveDays > 0 ? "أجر أيام الغياب والإجازة بلا أجر"
+    : s.absentDays > 0 ? "أجر أيام الغياب" : "أجر أيام الإجازة بلا أجر";
+  return `${title} (${parts.join("، ")})`;
 }

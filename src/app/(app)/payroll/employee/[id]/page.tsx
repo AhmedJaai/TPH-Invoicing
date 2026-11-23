@@ -17,7 +17,7 @@ import {
 import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, ANNUAL_LEAVE_DAYS, ANNUAL_LEAVE_DAYS_AFTER_FIVE, endOfService, formatLeaveDays, formatMinutes, hoursLabel, leaveBalance, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
+import { absenceLineLabel, ADJUSTMENT_LABEL, ANNUAL_LEAVE_DAYS, ANNUAL_LEAVE_DAYS_AFTER_FIVE, endOfService, formatLeaveDays, formatMinutes, hoursLabel, leaveBalance, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
 import { daysOffLabel, planOn, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
@@ -172,7 +172,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               {slip!.lateMinutes + slip!.earlyMinutes > 0 && (
                 <Line label="أجر دقائق التأخير والانصراف المبكر" note={`${slip!.lateMinutes + slip!.earlyMinutes} دقيقة لم يعملها${employee.lateGraceMinutes > 0 ? ` · ما كان في حدود سماح ${employee.lateGraceMinutes} دقيقة لم يُحسب` : ""}`} minor={slip!.lateMinor} sign="−" />
               )}
-              {slip!.absentDays > 0 && <Line label="أجر أيام الغياب" note={`${slip!.absentDays} يوم`} minor={slip!.absenceMinor} sign="−" />}
+              {absenceLineLabel(slip!) && <Line label={absenceLineLabel(slip!)!} minor={slip!.absenceMinor} sign="−" />}
               {(slip!.penaltiesMinor > 0 || slip!.warnings > 0) && (
                 <Line label="جزاءات المخالفات (لائحة تنظيم العمل)"
                   note={[slip!.warnings > 0 ? `${slip!.warnings} إنذار كتابي بلا خصم` : null, slip!.penaltiesDroppedMinor > 0 ? `وزاد ${formatRiyalsDisplay(slip!.penaltiesDroppedMinor)} على حد أجر خمسة أيام فلا يُحسم` : null].filter(Boolean).join(" · ") || undefined}
@@ -184,7 +184,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               <Line label="حُوّل له" minor={slip!.paidMinor} sign="−" note={slip!.paidOutsideMinor > 0 ? `منها ${formatRiyalsDisplay(slip!.paidOutsideMinor)} خارج كشف البنك` : undefined} />
               <Line label={slip!.remainingMinor !== null && slip!.remainingMinor < 0 ? "حُوّل له زيادة" : "الباقي للتحويل"} minor={slip!.remainingMinor === null ? null : Math.abs(slip!.remainingMinor)} strong />
             </div>
-            {slip!.leaveDays > 0 && <p className="mt-2 text-[11px] text-muted">وأخذ {slip!.leaveDays} يوم إجازة لا يُخصم عليها.</p>}
+            {slip!.leaveDays - slip!.unpaidLeaveDays > 0 && <p className="mt-2 text-[11px] text-muted">وأخذ {countNoun(slip!.leaveDays - slip!.unpaidLeaveDays, DAY)} إجازة بأجر لا يُخصم عنها.</p>}
             {row.loanMinor > 0 && <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-warn"><HandCoins className="h-3.5 w-3.5" aria-hidden />عليه سلف متبقية بـ{formatRiyalsDisplay(row.loanMinor)} ريال</p>}
             {rate === null && employee.kind === "MONTHLY" && <Callout tone="warn" className="mt-3" title="لم يُكتب راتبه لهذا الشهر">اكتبه من «الراتب» أدناه ليُحسب مستحقه.</Callout>}
           </Card>
