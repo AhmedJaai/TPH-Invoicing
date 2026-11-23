@@ -76,9 +76,20 @@ export const RECOVERABLE_VAT: ReadonlySet<TxCategory> = new Set<TxCategory>(["PO
  * يقرؤه بالمصنِّف (`vat-return.service.ts`) فيخصمه، وقائمةُ الدخل كانت تعدّه مصروفاً — الريالُ
  * نفسُه خُصم ضريبةً وحُسب تكلفة. قيس على نسخة الإنتاج: أغسطس ١٥٤٫٢٣ · سبتمبر ١٦٥٫٤٨ · أكتوبر ٩٫٦٠.
  */
-export function isRecoverableVat(category: TxCategory, description: string | null | undefined): boolean {
+export function isRecoverableVat(category: TxCategory, description: string | null | undefined, transactionType?: string | null): boolean {
   if (RECOVERABLE_VAT.has(category)) return true;
+  if (category === "BANK_FEE" && isBankVatType(transactionType)) return true;
   return category === "POS_FEE" && recognizePos(description, "DEBIT")?.kind === "POS_VAT";
+}
+
+/**
+ * نوعُ الحركة في كشف الأهليّ «ضريبة القيمة المضافة» — ضريبةُ رسمٍ بنكيّ مهما قُيّدت.
+ *
+ * إحدى عشرة حركةً (١٢٫٦٣ ريالاً، مايو–سبتمبر ٢٠٢٦) قُيّدت «رسماً بنكيّاً» بيد إنسان، فلم يخصمها
+ * الإقرار وحسبها الربحُ مصروفاً. وكلامُ البنك نفسِه في نوع الحركة يغلب القيدَ هنا: يُقرأ ولا يُكتب.
+ */
+export function isBankVatType(transactionType: string | null | undefined): boolean {
+  return /ضريب[ةه]\s*القيم[ةه]\s*المضاف[ةه]/.test(transactionType ?? "");
 }
 
 /** سدادٌ لهيئة الزكاة والضريبة: تسويةُ ضريبةٍ جُمعت من الزبائن، لا مصروفُ تشغيل. */

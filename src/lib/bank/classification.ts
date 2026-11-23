@@ -131,6 +131,8 @@ const KEYWORDS: readonly Keyword[] = [
   { match: /\bMinistry\s+of\b|وزاره\s|امانه\s|بلديه/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة حكومية" },
   { match: /التامينات\s*الاجتماعيه|\bGOSI\b/i, kind: "GOVERNMENT", direction: "DEBIT", label: "التأمينات الاجتماعية" },
   { match: /\bEJAR\b|ايجار|شبكه\s*ايجار/i, kind: "RENT", direction: "DEBIT", label: "منصّة إيجار" },
+  /* رسمُ خدمة الرواتب الشهريّ (٢٠ ريالاً) — رسمٌ بنكيّ لا راتب، وكانت «رواتب» تسبقه فيُعدّ راتباً */
+  { match: /الرسوم\s*الشهريه\s*للرواتب/, kind: "BANK_FEE", direction: "DEBIT", label: "رسم بنكي معروف" },
   { match: /رواتب|\bSALARY\b|\bPAYROLL\b|Monthly\s*Sal/i, kind: "SALARY", direction: "DEBIT", label: "الوصف يدلّ على راتب" },
   { match: /\bSTC\b|\bMOBILY\b|\bZAIN\b|الاتصالات\s*السعوديه/i, kind: "UTILITY", direction: "DEBIT", label: "مشغّل اتصالات" },
   { match: /Saudi\s*Energy|الشركه\s*السعوديه\s*للكهرباء|كهرباء|\bSWCC\b|مياه/i, kind: "UTILITY", direction: "DEBIT", label: "كهرباء أو مياه" },

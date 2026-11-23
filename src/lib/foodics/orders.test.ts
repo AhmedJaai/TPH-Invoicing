@@ -149,3 +149,19 @@ describe("مرآةُ الطلب", () => {
     expect(m?.order.wastedLines).toBe(1);
   });
 });
+
+describe("خصم العائلة: المدفوع هو المرجع", () => {
+  it("الطلب 7000: بند 19 وخصم 2.85 قبل الضريبة ودُفع 16.52 — الإجمالي ناقصاً الخصم يساوي المدفوع", () => {
+    const o = order({
+      reference: 7000, subtotal_price: 16.52174, discount_amount: 2.85, total_price: 16.52,
+      products: [{ id: "p-1", quantity: 1, unit_price: 19, total_price: 19, discount_amount: 0, status: PRODUCT_STATUS.CLOSED, product: { sku: "sk-0001", name: "Iced Spanish latte" }, taxes: [{ pivot: { amount: 2.47826 } }], options: [] }],
+      payments: [{ id: "pay-1", amount: 16.52, tips: 0, business_date: "2026-10-10", added_at: "2026-10-10 20:22:09", payment_method: { name: "Mada", type: PAYMENT_TYPE.CARD } }],
+    });
+    const sale = ordersToSalesFile([o]).file.sales[0];
+    expect(sale.grossMinor - sale.discountMinor).toBe(1652);
+  });
+  it("طلبٌ بلا خصم لا يتغيّر", () => {
+    const sale = ordersToSalesFile([order()]).file.sales[0];
+    expect([sale.grossMinor, sale.discountMinor]).toEqual([3300, 0]);
+  });
+});

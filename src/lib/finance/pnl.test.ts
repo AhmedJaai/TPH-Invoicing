@@ -152,3 +152,15 @@ describe("isRecoverableVat — ضريبةُ الرسوم ليست مصروفاً
     expect(isRecoverableVat("UTILITY", "REFERENCE : 81140155 VS26 0811 000000")).toBe(false);
   });
 });
+
+describe("ضريبة رسم بنكي قُيّدت رسماً", () => {
+  it("نوع الحركة «ضريبة القيمة المضافة» يجعلها ضريبة تُخصم لا مصروفاً", async () => {
+    const { isRecoverableVat, isBankVatType } = await import("./pnl");
+    expect(isBankVatType("ضريبة القيمة المضافة")).toBe(true);
+    expect(isBankVatType("ضريبه القيمه المضافه")).toBe(true);
+    expect(isBankVatType("رسوم تحويل")).toBe(false);
+    expect(isRecoverableVat("BANK_FEE", "x", "ضريبة القيمة المضافة")).toBe(true);
+    expect(isRecoverableVat("BANK_FEE", "x", "رسوم تحويل")).toBe(false);
+    expect(isRecoverableVat("SALARY", "x", "ضريبة القيمة المضافة")).toBe(false);
+  });
+});

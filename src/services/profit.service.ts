@@ -20,6 +20,7 @@
  */
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { vatInsideGross } from "@/lib/vat";
 import { financeDeclarations, financeSnapshots, monthCloses, products } from "@/db/schema";
 import { isTxCategory, type TxCategory } from "@/lib/bank/rules";
 import { computeConsumption, type SoldLineInput } from "@/lib/inventory/consumption";
@@ -76,7 +77,7 @@ function expectedDays(month: string, firstDay: string, today: string): number {
 }
 
 export async function loadRevenue(conn: Conn = db): Promise<Map<string, MonthRevenue>> {
-  const [pay, vat, heads] = await Promise.all([
+  const [pay, heads] = await Promise.all([
     conn.execute<{ month: string; paid: string; cash: string; card: string; refunds: string; staff: string }>(sql`
       select substr(o.business_date, 1, 7) as month,
              coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint as paid,
@@ -88,10 +89,6 @@ export async function loadRevenue(conn: Conn = db): Promise<Map<string, MonthRev
        where o.status in (4, 5)
        group by 1
     `),
-    conn.execute<{ month: string; vat: string }>(sql`
-      select to_char(business_date, 'YYYY-MM') as month, coalesce(sum(vat_minor), 0)::bigint as vat
-        from sales where is_void = false group by 1
-    `),
     conn.execute<{ month: string; discount: string; orders: number; days: number; first_day: string }>(sql`
       select substr(business_date, 1, 7) as month,
              coalesce(sum(discount_minor) filter (where status = 4), 0)::bigint as discount,
@@ -102,7 +99,6 @@ export async function loadRevenue(conn: Conn = db): Promise<Map<string, MonthRev
     `),
   ]);
   const headOf = new Map(heads.rows.map((r) => [r.month, r]));
-  const vatOf = new Map(vat.rows.map((r) => [r.month, Number(r.vat)]));
   const today = todayInRiyadh();
   return new Map(pay.rows.flatMap((r) => {
     const head = headOf.get(r.month);
@@ -110,7 +106,12 @@ export async function loadRevenue(conn: Conn = db): Promise<Map<string, MonthRev
     return [[r.month, {
       month: r.month,
       paidMinor: Number(r.paid), cashMinor: Number(r.cash), cardMinor: Number(r.card),
-      vatMinor: vatOf.get(r.month) ?? 0,
+      /*
+        ضريبةُ المخرجات ١٥/١١٥ ممّا دُفع — القاعدةُ التي يحسب بها الإقرار (`vat-return`)، لا رقمُ فودكس:
+        فودكس باع الإضافاتِ المدفوعة وأيّامَ الافتتاح بلا ضريبة، وحسب خصمَ العائلة على السعر قبله، فكان
+        رقمُه يخالف ما يُقرّ به ٣٨٨ ريالاً في سبعة أشهر (٢٣ نوفمبر ٢٠٢٦). والضريبةُ مستحقّةٌ على الشامل كلِّه.
+      */
+      vatMinor: vatInsideGross(Number(r.paid)),
       refundsMinor: Number(r.refunds), discountMinor: Number(head.discount), staffListMinor: Number(r.staff),
       orders: head.orders, coveredDays: head.days, expectedDays: expectedDays(r.month, head.first_day, today),
     }] as const];
@@ -153,15 +154,41 @@ const INVOICE_NET = sql`(case when i.subtotal_minor is not null then i.subtotal_
 
 interface PurchaseDay { day: string; netMinor: number; invoices: number; grossOnly: number }
 
+/*
+  الإشعارُ الدائن (مرتجعٌ أو خصمٌ من المورّد) ينقص المشتريات بصافيه — بيوم الإشعار لا بيوم فاتورته،
+  كما يحسبه إقرارُ الضريبة (`vat-return.service.ts`)، فلا يتغيّر شهرٌ مقفل بإشعارٍ وصل بعده.
+  وكان الربحُ يجمع الفواتير ولا يطرحه: إشعارُ مختبرات القهوة (١٣٨) زاد مشتريات نوفمبر ١٢٠ صافياً.
+  وحصّةُ الضريبة بنسبة ضريبة الفاتورة إلى إجماليّها، والمجهولُ ضريبتُه يُطرح كاملاً كما تُجمع فاتورتُه.
+*/
+const CREDIT_NOTE_NET = sql`(pa.amount_minor - case when i.vat_minor is not null and i.total_minor > 0
+  then round(pa.amount_minor::numeric * i.vat_minor / i.total_minor) else 0 end)`;
+const CREDIT_NOTE_DAY = sql`to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD')`;
+const CREDIT_NOTE_FROM = sql`payment_allocations pa
+  join payments p on p.id = pa.payment_id and p.method = 'CREDIT_NOTE' and p.status not in ('REVERSED', 'VOID')
+  join invoices i on i.id = pa.invoice_id and i.is_fixed_asset = false`;
+
 async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<PurchaseDay[]> {
-  const rows = await conn.execute<{ day: string; net: string; n: number; gross_only: number }>(sql`
-    select ${EFFECTIVE_DAY} as day, sum(${INVOICE_NET})::bigint as net, count(*)::int as n,
-           count(*) filter (where i.subtotal_minor is null and i.vat_minor is null)::int as gross_only
-      from invoices i
-     where i.is_fixed_asset = false and ${EFFECTIVE_DAY} >= ${from} and ${EFFECTIVE_DAY} <= ${to}
-     group by 1
-  `);
-  return rows.rows.map((r) => ({ day: r.day, netMinor: Number(r.net), invoices: r.n, grossOnly: r.gross_only }));
+  const [rows, notes] = await Promise.all([
+    conn.execute<{ day: string; net: string; n: number; gross_only: number }>(sql`
+      select ${EFFECTIVE_DAY} as day, sum(${INVOICE_NET})::bigint as net, count(*)::int as n,
+             count(*) filter (where i.subtotal_minor is null and i.vat_minor is null)::int as gross_only
+        from invoices i
+       where i.is_fixed_asset = false and ${EFFECTIVE_DAY} >= ${from} and ${EFFECTIVE_DAY} <= ${to}
+       group by 1
+    `),
+    conn.execute<{ day: string; net: string }>(sql`
+      select ${CREDIT_NOTE_DAY} as day, sum(${CREDIT_NOTE_NET})::bigint as net
+        from ${CREDIT_NOTE_FROM}
+       where ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
+       group by 1
+    `),
+  ]);
+  const byDay = new Map<string, PurchaseDay>(rows.rows.map((r) => [r.day, { day: r.day, netMinor: Number(r.net), invoices: r.n, grossOnly: r.gross_only }]));
+  for (const n of notes.rows) {
+    const d = byDay.get(n.day) ?? { day: n.day, netMinor: 0, invoices: 0, grossOnly: 0 };
+    byDay.set(n.day, { ...d, netMinor: d.netMinor - Number(n.net) });
+  }
+  return [...byDay.values()];
 }
 
 export interface PurchaseInvoiceRow {
@@ -183,7 +210,16 @@ export async function loadPurchaseInvoices(from: string, to: string, conn: Conn 
      where i.is_fixed_asset = false and ${EFFECTIVE_DAY} >= ${from} and ${EFFECTIVE_DAY} <= ${to}
      order by ${INVOICE_NET} desc
   `);
-  return rows.rows.map((r) => ({ id: r.id, invoiceNumber: r.invoice_number, supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: Boolean(r.gross_only) }));
+  /* والإشعاراتُ الدائنة بسالبها — فيساوي مجموعُ القائمة رقمَ المشتريات في القائمة */
+  const notes = await conn.execute<{ id: string; invoice_number: string; supplier_name: string; day: string; net: string }>(sql`
+    select p.id || ':' || i.id as id, i.invoice_number, su.name_ar as supplier_name, ${CREDIT_NOTE_DAY} as day, ${CREDIT_NOTE_NET}::bigint as net
+      from ${CREDIT_NOTE_FROM} join suppliers su on su.id = i.supplier_id
+     where ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
+  `);
+  return [
+    ...rows.rows.map((r) => ({ id: r.id, invoiceNumber: r.invoice_number, supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: Boolean(r.gross_only) })),
+    ...notes.rows.map((r) => ({ id: r.id, invoiceNumber: `إشعار دائن على ${r.invoice_number}`, supplierName: r.supplier_name, day: r.day, netMinor: -Number(r.net), grossOnly: false })),
+  ];
 }
 
 /** حركاتُ البنك الصادرة من فئة — مرشّحاتُ «وزِّعها على أشهر». */
@@ -398,9 +434,9 @@ export function visibleOpexRows(rows: readonly ExpenseRowView[], role: Role | nu
 
 async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
   const [rows, draws, ownerPaid, toPayroll] = await Promise.all([
-    conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null }>(sql`
+    conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null; transaction_type: string | null }>(sql`
       select e.id, e.category::text as category, e.label, e.amount_minor, e.source::text as source, e.occurred_on,
-             e.bank_transaction_id, bt.description, bt.beneficiary_raw as beneficiary
+             e.bank_transaction_id, bt.description, bt.beneficiary_raw as beneficiary, bt.transaction_type
         from expenses e left join bank_transactions bt on bt.id = e.bank_transaction_id
        where e.period_month = ${month}
        order by e.amount_minor desc
@@ -438,7 +474,7 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
   for (const r of rows.rows) {
     if (!isTxCategory(r.category)) continue;
     const source = r.source === "INVOICE" ? "INVOICE" as const : r.source === "MANUAL" ? "MANUAL" as const : "BANK" as const;
-    if (isRecoverableVat(r.category, r.description)) {
+    if (isRecoverableVat(r.category, r.description, r.transaction_type)) {
       excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "ضريبة رسوم تُخصم في الإقرار الضريبي" });
     } else if (r.category === "GOVERNMENT" && isTaxSettlement(r.description, r.beneficiary, r.label)) {
       excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة والجمارك (تسوية ضريبية، لا مصروف)" });

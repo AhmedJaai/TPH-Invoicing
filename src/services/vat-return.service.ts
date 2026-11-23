@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit";
 import { coverageStartFor, monthGapDays } from "@/lib/bank/coverage";
 import { categoryLabel } from "@/lib/accountant-pack";
 import { recognizePos } from "@/lib/bank/pos";
+import { isBankVatType } from "@/lib/finance/pnl";
 import { isValidSaudiVat, type InputVatStatus } from "@/lib/validation";
 import { companyConfig } from "@/config/drive";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
@@ -54,7 +55,8 @@ const FEE_ONLY: ReadonlySet<string> = new Set(["POS_FEE", "BANK_FEE"]);
  * فيُقرأ هنا بالمصنِّف ولا يُكتب: ضريبتُه تُخصم، والقيدُ التاريخيّ لا يُمسّ.
  * و`null`: رسمٌ لا يُعرض.
  */
-function vatCategory(r: { category: string; description: string | null; direction: "DEBIT" | "CREDIT" }): string | null {
+function vatCategory(r: { category: string; description: string | null; direction: "DEBIT" | "CREDIT"; transaction_type?: string | null }): string | null {
+  if (r.category === "BANK_FEE" && isBankVatType(r.transaction_type)) return "BANK_VAT";
   if (r.category === "POS_FEE") return recognizePos(r.description, r.direction)?.kind === "POS_VAT" ? "POS_VAT" : null;
   return FEE_ONLY.has(r.category) ? null : r.category;
 }
@@ -302,7 +304,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     left join vat_tx_choices c on c.bank_transaction_id = bt.id
     where (bt.value_date at time zone 'Asia/Riyadh')::date >= ${from}::date
       and (bt.value_date at time zone 'Asia/Riyadh')::date < ${until}::date
-      and bt.category::text <> 'BANK_FEE'
+      and (bt.category::text <> 'BANK_FEE' or bt.transaction_type ~ 'ضريب[ةه]\s*القيم[ةه]\s*المضاف[ةه]')
       and (bt.category::text <> 'POS_FEE' or bt.description like 'REFERENCE%')
     order by bt.value_date, bt.id
   `)).rows;

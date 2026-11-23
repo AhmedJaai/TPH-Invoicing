@@ -222,6 +222,20 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
     /* خصمُ الطلب كلِّه فوق خصم بنوده */
     discountMinor += riyalsToMinor(order.discount_amount) ?? 0;
 
+    /*
+      ما دفعه الزبون هو المرجع: «خصمُ العائلة» (١٥٪) يحسبه فودكس على السعر قبل الضريبة، فكان
+      الإجماليُّ ناقصاً الخصمَ لا يساوي المدفوع (٧٢٥ طلباً، ٤٩٠٫٩٧ ريالاً حتى ٢٣ نوفمبر ٢٠٢٦). فالخصمُ
+      فرقُ البنود عن المدفوع، والمردودُ ما رُدّ فعلاً — وفي كلّ طلبٍ بلا ذلك الخصم يساويان ما كانا.
+    */
+    const paidMinor = riyalsToMinor(order.total_price);
+    if (paidMinor !== null && !lines.every((l) => l.isVoid)) {
+      if (order.status === ORDER_STATUS.RETURNED) {
+        if (refundMinor > 0) refundMinor = Math.abs(paidMinor);
+      } else if (grossMinor >= paidMinor && paidMinor >= 0) {
+        discountMinor = grossMinor - paidMinor;
+      }
+    }
+
     /* مشروبُ الموظَّف: كمّيّاتُه تبقى للجرد، ومالُه صفرٌ بدليل — لا إيرادَ ولا ضريبةَ ولا مردود */
     if (staff) {
       grossMinor = 0;

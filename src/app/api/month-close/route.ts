@@ -25,6 +25,7 @@ import { WARNING, countNoun, countNounGen } from "@/lib/arabic";
 import { formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { describeError, logEvent } from "@/lib/log";
 import { freezePnl } from "@/services/profit.service";
+import { deriveExpensesFromBank } from "@/services/expense.service";
 import { sealMonth } from "@/services/month-seal.service";
 
 export const runtime = "nodejs";
@@ -195,6 +196,18 @@ async function handle(request: Request) {
     تنبيهات_أُقرَّت: report.warnings.length,
     ملاحظة: body.note ?? null,
   };
+
+  /*
+    مصروفاتُ الكشف تُقيَّد قبل القفل والشهرُ مفتوح — فالاشتقاقُ الآليّ يتخطّى المقفل (مؤثِّرٌ يرفضه)، فما
+    أُعيد تصنيفُه في شهرٍ مقفل لم يدخل الربحَ أبداً، ولا أدخله فتحُه وإقفالُه: رواتبُ ٥٬٦٧٨ ريالاً في يوليو
+    وأغسطس (٢٣ نوفمبر ٢٠٢٦). والتعذّرُ يُسمَع: لا يُقفل شهرٌ ومصروفاتُه ناقصة.
+  */
+  try {
+    await deriveExpensesFromBank(user.id);
+  } catch (e) {
+    logEvent("month_close.derive_failed", { month: body.month, ...describeError(e) });
+    return NextResponse.json({ error: "تعذّر قيد مصروفات الشهر من كشف البنك قبل إقفاله. أعد المحاولة." }, { status: 503 });
+  }
 
   /*
     الكتابةُ وأثرُها في معاملةٍ واحدة بقفل الشهر الحصريّ: ينتظر الإقفالُ كلَّ

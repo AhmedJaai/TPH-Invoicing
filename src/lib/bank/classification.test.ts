@@ -287,3 +287,10 @@ describe("الذاكرة تعمل على المستقبل لا على الكشف
     expect(other.source).not.toBe("MEMORY");
   });
 });
+
+describe("رسم خدمة الرواتب الشهري", () => {
+  it("«الرسوم الشهرية للرواتب» رسمٌ بنكي لا راتب", () => {
+    const tx = toCanonical({ valueDate: new Date("2026-08-30T00:00:00Z"), amountMinor: 20_00, direction: "DEBIT", description: "الرسوم الشهرية للرواتب" });
+    expect(classify(tx).kind).toBe("BANK_FEE");
+  });
+});
