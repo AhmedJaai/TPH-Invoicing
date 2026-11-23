@@ -269,6 +269,6 @@ async function handle(request: Request) {
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${formatMonth(body.month)}${report.warnings.length ? ` مع إقرارك ب${countNounGen(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
+    message: `أُقفل ${formatMonth(body.month)}${report.warnings.length ? ` مع إقرارك ${/^\d/.test(countNounGen(report.warnings.length, WARNING)) ? "بـ" : "ب"}${countNounGen(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}${sealed ? "" : " ولم تُحفظ أرقامه المختومة الآن، وستُحفظ في فحص الصباح."}`,
   });
 }
