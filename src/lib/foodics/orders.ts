@@ -230,7 +230,8 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
     const paidMinor = riyalsToMinor(order.total_price);
     if (paidMinor !== null && !lines.every((l) => l.isVoid)) {
       if (order.status === ORDER_STATUS.RETURNED) {
-        if (refundMinor > 0) refundMinor = Math.abs(paidMinor);
+        /* المردودُ ما رُدّ فعلاً، وخصمُه كان على البيع الأصليّ — لا يُطرح منه ثانيةً */
+        if (refundMinor > 0) { refundMinor = Math.abs(paidMinor); discountMinor = 0; }
       } else if (grossMinor >= paidMinor && paidMinor >= 0) {
         discountMinor = grossMinor - paidMinor;
       }

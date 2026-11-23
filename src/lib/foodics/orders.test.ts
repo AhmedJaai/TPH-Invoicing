@@ -165,3 +165,15 @@ describe("خصم العائلة: المدفوع هو المرجع", () => {
     expect([sale.grossMinor, sale.discountMinor]).toEqual([3300, 0]);
   });
 });
+
+describe("مردود طلبٍ عليه خصم العائلة", () => {
+  it("المردود ما رُدّ فعلاً، ولا خصم عليه", () => {
+    const o = order({
+      reference: 311, status: ORDER_STATUS.RETURNED, subtotal_price: -21.93, discount_amount: 4.35, total_price: -25.22,
+      products: [{ id: "p-1", quantity: -1, unit_price: 29, total_price: -29, discount_amount: 0, status: PRODUCT_STATUS.RETURNED, product: { sku: "sk-0013", name: "Matcha" }, taxes: [{ pivot: { amount: -3.78 } }], options: [] }],
+      payments: [{ id: "pay-1", amount: -25.22, tips: 0, business_date: "2026-10-10", added_at: "2026-10-10 20:22:09", payment_method: { name: "Mada", type: PAYMENT_TYPE.CARD } }],
+    });
+    const sale = ordersToSalesFile([o]).file.sales[0];
+    expect([sale.refundMinor, sale.discountMinor]).toEqual([2522, 0]);
+  });
+});
