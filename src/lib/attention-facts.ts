@@ -600,6 +600,13 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
          and i.invoice_date >= now() - interval '60 days'
          and not exists (select 1 from foodics_item_moves m where m.kind = 8 and m.sku = p.foodics_item_sku
                           and m.business_date >= to_char((now() at time zone 'Asia/Riyadh') - interval '45 days', 'YYYY-MM-DD'))
+         /* أُصلح في فودكس: صار مكوّناً في وصفةٍ ساريةٍ من كتالوجه لمنتجٍ قائم — يصرفه البيعُ القادم، فلا يُسأل عنه
+            خمسةً وأربعين يوماً بعد إصلاحه */
+         and not exists (select 1 from recipe_ingredients ri
+                           join recipe_versions v on v.id = ri.recipe_version_id and v.status = 'ACTIVE' and v.source = 'FOODICS_CATALOG'
+                           join recipes r on r.id = v.recipe_id and r.is_active
+                           join products mp on mp.id = r.product_id and mp.is_active
+                          where ri.product_id = p.id)
        group by p.id, p.name_ar
        order by 3 desc
        limit 40
