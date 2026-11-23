@@ -695,7 +695,7 @@ export function SortHeader({
       href={sortHref(pathname, params, param, formatSort(next))}
       scroll={false}
       replace
-      data-tip={next ? (next.dir === "desc" ? "رتّب تنازلياً" : "رتّب تصاعدياً") : "أعد الترتيب الأصلي"}
+      data-tip={next ? (next.dir === "desc" ? "رتّب تنازلياً" : "رتّب تصاعدياً") : "أعد الترتيب المقترح"}
       className={`-mx-1.5 inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-hover hover:text-ink ${current ? "text-ink" : ""}`}
     >
       {children}
@@ -709,9 +709,12 @@ export function SortHeader({
 export function SortSelect({
   param,
   options,
+  naturalLabel = "الترتيب المقترح",
 }: {
   param: string;
   options: readonly { key: string; label: string; first: SortDir }[];
+  /** اسمُ الترتيب الذي تأتي به الصفحة — «من تدين له أكثر أولاً» لا «الترتيب الأصلي». */
+  naturalLabel?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -727,7 +730,7 @@ export function SortSelect({
         onChange={(e) => router.replace(sortHref(pathname, params, param, e.target.value || null), { scroll: false })}
         className={`${fieldClass("sm")} max-w-56`}
       >
-        <option value="">الترتيب الأصلي</option>
+        <option value="">{naturalLabel}</option>
         {options.flatMap((o) => {
           const second: SortDir = o.first === "desc" ? "asc" : "desc";
           const word = (d: SortDir) => (d === "asc" ? "تصاعدياً" : "تنازلياً");

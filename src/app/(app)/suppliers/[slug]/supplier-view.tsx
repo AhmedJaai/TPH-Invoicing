@@ -800,7 +800,7 @@ export async function SupplierView({
                     const left = Number(r.amount) - Number(r.fee) - Number(r.allocated);
                     return left > 100 && r.status !== "REVERSED" && r.status !== "VOID"
                       ? <span className="font-bold"><Money minor={left} tone="warn" /></span>
-                      : <span className="text-muted">—</span>;
+                      : <span className="text-muted">لا شيء</span>;
                   },
                 },
                 { key: "method", header: "طريقة الدفع", secondary: true, cell: (r) => <span className="text-xs text-ink-soft">{METHOD_LABEL[r.method] ?? r.method}</span> },

@@ -272,7 +272,7 @@ export default async function FoodicsBankPage() {
                 : <GapWords gapMinor={b.gapMinor} agrees={b.verdict === "AGREES"} quiet={b.verdict === "SMALL_GAP"} />),
             },
             { key: "n", header: "العمليات", numeric: true, secondary: true, cell: (b) => <span className="nums nums-count">{b.payments}</span> },
-            { key: "window", header: "آخر عملية فيها", secondary: true, cell: (b) => (b.toMs === null ? <span className="text-muted">—</span> : <bdi className="text-xs text-muted">{formatMoment(new Date(b.toMs))}</bdi>) },
+            { key: "window", header: "آخر عملية فيها", secondary: true, cell: (b) => (b.toMs === null ? <span className="text-muted">غير معروف</span> : <bdi className="text-xs text-muted">{formatMoment(new Date(b.toMs))}</bdi>) },
           ]}
         />
       </Section>

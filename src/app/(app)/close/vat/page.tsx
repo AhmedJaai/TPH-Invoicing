@@ -654,8 +654,8 @@ function formBoxes(r: Awaited<ReturnType<typeof loadVatReturn>>["result"]): Form
 
 const boxColumns: Column<FormBox>[] = [
   { key: "label", header: "الخانة", primary: true, cell: (b) => b.label },
-  { key: "amount", header: "المبلغ قبل الضريبة", numeric: true, cell: (b) => b.amountMinor === null ? <span className="text-muted">—</span> : <Money minor={b.amountMinor} /> },
-  { key: "vat", header: "الضريبة", numeric: true, cell: (b) => b.vatMinor === null ? <span className="text-muted">—</span> : <Money minor={b.vatMinor} /> },
+  { key: "amount", header: "المبلغ قبل الضريبة", numeric: true, cell: (b) => b.amountMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={b.amountMinor} /> },
+  { key: "vat", header: "الضريبة", numeric: true, cell: (b) => b.vatMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={b.vatMinor} /> },
 ];
 
 function riyalsText(minor: number): string {

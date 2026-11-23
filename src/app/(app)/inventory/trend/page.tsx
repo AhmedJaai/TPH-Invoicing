@@ -260,7 +260,7 @@ const recurringColumns: readonly Column<RecurringItem>[] = [
   { key: "shortage", header: "النقص", numeric: true, cell: (r) => <Money minor={r.shortageCostMinor} tone={r.shortageCostMinor > 0 ? "danger" : undefined} /> },
   {
     key: "overage", header: "الزيادة", numeric: true, secondary: true,
-    cell: (r) => r.overageCostMinor > 0 ? <span className="text-info"><Money minor={r.overageCostMinor} /></span> : <span className="text-muted">—</span>,
+    cell: (r) => r.overageCostMinor > 0 ? <span className="text-info"><Money minor={r.overageCostMinor} /></span> : <span className="text-muted">لا شيء</span>,
   },
 ];
 

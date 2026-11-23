@@ -185,9 +185,9 @@ export default async function FinancePositionPage() {
                 <tr key={m.month} className="border-b border-line-soft last:border-0">
                   <td className="px-4 py-2.5 font-bold">{formatMonth(m.month)}</td>
                   <td className="px-3 py-2.5 text-end"><Money minor={m.cashMinor} /></td>
-                  <td className="px-3 py-2.5 text-end">{m.shortMinor === 0 ? <span className="text-muted">—</span> : <Money minor={m.shortMinor} />}</td>
-                  <td className="px-3 py-2.5 text-end">{m.overMinor === 0 ? <span className="text-muted">—</span> : <Money minor={m.overMinor} />}</td>
-                  <td className="px-4 py-2.5 text-end">{m.uncounted === 0 ? <span className="text-muted">—</span> : <span className="font-bold text-warn"><T s="{0} من {1}" a={[m.uncounted, m.tills]} /></span>}</td>
+                  <td className="px-3 py-2.5 text-end">{m.shortMinor === 0 ? <span className="text-muted">لا شيء</span> : <Money minor={m.shortMinor} />}</td>
+                  <td className="px-3 py-2.5 text-end">{m.overMinor === 0 ? <span className="text-muted">لا شيء</span> : <Money minor={m.overMinor} />}</td>
+                  <td className="px-4 py-2.5 text-end">{m.uncounted === 0 ? <span className="text-muted">لا شيء</span> : <span className="font-bold text-warn"><T s="{0} من {1}" a={[m.uncounted, m.tills]} /></span>}</td>
                 </tr>
               ))}
             </tbody>

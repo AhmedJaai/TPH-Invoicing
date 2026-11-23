@@ -188,9 +188,9 @@ export default async function PosPage() {
               header: "المعتاد",
               numeric: true,
               secondary: true,
-              cell: (m) => (m.usualBp === null ? <span className="text-muted">—</span> : <span className="nums">{formatRate(m.usualBp)}</span>),
+              cell: (m) => (m.usualBp === null ? <span className="text-muted">غير معروف</span> : <span className="nums">{formatRate(m.usualBp)}</span>),
             },
-            { key: "fixed", header: "رسم ثابت", numeric: true, secondary: true, cell: (m) => (m.fixedFeeMinor > 0 ? <Money minor={m.fixedFeeMinor} /> : <span className="text-muted">—</span>) },
+            { key: "fixed", header: "رسم ثابت", numeric: true, secondary: true, cell: (m) => (m.fixedFeeMinor > 0 ? <Money minor={m.fixedFeeMinor} /> : <span className="text-muted">لا رسوم</span>) },
             { key: "vat", header: "ضريبة الرسوم", numeric: true, secondary: true, cell: (m) => <Money minor={m.vatMinor} /> },
           ]}
         />

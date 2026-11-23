@@ -47,7 +47,7 @@ export function AgeingBar({
                 {b.label}
               </dt>
               <dd className={`mt-0.5 text-[13px] font-bold ${i >= 2 && buckets[i] > 0 ? (i === 3 ? "text-danger" : "text-warn") : ""}`}>
-                {buckets[i] > 0 ? <Money minor={buckets[i]} /> : <span className="font-normal text-muted">—</span>}
+                {buckets[i] > 0 ? <Money minor={buckets[i]} /> : <span className="font-normal text-muted">لا شيء</span>}
               </dd>
             </div>
           ))}

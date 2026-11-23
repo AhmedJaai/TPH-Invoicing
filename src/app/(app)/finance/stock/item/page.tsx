@@ -136,7 +136,7 @@ export default async function StockItemPage({ searchParams }: { searchParams: Pr
               { key: "name", header: "الصنف المباع", primary: true, cell: (r) => r.name },
               { key: "sold", header: "المباع", numeric: true, cell: (r) => <span className="nums">{formatUnits(r.soldMilli)}</span> },
               { key: "used", header: "المصروف منه", numeric: true, cell: (r) => <span className="nums">{qty(r.usedMilli)}</span> },
-              { key: "staff", header: "لمشروبات الموظفين", numeric: true, secondary: true, cell: (r) => (r.staffMilli === 0 ? <span className="text-muted">—</span> : <span className="nums">{qty(r.staffMilli)}</span>) },
+              { key: "staff", header: "لمشروبات الموظفين", numeric: true, secondary: true, cell: (r) => (r.staffMilli === 0 ? <span className="text-muted">لا شيء</span> : <span className="nums">{qty(r.staffMilli)}</span>) },
             ]}
             rows={detail.sales} keyOf={(r) => r.name}
             empty={<EmptyState icon={Coffee} title="لم يُصرف منه لأي صنف مباع في هذه المدة." hint="لا توجد وصفة تستخدمه، أو لم يُبع ما يستخدمه." action={<LinkButton href="/inventory/recipes" size="sm">الوصفات</LinkButton>} />}

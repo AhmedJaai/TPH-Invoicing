@@ -123,15 +123,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       cell: (r) => <MaybeMoney minor={r.slip.baseMinor} why={r.employee.kind === "MONTHLY" ? "لم يُكتب راتبه" : undefined} />,
       sortBy: (r) => r.slip.baseMinor,
     },
-    { key: "add", header: "إضافات", numeric: true, secondary: true, cell: (r) => (r.slip.additionsMinor > 0 ? <Money minor={r.slip.additionsMinor} /> : <span className="text-muted">—</span>) },
+    { key: "add", header: "إضافات", numeric: true, secondary: true, cell: (r) => (r.slip.additionsMinor > 0 ? <Money minor={r.slip.additionsMinor} /> : <span className="text-muted">لا شيء</span>) },
     {
       key: "ded", header: "خصومات", numeric: true,
       cell: (r) => r.slip.deductionsMinor === null ? <MaybeMoney minor={null} />
-        : r.slip.deductionsMinor > 0 ? <span title={deductionText(r)}><Money minor={-r.slip.deductionsMinor} signed /></span> : <span className="text-muted">—</span>,
+        : r.slip.deductionsMinor > 0 ? <span title={deductionText(r)}><Money minor={-r.slip.deductionsMinor} signed /></span> : <span className="text-muted">لا شيء</span>,
     },
-    { key: "adv", header: "سلف نقداً", numeric: true, secondary: true, cell: (r) => (r.slip.advancesMinor > 0 ? <Money minor={-r.slip.advancesMinor} signed /> : <span className="text-muted">—</span>) },
+    { key: "adv", header: "سلف نقداً", numeric: true, secondary: true, cell: (r) => (r.slip.advancesMinor > 0 ? <Money minor={-r.slip.advancesMinor} signed /> : <span className="text-muted">لا شيء</span>) },
     { key: "due", header: "المستحق", numeric: true, cell: (r) => <MaybeMoney minor={r.slip.dueMinor} />, sortBy: (r) => r.slip.dueMinor },
-    { key: "paid", header: "حُوّل", numeric: true, cell: (r) => (r.slip.paidMinor > 0 ? <Money minor={r.slip.paidMinor} /> : <span className="text-muted">—</span>), sortBy: (r) => r.slip.paidMinor },
+    { key: "paid", header: "حُوّل", numeric: true, cell: (r) => (r.slip.paidMinor > 0 ? <Money minor={r.slip.paidMinor} /> : <span className="text-muted">لم يُحوَّل</span>), sortBy: (r) => r.slip.paidMinor },
     {
       key: "left", header: "الباقي للتحويل", numeric: true,
       cell: (r) => r.slip.remainingMinor === null ? <MaybeMoney minor={null} />

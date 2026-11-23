@@ -523,7 +523,7 @@ export default async function DocumentsPage({
                     ? [{
                         key: "amount", header: "المبلغ", numeric: true,
                         /* بلا فاتورةٍ لا مبلغ مقيَّد — «—» لا «0.00» */
-                        cell: (r: Row) => r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">—</span>,
+                        cell: (r: Row) => r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">لم يُقرأ</span>,
                       }]
                     : []),
                   {

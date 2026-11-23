@@ -226,7 +226,7 @@ export default async function SuppliersPage({
       sortFirst: "desc",
       cell: (r) =>
         r.invoiceCount === 0 ? (
-          <span className="text-muted">—</span>
+          <span className="text-muted">لا فواتير</span>
         ) : (
           <span className="flex flex-col gap-0.5 text-[12px]">
             {/* قائمةُ الفواتير لمن يرى المبالغ — كانت تفتح لمدير المشتريات «خارج صلاحيتك» */}
@@ -292,7 +292,7 @@ export default async function SuppliersPage({
             sortFirst: "desc",
             cell: (r) =>
               r.ageing.oldestOwedDays === null ? (
-                <span className="text-muted">—</span>
+                <span className="text-muted">لا مستحق</span>
               ) : (
                 <Badge tone={ageTone(r.ageing.oldestOwedDays) === "muted" ? undefined : ageTone(r.ageing.oldestOwedDays)} dot>
                   <T s="منذ {0}" a={[countNoun(r.ageing.oldestOwedDays, DAY)]} /></Badge>
@@ -488,6 +488,7 @@ export default async function SuppliersPage({
           searchOf={(r) => [r.nameAr, r.nameEn, r.slug, r.vatNumber, r.aliases].filter(Boolean).join(" ")}
           searchLabel="ابحث باسم المورّد أو اسمه في البنك"
           sort={params.sort ?? null}
+          naturalOrder="من تدين له أكثر أولاً"
           columns={columns}
           empty={
             <EmptyState

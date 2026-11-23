@@ -104,7 +104,7 @@ export default async function InventoryHistoryPage() {
     },
     {
       key: "net", header: "الصافي", numeric: true, secondary: true,
-      cell: (r) => r.summary.linesMeasured === 0 ? <span className="text-muted">—</span> : <Money minor={r.summary.netCostMinor} />,
+      cell: (r) => r.summary.linesMeasured === 0 ? <span className="text-muted">لم يُقَس</span> : <Money minor={r.summary.netCostMinor} />,
     },
     {
       key: "items", header: "الأصناف المعدودة", numeric: true, secondary: true,

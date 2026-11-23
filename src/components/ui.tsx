@@ -832,6 +832,7 @@ export function DataTable<T>({
   searchLabel = "ابحث في هذا الجدول",
   sort,
   sortParam = "sort",
+  naturalOrder,
   selectable,
   bulk,
 }: {
@@ -850,6 +851,8 @@ export function DataTable<T>({
   sort?: string | null;
   /** اسمُ الوسيط في العنوان — لصفحةٍ فيها جدولان يُرتَّبان. */
   sortParam?: string;
+  /** اسمُ ترتيب الصفحة بلا اختيار، كما يُقرأ في قائمة الجوّال: «من تدين له أكثر أولاً». */
+  naturalOrder?: string;
   /**
    * تحديدٌ متعدّد: مربّعٌ في أوّل كلّ صفٍّ يقبله (`when`) ومربّعُ «الكلّ» في الرأس،
    * و`Shift` يحدّد المدى. الحالُ في المتصفّح (`BulkBar` في `ui-client`)، والمربّعُ
@@ -900,6 +903,7 @@ export function DataTable<T>({
           <Suspense fallback={null}>
             <SortSelect
               param={sortParam}
+              naturalLabel={naturalOrder}
               options={sortable.map((c) => ({ key: c.key, label: c.header, first: c.sortFirst ?? (c.numeric ? "desc" : "asc") }))}
             />
           </Suspense>
