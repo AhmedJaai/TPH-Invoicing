@@ -293,9 +293,10 @@ export default async function BankPage({
                   cell: (t) => (
                     <span className="flex min-w-0 items-start gap-2.5">
                       <DirectionIcon direction={t.direction} />
-                      <span className="min-w-0">
+                      {/* نصُّ الكشف طويل: كان يمدّ العمود فيُقصّ عمودُ «الحالة» على شاشة ١٢٨٠ — والكاملُ في `title` */}
+                      <span className="min-w-0 max-w-[20rem] 2xl:max-w-[26rem]">
                         <span className="block truncate font-bold" dir="auto">{t.who || t.description?.trim().slice(0, 60) || "حركة بلا وصف"}</span>
-                        <span className="mt-0.5 block max-w-[26rem] truncate text-[11px] font-normal text-muted" dir="auto" title={t.description ?? undefined}>
+                        <span className="mt-0.5 block truncate text-[11px] font-normal text-muted" dir="auto" title={t.description ?? undefined}>
                           {t.description}
                         </span>
                       </span>

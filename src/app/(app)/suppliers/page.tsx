@@ -19,7 +19,7 @@ import { buildInvoiceRequest, groupUnbackedBySupplier, invoiceRequestKey } from 
 import { loadInvoiceRequestMarks, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { RequestInvoiceLink } from "@/components/request-invoice-link";
 import { latestStatementMissing } from "@/services/statement-reconcile.service";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatRiyalsDisplay, TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import { loadBalanceTotals, loadOpenInvoiceAges, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadSupplierDirectory } from "@/services/supplier-intel.service";
 import { loadDuplicateHints } from "@/services/supplier-merge.service";
@@ -157,6 +157,8 @@ export default async function SuppliersPage({
     [0, 0, 0, 0],
   );
   const overdueMinor = overdue.reduce((s, o) => s + o.owedMinor, 0);
+  /* رصيدٌ لنا تحت ريال فرقُ تقريب (`TOTAL_ROUNDING_TOLERANCE_MINOR`) — لا بطاقةَ له تسأل عنه */
+  const creditShown = totals.creditLeftMinor > TOTAL_ROUNDING_TOLERANCE_MINOR;
   const oldestOverdue = overdue.reduce((m, o) => Math.max(m, o.oldestDays), 0);
 
   const needContract = rows.filter((r) => r.contract);
@@ -340,7 +342,7 @@ export default async function SuppliersPage({
         knows ? (
           <div>
           {/* رقمٌ صفرُه معلوم يُقال سطراً هادئاً لا بطاقةً «٠٫٠٠» (ui-ux.md) — والبطاقاتُ لما فيه جواب */}
-          <div className={`grid gap-3 ${overdueMinor > 0 && totals.creditLeftMinor > 0 ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]" : overdueMinor > 0 || totals.creditLeftMinor > 0 ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}>
+          <div className={`grid gap-3 ${overdueMinor > 0 && creditShown ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]" : overdueMinor > 0 || creditShown ? "grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}>
             <Figure
               className="col-span-2 lg:col-span-1"
               icon={Receipt}
@@ -356,7 +358,7 @@ export default async function SuppliersPage({
             </Figure>
             {overdueMinor > 0 && (
               <Figure
-                className={totals.creditLeftMinor > 0 ? undefined : "col-span-2 lg:col-span-1"}
+                className={creditShown ? undefined : "col-span-2 lg:col-span-1"}
                 icon={Hourglass}
                 label="متأخر أكثر من 60 يوماً"
                 href="/suppliers?view=overdue"
@@ -365,7 +367,7 @@ export default async function SuppliersPage({
                 sub={`عند ${countNounGen(overdue.length, SUPPLIER)} · أقدمها منذ ${countNounGen(oldestOverdue, DAY)}`}
               />
             )}
-            {totals.creditLeftMinor > 0 && (
+            {creditShown && (
               <Figure
                 className={overdueMinor > 0 ? undefined : "col-span-2 lg:col-span-1"}
                 icon={PiggyBank}
@@ -376,7 +378,7 @@ export default async function SuppliersPage({
               />
             )}
           </div>
-          {(overdueMinor === 0 || totals.creditLeftMinor === 0) && (
+          {(overdueMinor === 0 || !creditShown) && (
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
               {overdueMinor === 0 && (
                 <span className="inline-flex items-center gap-1.5">
@@ -384,10 +386,12 @@ export default async function SuppliersPage({
                   لا مبلغ متأخر أكثر من ستين يوماً بعد خصم أرصدتك.
                 </span>
               )}
-              {totals.creditLeftMinor === 0 && (
+              {!creditShown && (
                 <span className="inline-flex items-center gap-1.5">
                   <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
-                  لا رصيد لك عند أي مورّد: كل مبلغ دفعته وصلتك فاتورته.
+                  {totals.creditLeftMinor > 0
+                    ? <T s="لا رصيد يُذكر لك عند مورّد: {0} فرق تقريب، لا مبلغ دفعته بلا فاتورة." a={[<Money key="0" minor={totals.creditLeftMinor} />]} />
+                    : "لا رصيد لك عند أي مورّد: كل مبلغ دفعته وصلتك فاتورته."}
                 </span>
               )}
             </p>
