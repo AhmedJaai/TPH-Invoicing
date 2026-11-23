@@ -16,6 +16,7 @@ import { CARD_RECENT_DAYS, CARD_SMALL_MINOR, type CardBatchRow, type CardMonth, 
 import { cardGapKey, loadCardComparison, loadFoodicsSilenced, loadFoodicsTakings } from "@/services/foodics-takings.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { T } from "@/components/i18n/t";
+import { ManualExpense } from "@/components/manual-expense";
 
 export const dynamic = "force-dynamic";
 
@@ -290,10 +291,20 @@ export default async function FoodicsBankPage() {
             { key: "month", header: "الشهر", primary: true, cell: (m) => <span className="font-bold">{formatMonth(m.month)}</span> },
             { key: "cash", header: "النقد المسجّل في فودكس", numeric: true, cell: (m) => <Money minor={m.cashMinor} /> },
             { key: "bank", header: "دخل البنك من خارج الشبكة", numeric: true, cell: (m) => (m.bankOtherCreditsMinor === 0 ? <span className="text-muted">لا شيء</span> : <Money minor={m.bankOtherCreditsMinor} />) },
+            /* «أين ذهب النقد؟» (110): ما قُيّد صرفُه من الصندوق، وما بقي بلا أثر — لا يُقال «صُرف» ما لم يُقيَّد */
+            { key: "spent", header: "صُرف من الصندوق", numeric: true, cell: (m) => (m.tillSpentMinor === 0 ? <span className="text-muted">لم يُقيَّد شيء</span> : <Money minor={m.tillSpentMinor} />) },
+            { key: "untraced", header: "بلا أثر معروف", numeric: true, cell: (m) => (m.untracedMinor === 0 ? <span className="text-muted">لا شيء</span> : <span className="text-warn"><Money minor={m.untracedMinor} /></span>) },
             { key: "typed", header: "ما كتبته في الإقرار", numeric: true, cell: (m) => (m.typedForVatMinor === null ? <span className="text-warn">لم تكتب شيئاً</span> : <Money minor={m.typedForVatMinor} />) },
             { key: "variance", header: "فرق عدّ الصندوق", numeric: true, secondary: true, cell: (m) => (m.tillVarianceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={m.tillVarianceMinor} signed />) },
           ]}
         />
+        {can(user.role, "expense:edit") && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+            <span>دفعت شيئاً من نقد الصندوق؟ سجّله ليُعرف أين ذهب النقد، ويدخل في ربح شهره.</span>
+            <ManualExpense variant="secondary" defaultPaidFrom="TILL" />
+            <span className="text-muted">ولفاتورة مورّد: افتحها واختر «نقداً من الصندوق».</span>
+          </div>
+        )}
         <Callout tone="warn" icon={Banknote} className="mt-4" action={can(user.role, "month:close") ? <LinkButton href="/close/vat" variant="secondary" size="sm">افتح الإقرار</LinkButton> : undefined}>
           <T s="{0} هذه مبيعات تخضع للضريبة، والإقرار يأخذ قيمتها مما تكتبه أنت شهراً بشهر. العمود «النقد المسجّل في فودكس» هو الرقم الذي تكتبه في الإقرار، ولا تنقل هذه الصفحة إليه شيئاً من تلقاء نفسها. أما «فرق عدّ الصندوق» فهو ما عُدّ عند الإقفال مطروحاً منه ما توقّعه فودكس." a={[<strong key="0" className="text-ink"><T s="سجّل فودكس نقداً {0} منذ {1}، ولا أثر لإيداعه في الكشف." a={[<Money key="0" minor={cashTotal} />, <bdi key="1">{formatDay(t.firstDay)}</bdi>]} /></strong>]} /></Callout>
       </Section>

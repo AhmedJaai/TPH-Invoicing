@@ -994,6 +994,8 @@ export const expenses = pgTable("expenses", {
    */
   eventKey: text("event_key"),
   note: text("note"),
+  /** من أين دُفع (110): `TILL` نقدُ الصندوق · `OWNER` حسابُ المالك · `OTHER` — و`null` لم يُقَل. */
+  paidFrom: text("paid_from").$type<"TILL" | "OWNER" | "OTHER">(),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
 }, (t) => [

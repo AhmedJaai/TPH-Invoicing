@@ -369,6 +369,8 @@ export async function recordManualExpense(
     label: string;
     amountMinor: number;
     note?: string;
+    /** من أين دُفع — نقدُ الصندوق يُطرح ممّا سجّله فودكس نقداً (110). */
+    paidFrom?: "TILL" | "OWNER" | "OTHER" | null;
   },
   conn: Conn = db,
 ): Promise<string> {
@@ -402,6 +404,7 @@ export async function recordManualExpense(
         label: input.label,
       }),
       note: input.note,
+      paidFrom: input.paidFrom ?? null,
       createdById: userId,
     });
 

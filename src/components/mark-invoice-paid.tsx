@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, Landmark, Wallet } from "lucide-react";
+import { Banknote, Coins, Landmark, Wallet } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { postJson } from "@/lib/http-client";
 import { readDrawn } from "@/lib/drawn-credit";
@@ -67,9 +67,9 @@ async function post(body: unknown): Promise<{ ok: boolean; status: number; data:
   return { ok: res.ok, status: res.status, data };
 }
 
-function describePreview(p: Preview, invoiceDay?: string): string[] {
+function describePreview(p: Preview, invoiceDay?: string, from: "OWNER" | "TILL" = "OWNER"): string[] {
   /* اليومُ يومُ الفاتورة (`markPaidByOwner`: دفعها صاحبُها عند الشراء) — يُقال قبل الحفظ، فيومُها يحدّد شهرَها */
-  const parts = [`ستُسجَّل دفعة من حسابك بمبلغ ${formatRiyalsDisplay(p.ownerPaymentMinor)}${invoiceDay ? ` بتاريخ الفاتورة ${formatDay(invoiceDay)}` : ""}`];
+  const parts = [`ستُسجَّل دفعة ${from === "TILL" ? "نقداً من الصندوق" : "من حسابك"} بمبلغ ${formatRiyalsDisplay(p.ownerPaymentMinor)}${invoiceDay ? ` بتاريخ الفاتورة ${formatDay(invoiceDay)}` : ""}`];
   const freed = p.freed.reduce((s, f) => s + f.amountMinor, 0);
   if (freed > 0) {
     const moved = p.reapplied
@@ -105,6 +105,8 @@ export function MarkInvoicePaid({
   const [state, setState] = useState<State>(startOpen ? "choose" : "idle");
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  /* خارج كشف المقهى بابان: حسابُ المالك، أو نقدُ الصندوق — المعاينةُ واحدة والقيدُ يحمل طريقته */
+  const [outside, setOutside] = useState<"OWNER" | "TILL">("OWNER");
   /*
     يومُ السداد يُسأل ولا يُفترض: كان كلُّ إقرارٍ يُؤرَّخ بيوم الضغط، فيبتعد عن
     حوالته في الكشف (نافذةُ الربط أسبوعان) وتقع الدفعةُ في شهرٍ غير شهرها.
@@ -126,7 +128,8 @@ export function MarkInvoicePaid({
     setState(back);
   }
 
-  async function loadOwnerPreview() {
+  async function loadOwnerPreview(from: "OWNER" | "TILL" = "OWNER") {
+    setOutside(from);
     setState("previewing");
     setMessage(null);
     const r = await post({ invoiceIds: [invoiceId], source: "OWNER", preview: true });
@@ -135,17 +138,17 @@ export function MarkInvoicePaid({
     setState("confirm-owner");
   }
 
-  async function run(source: "OWNER" | "BANK", acknowledgeTwin = false) {
+  async function run(source: "OWNER" | "TILL" | "BANK", acknowledgeTwin = false) {
     setState("busy");
     setMessage(null);
     const r = await post(
-      source === "OWNER"
+      source !== "BANK"
         ? { invoiceIds: [invoiceId], source }
         : { invoiceIds: [invoiceId], source, paidOn, ...(acknowledgeTwin ? { acknowledgeTwin: true } : {}) },
     );
     if (!r || !r.ok) {
       setTwin(source === "BANK" && r?.status === 409 && r.data.twin === true);
-      return fail(r, source === "OWNER" ? "confirm-owner" : "confirm-bank");
+      return fail(r, source !== "BANK" ? "confirm-owner" : "confirm-bank");
     }
     setTwin(false);
 
@@ -218,13 +221,22 @@ export function MarkInvoicePaid({
         panel ? (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-xs font-bold text-ink-soft">من أين دفعت؟</legend>
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-3">
               <Choice
                 icon={Wallet}
-                title="من حسابي أو نقداً"
-                hint="لا يظهر في كشف المقهى. ستظهر لك معاينة قبل الحفظ."
-                busy={state === "previewing"}
-                onClick={loadOwnerPreview}
+                title="من حسابي"
+                hint="من مالك الخاص، لا يظهر في كشف المقهى. ستظهر لك معاينة قبل الحفظ."
+                busy={state === "previewing" && outside === "OWNER"}
+                disabled={state === "previewing"}
+                onClick={() => void loadOwnerPreview("OWNER")}
+              />
+              <Choice
+                icon={Coins}
+                title="نقداً من الصندوق"
+                hint="من نقد المبيعات في الصندوق. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك."
+                busy={state === "previewing" && outside === "TILL"}
+                disabled={state === "previewing"}
+                onClick={() => void loadOwnerPreview("TILL")}
               />
               <Choice
                 icon={Landmark}
@@ -239,8 +251,11 @@ export function MarkInvoicePaid({
         ) : (
           <>
             <span className="text-[11px] text-muted">من أين دفعت؟</span>
-            <button aria-busy={state === "previewing"} type="button" disabled={state === "previewing"} onClick={loadOwnerPreview} className={buttonClass("secondary", "sm")}>
-              من حسابي أو نقداً
+            <button aria-busy={state === "previewing" && outside === "OWNER"} type="button" disabled={state === "previewing"} onClick={() => void loadOwnerPreview("OWNER")} className={buttonClass("secondary", "sm")}>
+              من حسابي
+            </button>
+            <button aria-busy={state === "previewing" && outside === "TILL"} type="button" disabled={state === "previewing"} onClick={() => void loadOwnerPreview("TILL")} className={buttonClass("secondary", "sm")}>
+              نقداً من الصندوق
             </button>
             <button type="button" disabled={state === "previewing"} onClick={() => setState("confirm-bank")} className={buttonClass("secondary", "sm")}>
               حوالة من حساب المقهى
@@ -253,11 +268,11 @@ export function MarkInvoicePaid({
       {(state === "confirm-owner" || (state === "busy" && preview)) && preview && (
         <div className={panel ? "rounded-xl border border-line bg-sunken/60 p-3.5" : "flex max-w-md flex-wrap items-center justify-end gap-1.5"}>
           <ul className={panel ? "space-y-1 text-xs leading-relaxed text-ink-soft" : "text-[11px] leading-relaxed text-ink-soft"}>
-            {describePreview(preview, invoiceDay).map((line) => <li key={line}>{line}</li>)}
+            {describePreview(preview, invoiceDay, outside).map((line) => <li key={line}>{line}</li>)}
           </ul>
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
-            <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("OWNER")} className={buttonClass("primary", "sm")}>
-              {ACT.paidFromOwner}
+            <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run(outside)} className={buttonClass("primary", "sm")}>
+              {outside === "TILL" ? "سجّلها مدفوعة نقداً من الصندوق" : ACT.paidFromOwner}
             </button>
             <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>

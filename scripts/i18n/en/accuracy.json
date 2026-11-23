@@ -36,5 +36,19 @@
   "هي نفسها": "Same invoice",
   "أقررتَ أنهما واحد": "You confirmed they match",
   "السبب: {0}": "Reason: {0}",
-  "ربما هي {0} عندك ({1})": "Possibly your {0} ({1})"
+  "ربما هي {0} عندك ({1})": "Possibly your {0} ({1})",
+  "صُرف من الصندوق": "Spent from the till",
+  "بلا أثر معروف": "Untraced",
+  "لم يُقيَّد شيء": "Nothing recorded",
+  "نقداً من الصندوق": "Cash from the till",
+  "من حسابي": "From my account",
+  "غير ذلك": "Other",
+  "من أين دُفع؟": "Paid from?",
+  "من مالك الخاص.": "From your own money.",
+  "من نقد المبيعات. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك.": "From sales cash. Deducted from Foodics cash that never reached the bank.",
+  "دفعت شيئاً من نقد الصندوق؟ سجّله ليُعرف أين ذهب النقد، ويدخل في ربح شهره.": "Paid something from till cash? Record it so the cash is traced and counted in that month's profit.",
+  "ولفاتورة مورّد: افتحها واختر «نقداً من الصندوق».": "For a supplier invoice: open it and choose «Cash from the till».",
+  "سجّلها مدفوعة نقداً من الصندوق": "Mark paid in cash from the till",
+  "من مالك الخاص، لا يظهر في كشف المقهى. ستظهر لك معاينة قبل الحفظ.": "From your own money; not on the café statement. You'll see a preview before saving.",
+  "من نقد المبيعات في الصندوق. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك.": "From sales cash in the till. Deducted from Foodics cash that never reached the bank."
 }

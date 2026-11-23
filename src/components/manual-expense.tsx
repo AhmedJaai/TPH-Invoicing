@@ -26,7 +26,14 @@ const CATEGORIES: TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "ZA
  * وضغطتان على «قيّده» كانتا مصروفين: الخادمُ يردّ الثانيةَ (٤٠٩) ويسأل،
  * وهنا يُعرَض سؤالُه بزرٍّ صريح «هو مصروفٌ ثانٍ» لا بإعادة المحاولة.
  */
-export function ManualExpense({ variant = "primary", startOpen = false }: { variant?: ButtonVariant; startOpen?: boolean }) {
+const PAID_FROM = [
+  { value: "TILL", label: "نقداً من الصندوق", hint: "من نقد المبيعات. يُطرح مما سجّله فودكس نقداً ولم يدخل البنك." },
+  { value: "OWNER", label: "من حسابي", hint: "من مالك الخاص." },
+  { value: "OTHER", label: "غير ذلك", hint: "" },
+] as const;
+type PaidFrom = (typeof PAID_FROM)[number]["value"];
+
+export function ManualExpense({ variant = "primary", startOpen = false, defaultPaidFrom = "TILL" }: { variant?: ButtonVariant; startOpen?: boolean; defaultPaidFrom?: PaidFrom }) {
   const router = useRouter();
   const ids = useId();
   const [open, setOpen] = useState(startOpen);
@@ -34,6 +41,8 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
   const [amount, setAmount] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayInRiyadh());
   const [category, setCategory] = useState<TxCategory>("OTHER");
+  /* من أين دُفع (110) — الأغلبُ في مصروفٍ خارج البنك أنّه من الصندوق، فهو الافتراضيّ ويُرى قبل الحفظ */
+  const [paidFrom, setPaidFrom] = useState<PaidFrom>(defaultPaidFrom);
   const [busy, setBusy] = useState(false);
   const [tried, setTried] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +71,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
     setError(null);
     try {
       const r = await postJson<{ message?: string; duplicateOf?: string }>("/api/expense-actual", {
-        action: "record", label: label.trim(), amount, occurredOn, category, confirmDuplicate,
+        action: "record", label: label.trim(), amount, occurredOn, category, paidFrom, confirmDuplicate,
       });
       if (!r.ok) {
         if (r.status === 409 && typeof r.data.duplicateOf === "string") setDuplicate(r.error);
@@ -171,6 +180,21 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
             </select>
             <span className="mt-1 block text-[11px] text-muted">لا تسجّل هنا سداد المورّدين، فهو محسوب في المشتريات، وتسجيله مصروفاً يحسبه مرتين.</span>
           </label>
+
+          <fieldset>
+            <legend className="text-xs font-bold">من أين دُفع؟</legend>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {PAID_FROM.map((o) => (
+                <label key={o.value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs sm:min-h-0 ${paidFrom === o.value ? "border-accent-line bg-accent-soft/50 font-bold" : "border-line"}`}>
+                  <input type="radio" name={`${ids}-paid-from`} value={o.value} checked={paidFrom === o.value} onChange={() => setPaidFrom(o.value)} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+            {PAID_FROM.find((o) => o.value === paidFrom)?.hint && (
+              <span className="mt-1 block text-[11px] text-muted">{PAID_FROM.find((o) => o.value === paidFrom)!.hint}</span>
+            )}
+          </fieldset>
 
           {/* زرٌّ مخفيّ كي يُرسَل النموذج بـEnter من أيّ حقل */}
           <button type="submit" className="sr-only" tabIndex={-1}>سجّله</button>

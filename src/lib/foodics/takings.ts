@@ -236,6 +236,11 @@ export interface CashMonthInput {
   bankOtherCreditsMinor: number;
   /** ما كتبه صاحبُ المقهى نقداً للإقرار — `null` لم يُكتب. */
   typedForVatMinor: number | null;
+  /**
+   * ما قُيّد أنّه صُرف من نقد الصندوق في الشهر (110): مصروفاتٌ «نقداً من الصندوق» وسداداتُ مورّدين
+   * نقداً. صفرٌ هنا «لم يُقيَّد شيء» — والباقي يُسمّى «بلا أثرٍ معروف» لا «صُرف».
+   */
+  tillSpentMinor: number;
 }
 
 export interface CashMonth extends CashMonthInput {
@@ -243,6 +248,8 @@ export interface CashMonth extends CashMonthInput {
   notBankedMinor: number;
   /** نقدُ فودكس − ما كُتب للإقرار. `null` لم يُكتب. */
   vatTypedGapMinor: number | null;
+  /** ما لم يدخل البنك ولم يُقيَّد صرفُه من الصندوق — قد يكون عند المالك، أو صُرف ولم يُقيَّد. */
+  untracedMinor: number;
 }
 
 /** النقدُ لا يُقابَل يوماً بيوم: الإيداعُ يجمع أيّاماً. فالشهرُ وحدتُه، والفرقُ يُعرَض ولا يُسمّى. */
@@ -252,6 +259,7 @@ export function summariseCash(months: readonly CashMonthInput[]): CashMonth[] {
     .map((m) => ({
       ...m,
       notBankedMinor: m.cashMinor - m.bankOtherCreditsMinor,
+      untracedMinor: Math.max(0, m.cashMinor - m.bankOtherCreditsMinor - m.tillSpentMinor),
       vatTypedGapMinor: m.typedForVatMinor === null ? null : m.cashMinor - m.typedForVatMinor,
     }));
 }

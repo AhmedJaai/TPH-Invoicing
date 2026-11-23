@@ -71,7 +71,7 @@ export async function loadCardComparison(sinceDay: string | null = null): Promis
 }
 
 export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
-  const [compared, span, monthly, tills, bankOther, typed] = await Promise.all([
+  const [compared, span, monthly, tills, bankOther, typed, tillSpent] = await Promise.all([
     loadCardComparison(),
     db.execute<{ first: string | null; last: string | null; n: number }>(sql`
       select min(coalesce(to_char(p.added_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD'), p.business_date)) as first,
@@ -102,6 +102,15 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
        group by 1
     `),
     db.execute<{ month: string; cash_sales_gross_minor: number }>(sql`select month, cash_sales_gross_minor from vat_period_inputs`),
+    /* ما قُيّد صرفُه من نقد الصندوق (110): مصروفاتٌ «من الصندوق» وسداداتٌ نقداً لم تُردّ */
+    db.execute<{ month: string; total: string }>(sql`
+      select month, sum(total)::bigint as total from (
+        select e.period_month as month, e.amount_minor as total from expenses e where e.paid_from = 'TILL'
+        union all
+        select to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM'), p.amount_minor
+          from payments p where p.method = 'CASH' and p.status <> 'REVERSED'
+      ) x group by month
+    `),
   ]);
 
   const firstDay = span.rows[0]?.first ?? null;
@@ -109,6 +118,7 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
   const variance = new Map(tills.rows.map((r) => [r.month, r.variance === null ? null : Number(r.variance)]));
   const other = new Map(bankOther.rows.map((r) => [r.month, Number(r.total)]));
   const typedBy = new Map(typed.rows.map((r) => [r.month, Number(r.cash_sales_gross_minor)]));
+  const spentBy = new Map(tillSpent.rows.map((r) => [r.month, Number(r.total)]));
   const inputs: CashMonthInput[] = monthly.rows.map((r) => ({
     month: r.month,
     cashMinor: Number(r.cash),
@@ -117,6 +127,7 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
     tillVarianceMinor: variance.get(r.month) ?? null,
     bankOtherCreditsMinor: other.get(r.month) ?? 0,
     typedForVatMinor: typedBy.get(r.month) ?? null,
+    tillSpentMinor: spentBy.get(r.month) ?? 0,
   }));
 
   return {

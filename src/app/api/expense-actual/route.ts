@@ -32,6 +32,8 @@ const Body = z.object({
   label: z.string().max(200).optional(),
   amount: z.string().max(30).optional(),
   note: z.string().max(500).optional(),
+  /** من أين دُفع — `TILL` نقدُ الصندوق (110). */
+  paidFrom: z.enum(["TILL", "OWNER", "OTHER"]).nullable().optional(),
   /** أقرّ صاحبه بأنّه مصروفٌ ثانٍ بالقيمة نفسها */
   confirmDuplicate: z.boolean().optional(),
 });
@@ -141,6 +143,7 @@ async function handle(request: Request) {
       label,
       amountMinor,
       note: body.note?.trim() || undefined,
+      paidFrom: body.paidFrom ?? null,
     });
   } catch (e) {
     /* «شهر 2026-07 مقفل…» يُقال 409 — كان يسقط ٥٠٠ بلا جملة */

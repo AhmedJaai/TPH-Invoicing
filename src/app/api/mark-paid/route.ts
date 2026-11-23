@@ -43,7 +43,7 @@ const Body = z.object({
   supplierId: z.string().trim().min(1).max(64).optional(),
   note: z.string().max(500).optional(),
   /** من أين دُفعت: حوالة من حساب المقهى (الافتراضيّ) أو من حساب المالك. */
-  source: z.enum(["BANK", "OWNER"]).optional(),
+  source: z.enum(["BANK", "OWNER", "TILL"]).optional(),
   /** يُعرض ما سيقع ولا يُكتب شيء — للسداد من حساب المالك. */
   preview: z.boolean().optional(),
   /** أُقِرّ أنّ سداداً بالمورّد واليوم والمبلغ نفسها واقعةٌ أخرى (ردُّ 409 `twin`). */
@@ -81,7 +81,8 @@ async function handle(request: Request) {
   const body: Body = read.body;
 
   /* ── من حساب المالك: فاتورةٌ واحدة، بمعاينةٍ ثمّ إقرار ── */
-  if (body.source === "OWNER") {
+  if (body.source === "OWNER" || body.source === "TILL") {
+    const till = body.source === "TILL";
     const invoiceId = body.invoiceIds?.length === 1 ? body.invoiceIds[0] : null;
     if (!invoiceId) {
       return NextResponse.json({ error: "السداد من حساب المالك يُسجَّل لفاتورة واحدة كل مرة" }, { status: 400 });
@@ -95,7 +96,7 @@ async function handle(request: Request) {
 
       /* القيدُ والأثرُ في معاملةٍ واحدة: مالٌ يُثبَّت بلا أثرٍ في السجلّ لا يُراجَع */
       const outcome = await db.transaction(async (tx) => {
-        const out = await markPaidByOwner(tx, invoiceId);
+        const out = await markPaidByOwner(tx, invoiceId, { method: till ? "CASH" : "OWNER_ACCOUNT" });
         await recordAudit({
           actorId: user.id,
           action: "INVOICE_PAID_BY_OWNER",
@@ -108,7 +109,7 @@ async function handle(request: Request) {
             خُصم_من: out.reapplied,
             بقي_لك_عنده_بالهللات: out.creditLeftMinor,
             ملاحظة: body.note ?? null,
-            مصدر_السداد: "إقرار المالك: من حسابه الشخصيّ أو نقداً",
+            مصدر_السداد: till ? "نقداً من صندوق المقهى" : "إقرار المالك: من حسابه الشخصيّ",
           },
         }, tx);
         return out;
@@ -120,7 +121,7 @@ async function handle(request: Request) {
         marked: 1,
         totalMinor: outcome.ownerPaymentMinor,
         message:
-          `سُجّلت الفاتورة ${outcome.invoiceNumber} مسدّدة من حسابك بمبلغ ${formatRiyalsDisplay(outcome.ownerPaymentMinor)} ريال`
+          `سُجّلت الفاتورة ${outcome.invoiceNumber} مسدّدة ${till ? "نقداً من الصندوق" : "من حسابك"} بمبلغ ${formatRiyalsDisplay(outcome.ownerPaymentMinor)} ريال`
           + (moved > 0 ? ` · وانتقل ${formatRiyalsDisplay(moved)} من حوالات المقهى إلى فواتير أخرى لهذا المورّد` : "")
           + (outcome.creditLeftMinor > 0 ? ` · ويبقى لك عنده ${formatRiyalsDisplay(outcome.creditLeftMinor)}` : ""),
       });

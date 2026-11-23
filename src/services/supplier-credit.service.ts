@@ -359,7 +359,12 @@ export interface OwnerPaidOutcome extends OwnerPaidPlan {
  * `fromTransfers`: سُدّدت من تحويلات المقهى إلى المالك (لا من ماله الخاصّ) — فتُخصم منها في
  * قائمة الدخل (083). يقرّره المالكُ لكلّ فاتورة؛ وبلا قرارٍ لا يُخصم شيء.
  */
-export async function markPaidByOwner(tx: Tx, invoiceId: string, opts: { fromTransfers?: boolean } = {}): Promise<OwnerPaidOutcome> {
+/**
+ * `method`: من أين خرج المال — حسابُ المالك (`OWNER_ACCOUNT`، الافتراضيّ) أو **نقدُ الصندوق** (`CASH`):
+ * كلاهما خارج كشف المقهى فيُعامَلان هنا معاملةً واحدة، لكنّ نقد الصندوق يُطرح من «أين ذهب نقدُ فودكس»
+ * (أحمد، ٢٣ نوفمبر ٢٠٢٦: «في اشياء تدفع نقدا من الصندوق»).
+ */
+export async function markPaidByOwner(tx: Tx, invoiceId: string, opts: { fromTransfers?: boolean; method?: "OWNER_ACCOUNT" | "CASH" } = {}): Promise<OwnerPaidOutcome> {
   const plan = await previewOwnerPaid(tx, invoiceId);
   const { inv } = await loadInvoiceForOwner(tx, invoiceId);
 
@@ -376,7 +381,7 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string, opts: { fromTra
     supplierId: plan.supplierId,
     paidAt: new Date(inv.invoice_date),
     amountMinor: plan.ownerPaymentMinor,
-    method: "OWNER_ACCOUNT",
+    method: opts.method ?? "OWNER_ACCOUNT",
     appliesToMonth: inv.period_month,
     /* إقرارُ المالك صريحٌ بفاتورةٍ بعينها، ولا يظهر في كشف المقهى */
     acknowledgeTwin: true,
@@ -384,7 +389,7 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string, opts: { fromTra
   await allocate(tx, ownerPaymentId, [
     { invoiceId, amountMinor: plan.ownerPaymentMinor },
   ]);
-  if (opts.fromTransfers) {
+  if (opts.fromTransfers && (opts.method ?? "OWNER_ACCOUNT") === "OWNER_ACCOUNT") {
     await tx.update(payments).set({ fromOwnerTransfers: true }).where(eq(payments.id, ownerPaymentId));
   }
 

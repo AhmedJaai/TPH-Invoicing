@@ -118,12 +118,24 @@ describe("بطاقاتُ فودكس أمام دفعات البنك", () => {
 
 describe("النقدُ شهراً بشهر", () => {
   it("ما قُبض نقداً ولا أثرَ لإيداعه، وما كُتب للإقرار بجانبه", () => {
-    const [m] = summariseCash([{ month: "2026-06", cashMinor: 537_019, staffDrinksMinor: 307_500, otherMinor: 0, tillVarianceMinor: -300, bankOtherCreditsMinor: 0, typedForVatMinor: 500_000 }]);
+    const [m] = summariseCash([{ month: "2026-06", cashMinor: 537_019, staffDrinksMinor: 307_500, otherMinor: 0, tillVarianceMinor: -300, bankOtherCreditsMinor: 0, typedForVatMinor: 500_000, tillSpentMinor: 0 }]);
     expect(m.notBankedMinor).toBe(537_019);
     expect(m.vatTypedGapMinor).toBe(37_019);
   });
   it("ما لم يُكتب للإقرار «غير معروف» لا صفر", () => {
-    const [m] = summariseCash([{ month: "2026-06", cashMinor: 10, staffDrinksMinor: 0, otherMinor: 0, tillVarianceMinor: null, bankOtherCreditsMinor: 0, typedForVatMinor: null }]);
+    const [m] = summariseCash([{ month: "2026-06", cashMinor: 10, staffDrinksMinor: 0, otherMinor: 0, tillVarianceMinor: null, bankOtherCreditsMinor: 0, typedForVatMinor: null, tillSpentMinor: 0 }]);
     expect(m.vatTypedGapMinor).toBeNull();
+  });
+});
+
+describe("أين ذهب نقدُ فودكس — ما صُرف من الصندوق يُطرح ممّا لم يدخل البنك", () => {
+  it("نقدٌ ٥٠٠ ودخل البنك ١٠٠ وصُرف من الصندوق ٣٠٠ — بلا أثرٍ معروف ١٠٠", () => {
+    const [m] = summariseCash([{ month: "2026-11", cashMinor: 50_000, staffDrinksMinor: 0, otherMinor: 0, tillVarianceMinor: null, bankOtherCreditsMinor: 10_000, typedForVatMinor: null, tillSpentMinor: 30_000 }]);
+    expect(m.notBankedMinor).toBe(40_000);
+    expect(m.untracedMinor).toBe(10_000);
+  });
+  it("صُرف أكثرُ ممّا بقي (أُضيف للصندوق من خارجه) — لا يُقال سالباً", () => {
+    const [m] = summariseCash([{ month: "2026-11", cashMinor: 10_000, staffDrinksMinor: 0, otherMinor: 0, tillVarianceMinor: null, bankOtherCreditsMinor: 0, typedForVatMinor: null, tillSpentMinor: 15_000 }]);
+    expect(m.untracedMinor).toBe(0);
   });
 });
