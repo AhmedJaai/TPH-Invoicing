@@ -4,7 +4,7 @@ import { Fragment } from "react";
 import { loadUnitCostFindings } from "@/services/daily-checks.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CircleHelp, FileSpreadsheet, Info, Lock, Scale, Snowflake, TrendingUp } from "lucide-react";
+import { CircleHelp, FileSpreadsheet, Info, Lock, Scale, Snowflake, TrendingUp, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -15,10 +15,11 @@ import { FinanceReading } from "@/components/finance-reading";
 import { MaybeMoney, MonthTabs, ProfitTrend, Unknown, type TrendMonth } from "@/components/finance-bits";
 import { Badge, Callout, Card, KeyFigure, LinkButton, NoAccess, Section } from "@/components/ui";
 import { formatShare } from "@/lib/finance/format";
-import { INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
+import { EMPLOYEE, INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMoment, formatMonth } from "@/lib/riyadh-time";
 import { loadPnlSeries, type PnlView } from "@/services/profit.service";
 import { loadStoredReading } from "@/services/finance-reading.service";
+import { loadOutstanding } from "@/services/outstanding.service";
 import { T } from "@/components/i18n/t";
 import { BudgetSection } from "@/components/budget-section";
 
@@ -86,7 +87,11 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const [stored, unitCosts] = await Promise.all([loadStoredReading(month, view), loadUnitCostFindings().catch(() => null)]);
+  const [stored, unitCosts, outstanding] = await Promise.all([
+    loadStoredReading(month, view), loadUnitCostFindings().catch(() => null),
+    /* الشهرُ المقفل ثابت؛ والمفتوحُ يُقال ما بقي عليه — والتعذّرُ لا يُسقط الصفحة */
+    view.closed ? Promise.resolve(null) : loadOutstanding(month, view.pnl.profitMinor).catch(() => null),
+  ]);
   const p = view.pnl;
   const c = view.input.cogs;
   const canClose = can(user.role, "month:close");
@@ -202,6 +207,50 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           </ul>
         </Card>
       </div>
+
+      {outstanding && (
+        <Section
+          title="الربح بعد كل ما عليك لهذا الشهر"
+          icon={Wallet}
+          hint="الربح أعلاه يحسب الرواتب والفواتير الدورية حين تخرج من البنك. هنا يُطرح منه ما بقي عليك للشهر ولم يُدفع بعد، فترى ما يبقى لك فعلاً."
+        >
+          <Card padded={false}>
+            <ul className="divide-y divide-line-soft">
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 px-4 py-2.5">
+                <span className="text-[13px]">{p.profitLabel}</span>
+                <MaybeMoney minor={p.profitMinor} />
+              </li>
+              {outstanding.lines.map((l) => (
+                <li key={l.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5">
+                  <span className="min-w-0 flex-1 basis-48 ps-4 text-[12px] text-ink-soft">
+                    {l.id === "payroll" ? <Link href={`/payroll?month=${month}`} className="hover:underline">{l.label}</Link> : <bdi dir="auto">{l.label}</bdi>}
+                    {l.estimate && <span className="ms-2 inline-block"><Badge tone="warn">تقدير</Badge></span>}
+                    {l.note && <span className="block text-[11px] text-muted">{l.note}</span>}
+                  </span>
+                  <span className="text-sm"><Money minor={-l.amountMinor} /></span>
+                </li>
+              ))}
+              {outstanding.lines.length === 0 && (
+                <li className="px-4 py-2.5 text-[12px] text-muted">لا رواتب باقية لهذا الشهر، ولا خصماً شهرياً معتاداً لم يأتِ بعد.</li>
+              )}
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 bg-sunken/60 px-4 py-2.5">
+                <span className="text-[13px] font-bold">الربح بعد كل ما عليك</span>
+                <span className="text-sm font-bold">{outstanding.profitAfterMinor === null ? <Unknown why="الربح نفسه غير معروف بعد" /> : <Money minor={outstanding.profitAfterMinor} signed />}</span>
+              </li>
+            </ul>
+          </Card>
+          <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted">
+            {outstanding.unpaidInvoices.count > 0 && (
+              <li>
+                <T s="فواتير الشهر غير المسدّدة ({0}، {1}) محسوبة في المشتريات من يوم قيدها، فلا تُطرح مرة ثانية." a={[countNoun(outstanding.unpaidInvoices.count, INVOICE), <Money key="1" minor={outstanding.unpaidInvoices.openMinor} />]} />{" "}
+                <Link href="/payments" className="no-print font-bold text-accent hover:underline">ادفعها ←</Link>
+              </li>
+            )}
+            {outstanding.unknownPeople > 0 && <li className="text-warn">{countNoun(outstanding.unknownPeople, EMPLOYEE)} بلا راتب مكتوب لهذا الشهر، فلم يُطرح راتبه.</li>}
+            <li>إن دفعت لموظف من تحويلاتك لحسابك فوزّعها عليه في الرواتب، وإلا طُرحت هنا مرة ثانية.</li>
+          </ul>
+        </Section>
+      )}
 
       <Section title="تكلفة المبيعات بثلاث طرق" icon={Scale} hint="تُحسب الطرق الثلاث وتُعرض معاً، والفرق بينها يساعدك على كشف هدر أو تسريب أو فاتورة ناقصة.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
