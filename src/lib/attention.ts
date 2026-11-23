@@ -1561,7 +1561,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "MEDIUM",
       title: unconsumed.length === 1
         ? `«${unconsumed[0].name}» يُشترى ولا يصرفه فودكس حين يُباع`
-        : `${unconsumed.length} أصناف تُشترى ولا يصرفها فودكس حين تُباع`,
+        : `${countNoun(unconsumed.length, PRODUCT)} تُشترى ولا يصرفها فودكس حين تُباع`,
       detail: `اشترى المقهى منها ${formatRiyalsDisplay(total)} ريال في ستين يوماً، ولم يصرف فودكس منها شيئاً في 45 يوماً. المنتج أو الإضافة التي تبيعها في فودكس ليس فيها هذا الصنف مكوّناً، فلا ينقص مخزونه ولا تظهر كلفته.`,
       action: "في فودكس: القائمة ← المنتجات (أو خيارات الإضافات)، افتح ما يبيع هذا الصنف وأضفه في «المكونات» بكميته. وما لا يُباع أصلاً أسكته بسببه.",
       actionLabel: "افتح المشترى والمباع",
@@ -1570,7 +1570,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: unconsumed.slice(0, 12).map((u) => ({
         label: u.name,
-        sub: `اشتُري بـ${formatRiyalsDisplay(u.boughtMinor)} ريال في ${u.invoices} فاتورة · لم يُصرف في فودكس`,
+        sub: `اشتُري بـ${formatRiyalsDisplay(u.boughtMinor)} ريال في ${countNounGen(u.invoices, INVOICE)} · لم يُصرف في فودكس`,
         href: "/finance/stock",
         signalKey: u.key,
       })),
