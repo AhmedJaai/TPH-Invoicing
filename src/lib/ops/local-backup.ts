@@ -122,11 +122,16 @@ export interface BackupHeartbeat {
   lastCoreSuccess: string | null;
   lastFullSuccess: string | null;
   failed: { part: string; detail: string }[];
+  /** النسخةُ الثانية خارج الحاسوب (`BACKUP_COPY_ROOT`): آخرُ نجاحٍ لها، و`configured` أهي مضبوطةٌ أصلاً. */
+  offDisk: { configured: boolean; lastSuccess: string | null };
 }
 
 export const BACKUP_HEARTBEAT_ROW = "backup:local";
 
-export function buildHeartbeat(now: Date, day: string, results: Readonly<Record<string, PartResult>>, last: LastRun): BackupHeartbeat {
+export function buildHeartbeat(
+  now: Date, day: string, results: Readonly<Record<string, PartResult>>, last: LastRun,
+  offDisk: { configured: boolean; lastSuccess: string | null } = { configured: false, lastSuccess: null },
+): BackupHeartbeat {
   const coreOk = coreComplete(results);
   const driveOk = results["الدرايف"]?.ok === true;
   return {
@@ -137,6 +142,7 @@ export function buildHeartbeat(now: Date, day: string, results: Readonly<Record<
     lastCoreSuccess: coreOk ? now.toISOString() : last.lastCoreSuccess ?? null,
     lastFullSuccess: coreOk && driveOk ? now.toISOString() : last.lastSuccess ?? null,
     failed: Object.entries(results).filter(([, r]) => !r.ok).map(([part, r]) => ({ part, detail: r.detail.slice(0, 200) })),
+    offDisk,
   };
 }
 
@@ -151,6 +157,10 @@ export function parseHeartbeat(raw: string | null | undefined): BackupHeartbeat 
       lastCoreSuccess: typeof v.lastCoreSuccess === "string" ? v.lastCoreSuccess : null,
       lastFullSuccess: typeof v.lastFullSuccess === "string" ? v.lastFullSuccess : null,
       failed: Array.isArray(v.failed) ? v.failed.filter((f): f is { part: string; detail: string } => typeof f?.part === "string" && typeof f?.detail === "string") : [],
+      /* صفٌّ أقدمُ من النسخة الثانية: «غير مضبوطة» — لا يُدّعى أنّها تعمل */
+      offDisk: v.offDisk && typeof v.offDisk === "object" && typeof v.offDisk.configured === "boolean"
+        ? { configured: v.offDisk.configured, lastSuccess: typeof v.offDisk.lastSuccess === "string" ? v.offDisk.lastSuccess : null }
+        : { configured: false, lastSuccess: null },
     };
   } catch {
     return null;

@@ -30,6 +30,7 @@ export const SIGNAL_PREFIXES = [
   "statement-gap",
   "statement-missing",
   "statement-paid",
+  "statement-credit",
   "vat-risk",
   "payroll-tx",
 ] as const;
@@ -56,6 +57,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "statement-gap": "فرق بين كشف المورّد وسجلاتنا",
   "statement-missing": "فاتورة في كشف المورّد ليست عندنا",
   "statement-paid": "سداد لم يقيّده المورّد في كشفه",
+  "statement-credit": "إشعار دائن أو سداد في كشف المورّد لم نسجّله",
   "vat-risk": "ضريبة فاتورة لا تُخصم",
   "payroll-tx": "حوالة راتب ليست لموظف",
 };
@@ -75,6 +77,11 @@ export function statementMissingKey(slug: string, ref: string | null, day: strin
 }
 
 /** سدادٌ لم يقيّده المورّد — بالدفعة وكشفِه: كشفٌ أحدث يعيد السؤال إن بقيت غائبة عنه. */
+/** سطرُ دائنٍ في كشف المورّد لا نعرفه — بكشفه ويومه ومبلغه. */
+export function statementCreditKey(statementId: string, day: string, amountMinor: number): string {
+  return `statement-credit:${statementId.slice(0, 60)}:${day}:${amountMinor}`;
+}
+
 export function statementPaidKey(paymentId: string, statementId: string): string {
   return `statement-paid:${paymentId.slice(0, 60)}:${statementId.slice(0, 60)}`;
 }

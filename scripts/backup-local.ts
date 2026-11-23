@@ -134,7 +134,13 @@ function backupSecrets(): string {
   const out = path.join(DAY_DIR, "secrets");
   mkdirSync(out, { recursive: true });
   chmodSync(out, 0o700);
-  const names = readdirSync(REPO).filter((n) => n.startsWith(".env") && n !== ".env.example");
+  /*
+    ملفّاتٌ عاديّة وحدها: مجلّدٌ اسمُه يبدأ بـ`.env` (أنشأته جلسةُ تدقيق: `.env-audit/`) أسقط جزءَ الأسرار
+    كلَّه بـENOTSUP فصار اليومُ «ناقصاً» — والأسرارُ ملفّاتٌ لا مجلّدات.
+  */
+  const names = readdirSync(REPO, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.startsWith(".env") && e.name !== ".env.example")
+    .map((e) => e.name);
   for (const n of names) {
     copyFileSync(path.join(REPO, n), path.join(out, n));
     chmodSync(path.join(out, n), 0o600);
@@ -287,6 +293,7 @@ async function main() {
     ["الدرايف", backupDrive],
   ];
   // تُستدعى كلَّ ساعة: ما اكتمل اليومَ لا يُعاد (إلّا بـ--force)، وما تعذّر وحده يُعاد.
+  let copiedAt: string | null = null;
   const pending = pendingParts(last, DAY, steps.map(([n]) => n), process.argv.includes("--force"));
   if (pending.length === 0) return;
   if (!(await networkUp())) {
@@ -339,7 +346,7 @@ async function main() {
     }
     emptyOldTrash();
     /* تُنسخ حين أُخذت نسخةُ القاعدة في هذا التشغيل — لا كلَّ ساعةٍ يُعاد فيها الدرايفُ وحده */
-    if (pending.some((n) => (CORE_PARTS as readonly string[]).includes(n))) copyOffDisk();
+    if (pending.some((n) => (CORE_PARTS as readonly string[]).includes(n)) && copyOffDisk()) copiedAt = new Date().toISOString();
   }
 
   const now = new Date();
@@ -347,12 +354,14 @@ async function main() {
   const coreLast = coreOk ? now.toISOString() : last.lastCoreSuccess ?? null;
   const alert = (!coreOk && shouldNotify({ ...last, lastSuccess: coreLast }, DAY, now))
     || (coreOk && !ok && shouldNotify({ ...last, lastSuccess: last.lastSuccess ?? null }, DAY, now));
-  const heartbeat = buildHeartbeat(now, DAY, results, last);
+  const lastCopy = copiedAt ?? (typeof (last as { lastCopySuccess?: unknown }).lastCopySuccess === "string" ? (last as { lastCopySuccess: string }).lastCopySuccess : null);
+  const heartbeat = buildHeartbeat(now, DAY, results, last, { configured: Boolean(process.env.BACKUP_COPY_ROOT), lastSuccess: lastCopy });
   writeFileSync(LAST_RUN, JSON.stringify({
     lastAttempt: now.toISOString(),
     lastSuccess: ok ? now.toISOString() : last.lastSuccess ?? null,
     successDay: ok ? DAY : last.successDay ?? null,
     lastCoreSuccess: coreLast,
+    lastCopySuccess: lastCopy,
     notifiedDay: alert ? DAY : last.notifiedDay ?? null,
     day: DAY, ok, results,
   }, null, 2));
@@ -371,9 +380,9 @@ async function main() {
  * النسخةُ الثانية: يومُ اليوم يُنسخ إلى `BACKUP_COPY_ROOT` (بلا الأسرار إلّا بطلب)، ويُكنس هناك بقاعدة
  * الحفظ نفسها. وتعذّرُها يُقال سطراً ولا يجعل النسخةَ الأولى ناقصة.
  */
-function copyOffDisk(): void {
+function copyOffDisk(): boolean {
   const root = process.env.BACKUP_COPY_ROOT;
-  if (!root) return;
+  if (!root) return false;
   try {
     const dest = path.join(root, "days", DAY);
     rmSync(dest, { recursive: true, force: true });
@@ -384,8 +393,10 @@ function copyOffDisk(): void {
     const kept = readdirSync(path.join(root, "days")).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
     for (const d of daysToPrune(kept)) rmSync(path.join(root, "days", d), { recursive: true, force: true });
     log(`✓ النسخة الثانية: ${dest}`);
+    return true;
   } catch (e) {
     log(`✕ النسخة الثانية في ${root}: ${(e as Error).message}`);
+    return false;
   }
 }
 

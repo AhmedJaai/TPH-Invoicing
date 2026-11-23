@@ -183,6 +183,8 @@ export interface AttentionFacts {
   statementMissing?: { supplierName: string; slug: string; ref: string | null; day: string; amountMinor: number; unclear: boolean; key?: string }[];
   /** سدادٌ قيّدناه في مدّة آخر كشفٍ للمورّد ولم يرد فيه (`lib/statement-payments.ts`). الغائبُ: لم يُسأل. */
   statementPaidMissing?: { supplierName: string; slug: string; paymentId: string; day: string; amountMinor: number; method: string; periodTo: string; key?: string }[];
+  /** سطرٌ دائنٌ في كشف المورّد لا نعرفه — إشعارٌ دائن أو سدادٌ لم نسجّله. */
+  statementCreditUnrecorded?: { supplierName: string; slug: string; day: string; ref: string | null; amountMinor: number; creditNote: boolean; key?: string }[];
 
   /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
   misplacedFiles?: { label: string; sub: string; href: string }[];
@@ -1517,6 +1519,41 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     سدادٌ خرج للمورّد في مدّة كشفه ولم يقيّده فيه: رصيدُه الذي يطالب به فيه مالٌ وصله، ومن
     يسدّد الكشفَ كما هو يدفعه مرّتين. كان الكشفُ يُقابَل بفواتيرنا وحدها، والدائنُ رصيداً واحداً.
   */
+  /*
+    دائنٌ في كشف المورّد لا نعرفه: إشعارٌ دائن مالٌ لك عنده لم يُخصم ممّا تدين به، وسدادٌ لم نسجّله
+    يجعل ما تدين به في سجلاتنا أكبر. وُجد في «أفال» يدوياً (٢٣ نوفمبر ٢٠٢٦) فصار بنداً.
+  */
+  const theirCredits = f.statementCreditUnrecorded ?? [];
+  if (theirCredits.length > 0) {
+    const total = theirCredits.reduce((s, c) => s + c.amountMinor, 0);
+    const one = theirCredits[0];
+    const notes = theirCredits.filter((c) => c.creditNote).length;
+    out.push({
+      id: "statement-credit-unrecorded",
+      area: "SUPPLIERS",
+      severity: "HIGH",
+      title: theirCredits.length === 1
+        ? `${one.creditNote ? "إشعار دائن" : "سداد"} بـ${formatRiyalsDisplay(one.amountMinor)} في كشف ${one.supplierName} لم نسجّله`
+        : `${theirCredits.length} أسطر دائنة في كشوف المورّدين لم نسجّلها`,
+      detail: notes > 0
+        ? "المورّد كتب في كشفه إشعاراً دائناً (مرتجعاً أو إلغاء فاتورة) لا يوجد في سجلاتنا، فما تدين له به عندنا أكبر من الحقيقة، وقد تكون دفعت فاتورة ألغاها."
+        : "في كشف المورّد سداد لا يقابله شيء في سجلاتنا، فما تدين له به عندنا أكبر مما يطالبك به.",
+      action: "افتح صفحة المورّد: الإشعار الدائن يُسجَّل على فاتورته من «سجّل إشعاراً دائناً»، والسداد يُسجَّل دفعةً. وإن كان خطأً من المورّد فأسكته.",
+      actionLabel: "افتح صفحة المورّد",
+      href: `/suppliers/${encodeURIComponent(one.slug)}`,
+      count: theirCredits.length,
+      amountMinor: total,
+      impact: { kind: "RECOVERABLE", amountMinor: total },
+      evidence: theirCredits.slice(0, 10).map((c) => ({
+        label: c.supplierName,
+        sub: `${c.creditNote ? "إشعار دائن" : "سداد"} · ${formatDay(c.day)}${c.ref ? ` · ${c.ref}` : ""}`,
+        amountMinor: c.amountMinor,
+        href: `/suppliers/${encodeURIComponent(c.slug)}`,
+        signalKey: c.key,
+      })),
+    });
+  }
+
   const paidMissing = f.statementPaidMissing ?? [];
   if (paidMissing.length > 0) {
     const total = paidMissing.reduce((s, p) => s + p.amountMinor, 0);

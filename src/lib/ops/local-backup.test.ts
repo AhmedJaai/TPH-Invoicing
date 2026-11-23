@@ -100,7 +100,7 @@ describe("التشغيل كلَّ ساعة", () => {
 
   it("الحكم: القاعدةُ بعد يومين متأخّرة، والمرآةُ بعد أربعة، وبلا حالٍ «غير معروف»", () => {
     const now = new Date("2026-11-22T14:00:00Z");
-    const hb = (core: string | null, full: string | null) => ({ at: now.toISOString(), day: "2026-11-22", coreOk: true, driveOk: true, lastCoreSuccess: core, lastFullSuccess: full, failed: [] });
+    const hb = (core: string | null, full: string | null) => ({ at: now.toISOString(), day: "2026-11-22", coreOk: true, driveOk: true, lastCoreSuccess: core, lastFullSuccess: full, failed: [], offDisk: { configured: false, lastSuccess: null } });
     expect(backupVerdict(null, now).state).toBe("UNKNOWN");
     expect(backupVerdict(hb("2026-11-22T10:00:00Z", "2026-11-22T10:00:00Z"), now).state).toBe("OK");
     expect(backupVerdict(hb("2026-11-22T10:00:00Z", "2026-10-30T21:00:00Z"), now).state).toBe("MIRROR_STALE");
@@ -160,3 +160,13 @@ describe("النسخة الثانية خارج القرص", () => {
   });
 });
 
+
+describe("النسخةُ الثانية خارج الحاسوب في نبض النسخة", () => {
+  it("تُكتب وتُقرأ، والصفُّ الأقدم بلا حقلها «غير مضبوطة»", () => {
+    const hb = buildHeartbeat(new Date("2026-11-23T01:00:00Z"), "2026-11-23", { "القاعدة": { ok: true, detail: "" }, "الشيفرة": { ok: true, detail: "" }, "الأسرار": { ok: true, detail: "" } }, {}, { configured: true, lastSuccess: "2026-11-23T01:00:00Z" });
+    expect(parseHeartbeat(JSON.stringify(hb))?.offDisk).toEqual({ configured: true, lastSuccess: "2026-11-23T01:00:00Z" });
+    const old = { ...hb } as Record<string, unknown>;
+    delete old.offDisk;
+    expect(parseHeartbeat(JSON.stringify(old))?.offDisk).toEqual({ configured: false, lastSuccess: null });
+  });
+});

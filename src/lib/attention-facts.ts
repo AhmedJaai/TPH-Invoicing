@@ -26,7 +26,7 @@ import { loadSettlementComparisons } from "@/services/statement-payments.service
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
-import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
+import { priceRiseKey, silencedKeys, statementGapKey, statementMissingKey, statementCreditKey, statementPaidKey, vatRiskKey } from "./signal-decisions";
 import { annualImpactMinor, isRealMove, trackPrices } from "./price-watch";
 import { addDays } from "./riyadh-time";
 
@@ -464,6 +464,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
      limit 20
   `)).rows;
 
+  /* كشوفُ المورّدين مقابلَ سداداتنا — تُقرأ مرّةً لبندين (ما لم يقيّده هو، وما لم نقيّده نحن) */
+  const settlements = await loadSettlementComparisons();
   return {
     unrecordedInvoices: unrecordedRows.map((r) => {
       const minor = r.total_text ? parseRiyals(r.total_text) : null;
@@ -544,7 +546,18 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
        where i.period_month < (select max(mc.month) from month_closes mc where mc.status = 'CLOSED')
          and not exists (select 1 from month_closes mc where mc.month = i.period_month and mc.status = 'CLOSED')
        order by 1`)).rows.map((r) => r.m),
-    statementPaidMissing: (await loadSettlementComparisons())
+    /*
+      ما قيّده المورّدُ في كشفه دائناً ولا نعرفه — إشعارٌ دائن (مالٌ لك عنده) أو سدادٌ لم نسجّله. وُجد
+      في «أفال»: إشعارُ ١٬٩٩٨٫٧٠ «Reversal of INV/2026/00080» يظهر في صفحة المورّد وحدها.
+    */
+    statementCreditUnrecorded: settlements
+      .flatMap((r) => r.comparison.theirsOnly.map((t) => ({
+        supplierName: r.supplierName, slug: r.slug, day: t.line.day, ref: t.line.ref, amountMinor: t.line.amountMinor,
+        creditNote: t.kind === "CREDIT_NOTE", key: statementCreditKey(r.statementId, t.line.day, t.line.amountMinor),
+      })))
+      .filter((c) => !silenced.has(c.key))
+      .sort((a, b) => b.amountMinor - a.amountMinor),
+    statementPaidMissing: settlements
       .flatMap((r) => r.comparison.oursOnly.filter((p) => !p.isCreditNote).map((p) => ({
         supplierName: r.supplierName, slug: r.slug, paymentId: p.paymentId, day: p.day,
         amountMinor: p.amountMinor, method: p.method, periodTo: r.periodTo,
