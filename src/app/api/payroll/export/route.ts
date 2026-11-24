@@ -3,6 +3,7 @@
  */
 import { NextResponse } from "next/server";
 import { formatRiyals } from "@/lib/money";
+import { csvSafeCell } from "@/lib/payment-run";
 import { currentMonthRiyadh } from "@/lib/riyadh-time";
 import { failWith, guard } from "@/services/guard";
 import { loadPayrollMonth } from "@/services/payroll.service";
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
     const sheet = await loadPayrollMonth(month);
     const head = ["الموظف", "النوع", "الآيبان", "رقم المستفيد", "الراتب", "الإضافات", "الخصومات", "دقائق التأخير", "أيام الغياب", "إجازة بلا أجر (أيام)", "جزاءات اللائحة", "إنذارات", "السلف نقداً", "المستحق", "حُوّل", "الباقي للتحويل"];
     const lines = sheet.rows.map((r) => [
-      r.employee.name, r.employee.kind === "PART_TIME" ? "جزئي" : "شهري", r.employee.iban, r.employee.bankBeneficiaryId,
+      /* ما كتبه إنسانٌ نصّاً يبدأ بـ= أو + يُنفَّذ صيغةً في جداول البيانات — يُقرأ نصّاً. والمبالغُ لا تُمسّ: السالبُ رقمٌ */
+      csvSafeCell(r.employee.name), r.employee.kind === "PART_TIME" ? "جزئي" : "شهري", r.employee.iban && csvSafeCell(r.employee.iban), r.employee.bankBeneficiaryId && csvSafeCell(r.employee.bankBeneficiaryId),
       money(r.slip.baseMinor), money(r.slip.additionsMinor), money(r.slip.deductionsMinor), r.slip.lateMinutes + r.slip.earlyMinutes,
       r.slip.absentDays, r.slip.unpaidLeaveDays, money(r.slip.penaltiesMinor), r.slip.warnings, money(r.slip.advancesMinor), money(r.slip.dueMinor), money(r.slip.paidMinor), money(r.slip.remainingMinor),
     ].map(cell).join(","));

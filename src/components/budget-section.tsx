@@ -22,7 +22,8 @@ const STATE: Record<BudgetState, { label: string; tone: Tone }> = {
 export async function BudgetSection({ month, canEdit }: { month: string; canEdit: boolean }) {
   const v = await loadBudgetView(month);
   const editor = canEdit ? (
-    <details className="mt-4 group" open={v.lines.length === 0}>
+    /* مطويٌّ دائماً: ثمانيةُ حقولٍ فارغة في كلّ زيارةٍ لصفحة الربح ضجيجٌ لمن لم يقرّر ميزانية */
+    <details className="mt-4 group">
       <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-bold text-accent sm:min-h-6">
         {v.lines.length === 0 ? "اكتب ميزانية الشهر" : "عدّل الميزانية"}
       </summary>
