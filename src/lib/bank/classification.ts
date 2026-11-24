@@ -25,7 +25,7 @@ import { countNoun, countNounGen, TIME } from "@/lib/arabic";
 export type Layer = "STRUCTURE" | "LEARNED" | "KEYWORD" | "AMOUNT" | "NONE";
 
 /** نسخة منطق التصنيف — تُرفَع مع كل تغيير في الطبقات أو الكلمات. */
-export const CLASSIFICATION_VERSION = "2026-09-06.1";
+export const CLASSIFICATION_VERSION = "2026-11-25.1";
 
 export interface Classification {
   kind: TxKind;
@@ -203,6 +203,20 @@ export function classify(
   const key = identities[0]?.key ?? null;
 
   /* ── ٣. الكلمات ── */
+  /*
+    «شراء بضاعة» في حوالةٍ **واردة** معناه أنّ المرسِل اشترى منّا — ثمنُ بيعٍ لا سدادُ مورّد
+    (أحمد: حوالةُ ٤ يوليو ١٬١٠٠ من شخصٍ اشترى بضاعة كانت تُقرأ سداداً لمورّد).
+  */
+  if (GOODS_RE.test(tx.searchText) && tx.direction === "CREDIT") {
+    return {
+      kind: "OTHER_SALES",
+      layer: "KEYWORD",
+      source: "KEYWORD",
+      ruleId: null,
+      reason: "حوالة واردة وصفها «شراء بضاعة»: المرسل اشترى منك",
+      merchantKey: key,
+    };
+  }
   if (GOODS_RE.test(tx.searchText)) {
     return {
       kind: "SUPPLIER_PAYMENT",

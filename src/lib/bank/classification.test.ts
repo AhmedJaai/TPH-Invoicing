@@ -65,6 +65,11 @@ describe("الطبقة الثالثة — الكلمات بشروطها", () => 
     expect(c.reason).toContain("شراء بضاعة");
   });
 
+  it("«شراء بضاعة» في حوالةٍ واردة ثمنُ بيعٍ لا سدادُ مورّد", () => {
+    const c = classify(row({ direction: "CREDIT", transactionType: "تحويل داخلي وارد", description: "عميل تجريبي CHNL:SNB Payment Systems شراء بضاعة 99990000111122" }));
+    expect(c.kind).toBe("OTHER_SALES");
+  });
+
   it("زاتكا حكوميّة لا صدقة", () => {
     expect(classify(row({ description: "ZATCA سداد ضريبة" })).kind).toBe("GOVERNMENT");
   });
