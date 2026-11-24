@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, sql } from "drizzle-orm";
 import { CalendarCheck, Lock } from "lucide-react";
@@ -82,7 +83,8 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
       intro="أكّد أن الشهر اكتمل: وصلت كل فواتيره، وعولجت كل المشكلات أو قبلتها عن علم. بعدها تحصل على حزمة واحدة جاهزة للمحاسب."
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <MonthClose months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
+        {/* المفتاحُ الشهر: رابطُ «أشهر مقفلة» يعيد بناءه بشهره لا بحاله القديمة */}
+        <MonthClose key={selected} months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
 
         <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
           <Section title="أشهر مقفلة" icon={Lock} className="mt-0!">
@@ -93,12 +95,16 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
             ) : (
               <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
                 {closed.map((c) => (
-                  <li key={c.month} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                    <span className="flex items-center gap-2 font-bold">
-                      <Lock className="h-3.5 w-3.5 text-ok" strokeWidth={2} aria-hidden />
-                      {formatMonth(c.month)}
-                    </span>
-                    <span className="text-[11px] text-muted">{formatDay(c.closedAt)}</span>
+                  <li key={c.month}>
+                    {/* الشهرُ المقفل يُفتح بحزمته وإعادة فتحه — لا نصٌّ يُقرأ ثمّ يُبحث عنه في القائمة */}
+                    <Link href={`/close?month=${c.month}`} aria-current={c.month === selected ? "page" : undefined}
+                      className={`flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-sunken/60 ${c.month === selected ? "bg-accent-soft/50" : ""}`}>
+                      <span className="flex items-center gap-2 font-bold">
+                        <Lock className="h-3.5 w-3.5 text-ok" strokeWidth={2} aria-hidden />
+                        {formatMonth(c.month)}
+                      </span>
+                      <span className="text-[11px] text-muted">{formatDay(c.closedAt)}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>

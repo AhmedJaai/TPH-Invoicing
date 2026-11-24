@@ -1,10 +1,11 @@
 "use client";
 
+import { DownloadButton } from "./download-button";
 import Link from "next/link";
-import { useCallback, useState, Fragment } from "react";
+import { useCallback, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, ChevronDown, CircleAlert, CircleCheck, Download, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
+  ArrowLeft, ChevronDown, CircleAlert, CircleCheck, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
   TriangleAlert, Unlock, Wallet, type LucideIcon,
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
@@ -72,6 +73,11 @@ export function MonthClose({
   const [closing, setClosing] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  /*
+    الشهرُ المعروض الآن — ردُّ فحصٍ لشهرٍ تُرك يُهمَل. كان تبديلُ الشهر والفحصُ السابق لم يعُد يكتب
+    تقريرَ شهرٍ تحت اسم آخر، وفي الشاشة التي يُقفل منها الشهر.
+  */
+  const shown = useRef(initialMonth);
 
   const call = useCallback(
     async (action: "check" | "close" | "reopen" | "balances", forMonth: string, extra?: Record<string, string>) => {
@@ -81,6 +87,7 @@ export function MonthClose({
         const r = await postJson<Response>("/api/month-close", {
           month: forMonth, action, note: note.trim() || undefined, ...extra,
         });
+        if (forMonth !== shown.current) return false;
         if (!r.ok) {
           setError(r.error);
           if (r.data.report && r.data.status) setData(r.data as Response);
@@ -118,9 +125,16 @@ export function MonthClose({
         <label className="flex items-center gap-2 text-xs text-muted">
           <T s="الشهر{0}" a={[<select key="0"
             value={month}
+            disabled={busy === "closing" || busy === "reopening" || busy === "balancing"}
             onChange={(e) => {
-              setMonth(e.target.value);
-              void call("check", e.target.value);
+              const m = e.target.value;
+              shown.current = m;
+              setMonth(m);
+              /* تقريرُ الشهر السابق لا يبقى تحت اسم الجديد حتى يصل فحصُه */
+              setData(null);
+              /* الشهرُ في العنوان: التحديثُ والمشاركةُ يعودان إليه */
+              window.history.replaceState(null, "", `?month=${m}`);
+              void call("check", m);
             }}
             className="min-h-11 rounded-lg border border-line-input bg-raised px-3 text-sm font-bold text-ink sm:min-h-9"
           >
@@ -363,8 +377,7 @@ export function MonthClose({
                   <T s="ملف Excel من ست أوراق (الملخص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو نسخة للطباعة أو الحفظ بصيغة PDF بالأرقام نفسها.{0}" a={[isClosed ? " الشهر مقفل، فأرقامه ثابتة." : " الشهر مفتوح، وقد تتغيّر أرقامه بعد التنزيل، وهذا مذكور في الملف."]} /></p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a href={`/api/export/accountant?month=${month}`} download className={buttonClass(isClosed ? "primary" : "secondary")}>
-                  <T s="{0}نزّل Excel" a={[<Download key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
+                <DownloadButton href={`/api/export/accountant?month=${month}`} fallbackName={`accountant-${month}.xlsx`} variant={isClosed ? "primary" : "secondary"}>نزّل Excel</DownloadButton>
                 <Link href={`/close/pack?month=${month}`} className={buttonClass("secondary")}>
                   <T s="{0}اعرضها للطباعة" a={[<Printer key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></Link>
               </div>

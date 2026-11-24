@@ -36,7 +36,7 @@ export const dynamic = "force-dynamic";
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; supplier?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/payments");
@@ -48,7 +48,9 @@ export default async function PaymentsPage({
     );
   }
 
-  const { month: raw } = await searchParams;
+  const { month: raw, supplier: onlyRaw } = await searchParams;
+  /* «جهّز سداده» من ملفّ المورّد: الدفعةُ تُفتح وهو وحده مختار — لا الكلُّ يُلغى ثمّ يُبحث عنه */
+  const only = onlyRaw && /^[A-Za-z0-9_-]{1,64}$/.test(onlyRaw) ? onlyRaw : null;
   const current = currentMonthRiyadh();
   const defaultMonth = previousMonth(current);
   const chosen = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : null;
@@ -66,6 +68,11 @@ export default async function PaymentsPage({
   if (chosen === null && isEmptyRun(run)) {
     const next = await loadPaymentRun(current, { creditBySupplier: creditBy });
     if (!isEmptyRun(next)) { month = current; run = next; }
+  }
+  /* والمورّدُ المطلوب ليس في الشهر الماضي — فواتيرُه من الجاري: يُفتح الجاري */
+  if (chosen === null && only && month !== current && !run.ready.some((r) => r.supplierId === only)) {
+    const next = await loadPaymentRun(current, { creditBySupplier: creditBy });
+    if (next.ready.some((r) => r.supplierId === only)) { month = current; run = next; }
   }
   /* المحجوزون كذلك: رقمُ واتساب كلٍّ منهم من ملفّه، لا شاشةُ اختيار جهة */
   const supplierIds = [...new Set([...run.ready.map((r) => r.supplierId), ...run.held.map((h) => h.invoice.supplierId)])];
@@ -198,7 +205,7 @@ export default async function PaymentsPage({
         <>
           {run.ready.length > 0 && (
             <div className="mt-10">
-              <PayRunPlanner month={month} suppliers={planner} />
+              <PayRunPlanner month={month} suppliers={planner} only={only} />
             </div>
           )}
 

@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, CircleDashed, FileSearch, MessageSquarePlus, RotateCcw, Send, Sparkles, Target, Trash2, X } from "lucide-react";
+import { CheckCircle2, CircleDashed, FileSearch, MessageSquarePlus, RotateCcw, Send, Sparkles, Target, X } from "lucide-react";
 import { countNoun, DAY } from "@/lib/arabic";
 import { postJson, request } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { ReadySubmit, toast } from "./ui-client";
+import { ConfirmAction, ReadySubmit, toast } from "./ui-client";
 import { AdvisorText } from "./advisor-text";
 
 export interface ChatMessage {
@@ -116,13 +116,13 @@ export function AdvisorWorkspace({
     router.refresh();
   }
 
-  async function removeThread(id: string) {
-    if (!window.confirm("تُحذف هذه المحادثة برسائلها، وتبقى بنود الخطة التي كُتبت منها. أتحذفها؟")) return;
+  async function removeThread(id: string): Promise<boolean> {
     const r = await postJson("/api/advisor/manage", { kind: "delete-thread", id });
-    if (!r.ok) { toast({ tone: "danger", title: "تعذّر الحذف", body: r.error }); return; }
+    if (!r.ok) { toast({ tone: "danger", title: "تعذّر الحذف", body: r.error }); return false; }
     toast({ tone: "ok", title: "حُذفت المحادثة" });
     if (id === threadId) router.replace("/finance/advisor");
     else router.refresh();
+    return true;
   }
 
   const open = plan.filter((p) => p.status === "OPEN");
@@ -294,9 +294,16 @@ export function AdvisorWorkspace({
                     <span className="truncate">{t.title}</span>
                     <span className="text-[10px] font-normal text-muted">{t.updatedLabel}</span>
                   </Link>
-                  <button type="button" aria-label={`احذف المحادثة «${t.title}»`} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-hover hover:text-danger" onClick={() => void removeThread(t.id)}>
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
+                  {/* لوحُ التأكيد نفسُه الذي في كلّ التطبيق — لا نافذةُ المتصفّح بلغتها واتّجاهها */}
+                  <ConfirmAction
+                    label="احذف"
+                    variant="quiet"
+                    title={`حذف المحادثة «${t.title}»`}
+                    consequence="تُحذف هذه المحادثة برسائلها، وتبقى بنود الخطة التي كُتبت منها."
+                    acknowledgement="أفهم أن رسائل المحادثة لن تعود."
+                    confirmLabel="احذفها"
+                    onConfirm={() => removeThread(t.id)}
+                  />
                 </li>
               ))}
             </ul>

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { DownloadButton } from "@/components/download-button";
 import { deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { redirect } from "next/navigation";
-import { ArrowLeftRight, Download, Info, Link2, ReceiptText, UserPlus, Users } from "lucide-react";
+import { ArrowLeftRight, Info, Link2, ReceiptText, UserPlus, Users } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -9,12 +10,12 @@ import { Money } from "@/components/money";
 import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
 import { PostAction } from "@/components/post-action";
 import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton, type OwedByMonth } from "@/components/payroll/forms";
-import { Badge, buttonClass, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
+import { Badge, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, countNounGen, DAY, EMPLOYEE, TRANSFER } from "@/lib/arabic";
 import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
-import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
 import { loadBankPayees, loadEmployees, loadPayrollMonth, loadPayrollMonths, loadOpenTransfers, transfersSince, type PayrollRow, type TransferView } from "@/services/payroll.service";
 
@@ -51,7 +52,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const canEdit = can(user.role, "payroll:edit");
   const q = await searchParams;
   const current = currentMonthRiyadh();
-  const month = q.month && MONTH_RE.test(q.month) ? q.month : current;
+  /*
+    بلا اختيار: في الأيّام العشرة الأولى يُحوَّل راتبُ الشهر الماضي (`suggestedPayMonth`) — فإن بقي فيه
+    شيءٌ فُتح هو. كانت تفتح في ٣ ديسمبر على ديسمبر كلِّه «باقياً» وحوالاتُ نوفمبر خلف لسانٍ آخر.
+  */
+  const chosen = q.month && MONTH_RE.test(q.month) ? q.month : null;
+  const payMonth = suggestedPayMonth(todayInRiyadh());
+  const month = chosen
+    ?? (payMonth !== current && payrollTotals((await loadPayrollMonth(payMonth)).rows.map((r) => r.slip)).remainingMinor > 0 ? payMonth : current);
 
   const [sheet, open, payees, staff, start] = await Promise.all([
     loadPayrollMonth(month),
@@ -150,7 +158,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       intro={`كم يستحق كل موظف عن ${formatMonth(month)} بعد الخصومات والسلف، وكم حوّلت له، وكم بقي. الراتب يُصرف يوم ${PAYDAY}، والخصومات عمّا وقع من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}
       actions={
         <>
-          <a href={`/api/payroll/export?month=${month}`} download className={buttonClass("quiet", "sm")}><Download className="h-3.5 w-3.5" aria-hidden />تنزيل المسيّر</a>
+          <DownloadButton href={`/api/payroll/export?month=${month}`} fallbackName={`payroll-${month}.csv`} variant="quiet" size="sm">تنزيل المسيّر</DownloadButton>
           <LinkButton href="/payroll/employees" variant="secondary" size="sm" icon={Users}>الموظفون</LinkButton>
         </>
       }

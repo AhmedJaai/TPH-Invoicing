@@ -451,7 +451,7 @@ export async function SupplierView({
               {ageing.oldestOwedDays !== null && (
                 /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
                 can(user.role, "payment:approve") ? (
-                  <Link href="/payments" className="rounded-full hover:opacity-80">
+                  <Link href={`/payments?supplier=${encodeURIComponent(s.id)}`} className="rounded-full hover:opacity-80">
                     <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
                       <T s="أقدم مبلغ مستحق منذ {0}، جهّز سداده" a={[countNoun(ageing.oldestOwedDays, DAY)]} /></Badge>
                   </Link>

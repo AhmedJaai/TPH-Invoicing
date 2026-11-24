@@ -3,7 +3,7 @@
 import { DateChips } from "./date-chips";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useSyncExternalStore, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, Fragment } from "react";
 import { Check, ChevronDown, CircleAlert, CircleCheck, Download, MessageCircle, RotateCcw, ShieldAlert, Wallet } from "lucide-react";
 import { Money } from "./money";
 import { CopyValue } from "./copy-value";
@@ -55,7 +55,7 @@ export interface PlannerSupplier {
 
 type RowState = "running" | "ok" | "failed";
 
-export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: PlannerSupplier[] }) {
+export function PayRunPlanner({ month, suppliers, only = null }: { month: string; suppliers: PlannerSupplier[]; only?: string | null }) {
   const router = useRouter();
   /* ما اختاره من قبل لهذا الشهر يعود بعد التحميل — ويُقال في سطرٍ ظاهر */
   const raw = useSyncExternalStore(subscribeSelection, () => rawSelection(month), () => "");
@@ -78,6 +78,14 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
   function change(next: PayRunSelection) {
     saveSelection(month, next);
   }
+
+  /* جاء من ملفّ مورّدٍ بعينه (`?supplier=`): يُختار وحده مرّةً عند الفتح، والباقون يُعادون بضغطة */
+  const appliedOnly = useRef(false);
+  useEffect(() => {
+    if (appliedOnly.current || !only || !suppliers.some((s) => s.supplierId === only)) return;
+    appliedOnly.current = true;
+    saveSelection(month, { ...parseSelection(rawSelection(month)), skipSuppliers: suppliers.filter((s) => s.supplierId !== only).map((s) => s.supplierId) });
+  }, [only, suppliers, month]);
 
   const plans = useMemo(
     () => new Map(suppliers.map((s) => [s.supplierId, planSupplier(s, selection)])),

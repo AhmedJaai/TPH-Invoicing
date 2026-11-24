@@ -243,7 +243,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             {outstanding.unpaidInvoices.count > 0 && (
               <li>
                 <T s="فواتير الشهر غير المسدّدة ({0}، {1}) محسوبة في المشتريات من يوم قيدها، فلا تُطرح مرة ثانية." a={[countNoun(outstanding.unpaidInvoices.count, INVOICE), <Money key="1" minor={outstanding.unpaidInvoices.openMinor} />]} />{" "}
-                <Link href="/payments" className="no-print font-bold text-accent hover:underline">ادفعها ←</Link>
+                {/* «الدفعات» للمالك وحده — والمحاسبُ يرى الحسابات لا «خارج صلاحيتك» */}
+                {can(user.role, "payment:approve")
+                  ? <Link href="/payments" className="no-print font-bold text-accent hover:underline">ادفعها ←</Link>
+                  : <Link href="/suppliers" className="no-print font-bold text-accent hover:underline">افتح الحسابات ←</Link>}
               </li>
             )}
             {outstanding.unknownPeople > 0 && <li className="text-warn">{countNoun(outstanding.unknownPeople, EMPLOYEE)} بلا راتب مكتوب لهذا الشهر، فلم يُطرح راتبه.</li>}

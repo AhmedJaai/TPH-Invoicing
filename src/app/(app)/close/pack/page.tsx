@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { DownloadButton } from "@/components/download-button";
 import { redirect } from "next/navigation";
-import { ArrowRight, Download, FileText } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { companyConfig } from "@/config/drive";
 import { mainClass } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { EmptyState, LinkTabs, NoAccess, buttonClass } from "@/components/ui";
+import { EmptyState, LinkTabs, NoAccess } from "@/components/ui";
 import { PrintButton } from "@/components/print-button";
 import { loadAccountantPack } from "@/services/accountant-pack.service";
 import {
@@ -85,8 +86,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
           <Link href="/close#export" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-ink-soft hover:text-accent sm:min-h-0">
             <T s="{0}إقفال الشهر" a={[<ArrowRight key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
           <div className="flex flex-wrap gap-2">
-            <a href={`/api/export/accountant?month=${month}`} download className={buttonClass("secondary")}>
-              <T s="{0}نزّل Excel" a={[<Download key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
+            <DownloadButton href={`/api/export/accountant?month=${month}`} fallbackName={`accountant-${month}.xlsx`}>نزّل Excel</DownloadButton>
             <PrintButton />
           </div>
         </div>

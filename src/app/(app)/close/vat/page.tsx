@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
+import { DownloadButton } from "@/components/download-button";
 import { Suspense, Fragment } from "react";
 import { sql } from "drizzle-orm";
-import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, CircleCheck, ClipboardList, Download, FileWarning, Landmark, Receipt, SearchCheck, TriangleAlert } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, CircleCheck, ClipboardList, FileWarning, Landmark, Receipt, SearchCheck, TriangleAlert } from "lucide-react";
 import { db } from "@/db";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
+import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { VatBulk, VatCashField, VatFilePanel, VatTxToggle, VatVoidFiling } from "@/components/vat-choice";
 import { SalesWitnessPanel, SalesWitnessSkeleton } from "@/components/sales-witness";
 import { loadFoodicsCashByMonth } from "@/services/sales-witness.service";
@@ -355,7 +356,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
               title="للنسخ إلى نموذج الهيئة"
               icon={ClipboardList}
               hint="يطلب نموذج الإقرار لكل خانة المبلغ قبل الضريبة والضريبة نفسها. الأرقام هنا بالريال كما حُسبت، وأرقام الخانات بترتيب نموذج الإقرار، فطابقها مع أسماء الخانات في بوابة الهيئة."
-              action={<LinkButton href={`/api/export/vat?period=${periodKey(period)}`} size="sm" icon={Download} prefetch={false}>نزّل سجل الإقرار (Excel)</LinkButton>}
+              action={<DownloadButton href={`/api/export/vat?period=${periodKey(period)}`} fallbackName={`vat-${periodKey(period)}.xlsx`} size="sm">نزّل سجل الإقرار (Excel)</DownloadButton>}
             >
               <DataTable columns={boxColumns} rows={formBoxes(r)} keyOf={(b) => b.key} />
             </Section>

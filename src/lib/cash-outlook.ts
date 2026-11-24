@@ -183,7 +183,8 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         label: s.supplierName,
         amountMinor: s.amountMinor,
         kind: "SUPPLIER" as const,
-        href: "/payments",
+        /* يفتح الدفعةَ والمورّدُ وحده مختار */
+        href: `/payments?supplier=${encodeURIComponent(s.supplierId)}`,
       }));
 
   const recurringLines = (month: string, filter: (day: number | null) => boolean): OutflowLine[] =>
@@ -405,7 +406,7 @@ export function dueThisWeek(
       label: s.supplierName,
       amountMinor: s.amountMinor,
       kind: "SUPPLIER" as const,
-      href: "/payments",
+      href: `/payments?supplier=${encodeURIComponent(s.supplierId)}`,
       date: null,
     }));
 
