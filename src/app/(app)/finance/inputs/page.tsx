@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** ما يُقرّ به: مصروفاتُ تشغيلٍ قد تقع خارج الكشف أو تُدفَع دفعةً لأشهر. */
 const CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
-const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهرياً)", NONE: "لا يوجد" } as const;
+const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهرياً)", MEMO: "للعلم (لا يُطرح من الربح)", NONE: "لا يوجد" } as const;
 
 /**
  * ما لا يراه الكشف — الإيجارُ الذي يغطّي أشهراً، والراتبُ النقديّ، وما يُدفَع من حسابٍ

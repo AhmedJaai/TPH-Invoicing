@@ -261,7 +261,7 @@ export async function InvoiceView({
             {inv.taxStatus !== "VALID" && gaps.length > 0 && (
               <span className="text-xs text-ink-soft"><T s="ينقصها: {0}" a={[<b key="0" className="text-ink">{gaps.join("، ")}</b>]} /></span>
             )}
-            {inv.isFixedAsset && <Badge tone="info">أصل ثابت</Badge>}
+            {inv.isFixedAsset && <Badge tone="info">خارج تكلفة المبيعات</Badge>}
           </div>
           <p className="mt-5 text-xs font-bold text-muted">{p.settled ? "لا شيء متبقٍ" : "المتبقي عليها"}</p>
           <p className={`mt-1.5 text-[2.2rem] font-bold leading-none tracking-tight sm:text-[2.6rem] ${p.settled ? "text-ok" : ""}`}>
@@ -528,7 +528,7 @@ export async function InvoiceView({
               <Row label="التصنيف">
                 <span className="flex flex-wrap items-center gap-2">
                   {inv.isFixedAsset
-                    ? <span className="text-warn">أصل ثابت (يُرسمَل، خارج تكلفة المبيعات)</span>
+                    ? <span className="text-warn">خارج تكلفة المبيعات: أصل ثابت أو من رأس مال الافتتاح</span>
                     : <span>مشتريات (تدخل تكلفة المبيعات)</span>}
                   {canEdit && !monthClosed && (
                     <PostAction
@@ -536,9 +536,9 @@ export async function InvoiceView({
                       body={{ invoiceId: inv.id, isFixedAsset: !inv.isFixedAsset }}
                       undo={{ body: { invoiceId: inv.id, isFixedAsset: inv.isFixedAsset } }}
                       variant="quiet"
-                      done={inv.isFixedAsset ? "صارت مشتريات" : "صارت أصلاً ثابتاً"}
+                      done={inv.isFixedAsset ? "دخلت تكلفة المبيعات" : "خرجت من تكلفة المبيعات"}
                     >
-                      {inv.isFixedAsset ? "ليست أصلاً: بضاعة أو مستلزمات" : "اجعلها أصلاً ثابتاً"}
+                      {inv.isFixedAsset ? "أدخلها تكلفة المبيعات" : "أخرجها من تكلفة المبيعات"}
                     </PostAction>
                   )}
                 </span>

@@ -164,3 +164,16 @@ describe("ضريبة رسم بنكي قُيّدت رسماً", () => {
     expect(isRecoverableVat("SALARY", "x", "ضريبة القيمة المضافة")).toBe(false);
   });
 });
+
+describe("الإهلاك للعلم", () => {
+  it("يُعرض تحت الربح ولا يُنقصه، ومعه «الربح بعد الإهلاك»", async () => {
+    const { buildPnl } = await import("./pnl");
+    const base = { month: "2026-08", open: false, revenue: { paidMinor: 115_000_00, vatMinor: 15_000_00, coveredDays: 31, expectedDays: 31 },
+      cogs: { purchasesMinor: 30_000_00, purchasesInvoices: 10, purchasesGrossOnly: 0, theoreticalMinor: null, stock: null, stockMissing: "x", foodicsMinor: null, wasteMinor: 0, staffMinor: null, returnedMinor: null },
+      opex: [{ category: "RENT" as const, label: "إيجار", amountMinor: 10_000_00, source: "BANK" as const }], excluded: [], declaredNone: [], bankGapDays: 0 };
+    const without = buildPnl(base);
+    const withMemo = buildPnl({ ...base, memos: [{ id: "d1", label: "إهلاك", amountMinor: 6_211_32 }] });
+    expect(withMemo.profitMinor).toBe(without.profitMinor);
+    expect(withMemo.lines.find((l) => l.id === "profit-after-memos")?.amountMinor).toBe((without.profitMinor ?? 0) - 6_211_32);
+  });
+});

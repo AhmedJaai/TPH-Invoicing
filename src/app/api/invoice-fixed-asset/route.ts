@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       changed: out.changed,
-      message: read.body.isFixedAsset ? "صارت أصلاً ثابتاً، وخرجت من تكلفة المبيعات" : "صارت مشتريات، ودخلت تكلفة المبيعات",
+      message: read.body.isFixedAsset ? "خرجت من تكلفة المبيعات (أصل ثابت أو رأس مال الافتتاح)" : "دخلت تكلفة المبيعات",
     });
   } catch (e) {
     if (e instanceof InvoiceCorrectionRefused) return NextResponse.json({ error: e.message }, { status: e.status });

@@ -113,6 +113,9 @@ export interface StockCogs {
   suspectItems: string[];
 }
 
+/** رقمٌ محاسبيّ للعلم — يُعرض تحت الربح ولا يُطرح منه (الإهلاك). */
+export interface PnlMemo { id: string; label: string; amountMinor: number }
+
 export interface PnlInput {
   month: string;
   /** الشهرُ لم ينتهِ بعد. */
@@ -130,6 +133,8 @@ export interface PnlInput {
    * للمحاسب، فلا يُطرح منها شيءٌ هنا ويُقال ذلك بجانبها. غائبٌ في لقطةٍ أقدم.
    */
   otherSales?: { grossMinor: number; count: number } | null;
+  /** «للعلم» تحت الربح — غائبٌ في لقطةٍ أقدم. */
+  memos?: PnlMemo[];
   cogs: {
     purchasesMinor: number;
     purchasesInvoices: number;
@@ -335,6 +340,18 @@ export function buildPnl(input: PnlInput): Pnl {
     if (input.open) profitLabel += " — حتى اليوم";
   }
   lines.push({ id: "profit", label: profitLabel, amountMinor: profitMinor, kind: "total", note: profitMinor === null ? "يحتاج إلى إيراد وتكلفة" : undefined });
+
+  /*
+    ── للعلم: الإهلاك ──
+    أصولُ الافتتاح دُفعت من رأس المال، فإهلاكُها رقمٌ محاسبيّ لا يُنقص الربحَ الفعليّ (أحمد، ٢٤ نوفمبر
+    ٢٠٢٦: «can be an accounting figure shown below … but not deducted»). يُعرض وما بعده، ولا يمسّ الربح.
+  */
+  const memos = input.memos ?? [];
+  if (memos.length > 0) {
+    for (const m of memos) lines.push({ id: m.id, label: `${m.label} (للعلم، لا يُطرح)`, amountMinor: m.amountMinor, kind: "memo" });
+    const memoTotal = memos.reduce((s, m) => s + m.amountMinor, 0);
+    lines.push({ id: "profit-after-memos", label: "الربح بعد الإهلاك (رقم محاسبي)", amountMinor: profitMinor === null ? null : profitMinor - memoTotal, kind: "memo" });
+  }
 
   /* ── للعلم: ما ليس مصروفاً ── */
   const excludedMinor = input.excluded.filter((x) => x.kind !== "PURCHASES").reduce((s, x) => s + x.amountMinor, 0);

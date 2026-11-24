@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 const Month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "اكتب الشهر بصيغة YYYY-MM، مثل 2026-08");
 const Create = z.object({
   action: z.literal("create"),
-  kind: z.enum(["SPREAD", "OFF_BOOK", "NONE"]),
+  kind: z.enum(["SPREAD", "OFF_BOOK", "NONE", "MEMO"]),
   category: z.string().refine(isTxCategory, "فئة غير معروفة"),
   label: z.string().trim().min(2, "اكتب وصفاً قصيراً").max(120),
   /** المبلغُ نصّاً بالريال — يُقرأ هللاتٍ في الخادم. */
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     }
     if (!isTxCategory(body.category)) return NextResponse.json({ error: "فئة غير معروفة" }, { status: 400 });
     let amountMinor = 0;
-    if (body.kind === "OFF_BOOK") {
+    if (body.kind === "OFF_BOOK" || body.kind === "MEMO") {
       const parsed = parseRiyals(body.amount ?? "");
       if (parsed === null || parsed <= 0) return NextResponse.json({ error: "اكتب مبلغ الشهر رقماً أكبر من صفر." }, { status: 400 });
       amountMinor = parsed;

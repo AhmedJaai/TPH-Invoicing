@@ -2454,7 +2454,7 @@ export const foodicsSyncRuns = pgTable("foodics_sync_runs", {
  */
 export const financeDeclarations = pgTable("finance_declarations", {
   id: id(),
-  kind: text("kind").$type<"SPREAD" | "OFF_BOOK" | "NONE">().notNull(),
+  kind: text("kind").$type<"SPREAD" | "OFF_BOOK" | "NONE" | "MEMO">().notNull(),
   category: text("category").notNull(),
   label: text("label").notNull(),
   amountMinor: integer("amount_minor").notNull(),

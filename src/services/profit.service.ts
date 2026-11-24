@@ -30,7 +30,7 @@ import { toCanonical } from "@/lib/inventory/units";
 import { assertMonthsOpen } from "./month-guard";
 import {
   buildPnl, isRecoverableVat, isTaxSettlement, monthsBetween, ownerPaidDeduction, spreadShare,
-  type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs,
+  type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs, type PnlMemo,
 } from "@/lib/finance/pnl";
 import { suspectCountJump } from "@/lib/finance/stock-flow";
 import { previousMonth, stockWindow, type StockWindow } from "@/lib/finance/stock-window";
@@ -395,7 +395,7 @@ async function stockCogs(
 
 export interface Declaration {
   id: string;
-  kind: "SPREAD" | "OFF_BOOK" | "NONE";
+  kind: "SPREAD" | "OFF_BOOK" | "NONE" | "MEMO";
   category: TxCategory;
   label: string;
   amountMinor: number;
@@ -432,7 +432,7 @@ export function visibleOpexRows(rows: readonly ExpenseRowView[], role: Role | nu
   }));
 }
 
-async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
+async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[]; memos: PnlMemo[] }> {
   const [rows, draws, ownerPaid, toPayroll] = await Promise.all([
     conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null; transaction_type: string | null }>(sql`
       select e.id, e.category::text as category, e.label, e.amount_minor, e.source::text as source, e.occurred_on,
@@ -485,9 +485,12 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
     }
   }
   const declaredNone: TxCategory[] = [];
+  const memos: PnlMemo[] = [];
   for (const d of declarations) {
     if (month < d.fromMonth || month > d.toMonth) continue;
     if (d.kind === "NONE") declaredNone.push(d.category);
+    /* «للعلم»: رقمٌ محاسبيّ يُعرض تحت الربح ولا يُطرح منه (الإهلاك — أحمد، ٢٤ نوفمبر ٢٠٢٦) */
+    else if (d.kind === "MEMO") { if (d.amountMinor > 0) memos.push({ id: `decl-${d.id}`, label: d.label, amountMinor: d.amountMinor }); }
     else {
       const amountMinor = d.kind === "SPREAD" ? spreadShare(d.amountMinor, d.fromMonth, d.toMonth, month) : d.amountMinor;
       if (amountMinor > 0) opex.push({ id: `decl-${d.id}`, category: d.category, label: d.label, amountMinor, source: d.kind, occurredOn: null, bankTransactionId: d.bankTransactionId, declarationId: d.id });
@@ -530,7 +533,7 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
       amountMinor: -deductMinor, source: "OWNER_PAID", occurredOn: null, bankTransactionId: null, declarationId: null,
     });
   }
-  return { opex, excluded, declaredNone };
+  return { opex, excluded, declaredNone, memos };
 }
 
 /* ─────────────────────────── قائمةُ الشهر ─────────────────────────── */
@@ -642,7 +645,7 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
       staffMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.staffMinor) : null,
       returnedMinor: hasSales ? sumDays(theoretical, monthStart, monthEnd, (v) => v.returnedMinor) : null,
     },
-    opex: opexData.opex, excluded: opexData.excluded, declaredNone: opexData.declaredNone,
+    opex: opexData.opex, excluded: opexData.excluded, declaredNone: opexData.declaredNone, memos: opexData.memos,
     bankGapDays: coverage[0]?.gapDays ?? null,
   };
   return {
@@ -719,7 +722,7 @@ export async function freezePnl(month: string, actorId: string | null): Promise<
 export class DeclarationRefused extends Error {}
 
 export interface NewDeclaration {
-  kind: "SPREAD" | "OFF_BOOK" | "NONE";
+  kind: "SPREAD" | "OFF_BOOK" | "NONE" | "MEMO";
   category: TxCategory;
   label: string;
   amountMinor: number;
