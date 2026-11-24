@@ -54,6 +54,12 @@ describe("payslip — كم لازم أحوّل", () => {
     expect(s.dueMinor).toBe(s.earnedMinor! - 50_000);
     expect(s.remainingMinor).toBe(s.dueMinor! - 100_000);
   });
+  it("من غاب الشهرَ كلَّه لا يخرج له سالب: الغيابُ لا يزيد على أجر أيّامه", () => {
+    const attendance = Array.from({ length: 31 }, (_, i) => ({ kind: "ABSENT" as const, day: `2026-10-${String(i + 1).padStart(2, "0")}`, minutes: null }));
+    const s = payslip({ ...base, days: { worked: 31, of: 31 }, attendance });
+    expect(s.absenceMinor).toBe(300_000);
+    expect(s.earnedMinor).toBe(0);
+  });
   it("راتبٌ غير مكتوب: المستحقّ والباقي غير معروفين، وما حُوِّل يبقى معروفاً", () => {
     const s = payslip({ ...base, salaryMinor: null, paidMinor: 70_000 });
     expect(s.dueMinor).toBeNull();

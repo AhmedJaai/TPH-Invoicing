@@ -336,7 +336,15 @@ export function payslip(input: PayslipInput): Payslip {
   const rate = monthly ? input.salaryMinor : 0;
   const lateMinor = !monthly || lateMinutes + earlyMinutes === 0 ? 0
     : rate === null ? null : divRound(rate * (lateMinutes + earlyMinutes), DAYS_PER_MONTH * input.policy.shiftMinutes);
-  const absenceMinor = monthly ? absenceDeductionMinor(rate, absentDays + unpaidLeaveDays) : 0;
+  const absenceRaw = monthly ? absenceDeductionMinor(rate, absentDays + unpaidLeaveDays) : 0;
+  /*
+    أجرُ الوقت غير المعمول لا يزيد على أجر أيّامه: الغيابُ يُقاس بثلاثين يوماً والأساسُ بأيّام الشهر
+    الفعليّة، فمن غاب أكتوبرَ كلَّه (٣١ يوماً) كان يخرج له «−١٠٠» على راتب ٣٬٠٠٠. فيُقصّ الغيابُ إلى ما
+    بقي من الأساس بعد التأخير — والجزاءاتُ والخصمُ اليدويّ بابٌ آخر يحدّه نصفُ الأجر.
+  */
+  const absenceMinor = absenceRaw === null || baseMinor === null || lateMinor === null
+    ? absenceRaw
+    : Math.min(absenceRaw, Math.max(0, baseMinor - lateMinor));
   const pen = monthly ? input.penalties ?? { chargedMinor: 0, droppedMinor: 0, warnings: 0 } : { chargedMinor: 0, droppedMinor: 0, warnings: 0 };
   /* م ٩٢/٢: الحسمُ كلُّه لا يزيد على نصف الأجر — وأجرُ الوقت غير المعمول ليس حسماً من أجرٍ استُحقّ */
   const halfCap = rate ? divRound(rate, 2) : null;

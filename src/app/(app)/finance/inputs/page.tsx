@@ -12,7 +12,7 @@ import { monthsBetween, spreadShare } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, MONTH } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
-import { loadDeclarations, loadSpreadCandidates } from "@/services/profit.service";
+import { DECLARABLE_CATEGORIES, loadDeclarations, loadSpreadCandidates } from "@/services/profit.service";
 import { closedMonthsAmong } from "@/services/month-guard";
 import { db } from "@/db";
 import { T } from "@/components/i18n/t";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** ما يُقرّ به: مصروفاتُ تشغيلٍ قد تقع خارج الكشف أو تُدفَع دفعةً لأشهر. */
-const CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
+const CATEGORIES: readonly TxCategory[] = DECLARABLE_CATEGORIES;
 const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهرياً)", MEMO: "للعلم (لا يُطرح من الربح)", NONE: "لا يوجد" } as const;
 
 /**

@@ -168,14 +168,22 @@ const CREDIT_NOTE_FROM = sql`payment_allocations pa
   join invoices i on i.id = pa.invoice_id and i.is_fixed_asset = false`;
 
 /*
-  سدادُ مورّدٍ لا فاتورةَ له أصلاً مشترياتٌ يومَ دفعه — بإجماليّه (لا ضريبةَ مقروءة). كانت حوالاتُ «مريم —
+  سدادُ مورّدٍ لا تقابله فاتورةٌ مشترياتٌ يومَ دفعه — بإجماليّه (لا ضريبةَ مقروءة). كانت حوالاتُ «مريم —
   براونيز» (٣٬١٢٠، يوليو–سبتمبر) في الكشف ولا في أيّ بابٍ من الربح: الشراءُ من الفواتير وحدها، ولا فاتورة.
-  فإن وصلت لمورّدٍ فاتورةٌ يوماً خرج من هذا الباب كلُّه وصار سدادُه يُخصَّص كغيره — فلا يُعدّ مرّتين.
+
+  والمعدودُ **ما لم يُخصَّص من الدفعة لفاتورة** — لمورّدٍ لا فواتيرَ له، أو قيل عنه «لا يصدر فواتير».
+  كان الشرطُ «لا فاتورةَ للمورّد أصلاً»: فأوّلُ فاتورةٍ تُقيَّد له تُسقط كلَّ ما دُفع له قبلها من المشتريات
+  (٣٬١٢٠ من أشهرٍ مقفلة) وتُبقي فاتورتَها وحدها. وبالباقي غيرِ المخصَّص يُحفَظ المجموع: ما خُصّص لفاتورةٍ
+  تحسبه فاتورتُه، وما لم يُخصَّص تحسبه الدفعة — لا يسقط ريالٌ ولا يُعدّ مرّتين (أوسكا ولافا وأوراق الزيتون
+  «لا تصدر فواتير» ولها فواتير: سدادُ لافا ٢٧ في يونيو لم تقابله فاتورة ولم يكن في الربح).
 */
 const NO_INVOICE_PAY_DAY = sql`to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD')`;
+const NO_INVOICE_PAY_NET = sql`(p.amount_minor - p.fee_minor
+  - coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.payment_id = p.id), 0))`;
 const NO_INVOICE_PAY_FROM = sql`payments p join suppliers su on su.id = p.supplier_id
   where p.status not in ('REVERSED', 'VOID') and p.method <> 'CREDIT_NOTE'
-    and not exists (select 1 from invoices i where i.supplier_id = p.supplier_id)`;
+    and (su.issues_invoices = false or not exists (select 1 from invoices i where i.supplier_id = p.supplier_id))
+    and ${NO_INVOICE_PAY_NET} > 0`;
 
 async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<PurchaseDay[]> {
   const [rows, notes, noInvoice] = await Promise.all([
@@ -193,7 +201,7 @@ async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<P
        group by 1
     `),
     conn.execute<{ day: string; net: string; n: number }>(sql`
-      select ${NO_INVOICE_PAY_DAY} as day, sum(p.amount_minor - p.fee_minor)::bigint as net, count(*)::int as n
+      select ${NO_INVOICE_PAY_DAY} as day, sum(${NO_INVOICE_PAY_NET})::bigint as net, count(*)::int as n
         from ${NO_INVOICE_PAY_FROM}
          and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
        group by 1
@@ -237,13 +245,13 @@ export async function loadPurchaseInvoices(from: string, to: string, conn: Conn 
      where ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
   `);
   const noInvoice = await conn.execute<{ id: string; supplier_name: string; day: string; net: string }>(sql`
-    select p.id, su.name_ar as supplier_name, ${NO_INVOICE_PAY_DAY} as day, (p.amount_minor - p.fee_minor)::bigint as net
+    select p.id, su.name_ar as supplier_name, ${NO_INVOICE_PAY_DAY} as day, ${NO_INVOICE_PAY_NET}::bigint as net
       from ${NO_INVOICE_PAY_FROM}
        and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
   `);
   return [
     ...rows.rows.map((r) => ({ id: r.id, invoiceNumber: r.invoice_number, supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: Boolean(r.gross_only) })),
-    ...noInvoice.rows.map((r) => ({ id: r.id, invoiceNumber: "سداد بلا فاتورة (المورّد لا يصدر فواتير)", supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: true })),
+    ...noInvoice.rows.map((r) => ({ id: r.id, invoiceNumber: "سداد لم تقابله فاتورة (المورّد لا يصدر فواتير)", supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: true })),
     ...notes.rows.map((r) => ({ id: r.id, invoiceNumber: `إشعار دائن على ${r.invoice_number}`, supplierName: r.supplier_name, day: r.day, netMinor: -Number(r.net), grossOnly: false })),
   ];
 }
@@ -523,6 +531,8 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
     }
   }
   for (const d of draws.rows) {
+    /* تحويلٌ للمالك وُزّع على أشهر تدخله حصصُه أعلاه — لا يُعدّ كاملاً أيضاً */
+    if (spreadTx.has(d.id)) continue;
     opex.push({ id: `owner-${d.id}`, category: "PERSONAL", label: d.label ?? "تحويل لحساب المالك", amountMinor: d.amount_minor, source: "BANK", occurredOn: d.day, bankTransactionId: d.id, declarationId: null });
   }
   /*
@@ -762,7 +772,14 @@ export interface NewDeclaration {
 export const MAX_DECLARATION_MONTHS = 36;
 export const MAX_MEMO_MONTHS = 60;
 
+/**
+ * ما يُقرّ به من الأبواب — مصروفاتُ تشغيل. والخادمُ يفرضه لا الصفحةُ وحدها: «تحويلٌ شخصيّ» يُوزَّع
+ * كان يُعدّ مرّتين (تحويلاتُ المالك تُجمع كاملةً ولا تُسأل عن التوزيع)، و«سدادُ مورّد» تحسبه فاتورته.
+ */
+export const DECLARABLE_CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
+
 export async function createDeclaration(input: NewDeclaration, actorId: string, conn?: Tx): Promise<string> {
+  if (!DECLARABLE_CATEGORIES.includes(input.category)) throw new DeclarationRefused("هذا الباب لا يُضاف من هنا: الإيجار والرواتب والكهرباء والحكومي وأخرى وحدها.");
   if (input.fromMonth > input.toMonth) throw new DeclarationRefused("الشهر الأخير قبل الشهر الأول.");
   const [fy, fm] = input.fromMonth.split("-").map(Number);
   const [ty, tm] = input.toMonth.split("-").map(Number);
