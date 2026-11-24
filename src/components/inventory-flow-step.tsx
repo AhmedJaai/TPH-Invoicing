@@ -151,7 +151,7 @@ export function FlowStep({
                   {row.productName}
                   <span className="ms-2 text-[11px] font-medium text-muted"><T s="{0} · بوحدة {1}" a={[row.categoryLabel, row.unitLabel]} /></span>
                 </p>
-                <p className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${row.expected === null ? "bg-warn-bg text-warn" : "bg-accent-soft text-accent"}`}>
+                <p className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${row.expected === null || row.expectedBelowZero ? "bg-warn-bg text-warn" : "bg-accent-soft text-accent"}`}>
                   <T s="{0}المتوقع على الرف:{1}" a={[<Equal key="0" className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />, <span key="1" className={row.expected === null ? "" : "nums"}>{row.expected ?? "غير معروف"}</span>]} /></p>
               </div>
 
@@ -211,7 +211,10 @@ export function FlowStep({
                   strong
                   source={row.expected === null
                     ? `غير معروف لأن ${[row.openingText === null && "الرصيد", row.purchasesText === null && "المشتريات", row.consumptionText === null && "الاستهلاك"].filter(Boolean).join(" و") || "أحد بنود المعادلة"} غير معروف. أكمله في خانته`
-                    : "يُقارن بما تعدّه"}
+                    /* رفٌّ تحت الصفر لا يكون — صُرف أكثرُ ممّا كان ودخل، فالناقصُ رصيدٌ أو شراء */
+                    : row.expectedBelowZero
+                      ? "تحت الصفر، وهذا لا يكون: صُرف أكثر مما كان على الرف ودخل. غالباً رصيد افتتاحي أو شراء لم يُسجَّل، فصحّحه في خانته قبل العدّ"
+                      : "يُقارن بما تعدّه"}
                 />
               </dl>
 

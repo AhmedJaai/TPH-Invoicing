@@ -107,6 +107,7 @@ export function InventoryWorkspace({
       baseUnit: l.baseUnit,
       unitChoices: unitChoices(l.baseUnit).map((u) => ({ value: u, label: storedUnitLabel(u) })),
       expected: q(l.theoreticalClosingMilli, l.baseUnit),
+      expectedBelowZero: (l.theoreticalClosingMilli ?? 0) < 0,
       actual: l.actualMilli === null ? "" : trim(canonicalToQuantity(l.actualMilli, l.baseUnit)),
       varianceText: l.varianceMilli === null ? null : formatSignedQuantity(l.varianceMilli, l.baseUnit),
       /* النسبةُ المعروضة هي نسبةُ الاستهلاك — جوابُ «كم ضاع ممّا صُرف» */

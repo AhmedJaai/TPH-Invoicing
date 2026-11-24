@@ -55,6 +55,8 @@ export interface StepRow extends CountRow {
   adjustmentsText: string | null;
   consumptionText: string | null;
   wasteText: string | null;
+  /** المتوقَّعُ تحت الصفر — لا رفَّ سالب: رصيدٌ افتتاحيّ أو شراءٌ ناقص، أو وصفةٌ أكبر من الواقع. */
+  expectedBelowZero: boolean;
 }
 
 export type { StepId } from "./inventory-ui";
