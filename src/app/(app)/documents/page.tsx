@@ -8,7 +8,7 @@ import {
   Archive, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, FileSearch, FolderSync, Search, Upload,
 } from "lucide-react";
 import { db } from "@/db";
-import { documents, invoices, suppliers } from "@/db/schema";
+import { captures, documents, invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -114,7 +114,7 @@ export default async function DocumentsPage({
   const whereBase = base.length ? and(...base) : undefined;
 
   /* استعلاماتٌ متوازية لا متسلسلة — لا يعتمد أيّها على الآخر */
-  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, anyDoc, pending, beat] = await Promise.all([
+  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, anyDoc, pending, beat, teamCaptures] = await Promise.all([
     db.select({ total: count() }).from(documents).where(where),
 
     db
@@ -188,6 +188,10 @@ export default async function DocumentsPage({
 
     /* نبضُ الدرايف في الرأس — «هل تعمل المزامنة وحدها؟» جوابُه هنا لا في صفحةٍ أخرى */
     canDecide ? loadDriveHeartbeat(user.id).catch(() => null) : Promise.resolve(null),
+    /* صورُ الفريق المعلّقة ليست مستنداتٍ بعد — لكنّها تنتظر القرارَ نفسَه («يحتاج قرارك» يعدّها) */
+    canDecide
+      ? db.select({ n: count() }).from(captures).where(eq(captures.status, "PENDING")).then((r) => Number(r[0]?.n ?? 0))
+      : Promise.resolve(0),
   ]);
 
   const total = Number(totalRows[0].total);
@@ -395,6 +399,14 @@ export default async function DocumentsPage({
             </Suspense>
           </div>
 
+          {tab === "WAITING" && teamCaptures > 0 && (
+            /* كان الصندوقُ يقول «لا شيء ينتظر قرارك» و«يحتاج قرارك» يعدّ صورةً صوّرها الفريق — فالصورُ تُقال هنا */
+            <Link href="/upload#team" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-[13px] font-bold text-warn hover:underline">
+              <span>{teamCaptures === 1 ? "فاتورة صوّرها الفريق تنتظر اعتمادك" : teamCaptures === 2 ? "فاتورتان صوّرهما الفريق تنتظران اعتمادك" : <T s="{0} فواتير صوّرها الفريق تنتظر اعتمادك" a={[teamCaptures]} />}</span>
+              <span className="shrink-0 text-xs">راجعها ←</span>
+            </Link>
+          )}
+
           {/* العدُّ فوق الفراغ يكرّر ما يقوله الفراغ نفسه */}
           {rows.length > 0 && (
             <p className="mt-4 text-xs text-muted">
@@ -413,7 +425,7 @@ export default async function DocumentsPage({
                 <EmptyState
                   compact
                   icon={CircleCheck}
-                  title="لا توجد مستندات تنتظر قرارك."
+                  title={teamCaptures > 0 ? "لا مستندات تنتظر قرارك غير صور الفريق أعلاه." : "لا توجد مستندات تنتظر قرارك."}
                   hint="تمّ اعتماد كل ما وصل أو رفضه. وما يصل لاحقاً بالرفع أو من الدرايف ويحتاج مراجعتك سيظهر هنا."
                   action={
                     <>
