@@ -16,6 +16,7 @@ import { SYSTEM_ACTOR_NAME, isSystemAudit } from "@/lib/audit-actor";
 import { DAY, DOCUMENT, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
 import { can, type Role } from "@/lib/permissions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
+import { activityTarget, isOwnActivity } from "@/lib/notice-activity";
 import { loadOverdueBalances } from "./supplier-balance.service";
 import { loadDriveHeartbeat } from "./drive-status.service";
 
@@ -64,7 +65,7 @@ const DECISION_ACTIONS = [
 const WINDOW_DAYS = 14;
 
 type ActivityRow = {
-  id: string; action: string; entity_type: string; at: string;
+  id: string; action: string; entity_type: string; entity_id: string; at: string;
   actor_id: string | null; after: unknown; actor: string | null;
 };
 
@@ -103,13 +104,13 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
     `),
     audit
       ? db.execute<ActivityRow>(sql`
-          select a.id, a.action, a.entity_type, a.at, a.actor_id, a.after, u.name as actor
+          select a.id, a.action, a.entity_type, a.entity_id, a.at, a.actor_id, a.after, u.name as actor
             from audit_logs a
             left join users u on u.id = a.actor_id
            where a.at > now() - make_interval(days => ${WINDOW_DAYS})
              and a.action not in ('SUPPLIER_ALIAS_LEARNED', 'DRIVE_FILE_RENAMED', 'AI_ANALYSIS_RUN')
            order by a.at desc
-           limit 25
+           limit 80
         `)
       : Promise.resolve({ rows: [] as ActivityRow[] }),
     db.execute<{ arrived: number; archived: number; payments: number; decisions: number }>(sql`
@@ -207,14 +208,16 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
   for (const a of activity.rows) {
     if (QUIET_ACTIONS.has(a.action)) continue;
     const bySystem = isSystemAudit({ actorId: a.actor_id, after: a.after });
+    if (isOwnActivity(a.actor_id, user.id, bySystem)) continue;
+    const target = activityTarget(a.entity_type, a.entity_id);
     notices.push({
       id: `audit:${a.id}`,
       at: new Date(a.at).toISOString(),
       kind: "ACTIVITY",
       tone: "ok",
       title: actionLabel(a.action),
-      body: `بواسطة ${bySystem ? SYSTEM_ACTOR_NAME : a.actor ?? "مستخدم آخر"}`,
-      href: "/settings/audit",
+      body: `بواسطة ${bySystem ? SYSTEM_ACTOR_NAME : a.actor ?? "مستخدم آخر"}${target.label ? ` · ${target.label}` : ""}`,
+      href: target.href,
       bySystem,
     });
   }

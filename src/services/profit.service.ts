@@ -758,14 +758,16 @@ export interface NewDeclaration {
   note: string | null;
 }
 
-/** أشهرُ توزيعٍ فوق هذا خطأُ إدخالٍ على الأرجح. */
+/** أشهرُ توزيعٍ فوق هذا خطأُ إدخالٍ على الأرجح. والإهلاكُ «للعلم» يمتدّ أطول — أصلٌ على أربع سنين أو خمس. */
 export const MAX_DECLARATION_MONTHS = 36;
+export const MAX_MEMO_MONTHS = 60;
 
 export async function createDeclaration(input: NewDeclaration, actorId: string, conn?: Tx): Promise<string> {
   if (input.fromMonth > input.toMonth) throw new DeclarationRefused("الشهر الأخير قبل الشهر الأول.");
   const [fy, fm] = input.fromMonth.split("-").map(Number);
   const [ty, tm] = input.toMonth.split("-").map(Number);
-  if ((ty - fy) * 12 + (tm - fm) + 1 > MAX_DECLARATION_MONTHS) throw new DeclarationRefused(`المدة أطول من ${MAX_DECLARATION_MONTHS} شهراً. راجع الشهرين.`);
+  const cap = input.kind === "MEMO" ? MAX_MEMO_MONTHS : MAX_DECLARATION_MONTHS;
+  if ((ty - fy) * 12 + (tm - fm) + 1 > cap) throw new DeclarationRefused(`المدة أطول من ${cap} شهراً. راجع الشهرين.`);
   const run = async (t: Tx): Promise<string> => {
     /*
       ما يُضاف يغيّر قائمةَ دخل كلّ شهرٍ يغطّيه — فالشهرُ المقفل لا يُكتب فيه من هذا الباب أيضاً.

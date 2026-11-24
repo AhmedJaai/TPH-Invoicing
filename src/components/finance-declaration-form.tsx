@@ -13,6 +13,7 @@ const KINDS = [
   { value: "OFF_BOOK", label: "مصروف خارج الكشف يتكرر كل شهر", hint: "كراتب يُدفع نقداً أو إيجار يُدفع من حساب شخصي. اكتب مبلغ الشهر الواحد." },
   { value: "SPREAD", label: "دفعة في الكشف تغطي عدة أشهر", hint: "كإيجار دُفع مرة واحدة عن ستة أشهر، فيُوزَّع بالتساوي على أشهره." },
   { value: "NONE", label: "لا يوجد في هذه الأشهر", hint: "لم يكن على المقهى هذا المصروف في تلك الأشهر، فلا يُعدّ ناقصاً." },
+  { value: "MEMO", label: "رقم للعلم لا يُطرح من الربح", hint: "كإهلاك جهاز أو أصل اشتُري قبل الافتتاح. يظهر تحت الربح ومعه «الربح بعد الإهلاك»، ولا يُنقص الربح. اكتب مبلغ الشهر الواحد." },
 ] as const;
 type Kind = (typeof KINDS)[number]["value"];
 
@@ -38,15 +39,16 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const needsAmount = kind === "OFF_BOOK" || kind === "MEMO";
   const options = (candidates[category] ?? []).filter((c) => !c.spread);
   const categoryLabel = categories.find((c) => c.value === category)?.label ?? "";
   const ready = fromMonth !== "" && toMonth !== "" && fromMonth <= toMonth
-    && (kind !== "OFF_BOOK" || amount.trim() !== "") && (kind !== "SPREAD" || txId !== "");
+    && (!needsAmount || amount.trim() !== "") && (kind !== "SPREAD" || txId !== "");
 
   /* المعطّلُ بسببٍ يُضغط ليقوله (ui-ux.md) — كان «احفظ» معطّلاً صامتاً لا يُعرف ما ينقصه */
   const missing = fromMonth === "" || toMonth === "" ? "اختر شهر البداية وشهر النهاية."
     : fromMonth > toMonth ? "شهر النهاية قبل شهر البداية."
-    : kind === "OFF_BOOK" && amount.trim() === "" ? "اكتب مبلغ الشهر الواحد."
+    : needsAmount && amount.trim() === "" ? "اكتب مبلغ الشهر الواحد."
     : kind === "SPREAD" && txId === "" ? "اختر حركة البنك التي تريد توزيعها."
     : null;
 
@@ -58,7 +60,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
     const r = await postJson<{ message?: string }>("/api/finance/declaration", {
       action: "create", kind, category,
       label: label.trim() || (kind === "NONE" ? `لا ${categoryLabel}` : categoryLabel),
-      amount: kind === "OFF_BOOK" ? amount.trim() : undefined,
+      amount: needsAmount ? amount.trim() : undefined,
       fromMonth, toMonth,
       bankTransactionId: kind === "SPREAD" ? txId : null,
     });
@@ -91,7 +93,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
             {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>]} /></label>
         <label className="text-xs font-medium text-ink-soft">
-          <T s="وصف قصير {0}{1}" a={[<span key="0" className="font-normal text-muted">(اختياري)</span>, <input key="1" type="text" value={label} onChange={(e) => setLabel(e.target.value)} disabled={busy} maxLength={120} placeholder={kind === "OFF_BOOK" ? "راتب فلان نقداً" : categoryLabel} className={field} />]} /></label>
+          <T s="وصف قصير {0}{1}" a={[<span key="0" className="font-normal text-muted">(اختياري)</span>, <input key="1" type="text" value={label} onChange={(e) => setLabel(e.target.value)} disabled={busy} maxLength={120} placeholder={kind === "OFF_BOOK" ? "راتب فلان نقداً" : kind === "MEMO" ? "إهلاك ماكينة القهوة" : categoryLabel} className={field} />]} /></label>
 
         {kind === "SPREAD" && (
           <label className="text-xs font-medium text-ink-soft sm:col-span-2">
@@ -100,7 +102,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
               {options.map((c) => <option key={c.id} value={c.id}>{c.dayLabel} · {c.amountText} ريال · {c.label}</option>)}
             </select>, options.length === 0 && <span key="1" className="mt-1 block text-[11px] text-warn"><T s="لا توجد في الكشف حركة مصنّفة «{0}» لم تُوزَّع بعد. صنّف الحركة أولاً من «حركة البنك»." a={[categoryLabel]} /></span>]} /></label>
         )}
-        {kind === "OFF_BOOK" && (
+        {needsAmount && (
           <label className="text-xs font-medium text-ink-soft">
             <T s="مبلغ الشهر الواحد (ريال){0}" a={[<input key="0" type="text" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} placeholder="0.00" className={`${field} nums text-end`} />]} /></label>
         )}
