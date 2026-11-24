@@ -265,3 +265,32 @@ export async function generateReading(month: string, actorId: string | null, dea
     .returning({ createdAt: financeReadings.createdAt });
   return { ok: true, stored: { reading, facts, model, createdAt: row.createdAt, stale: false } };
 }
+
+/**
+ * القراءةُ القديمة تُعاد كلَّ صباح — كانت قراءةُ أكتوبر تقول «صافي الربح ٥٤٬٧١٧» والربحُ بعد
+ * التصحيحات ٥١٬٩٩٠، وتبقى كذلك حتى يضغط أحدٌ «اقرأ من جديد». فيُعاد ما له قراءةٌ تغيّرت أرقامُه
+ * من الأشهر المنتهية وحدها (الجاري يتغيّر كلَّ يوم بطبعه)، الأحدثُ أوّلاً، و`limit` نداءً على الأكثر.
+ */
+export async function refreshStaleReadings(actorId: string | null, limit = 2): Promise<{ refreshed: string[]; failed: { month: string; reason: string }[] }> {
+  const rows = await db.selectDistinct({ month: financeReadings.month }).from(financeReadings).where(eq(financeReadings.scope, SCOPE));
+  const withReading = new Set(rows.map((r) => r.month));
+  const series = await loadPnlSeries();
+  const stale: string[] = [];
+  for (const view of [...series].sort((a, b) => b.month.localeCompare(a.month))) {
+    if (view.input.open || !withReading.has(view.month)) continue;
+    const stored = await loadStoredReading(view.month, view);
+    if (stored?.stale) stale.push(view.month);
+  }
+  const refreshed: string[] = [];
+  const failed: { month: string; reason: string }[] = [];
+  for (const month of stale.slice(0, limit)) {
+    const r = await generateReading(month, actorId);
+    if (r.ok) refreshed.push(month);
+    else {
+      failed.push({ month, reason: r.reason });
+      /* رصيدٌ نافد أو مفتاحٌ غائب لا يصلحه الشهرُ التالي */
+      if (r.status === 402 || r.status === 503) break;
+    }
+  }
+  return { refreshed, failed };
+}

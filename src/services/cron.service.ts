@@ -288,6 +288,8 @@ export interface DailyCronDeps {
   checkBudgets?: () => Promise<{ label: string }[]>;
   /** وصفاتُ فودكس وأصنافُه تُقرأ كلَّ صباح — ما تغيّر فيه يسري من اليوم (`importParsedCatalog`). */
   refreshCatalog?: () => Promise<{ written: number; skippedHuman: number; unchanged: number; blocked: number }>;
+  /** قراءةُ شهرٍ منتهٍ تغيّرت أرقامُه تُعاد (`refreshStaleReadings`) — تعذُّرها يُقال ولا يُسقط اليوم. */
+  refreshReadings?: () => Promise<{ refreshed: string[]; failed: { month: string; reason: string }[] }>;
 }
 
 function snapshotLine(day: string, written: boolean, figures: DayFigures): string {
@@ -361,6 +363,15 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
     } else {
       parts.push(r.written > 0 ? `وصفات فودكس: تغيّرت ${r.written} فسرت من اليوم` : "وصفات فودكس كما هي");
       if (r.blocked > 0) parts.push(`ووصفات لم تُقرأ (${r.blocked})`);
+    }
+  }
+
+  if (deps.refreshReadings) {
+    const r = await deps.refreshReadings().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (r instanceof Error) parts.push(`تعذّرت إعادة القراءة الذكية: ${r.message.split("\n")[0].slice(0, 160)}`);
+    else {
+      if (r.refreshed.length > 0) parts.push(`أُعيدت القراءة الذكية لـ${r.refreshed.join("، ")} لأن أرقامها تغيّرت`);
+      for (const f of r.failed) parts.push(`تعذّرت إعادة قراءة ${f.month}: ${f.reason.slice(0, 120)}`);
     }
   }
 

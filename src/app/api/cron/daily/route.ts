@@ -23,6 +23,7 @@ import { foodicsConfigured } from "@/lib/foodics/client";
 import { fetchFoodicsCatalog } from "@/services/foodics-sync.service";
 import { importParsedCatalog } from "@/services/catalog-import.service";
 import { todayInRiyadh } from "@/lib/riyadh-time";
+import { refreshStaleReadings } from "@/services/finance-reading.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -59,5 +60,7 @@ export async function POST(request: Request) {
     refreshCatalog: foodicsConfigured()
       ? () => withDeadline(45_000, async () => (await importParsedCatalog(await fetchFoodicsCatalog(), { effectiveFrom: todayInRiyadh(), actorId, dryRun: false })).recipes)
       : undefined,
+    /* القراءةُ الذكيّة لا تبقى على أرقامٍ قديمة — شهران على الأكثر، كلٌّ تحت موعده */
+    refreshReadings: () => withDeadline(90_000, () => refreshStaleReadings(actorId, 2)),
   }));
 }

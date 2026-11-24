@@ -50,9 +50,20 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
         <>
           {stored.stale && (
             <p role="status" className="mt-4 rounded-xl border border-warn/30 bg-warn-bg px-4 py-2.5 text-xs font-bold text-warn">
-              تغيّرت الأرقام منذ كُتبت هذه القراءة، فهي مبنية على أرقام قديمة. اضغط «اقرأ من جديد».
+              تغيّرت الأرقام منذ كُتبت هذه القراءة، فطُويت كي لا تقرأ أرقاماً قديمة. تُعاد كل صباح من نفسها، أو اضغط «اقرأ من جديد» الآن.
             </p>
           )}
+          <ReadingBody stored={stored} factOf={factOf} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** القراءةُ القديمة تُطوى خلف «القراءة السابقة» — جملُها تذكر أرقاماً لم تعد صحيحة. */
+function ReadingBody({ stored, factOf }: { stored: StoredReading; factOf: Map<string, Fact> }) {
+  const body = (
+    <>
           <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
             {ORDER.map((section) => {
               const list = stored.reading.sentences.filter((s) => s.section === section);
@@ -87,8 +98,12 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
           </div>
           <p className="mt-4 text-[11px] text-muted">
             <T s="كُتبت في {0}{1}" a={[<bdi key="0">{formatMoment(new Date(stored.createdAt))}</bdi>, stored.reading.dropped > 0 && <Fragment key="1"> <T s=" · حُذفت {0} جملة لأنها ذكرت رقماً من خارج الأرقام المحسوبة" a={[stored.reading.dropped]} /></Fragment>]} /></p>
-        </>
-      )}
-    </div>
+    </>
   );
+  return stored.stale ? (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">القراءة السابقة (بأرقام قديمة)</summary>
+      <div className="opacity-70">{body}</div>
+    </details>
+  ) : body;
 }

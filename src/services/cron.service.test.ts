@@ -318,4 +318,14 @@ describe("لقطةُ اليوم", () => {
     expect(r.result).toContain("رصيد القراءة الذكية غير معروف: ردّ المزوّد 401");
     expect(r.result).not.toMatch(/0\.00 USD/);
   });
+
+  it("القراءةُ الذكيّة القديمة تُعاد ويُقال لأيّ شهر — وتعذُّرها لا يُسقط اليوم", async () => {
+    const r = await dailyCronJob({ ...quietDeps, refreshReadings: async () => ({ refreshed: ["2026-10"], failed: [{ month: "2026-09", reason: "نفد رصيد حساب الذكاء" }] }) });
+    expect(r.ok).toBe(true);
+    expect(r.result).toContain("أُعيدت القراءة الذكية لـ2026-10");
+    expect(r.result).toContain("تعذّرت إعادة قراءة 2026-09: نفد رصيد حساب الذكاء");
+    const broken = await dailyCronJob({ ...quietDeps, refreshReadings: async () => { throw new Error("انقطع"); } });
+    expect(broken.ok).toBe(true);
+    expect(broken.result).toContain("تعذّرت إعادة القراءة الذكية: انقطع");
+  });
 });
