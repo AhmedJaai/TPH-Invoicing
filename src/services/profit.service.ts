@@ -167,8 +167,18 @@ const CREDIT_NOTE_FROM = sql`payment_allocations pa
   join payments p on p.id = pa.payment_id and p.method = 'CREDIT_NOTE' and p.status not in ('REVERSED', 'VOID')
   join invoices i on i.id = pa.invoice_id and i.is_fixed_asset = false`;
 
+/*
+  سدادُ مورّدٍ لا فاتورةَ له أصلاً مشترياتٌ يومَ دفعه — بإجماليّه (لا ضريبةَ مقروءة). كانت حوالاتُ «مريم —
+  براونيز» (٣٬١٢٠، يوليو–سبتمبر) في الكشف ولا في أيّ بابٍ من الربح: الشراءُ من الفواتير وحدها، ولا فاتورة.
+  فإن وصلت لمورّدٍ فاتورةٌ يوماً خرج من هذا الباب كلُّه وصار سدادُه يُخصَّص كغيره — فلا يُعدّ مرّتين.
+*/
+const NO_INVOICE_PAY_DAY = sql`to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD')`;
+const NO_INVOICE_PAY_FROM = sql`payments p join suppliers su on su.id = p.supplier_id
+  where p.status not in ('REVERSED', 'VOID') and p.method <> 'CREDIT_NOTE'
+    and not exists (select 1 from invoices i where i.supplier_id = p.supplier_id)`;
+
 async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<PurchaseDay[]> {
-  const [rows, notes] = await Promise.all([
+  const [rows, notes, noInvoice] = await Promise.all([
     conn.execute<{ day: string; net: string; n: number; gross_only: number }>(sql`
       select ${EFFECTIVE_DAY} as day, sum(${INVOICE_NET})::bigint as net, count(*)::int as n,
              count(*) filter (where i.subtotal_minor is null and i.vat_minor is null)::int as gross_only
@@ -182,11 +192,21 @@ async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<P
        where ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
        group by 1
     `),
+    conn.execute<{ day: string; net: string; n: number }>(sql`
+      select ${NO_INVOICE_PAY_DAY} as day, sum(p.amount_minor - p.fee_minor)::bigint as net, count(*)::int as n
+        from ${NO_INVOICE_PAY_FROM}
+         and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
+       group by 1
+    `),
   ]);
   const byDay = new Map<string, PurchaseDay>(rows.rows.map((r) => [r.day, { day: r.day, netMinor: Number(r.net), invoices: r.n, grossOnly: r.gross_only }]));
   for (const n of notes.rows) {
     const d = byDay.get(n.day) ?? { day: n.day, netMinor: 0, invoices: 0, grossOnly: 0 };
     byDay.set(n.day, { ...d, netMinor: d.netMinor - Number(n.net) });
+  }
+  for (const n of noInvoice.rows) {
+    const d = byDay.get(n.day) ?? { day: n.day, netMinor: 0, invoices: 0, grossOnly: 0 };
+    byDay.set(n.day, { ...d, netMinor: d.netMinor + Number(n.net), invoices: d.invoices + n.n, grossOnly: d.grossOnly + n.n });
   }
   return [...byDay.values()];
 }
@@ -216,8 +236,14 @@ export async function loadPurchaseInvoices(from: string, to: string, conn: Conn 
       from ${CREDIT_NOTE_FROM} join suppliers su on su.id = i.supplier_id
      where ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
   `);
+  const noInvoice = await conn.execute<{ id: string; supplier_name: string; day: string; net: string }>(sql`
+    select p.id, su.name_ar as supplier_name, ${NO_INVOICE_PAY_DAY} as day, (p.amount_minor - p.fee_minor)::bigint as net
+      from ${NO_INVOICE_PAY_FROM}
+       and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
+  `);
   return [
     ...rows.rows.map((r) => ({ id: r.id, invoiceNumber: r.invoice_number, supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: Boolean(r.gross_only) })),
+    ...noInvoice.rows.map((r) => ({ id: r.id, invoiceNumber: "سداد بلا فاتورة (المورّد لا يصدر فواتير)", supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: true })),
     ...notes.rows.map((r) => ({ id: r.id, invoiceNumber: `إشعار دائن على ${r.invoice_number}`, supplierName: r.supplier_name, day: r.day, netMinor: -Number(r.net), grossOnly: false })),
   ];
 }
