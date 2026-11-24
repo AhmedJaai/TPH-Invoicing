@@ -87,6 +87,28 @@ describe("الرصيد الافتتاحيّ اليدويّ", () => {
       expect(l.theoreticalClosingMilli).toBeNull();
     }));
 
+  it("وصنفٌ أوّلُ شرائه في الأسبوع ولم يدخله شيءٌ قبله — صفرٌ بدليل، وما اشتُري قبله يبقى مجهولاً", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee, milk } = await cafe(tx, 0);
+      await makeInvoicePurchase(tx, coffee, "2026-09-14", 440_00, { packSize: "1", contentUnit: "KG", contentQuantity: "5", qty: "1" });
+      await makeInvoicePurchase(tx, milk, "2026-09-01", 100_00, { packSize: "1", contentUnit: "L", contentQuantity: "10", qty: "1" });
+      await makeInvoicePurchase(tx, milk, "2026-09-14", 100_00, { packSize: "1", contentUnit: "L", contentQuantity: "10", qty: "1" });
+      const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
+
+      const fresh = await line(tx, countId, coffee);
+      expect(fresh.openingMilli).toBe(0);
+      expect(fresh.openingSource).toBe("NEVER_STOCKED");
+      expect(fresh.flags).not.toContain("OPENING_UNKNOWN");
+
+      const older = await line(tx, countId, milk);
+      expect(older.openingMilli).toBeNull();
+      expect(older.openingSource).toBe("UNKNOWN");
+
+      /* واليدويُّ يغلبه */
+      await setOpenings(countId, [{ productId: coffee, enteredMilli: 2000, unit: "G" }], actorId, tx);
+      expect((await line(tx, countId, coffee)).openingSource).toBe("MANUAL");
+    }));
+
   it("وفعليّ الجرد المقفل السابق افتتاحيّ ما بعده — «من جرد الأسبوع السابق»", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);

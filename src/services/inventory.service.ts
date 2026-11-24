@@ -503,6 +503,44 @@ export async function resolveOpenings(
     settle(String(r.product_id), toCanonical(Number(r.quantity_milli), unit), "MOVEMENT", String(r.id));
   }
 
+  /*
+    ٤ · صفرٌ بدليل — صنفٌ **لم يدخله شيءٌ قبل الفترة**: لا بندَ فاتورةٍ مربوطٌ به ولا استلامٌ يدويّ
+    ولا عدٌّ في جردٍ مقفَل ولا رصيدٌ مسجَّل، وأوّلُ دخوله في الفترة أو بعدها. فما على رفّه عند
+    بدئها صفرٌ معروف لا مجهول (Colombia natural: أوّلُ شرائه ١٥ نوفمبر، وكان «غير معروف» فلا
+    يُحسب له متوقَّع). والصنفُ الذي لم يدخله شيءٌ قطّ يبقى مجهولاً — لا دليلَ أنّه صنفُ رفّ.
+    واليدويُّ يغلبه كسائرها.
+  */
+  const pending = [...values].filter(([, v]) => v === null).map(([id]) => id);
+  if (pending.length > 0) {
+    const effective = sql`coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD'))`;
+    const fresh = await conn.execute<{ product_id: string }>(sql`
+      with entries as (
+        select sp.product_id, ${effective} as day
+          from invoice_lines il
+          join invoices i on i.id = il.invoice_id
+          join supplier_products sp on sp.id = il.supplier_product_id
+         where sp.product_id in (${sql.join(pending.map((id) => sql`${id}`), sql`, `)})
+        union all
+        select r.product_id, r.received_on as day
+          from inventory_receipts r
+         where r.voided_at is null
+           and r.product_id in (${sql.join(pending.map((id) => sql`${id}`), sql`, `)})
+      )
+      select e.product_id
+        from entries e
+       group by e.product_id
+      having min(e.day) >= ${periodStart}
+         and not exists (
+           select 1 from inventory_count_lines l join inventory_counts c on c.id = l.count_id
+            where l.product_id = e.product_id and c.status = 'FINALISED'
+              and c.period_end < ${periodStart} and l.actual_milli is not null)
+         and not exists (
+           select 1 from inventory_movements m
+            where m.product_id = e.product_id and m.kind = 'OPENING' and m.occurred_on < ${periodStart})
+    `);
+    for (const r of fresh.rows) settle(String(r.product_id), 0, "NEVER_STOCKED", null);
+  }
+
   return { values, sources };
 }
 

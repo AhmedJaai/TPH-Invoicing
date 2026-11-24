@@ -86,12 +86,13 @@ export const FLAG_LABEL: Record<LineFlag, string> = {
 };
 
 /** مصدرُ الرصيد الافتتاحيّ — بترتيبٍ ثابت لا تتنافس فيه المصادر. */
-export type OpeningSource = "MANUAL" | "PREVIOUS_COUNT" | "MOVEMENT" | "UNKNOWN";
+export type OpeningSource = "MANUAL" | "PREVIOUS_COUNT" | "MOVEMENT" | "NEVER_STOCKED" | "UNKNOWN";
 
 export const OPENING_SOURCE_LABEL: Record<OpeningSource, string> = {
   MANUAL: "أُدخل يدوياً",
   PREVIOUS_COUNT: "من جرد الأسبوع السابق",
   MOVEMENT: "من رصيد افتتاحي مسجّل",
+  NEVER_STOCKED: "صفر: لم يُشترَ ولم يُعدّ قبل هذه الفترة",
   UNKNOWN: "غير معروف",
 };
 
