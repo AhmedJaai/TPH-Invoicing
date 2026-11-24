@@ -53,8 +53,16 @@ export interface NoticeFeed {
   digest: Digest;
 }
 
-/** أفعالٌ في السجلّ لا يُشعَر بها: يكتبها النظام بنفسه بالمئات. */
-const QUIET_ACTIONS = new Set(["SUPPLIER_ALIAS_LEARNED", "DRIVE_FILE_RENAMED", "AI_ANALYSIS_RUN"]);
+/**
+ * أفعالٌ في السجلّ لا يُشعَر بها: يكتبها النظام بنفسه بالعشرات، وما يهمّ منها يُقال من بابه
+ * (المستنداتُ الواصلة بعددها، والمزامنةُ المتوقّفة بحالها). مزامنةُ فودكس كلَّ ساعة وتسميةُ ملفٍّ
+ * وإعادةُ قراءة كانت تملأ الجرس بثلاثين «جديداً» لا يُفعل بأيٍّ منها شيء.
+ */
+const QUIET_ACTIONS: readonly string[] = [
+  "SUPPLIER_ALIAS_LEARNED", "DRIVE_FILE_RENAMED", "AI_ANALYSIS_RUN",
+  "SALES_IMPORTED", "DOCUMENT_REREAD", "DRIVE_FILE_RENAME_INTENT", "DRIVE_SYNCED", "CATALOG_IMPORTED",
+];
+const QUIET = new Set(QUIET_ACTIONS);
 
 /** أفعالٌ تُحسب «قراراتٍ» في الملخّص — ما حسمه إنسان. */
 const DECISION_ACTIONS = [
@@ -108,7 +116,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
             from audit_logs a
             left join users u on u.id = a.actor_id
            where a.at > now() - make_interval(days => ${WINDOW_DAYS})
-             and a.action not in ('SUPPLIER_ALIAS_LEARNED', 'DRIVE_FILE_RENAMED', 'AI_ANALYSIS_RUN')
+             and a.action not in (${sql.join(QUIET_ACTIONS.map((a) => sql`${a}`), sql`, `)})
            order by a.at desc
            limit 80
         `)
@@ -206,7 +214,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
   }
 
   for (const a of activity.rows) {
-    if (QUIET_ACTIONS.has(a.action)) continue;
+    if (QUIET.has(a.action)) continue;
     const bySystem = isSystemAudit({ actorId: a.actor_id, after: a.after });
     if (isOwnActivity(a.actor_id, user.id, bySystem)) continue;
     const target = activityTarget(a.entity_type, a.entity_id);
