@@ -761,6 +761,7 @@ describe("جرد الأسبوع المتأخّر في «يحتاج قرارك»"
     const { buildAttention } = await import("./attention");
     const item = buildAttention({ ...quiet, lateCount: { weekStart: "2026-11-15", weekEnd: "2026-11-21", daysLate: 5, draft: true } }).find((i) => i.id === "inventory-count-late");
     expect(item?.actionLabel).toBe("أكمل الجرد");
+    expect(item?.title).toBe("جرد أسبوع 15–21 نوفمبر مفتوح ولم يُقفل");
     expect(item?.severity).toBe("HIGH");
   });
 });

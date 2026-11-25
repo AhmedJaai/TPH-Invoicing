@@ -1091,7 +1091,11 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   /* جردُ الأسبوع متأخّر — كلُّ يومٍ يُبعد العدَّ عن يومه فيكبر ما لا يُفسَّر من الفرق */
   if (f.lateCount) {
     const c = f.lateCount;
-    const week = `${formatDay(c.weekStart)} – ${formatDay(c.weekEnd)}`;
+    /* «١٥–٢١ نوفمبر» — والشهرُ مرّةً واحدة إن لم يعبر الأسبوعُ شهرين */
+    const sameMonth = c.weekStart.slice(0, 7) === c.weekEnd.slice(0, 7);
+    const week = sameMonth
+      ? `${Number(c.weekStart.slice(8))}–${Number(c.weekEnd.slice(8))} ${formatMonth(c.weekEnd.slice(0, 7)).replace(/\s+\d{4}$/, "")}`
+      : `${formatDay(c.weekStart)} – ${formatDay(c.weekEnd)}`;
     out.push({
       id: "inventory-count-late",
       area: "DATA",
