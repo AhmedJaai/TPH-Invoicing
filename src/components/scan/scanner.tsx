@@ -64,7 +64,7 @@ interface ScanPage {
 }
 
 type Check =
-  | { kind: "verdict"; verdict: ClarityVerdict }
+  | { kind: "verdict"; verdict: ClarityVerdict; recorded?: { supplierName: string | null; invoiceNumber: string } | null }
   | { kind: "outage"; message: string }
   | { kind: "failed"; message: string }
   | { kind: "duplicate"; where: "DOCUMENT" | "CAPTURE" };
@@ -359,12 +359,12 @@ export function Scanner({ token, label, recent, embedded = false }: { token: str
     entry.result = (async (): Promise<Check> => {
       try {
         const res = await fetch("/api/capture/scan/check", { method: "POST", body });
-        const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE"; draftId?: string | null }>(res);
+        const read = await readResponse<{ verdict?: ClarityVerdict; outage?: boolean; message?: string; duplicate?: "DOCUMENT" | "CAPTURE"; draftId?: string | null; recorded?: { supplierName: string | null; invoiceNumber: string } }>(res);
         if (!read.ok) return { kind: "failed", message: read.error };
         const d = read.data;
         entry.draftId = d.draftId ?? null;
         if (d.duplicate) return { kind: "duplicate", where: d.duplicate };
-        if (d.verdict) return { kind: "verdict", verdict: d.verdict };
+        if (d.verdict) return { kind: "verdict", verdict: d.verdict, recorded: d.recorded ?? null };
         if (d.outage) return { kind: "outage", message: d.message ?? "" };
         return { kind: "failed", message: d.message ?? "تعذّرت قراءة الصورة." };
       } catch {
@@ -956,7 +956,21 @@ function Checked({
         className="mt-1 w-full rounded-lg border border-line-input bg-raised px-3 py-2 text-sm"
       />
 
-      {clear ? (
+      {result.kind === "verdict" && result.recorded ? (
+        /* فاتورةٌ بالمورّد والرقم نفسيهما مقيَّدةٌ من قبل — لا تُرسل ثانيةً، إلّا إن رأى المصوِّر القراءة خاطئة */
+        <>
+          <div role="status" className="mt-4 rounded-xl border border-ok/30 bg-ok-bg px-4 py-3">
+            <p className="flex items-center gap-2 text-base font-bold text-ok"><CircleCheck className="h-5 w-5" aria-hidden /> هذه الفاتورة مسجّلة من قبل</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+              {result.recorded.supplierName ?? "المورّد"} · رقم <bdi dir="ltr">{result.recorded.invoiceNumber}</bdi>. لا حاجة لإرسالها.
+            </p>
+          </div>
+          <button type="button" onClick={onDone} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>تم</button>
+          <button type="button" onClick={onSend} className={`${buttonClass("quiet", "md")} mt-2 w-full`}>
+            <Send className="h-4 w-4" aria-hidden /> ليست هي، أرسلها
+          </button>
+        </>
+      ) : clear ? (
         <button type="button" onClick={onSend} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
           <Send className="h-5 w-5" aria-hidden /> أرسل
         </button>

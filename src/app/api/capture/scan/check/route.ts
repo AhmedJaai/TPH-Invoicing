@@ -57,7 +57,7 @@ async function handle(request: Request) {
         return null;
       }),
     ]);
-    if (out.ok) return NextResponse.json({ verdict: out.verdict, draftId });
+    if (out.ok) return NextResponse.json({ verdict: out.verdict, draftId, ...(out.recorded ? { recorded: out.recorded } : {}) });
     return NextResponse.json({ outage: out.outage, message: out.message, draftId });
   } catch (e) {
     if (e instanceof CaptureInputError) return NextResponse.json({ error: e.message }, { status: e.status });

@@ -196,7 +196,8 @@ export async function alreadyArrived(sha256: string): Promise<"DOCUMENT" | "CAPT
 /* ───────────────────────── القراءة ───────────────────────── */
 
 export type ClarityOutcome =
-  | { ok: true; verdict: ClarityVerdict }
+  /** `recorded`: فاتورةٌ بالمورّد والرقم نفسيهما مقيَّدةٌ بملفّها — يُقال للمصوِّر قبل أن يرسل */
+  | { ok: true; verdict: ClarityVerdict; recorded: { supplierName: string | null; invoiceNumber: string } | null }
   /** القارئُ متوقّف — ليس عيباً في الصورة، فتُرسَل وتُقرأ لاحقاً */
   | { ok: false; outage: true; message: string }
   | { ok: false; outage: false; message: string };
@@ -225,7 +226,14 @@ export async function readForClarity(file: InspectedFile, cacheOwnerId: string |
     return { ok: false, outage: false, message: "لم يستطع النظام قراءة هذه الصورة. صوّرها مرة أخرى في إضاءة أفضل." };
   }
   if (!cached) await saveCachedReading(file.sha256, reading, cacheOwnerId);
-  return { ok: true, verdict: judgeClarity(reading.value) };
+  /*
+    صورةٌ جديدة لفاتورةٍ مقيَّدة: بصمتُها غيرُ بصمة الأولى فلا يردّها `alreadyArrived`، وكان صاحبُ
+    العمل يرفض «وصلت من قبل» بيده (نحو ٢٥ من ٣٥ مرفوضة). فتُقابَل بالمورّد والرقم كما في قائمته
+    (`labelRecorded`)، ويُقال للمصوِّر — وله أن يرسلها على أيّ حال إن رأى القراءة خاطئة.
+  */
+  const label = (await labelRecordedCaptures([{ id: "scan", reading: reading.value }]).catch(() => new Map<string, RecordedLabel>())).get("scan");
+  const recorded = label?.kind === "RECORDED" ? { supplierName: label.supplierName, invoiceNumber: label.invoiceNumber } : null;
+  return { ok: true, verdict: judgeClarity(reading.value), recorded };
 }
 
 /* ───────────────────────── المسودّة ───────────────────────── */
