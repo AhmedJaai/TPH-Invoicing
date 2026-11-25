@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
-  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
+  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, TrendingUp, Wallet,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -35,6 +35,8 @@ import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 import { T } from "@/components/i18n/t";
 import { CafePulse } from "@/components/cafe-pulse";
+import { loadPnl } from "@/services/profit.service";
+import { loadOutstanding } from "@/services/outstanding.service";
 import { loadPulse } from "@/services/pulse.service";
 
 export const dynamic = "force-dynamic";
@@ -263,6 +265,13 @@ export default async function HomePage() {
               )}
             </KeyFigure>
           )}
+          {can(user.role, "amounts:view") && (
+            <SectionBoundary what="ربح الشهر">
+              <Suspense fallback={<FigureSkeleton />}>
+                <ProfitFigure />
+              </Suspense>
+            </SectionBoundary>
+          )}
           <SectionBoundary what="مشتريات الشهر">
             <Suspense fallback={<FigureSkeleton />}>
               <PurchasesFigure factsP={factsP} />
@@ -373,6 +382,35 @@ async function PurchasesFigure({ factsP }: { factsP: Promise<ChangeFacts> }) {
       }
       delta={pct}
     />
+  );
+}
+
+/**
+ * «كم ربحتُ هذا الشهر؟» على الرئيسيّة — من `loadPnl` نفسِه الذي في «المالية» وباسمه الذي يشمله
+ * («صافي الربح — بتكلفة المشتريات — حتى اليوم»)، وتحته الربحُ بعد كلّ ما عليك للشهر (`loadOutstanding`):
+ * الرواتبُ الباقية والخصمُ الشهريّ المعتاد الذي لم يأتِ بعد.
+ */
+async function ProfitFigure() {
+  const month = currentMonthRiyadh();
+  const view = await loadPnl(month);
+  const profit = view.pnl.profitMinor;
+  const after = profit === null ? null : await loadOutstanding(month, profit).catch(() => null);
+  return (
+    <KeyFigure
+      icon={TrendingUp}
+      label="الربح"
+      period={`${formatMonth(month)} حتى اليوم`}
+      href="/finance"
+      value={profit === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={profit} signed />}
+      tone={profit !== null && profit < 0 ? "danger" : undefined}
+      sub={view.pnl.profitLabel}
+    >
+      {after && after.totalMinor > 0 && after.profitAfterMinor !== null && (
+        <p className="text-xs text-ink-soft">
+          <T s="بعد كل ما عليك للشهر: {0}" a={[<Money key="0" minor={after.profitAfterMinor} signed />]} />
+        </p>
+      )}
+    </KeyFigure>
   );
 }
 
