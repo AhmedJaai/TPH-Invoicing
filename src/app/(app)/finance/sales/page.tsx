@@ -15,6 +15,7 @@ import { loadSalesAnalysis, type ItemRow } from "@/services/sales-analysis.servi
 import { T } from "@/components/i18n/t";
 import { SalesHeatmap } from "@/components/sales-heatmap";
 import { buildHeatmap } from "@/lib/finance/sales-heatmap";
+import { priceForMargin, TARGET_MARGIN_BP } from "@/lib/finance/margin-price";
 
 export const dynamic = "force-dynamic";
 
@@ -186,15 +187,26 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-3">
         <Mover title="ما ارتفع" icon={TrendingUp} items={risers} empty="لم يرتفع أي صنف عن الشهر السابق." />
         <Mover title="ما انخفض" icon={TrendingDown} items={fallers} empty="لم ينخفض أي صنف عن الشهر السابق." />
-        <Section id="margins" title="أضعف الهوامش" icon={Coffee} hint="من بين الأصناف التي بيع منها بثلاثمئة ريال فأكثر.">
+        <Section id="margins" title="أضعف الهوامش" icon={Coffee} hint="من بين الأصناف التي بيع منها بثلاثمئة ريال فأكثر، وتحت كلٍّ السعرُ الذي تصير به كلفةُ مكوّناته ٣٥٪ من سعره.">
           {weak.length === 0 ? <EmptyState compact title="لا يوجد صنف له وصفة وتكلفة بعد." action={<LinkButton href="/inventory/recipes" size="sm">الوصفات</LinkButton>} /> : (
             <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
-              {weak.map((i) => (
-                <li key={i.key} className="flex items-baseline justify-between gap-2 py-2.5 text-[13px]">
-                  <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
-                  <span className="shrink-0 font-bold">{formatShare(i.marginBp)} <span className="text-[11px] font-normal text-muted"><T s="من {0}" a={[<Money key="0" minor={i.salesMinor} />]} /></span></span>
-                </li>
-              ))}
+              {weak.map((i) => {
+                const price = priceForMargin(i);
+                return (
+                  <li key={i.key} className="py-2.5 text-[13px]">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
+                      <span className="shrink-0 font-bold">{formatShare(i.marginBp)} <span className="text-[11px] font-normal text-muted"><T s="من {0}" a={[<Money key="0" minor={i.salesMinor} />]} /></span></span>
+                    </span>
+                    {/* القائمةُ تقول أين الضعف؛ والسطرُ يقول ما الذي يصلحه — والقرارُ لصاحبه */}
+                    {price && (
+                      <span className="mt-1 block text-[11px] leading-relaxed text-muted">
+                        <T s="يُباع بـ{0} وكلفتُه {1}. بـ{2} يبلغ هامشُه {3}." a={[<Money key="0" minor={price.currentUnitMinor} />, <Money key="1" minor={price.unitCostMinor} />, <span key="2" className="font-bold text-ink"><Money minor={price.targetUnitMinor} /></span>, formatShare(TARGET_MARGIN_BP)]} />
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Section>
