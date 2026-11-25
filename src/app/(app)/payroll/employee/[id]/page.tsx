@@ -211,7 +211,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 <Card>
                   <h2 className="mb-3 text-sm font-bold">أسبوع عمل</h2>
                   <WeekForm employeeId={id} defaultDay={defaultDay} suggestedHours={worked.minutes > 0 ? formatMinutes(worked.minutes) : undefined} />
-                  {worked.minutes > 0 && <p className="mt-2 text-[11px] text-muted">من تسجيل الحضور هذا الشهر: {formatMinutes(worked.minutes)} ساعة{worked.open > 0 ? `، و${worked.open} حضور بلا انصراف لم يُحسب` : ""}.</p>}
+                  {worked.minutes > 0 && <p className="mt-2 text-[11px] text-muted">ساعات العمل من تسجيل الحضور هذا الشهر: <bdi className="nums">{formatMinutes(worked.minutes)}</bdi>{worked.open > 0 ? `، و${worked.open} حضور بلا انصراف لم يُحسب` : ""}.</p>}
                 </Card>
               )}
             </div>
@@ -241,7 +241,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
             ))}
             {row.weeks.map((w) => (
               <li key={w.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1 basis-48 text-sm">أسبوع {formatDay(w.weekStart)}{w.minutes !== null && <span className="block text-[11px] text-muted">{formatMinutes(w.minutes)} ساعة</span>}</span>
+                <span className="min-w-0 flex-1 basis-48 text-sm">أسبوع {formatDay(w.weekStart)}{w.minutes !== null && <span className="block text-[11px] text-muted">ساعات العمل: <bdi className="nums">{formatMinutes(w.minutes)}</bdi></span>}</span>
                 <Money minor={w.amountMinor} />
                 {canEdit && <PostAction url="/api/payroll/entry" body={{ action: "week-clear", id: w.id }} variant="quiet" done="مُسح">امسح</PostAction>}
               </li>
