@@ -207,8 +207,8 @@ def m_ets(Y: pd.DataFrame, origin: pd.Timestamp, ex: pd.DataFrame, **_) -> pd.Da
     return out
 
 
-EXTRA = ["concert", "football", "festival", "break_short"]
-GLM_FEATURES = ["concert", "football", "break_short", "holiday", "holiday_eve", "eid_window", "ramadan", "school_break", "summer", "payday_week",
+EXTRA = ["concert", "football", "festival", "bigmatch", "launch", "break_short"]
+GLM_FEATURES = ["concert", "football", "bigmatch", "launch", "break_short", "holiday", "holiday_eve", "eid_window", "ramadan", "school_break", "summer", "payday_week",
                 "citizen_account", "month_end", "event", "t_max", "humidity", "rain_mm"]
 
 
@@ -375,7 +375,7 @@ class GBM:
 class Chronos:
     """Chronos-2 بلا تدريب، بمتغيّرات التقويم والطقس المعروفة مقدَّماً."""
 
-    COVARIATES = ["dow", "concert", "football", "break_short", "holiday", "holiday_eve", "eid_window", "ramadan", "school_break", "summer",
+    COVARIATES = ["dow", "concert", "football", "bigmatch", "launch", "break_short", "holiday", "holiday_eve", "eid_window", "ramadan", "school_break", "summer",
                   "payday_week", "event", "t_max", "humidity"]
 
     def __init__(self, cross: bool = False):
@@ -839,7 +839,7 @@ DRIVER_GROUPS = {
     "holiday": "الإجازات", "holiday_eve": "الإجازات", "eid": "الإجازات", "eid_window": "الإجازات",
     "ramadan": "رمضان", "ramadan_day": "رمضان", "ramadan_last10": "رمضان",
     "days_from_payday": "الراتب", "days_to_payday": "الراتب", "payday_week": "الراتب", "citizen_account": "الراتب",
-    "concert": "حفلات جدة", "football": "مباريات جدة", "festival": "فعاليات جدة", "break_short": "المدارس",
+    "concert": "حفلات جدة", "football": "مباريات جدة", "bigmatch": "مباريات كبرى", "launch": "حدث عالمي", "festival": "فعاليات جدة", "break_short": "المدارس",
     "dom": "يوم الشهر", "month_end": "يوم الشهر", "event": "حدثٌ مسجَّل", "h": "بُعد اليوم",
 }
 
