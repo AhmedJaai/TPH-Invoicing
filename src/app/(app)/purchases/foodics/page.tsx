@@ -13,7 +13,7 @@ import { Badge, Callout, DataTable, EmptyState, KeyFigure, LinkButton, NoAccess,
 import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { invoiceHref } from "@/lib/invoice-profile";
-import { milliToDecimal } from "@/lib/inventory/units";
+import { decimalToMilli, milliToDecimal } from "@/lib/inventory/units";
 import { ownerPairKey, type InvoiceSide, type MatchBasis, type MatchedPair, type PurchaseSide } from "@/lib/foodics/purchase-compare";
 import { loadPairLines, loadPurchaseWitness, type FoodicsSupplierRow } from "@/services/foodics-compare.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
@@ -180,7 +180,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                   keyOf={(l) => String(l.i)}
                   columns={[
                     { key: "name", header: "البند", primary: true, cell: (l) => <span>{l.description}</span> },
-                    { key: "qty", header: "الكمية", numeric: true, cell: (l) => <span className="nums">{l.qty ?? "—"}</span> },
+                    { key: "qty", header: "الكمية", numeric: true, cell: (l) => { const m = decimalToMilli(l.qty); return m === null ? <span className="text-muted">غير مقروءة</span> : <span className="nums">{milliToDecimal(m)}</span>; } },
                     { key: "total", header: "إجمالي السطر", numeric: true, cell: (l) => (l.lineTotalMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={l.lineTotalMinor} />) },
                   ]}
                 />

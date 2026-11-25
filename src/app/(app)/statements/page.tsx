@@ -122,6 +122,8 @@ export default async function StatementsPage({
                 <span className="block text-[11px] text-muted">
                   {countNoun(m.invoiceCount, INVOICE)}
                   {m.lastInvoiceDate && <> <T s=" · آخر فاتورة {0}" a={[formatDay(m.lastInvoiceDate)]} /></>}
+                  {/* بلا رقمٍ محفوظ يفتح واتساب بلا مستلِم — يُقال ذلك قبل الضغط لا بعده */}
+                  {!m.phoneE164 && <> · <Link href={`/suppliers/${m.slug}`} className="font-bold text-accent hover:underline">لا رقم واتساب محفوظ</Link></>}
                 </span>
               </span>
               <a
