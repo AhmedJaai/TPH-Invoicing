@@ -330,7 +330,7 @@ export default async function SettingsPage() {
               id="backup"
               title="النسخة الاحتياطية"
               icon={HardDrive}
-              hint="تُنسخ القاعدة والشيفرة والأسرار كل يوم على حاسوبك في مجلد TPH-Backups، ومعها مرآة لملفات الدرايف، ونسخة ثانية من القاعدة خارج الحاسوب في iCloud. يُعاد ما تعذّر كل ساعة ما دام الحاسوب يعمل."
+              hint="تُنسخ بيانات النظام كلها كل يوم على حاسوبك في مجلد TPH-Backups، ومعها نسخة من ملفات الدرايف، ونسخة ثانية من البيانات خارج الحاسوب في iCloud. يُعاد ما تعذّر كل ساعة ما دام الحاسوب يعمل."
             >
               {backup.state === "UNKNOWN" ? (
                 <Callout tone="warn" title="حالها غير معروف">
@@ -346,7 +346,7 @@ export default async function SettingsPage() {
                       </dd>
                     </div>
                     <div className="rounded-xl border border-line bg-raised p-4">
-                      <dt className="text-[11px] text-muted">مرآة ملفات الدرايف</dt>
+                      <dt className="text-[11px] text-muted">نسخة ملفات الدرايف</dt>
                       <dd className={`mt-1 text-sm font-bold ${backup.hb.driveOk ? "text-ok" : "text-warn"}`}>
                         {backup.hb.lastFullSuccess ? <T s="آخر نسخة كاملة {0}" a={[formatMoment(new Date(backup.hb.lastFullSuccess))]} /> : "لم تكتمل بعد"}
                       </dd>
@@ -380,10 +380,10 @@ export default async function SettingsPage() {
           {serverErrorRows !== null && (
             <Section
               id="errors"
-              title="أعطال الخادم"
+              title="أعطال النظام"
               icon={ShieldAlert}
               count={serverErrorRows.length}
-              hint="ما تعطّل في الخادم في آخر سبعة أيام، محفوظاً هنا لأن سجل الاستضافة يُمحى بعد ساعة. العطل نفسه يُعدّ ولا يتكرر سطره. أرسل المرجع لمن يطوّر النظام."
+              hint="ما تعطّل في النظام في آخر سبعة أيام. العطل نفسه يُعدّ ولا يتكرر سطره. أرسل المرجع لمن يطوّر النظام."
             >
               {serverErrorRows.length === 0 ? (
                 <p className="text-sm text-ink-soft">لا عطل في آخر سبعة أيام.</p>

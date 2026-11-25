@@ -75,7 +75,7 @@ export default async function MissingInvoicesPage() {
       width="wide"
       title={TITLE}
       eyebrow={<T s="المورّدون الذين لهم فاتورة في آخر {0}" a={[countNoun(ACTIVE_WINDOW_DAYS, DAY)]} />}
-      intro="الفاتورة الغائبة ليست في أرشيفك، فلا يكشفها إلا شاهد من خارجه: كشف المورّد، أو ما أُدخل في فودكس، أو حوالة البنك. هنا الشهود كلهم لكل مورّد، ومن لا شاهد عليه."
+      intro="الفاتورة الغائبة ليست في أرشيفك، فلا يكشفها إلا مصدر من خارجه: كشف المورّد، أو ما أُدخل في فودكس، أو حوالة البنك. هنا ما تقوله هذه المصادر لكل مورّد، ومن لا مصدر يؤكّد تعامله."
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
@@ -84,10 +84,10 @@ export default async function MissingInvoicesPage() {
           tone={board.totals.invoices > 0 ? "warn" : "ok"}
           value={<span className="nums">{board.totals.invoices}</span>}
           sub={board.totals.invoices === 0
-            ? <T s="لا قرينة على فاتورة غائبة عند {0} عليهم شاهد." a={[countNoun(board.clearCount, SUPPLIER)]} />
+            ? <T s="لا فاتورة ناقصة عند {0} نعرف تعاملهم من مصدر آخر." a={[countNoun(board.clearCount, SUPPLIER)]} />
             : board.totals.confirmedByTwo > 0
-              ? <T s="بمجموع {0}، ومنها {1} شهد عليها شاهدان." a={[<Money key="0" minor={board.totals.missingMinor} />, <span key="1" className="nums">{board.totals.confirmedByTwo}</span>]} />
-              : <T s="بمجموع {0}، وكل منها شهد عليه شاهد واحد." a={[<Money key="0" minor={board.totals.missingMinor} />]} />}
+              ? <T s="بمجموع {0}، ومنها {1} أكّدها مصدران." a={[<Money key="0" minor={board.totals.missingMinor} />, <span key="1" className="nums">{board.totals.confirmedByTwo}</span>]} />
+              : <T s="بمجموع {0}، وكل منها أكّده مصدر واحد." a={[<Money key="0" minor={board.totals.missingMinor} />]} />}
           href="#leads"
         />
         <KeyFigure
@@ -102,7 +102,7 @@ export default async function MissingInvoicesPage() {
         />
         <KeyFigure
           icon={EyeOff}
-          label="مورّدون لا شاهد عليهم"
+          label="مورّدون بلا مصدر يؤكّد تعاملهم"
           tone={board.blind.length > 0 ? "warn" : "ok"}
           value={<span className="nums">{board.blind.length}</span>}
           sub={board.blind.length > 0
@@ -117,15 +117,15 @@ export default async function MissingInvoicesPage() {
         title="قرائن على فواتير غائبة"
         icon={FileQuestion}
         count={leads.length}
-        hint="كل سطر واقعة ذكرها شاهد من خارج أرشيفك ولا فاتورة لها عندك. وما شهد عليه اثنان بالمبلغ نفسه في أسبوع واحد سطر واحد لا سطران. اضغط السطر لتحسمه في صفحته."
+        hint="كل سطر شراءٌ ذكره مصدر من خارج أرشيفك ولا فاتورة له عندك. وما ذكره مصدران بالمبلغ نفسه في أسبوع واحد سطر واحد لا سطران. اضغط السطر لتحسمه في صفحته."
         className="mt-8"
       >
         {leads.length === 0 ? (
           <EmptyState
             compact
             icon={ShieldCheck}
-            title="لا قرينة على فاتورة غائبة."
-            hint="كل ما ذكرته كشوف المورّدين وما أُدخل في فودكس له فاتورة عندك. هذا لا يشمل من لا شاهد عليهم أدناه."
+            title="لا فاتورة ناقصة نعرفها."
+            hint="كل ما ذكرته كشوف المورّدين وما أُدخل في فودكس له فاتورة عندك. هذا لا يشمل المورّدين الذين لا مصدر يؤكّد تعاملهم أدناه."
           />
         ) : (
           <DataTable
@@ -194,14 +194,14 @@ export default async function MissingInvoicesPage() {
 
       <Section
         id="blind"
-        title="مورّدون لا شاهد عليهم"
+        title="مورّدون بلا مصدر يؤكّد تعاملهم"
         icon={EyeOff}
         count={board.blind.length}
         hint="يصدرون فواتير ولهم فاتورتان فأكثر حديثاً، ولا كشف حساب حديثاً منهم ولا ربط بفودكس. فاتورة تغيب منهم لا يكشفها شيء حتى تُدفع. اطلب كشف حسابه، أو اربط مورّده في فودكس."
         className="mt-8"
       >
         {board.blind.length === 0 ? (
-          <EmptyState compact icon={ShieldCheck} title="كل مورّد يتكرر تعامله عليه شاهد." hint="لكل منهم كشف حساب حديث أو ربط بمورّده في فودكس." />
+          <EmptyState compact icon={ShieldCheck} title="كل مورّد يتكرر تعامله له مصدر يؤكّده." hint="لكل منهم كشف حساب حديث أو ربط بمورّده في فودكس." />
         ) : (
           <DataTable
             rows={board.blind}
@@ -209,7 +209,7 @@ export default async function MissingInvoicesPage() {
             hrefOf={(r) => `/suppliers/${encodeURIComponent(r.supplier.slug)}`}
             columns={[
               { key: "supplier", header: "المورّد", primary: true, cell: (r) => <span className="font-semibold">{r.supplier.name}</span> },
-              { key: "why", header: "لماذا لا شاهد", wrap: true, cell: (r) => <span className="text-xs text-ink-soft"><CoverNote cover={r.cover} />، وغير مربوط بفودكس</span> },
+              { key: "why", header: "لماذا لا نعرف", wrap: true, cell: (r) => <span className="text-xs text-ink-soft"><CoverNote cover={r.cover} />، وغير مربوط بفودكس</span> },
               { key: "last", header: "آخر فاتورة", cell: (r) => <bdi className="whitespace-nowrap text-ink-soft">{formatDay(r.supplier.lastInvoiceDay)}</bdi> },
               { key: "billed", header: "مجموع فواتيره الحديثة", numeric: true, cell: (r) => <Money minor={r.supplier.recentBilledMinor} /> },
               { key: "count", header: "عددها", numeric: true, cell: (r) => <span className="nums">{r.supplier.recentInvoices}</span> },
@@ -218,7 +218,7 @@ export default async function MissingInvoicesPage() {
         )}
         {board.oneOffCount > 0 && (
           <p className="mt-3 text-xs text-ink-soft">
-            <T s="و{0} بلا شاهد لهم فاتورة واحدة في المدة (شراء مرة واحدة)، فلا يُسأل عنهم هنا." a={[countNoun(board.oneOffCount, SUPPLIER)]} />
+            <T s="و{0} بلا مصدر لهم فاتورة واحدة في المدة (شراء مرة واحدة)، فلا يُسأل عنهم هنا." a={[countNoun(board.oneOffCount, SUPPLIER)]} />
           </p>
         )}
       </Section>
@@ -252,7 +252,7 @@ export default async function MissingInvoicesPage() {
         </Section>
       )}
 
-      <Suspense fallback={<p className="mt-8 rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">يحسب قرينة المخزون: المشترى والمباع منذ البداية…</p>}>
+      <Suspense fallback={<p className="mt-8 rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">يحسب ما يقوله المخزون: المشترى والمباع منذ البداية…</p>}>
         <StockLeads />
       </Suspense>
     </PageShell>
@@ -271,7 +271,7 @@ async function StockLeads() {
   return (
     <Section
       id="stock"
-      title="قرينة من المخزون: صُرف أكثر مما اشتُري"
+      title="المخزون يقول: صُرف أكثر مما اشتُري"
       icon={PackageSearch}
       count={leads.length}
       hint="أصناف صرفت منها الوصفات منذ البداية أكثر مما سُجّل شراؤه. هذه أضعف القرائن ولا تدخل الأرقام أعلاه: قد تكون فاتورة غائبة، أو بند فاتورة لم يُربط بصنفه، أو وصفة تصرف أكثر من الواقع. ابدأ بربط البنود."
