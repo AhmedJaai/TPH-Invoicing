@@ -23,13 +23,14 @@
 import { loadBackupVerdict } from "@/services/backup-status.service";
 import { loadUnitCostFindings } from "@/services/daily-checks.service";
 import { loadOriginalsCheck } from "@/services/drive-originals.service";
+import { lateWeeklyCount } from "@/lib/inventory/count-due";
 import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildAttention, type AttentionItem } from "./attention";
 import { gatherAttentionFacts } from "./attention-facts";
 import { partitionSnoozed, type SnoozedItem } from "./attention-snooze";
-import { formatMoment, todayInRiyadh } from "./riyadh-time";
+import { addDays, formatMoment, todayInRiyadh } from "./riyadh-time";
 import { areaCounts, tabCounts } from "./nav";
 import { can, type Capability, type Role } from "./permissions";
 import { loadOpenIbanWatch } from "@/services/iban-guard.service";
@@ -55,7 +56,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts, budgets, originals] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts, budgets, originals, countRows] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
@@ -70,6 +71,10 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     loadBudgetFindings().catch(() => []),
     /* فحصُ الصباح لأصول الدرايف — صفٌّ واحد يُقرأ */
     loadOriginalsCheck().catch(() => null),
+    /* جردُ الأسبوع الماضي: آخرُ الجرود تكفي لحكم «متأخّر» */
+    db.execute<{ status: string; period_start: string; period_end: string }>(sql`
+      select status::text as status, period_start, period_end from inventory_counts order by period_end desc limit 12
+    `).then((r) => r.rows).catch(() => []),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -115,6 +120,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     } : null,
     unitCostSuspects: unitCosts ? unitCosts.findings.map((f) => ({ name: f.name, ratio: f.invoiceRate / f.catalogRate })) : [],
     missingOriginals: originals?.missing ?? [],
+    lateCount: lateWeeklyCount(todayInRiyadh(), countRows.map((c) => ({ status: c.status, periodStart: String(c.period_start), periodEnd: String(c.period_end) })), addDays),
     budgetOver: budgets.map((b) => ({ label: b.label, budgetMinor: b.budgetMinor, actualMinor: b.actualMinor })),
     backupStale: backup.state === "CORE_STALE" || backup.state === "MIRROR_STALE" ? {
       core: backup.state === "CORE_STALE",

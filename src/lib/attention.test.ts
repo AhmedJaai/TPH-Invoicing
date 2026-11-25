@@ -766,3 +766,12 @@ describe("أصول الدرايف الغائبة", () => {
     expect(buildAttention({ ...base, missingOriginals: [] }).find((i) => i.id === "drive-originals-missing")).toBeUndefined();
   });
 });
+
+describe("جرد الأسبوع المتأخّر في «يحتاج قرارك»", () => {
+  it("المسوّدةُ تُقال «مفتوح ولم يُقفل»، ومن خمسة أيّام عالية", async () => {
+    const { buildAttention } = await import("./attention");
+    const item = buildAttention({ ...quiet, lateCount: { weekStart: "2026-11-15", weekEnd: "2026-11-21", daysLate: 5, draft: true } }).find((i) => i.id === "inventory-count-late");
+    expect(item?.actionLabel).toBe("أكمل الجرد");
+    expect(item?.severity).toBe("HIGH");
+  });
+});

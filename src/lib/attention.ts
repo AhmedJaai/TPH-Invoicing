@@ -286,6 +286,8 @@ export interface AttentionFacts {
   monthsLeftOpen?: string[];
   /** سعرُ وحدةٍ من الفواتير يخالف كلفةَ الكتالوج أضعافاً — `ratio` الفواتيرُ ÷ الكتالوج (فحص الصباح، 108). */
   unitCostSuspects?: { name: string; ratio: number }[];
+  /** جردُ الأسبوع الماضي لم يُقفل بعد يومين من نهايته (`lateWeeklyCount`). */
+  lateCount?: { weekStart: string; weekEnd: string; daysLate: number; draft: boolean } | null;
   /** أصولُ مستنداتٍ غابت من الدرايف (٤٠٤ أو سلّة المحذوفات) في آخر فحص صباح. */
   missingOriginals?: { documentId: string; fileName: string; state: "gone" | "trashed" }[];
   /** أبوابٌ تجاوزت ميزانيةَ الشهر الجاري (111). */
@@ -1068,6 +1070,25 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     أصلُ المستند غاب من الدرايف — القيدُ في الدفاتر بلا ورقة، والمحاسبُ والهيئةُ يطلبانها. وُجد بتدقيقٍ
     يدويّ (ثمانيةُ أصول، ٢٥ نوفمبر ٢٠٢٦) فصار فحصَ صباح. لا يُحذف قيدٌ ولا يُمسّ الدرايف من هنا.
   */
+  /* جردُ الأسبوع متأخّر — كلُّ يومٍ يُبعد العدَّ عن يومه فيكبر ما لا يُفسَّر من الفرق */
+  if (f.lateCount) {
+    const c = f.lateCount;
+    const week = `${formatDay(c.weekStart)} – ${formatDay(c.weekEnd)}`;
+    out.push({
+      id: "inventory-count-late",
+      area: "DATA",
+      severity: c.daysLate >= 5 ? "HIGH" : "MEDIUM",
+      title: c.draft ? `جرد أسبوع ${week} مفتوح ولم يُقفل` : `جرد أسبوع ${week} لم يُبدأ`,
+      detail: `مضى ${countNounGen(c.daysLate, DAY)} على آخر يوم فيه. كلما تأخر العدّ عن يومه اختلط بمبيعات ما بعده، فكبر الفرق الذي لا يُفسَّر.`,
+      action: c.draft ? "أكمل العدّ وأقفل الجرد." : "ابدأ جرد الأسبوع وأدخل ما على الرف.",
+      actionLabel: c.draft ? "أكمل الجرد" : "ابدأ الجرد",
+      href: "/inventory",
+      count: 1,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: [],
+    });
+  }
+
   const mo = f.missingOriginals ?? [];
   if (mo.length > 0) {
     out.push({
