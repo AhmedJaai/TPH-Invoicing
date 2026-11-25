@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation";
+import { sql } from "drizzle-orm";
+import { db } from "@/db";
+import { ObligationSuggestions } from "@/components/obligation-suggestions";
+import { suggestObligations } from "@/lib/obligation-suggest";
 import { Archive, CalendarClock, FileBadge, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -38,6 +42,15 @@ export default async function ObligationsPage() {
 
   const view = await loadObligations();
   const canEdit = can(user.role, "expense:edit");
+  /* وثائقُ تُقترح من رسومٍ سُدّدت للبلدية والمركز السعوديّ للأعمال — والنوعُ القائم لا يُقترح */
+  const suggestions = canEdit ? suggestObligations(
+    (await db.execute<{ day: string; amount_minor: number; text: string }>(sql`
+      select to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day, amount_minor,
+             coalesce(beneficiary_raw, '') || ' ' || coalesce(description, '') as text
+        from bank_transactions where category = 'GOVERNMENT' and direction = 'DEBIT'
+    `)).rows.map((r) => ({ day: r.day, amountMinor: Number(r.amount_minor), text: r.text })),
+    new Set(view.open.map((o) => o.kind)),
+  ) : [];
   const canSnooze = can(user.role, "bank:edit");
   const today = todayInRiyadh();
   const rows = view.open.map((o) => ({ ...o, left: daysLeft(o.expiresOn, today), level: expiryLevel(o, today), snoozed: view.silenced.has(obligationKey(o)) }));
@@ -48,6 +61,7 @@ export default async function ObligationsPage() {
   if (view.open.length === 0 && view.archived.length === 0) {
     return (
       <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="الوثائق التي لها تاريخ انتهاء: السجل التجاري، ورخصة البلدية، والدفاع المدني، والشهادات الصحية، والإقامات، وعقد الإيجار.">
+        <ObligationSuggestions items={suggestions} />
         <EmptyState
           icon={FileBadge}
           title="لم تُضف أي وثيقة بعد."
@@ -66,6 +80,7 @@ export default async function ObligationsPage() {
       intro="التأخر في تجديد هذه الوثائق قد يعرّضك لغرامات، وسيذكّرك النظام قبل انتهاء كل منها في «يحتاج قرارك»."
       actions={canEdit ? <ObligationForm /> : undefined}
     >
+      <ObligationSuggestions items={suggestions} />
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={TriangleAlert}
