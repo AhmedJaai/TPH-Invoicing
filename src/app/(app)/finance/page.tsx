@@ -18,6 +18,7 @@ import { formatShare } from "@/lib/finance/format";
 import { EMPLOYEE, INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMoment, formatMonth } from "@/lib/riyadh-time";
 import { loadPnlSeries, type PnlView } from "@/services/profit.service";
+import { ProfitSpark } from "@/components/profit-spark";
 import { loadStoredReading } from "@/services/finance-reading.service";
 import { loadOutstanding } from "@/services/outstanding.service";
 import { T } from "@/components/i18n/t";
@@ -147,6 +148,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
               : <><T s="هامشه {0}، {1} لأنه ينقصه ما في القائمة أدناه." a={[<strong key="0" className="text-ink">{formatShare(p.netMarginBp)}</strong>, <strong key="1" className="text-ink">وليس صافياً بعد</strong>]} /></>
             }
           >
+            <ProfitSpark months={series.map(trendOf)} active={month} />
             {p.gaps.length > 0 && (
               <ul className="space-y-2 text-xs leading-relaxed text-ink-soft">
                 {p.gaps.map((g) => (
