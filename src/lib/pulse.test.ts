@@ -8,6 +8,7 @@ const base = {
   lastWeek: [{ hour: 8, paidMinor: 50_00, orders: 2 }, { hour: 21, paidMinor: 900_00, orders: 30 }],
   lastWeekToNow: { paidMinor: 320_00, orders: 12 },
   yesterday: { paidMinor: 4_200_00, orders: 140 },
+  yesterdayDay: "2026-11-24",
   yesterdayUsualMinor: 3_500_00,
   syncedAt: "2026-11-25T10:00:00.000Z",
 };
@@ -40,8 +41,15 @@ describe("نبض المقهى", () => {
   });
 
   it("«أمس» قبل الخامسة فجراً هو يومُ العمل الذي أُغلق للتوّ، وبعدها أمسُ بمعتاده", () => {
-    expect(buildPulse(base).lastDay).toEqual({ paidMinor: 4_200_00, orders: 140, vsBp: 2000, against: "USUAL" });
+    expect(buildPulse(base).lastDay).toEqual({ day: "2026-11-24", paidMinor: 4_200_00, orders: 140, vsBp: 2000, against: "USUAL" });
     const late = buildPulse({ ...base, nowHour: 4 });
-    expect(late.lastDay).toEqual({ paidMinor: 400_00, orders: 14, vsBp: 2500, against: "LAST_WEEK" });
+    expect(late.lastDay).toEqual({ day: "2026-11-25", paidMinor: 400_00, orders: 14, vsBp: 2500, against: "LAST_WEEK" });
+  });
+
+  it("أمسُ دون معتاده بـ٣٥٪ فأكثر يُسأل عنه، وما فوقه لا", async () => {
+    const { lowSalesDay } = await import("./pulse");
+    expect(lowSalesDay(buildPulse({ ...base, yesterday: { paidMinor: 2_000_00, orders: 70 } }))).toEqual({ day: "2026-11-24", paidMinor: 2_000_00, vsBp: -4286 });
+    expect(lowSalesDay(buildPulse(base))).toBeNull();
+    expect(lowSalesDay(null)).toBeNull();
   });
 });

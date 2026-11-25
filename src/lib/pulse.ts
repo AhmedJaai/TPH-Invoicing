@@ -28,6 +28,8 @@ export interface PulseInput {
   lastWeekToNow: { paidMinor: number; orders: number } | null;
   /** أمس كاملاً، ومتوسطُ أيّام الأسبوع نفسها قبله (حتى أربعة). */
   yesterday: { paidMinor: number; orders: number } | null;
+  /** يومُ «أمس» نفسُه (`YYYY-MM-DD`). */
+  yesterdayDay: string;
   yesterdayUsualMinor: number | null;
   /** آخرُ مزامنةٍ ناجحة — ISO. */
   syncedAt: string | null;
@@ -49,7 +51,7 @@ export interface PulseView {
    * آخرُ يوم عملٍ اكتمل — «أمس» بلسان صاحب المقهى. بعد منتصف الليل وقبل الخامسة يومُ العمل الجاري
    * أُغلق للتوّ (المقهى يُغلق نحو الثانية والنصف) فهو هو، ويُقارَن بنظيره قبل أسبوع؛ وبعدها أمسُ بمعتاده.
    */
-  lastDay: { paidMinor: number; orders: number; vsBp: number | null; against: "LAST_WEEK" | "USUAL" } | null;
+  lastDay: { day: string; paidMinor: number; orders: number; vsBp: number | null; against: "LAST_WEEK" | "USUAL" } | null;
   syncedAt: string | null;
 }
 
@@ -86,8 +88,8 @@ export function buildPulse(i: PulseInput): PulseView {
     peakMinor,
     yesterday: i.yesterday ? { ...i.yesterday, vsUsualBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor) } : null,
     lastDay: i.nowHour < BUSINESS_DAY_START_HOUR && i.nowHour >= 3
-      ? (orders > 0 ? { paidMinor, orders, vsBp: i.lastWeekToNow ? bp(paidMinor, i.lastWeekToNow.paidMinor) : null, against: "LAST_WEEK" as const } : null)
-      : i.yesterday ? { ...i.yesterday, vsBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor), against: "USUAL" as const } : null,
+      ? (orders > 0 ? { day: i.businessDay, paidMinor, orders, vsBp: i.lastWeekToNow ? bp(paidMinor, i.lastWeekToNow.paidMinor) : null, against: "LAST_WEEK" as const } : null)
+      : i.yesterday ? { day: i.yesterdayDay, ...i.yesterday, vsBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor), against: "USUAL" as const } : null,
     syncedAt: i.syncedAt,
   };
 }
@@ -95,4 +97,14 @@ export function buildPulse(i: PulseInput): PulseView {
 /** يومُ العمل لساعةٍ ويومٍ بتوقيت الرياض: قبل الخامسة فجراً يومُ أمس. */
 export function businessDayOf(riyadhDay: string, riyadhHour: number, addDays: (d: string, n: number) => string): string {
   return riyadhHour < BUSINESS_DAY_START_HOUR ? addDays(riyadhDay, -1) : riyadhDay;
+}
+
+/** يومٌ اكتمل وبيعُه دون معتاد يومه بهذا فأكثر — يُسأل عنه (خمسةُ أيّامٍ من مئةٍ وستّين في التاريخ). */
+export const LOW_DAY_BP = -3500;
+
+/** أمسُ أقلُّ من معتاده بكثير؟ — للمقارنة بالمعتاد وحدها (يومٌ مكتمل بأربعة أسابيعه). */
+export function lowSalesDay(p: PulseView | null): { day: string; paidMinor: number; vsBp: number } | null {
+  const d = p?.lastDay;
+  if (!d || d.against !== "USUAL" || d.vsBp === null || d.vsBp > LOW_DAY_BP) return null;
+  return { day: d.day, paidMinor: d.paidMinor, vsBp: d.vsBp };
 }

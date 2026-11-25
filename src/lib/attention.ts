@@ -3,7 +3,7 @@ import {
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import type { Capability } from "./permissions";
-import { formatDay, formatMonth } from "./riyadh-time";
+import { formatDay, formatMonth, formatWeekday } from "./riyadh-time";
 import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
 import { driftLine, driftMagnitude } from "./month-seal";
@@ -286,6 +286,8 @@ export interface AttentionFacts {
   monthsLeftOpen?: string[];
   /** سعرُ وحدةٍ من الفواتير يخالف كلفةَ الكتالوج أضعافاً — `ratio` الفواتيرُ ÷ الكتالوج (فحص الصباح، 108). */
   unitCostSuspects?: { name: string; ratio: number }[];
+  /** يومُ عملٍ مكتملٌ بيعُه دون معتاد يومه بكثير (`lowSalesDay`). */
+  lowSalesDay?: { day: string; paidMinor: number; vsBp: number } | null;
   /** جردُ الأسبوع الماضي لم يُقفل بعد يومين من نهايته (`lateWeeklyCount`). */
   lateCount?: { weekStart: string; weekEnd: string; daysLate: number; draft: boolean } | null;
   /** أبوابٌ تجاوزت ميزانيةَ الشهر الجاري (111). */
@@ -1060,6 +1062,28 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: uc.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: uc.slice(0, 8).map((x) => ({ label: x.name, sub: `سعر الفواتير ${fmt(x.ratio)} من الكتالوج`, href: "/finance/stock#unit-cost" })),
+      needs: "amounts:view",
+    });
+  }
+
+  /*
+    يومٌ بيعُه دون معتاد يومه بكثير — جهازُ فودكس لم يُزامن، أو طلباتٌ لم تُسجَّل، أو ركودٌ حقيقيّ:
+    كلُّها تُسأل في يومها لا آخرَ الشهر. خمسةُ أيّامٍ من مئةٍ وستّين في التاريخ.
+  */
+  if (f.lowSalesDay) {
+    const l = f.lowSalesDay;
+    out.push({
+      id: "sales-day-low",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: `مبيعات ${formatWeekday(l.day).split(" ")[0]} ${formatDay(l.day)} أقل من معتادها بـ${Math.abs(Math.round(l.vsBp / 100))}٪`,
+      detail: "أقل بكثير من متوسط اليوم نفسه في الأسابيع الأربعة السابقة. قد يكون جهاز فودكس لم يُزامن، أو طلبات لم تُسجَّل، أو ركوداً حقيقياً.",
+      action: "تأكد أن أجهزة فودكس كانت متصلة وأن كل الطلبات سُجّلت، وراجع صندوق ذلك اليوم. وإن كان السبب معروفاً فأجّل البند.",
+      actionLabel: "افتح المبيعات",
+      href: "/finance/sales",
+      count: 1,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: [],
       needs: "amounts:view",
     });
   }

@@ -61,6 +61,7 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
     today: todayRows, lastWeek: weekRows,
     lastWeekToNow: weekRows.length === 0 ? null : { paidMinor: toNow.reduce((s, h) => s + h.paidMinor, 0), orders: toNow.reduce((s, h) => s + h.orders, 0) },
     yesterday: byDay.get(yesterday) ?? null,
+    yesterdayDay: yesterday,
     yesterdayUsualMinor: usual.length === 0 ? null : Math.round(usual.reduce((a, b) => a + b, 0) / usual.length),
     syncedAt: sync.rows[0]?.at ? new Date(sync.rows[0].at).toISOString() : null,
   });

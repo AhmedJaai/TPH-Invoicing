@@ -96,6 +96,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "backup-stale": FileQuestion,
   "unit-cost-suspect": FileQuestion,
   "inventory-count-late": FileQuestion,
+  "sales-day-low": FileQuestion,
   "budget-over": PiggyBank,
   "statement-credit-unrecorded": ReceiptText,
   "line-qty-misread": ScanSearch,
