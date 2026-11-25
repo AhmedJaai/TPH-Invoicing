@@ -36,6 +36,8 @@ import { toast } from "./ui-client";
  */
 const BACKLOG_EVERY_MS = 10 * 60_000;
 const SYNC_EVERY_MS = 3 * 60 * 60_000;
+/** فودكسُ كلَّ أربعين دقيقة والصفحةُ مفتوحة — `BROWSER_FOODICS_EVERY_MS` في الخادم. */
+const FOODICS_EVERY_MS = 40 * 60_000;
 /** مزامنةٌ تعثّرت (شبكةٌ انقطعت، ٥٠٢، مزامنةٌ أخرى جارية) تُعاد بعد خمس دقائق لا بعد ثلاث ساعات. */
 const SYNC_RETRY_MS = 5 * 60_000;
 /**
@@ -164,8 +166,8 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
         فودكس: ما تغيّر منذ آخر قراءة. صامتٌ إن لم يكن موصولاً أو لم يأتِ بجديد؛
         والطابعُ بعد الردّ، والمتعثّرةُ تُعاد بعد خمس دقائق — كالدرايف.
       */
-      if (elapsed("tph:auto-foodics", SYNC_EVERY_MS)) {
-        stamp("tph:auto-foodics", Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
+      if (elapsed("tph:auto-foodics", FOODICS_EVERY_MS)) {
+        stamp("tph:auto-foodics", Date.now() - FOODICS_EVERY_MS + SYNC_RETRY_MS);
         const r = await postJson<{ counts?: { salesWritten?: number; linesRevised?: number } }>("/api/foodics-sync", { background: true });
         if (r.ok) {
           stamp("tph:auto-foodics");

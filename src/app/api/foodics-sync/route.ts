@@ -12,7 +12,7 @@ import { foodicsConfigured } from "@/lib/foodics/client";
 import { guard, respondTo } from "@/services/guard";
 import { runAsSystemIf } from "@/lib/actor-context";
 import { runLeasedFoodicsSync } from "@/services/foodics-sync.service";
-import { BROWSER_SYNC_EVERY_MS, scheduledRanRecently } from "@/services/cron.service";
+import { BROWSER_FOODICS_EVERY_MS, scheduledRanRecently } from "@/services/cron.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,7 +48,7 @@ async function handle(request: Request) {
   }
 
   /* الخلفيّةُ من القشرة تُترَك إن نجح تشغيلٌ مجدول قريباً — قرأ ما تغيّر، فلا يعيده كلُّ جهاز */
-  if (read.body.background && await scheduledRanRecently("foodics", BROWSER_SYNC_EVERY_MS)) {
+  if (read.body.background && await scheduledRanRecently("foodics", BROWSER_FOODICS_EVERY_MS)) {
     return NextResponse.json({ ok: true, configured: true, scheduled: true });
   }
 
