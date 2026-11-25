@@ -103,7 +103,8 @@ async function main() {
       driveId: documents.driveFileId,
       fileName: documents.fileName,
       supplierSlug: suppliers.slug,
-      periodMonth: documents.periodMonth,
+      /* شهرُ الدفاتر شهرُ الفاتورة؛ وشهرُ المستند مجلّدُه في الدرايف — صورةُ ٧ يونيو رُفعت في يوليو فبقيت في مجلّده والفاتورةُ في يونيو */
+      periodMonth: sql<string | null>`coalesce(${invoices.periodMonth}, ${documents.periodMonth})`,
       invoiceNumber: invoices.invoiceNumber,
       totalMinor: invoices.totalMinor,
       hasInvoice: sql<boolean>`${invoices.id} is not null`,
@@ -128,7 +129,20 @@ async function main() {
   console.log(`  القاعدة: ${records.length} قيداً\n`);
 
   /* ── المقابلة ── */
-  const findings = auditTruth(archive, records);
+  /*
+    وأصلُ المرفوض معروفٌ لا مفقود: صورةٌ ثانيةٌ لفاتورةٍ مسجّلةٍ برقمها، رفضها إنسانٌ أو المزامنة
+    عن علم. استثناؤه من القاعدة وحدها جعله «في الأرشيف بلا قيد» — ٢٤ إنذاراً كاذباً
+    (فواتير ZEDZd بصورتيها) والفاتورةُ نفسها مسجّلة.
+  */
+  const rejected = await db
+    .select({ driveId: documents.driveFileId })
+    .from(documents)
+    .where(and(eq(documents.status, "REJECTED"), isNotNull(documents.driveFileId)));
+  const rejectedDrive = new Set(rejected.map((r) => r.driveId));
+  const known = archive.filter((f) => !rejectedDrive.has(f.driveId));
+  if (known.length < archive.length) console.log(`  واستُثني ${archive.length - known.length} ملفّاً أصلُه مستندٌ مرفوض عن علم\n`);
+
+  const findings = auditTruth(known, records);
   const counts = summarize(findings);
 
   console.log("───────────────────────────────────\n");
