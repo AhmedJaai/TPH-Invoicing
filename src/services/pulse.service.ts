@@ -4,6 +4,7 @@
  * والطلبُ المعدود ما دُفع فيه شيء — مشروبُ موظّفٍ أو طلبٌ مخصومٌ كلُّه ليس «طلباً» بمتوسط صفر.
  */
 import { cache } from "react";
+import { decimalToMilli } from "@/lib/inventory/units";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildPulse, businessDayOf, type HourSales, type PulseView } from "@/lib/pulse";
@@ -31,7 +32,7 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
        ${until ? sql`and o.opened_at <= ${until.toISOString()}` : sql``}
      group by 1
   `);
-  const [today, lastWeek, lastWeekToNow, days, sync] = await Promise.all([
+  const [today, lastWeek, lastWeekToNow, days, sync, top] = await Promise.all([
     hourly(day, now),
     hourly(weekAgo, null),
     hourly(weekAgo, nowWeekAgo),
@@ -45,6 +46,15 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
     `),
     conn.execute<{ at: string | null }>(sql`
       select max(finished_at)::text as at from foodics_sync_runs where status in ('OK', 'SUCCESS', 'DONE', 'ok', 'success')
+    `),
+    /* ما يُطلب اليوم — سطورُ البيع نفسُها التي يقرؤها الجرد، بلا إضافاتٍ ولا مرتجعٍ ولا ملغى ولا ضيافة */
+    conn.execute<{ name: string; qty: string }>(sql`
+      select min(sl.description) as name, sum(sl.quantity)::text as qty
+        from sale_lines sl join sales s on s.id = sl.sale_id
+       where s.business_date = ${day} and not sl.is_modifier and not sl.is_refund
+         and not sl.is_void and not s.is_void and not sl.is_complimentary
+       group by coalesce(sl.pos_product_id::text, sl.description)
+       order by sum(sl.quantity) desc limit 3
     `),
   ]);
   const rows = (r: { rows: { hour: number; paid: string; orders: number }[] }): HourSales[] =>
@@ -64,6 +74,10 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
     yesterdayDay: yesterday,
     yesterdayUsualMinor: usual.length === 0 ? null : Math.round(usual.reduce((a, b) => a + b, 0) / usual.length),
     syncedAt: sync.rows[0]?.at ? new Date(sync.rows[0].at).toISOString() : null,
+    topItems: top.rows.flatMap((r) => {
+      const quantityMilli = decimalToMilli(r.qty);
+      return quantityMilli === null ? [] : [{ name: r.name, quantityMilli }];
+    }),
   });
 }
 

@@ -33,6 +33,8 @@ export interface PulseInput {
   yesterdayUsualMinor: number | null;
   /** آخرُ مزامنةٍ ناجحة — ISO. */
   syncedAt: string | null;
+  /** أكثرُ الأصناف طلباً اليوم حتى الآن، بالكمّيّة (مِلّي) — بلا مرتجعٍ ولا ملغى ولا ضيافة. */
+  topItems?: readonly { name: string; quantityMilli: number }[];
 }
 
 export interface PulseView {
@@ -53,6 +55,8 @@ export interface PulseView {
    */
   lastDay: { day: string; paidMinor: number; orders: number; vsBp: number | null; against: "LAST_WEEK" | "USUAL" } | null;
   syncedAt: string | null;
+  /** أكثرُ ثلاثة أصنافٍ طلباً اليوم — «ما الذي يُطلب الآن؟». */
+  topItems: { name: string; quantityMilli: number }[];
 }
 
 const bp = (now: number, before: number | null) => (before === null || before <= 0 ? null : Math.round(((now - before) * 10_000) / before));
@@ -91,6 +95,7 @@ export function buildPulse(i: PulseInput): PulseView {
       ? (orders > 0 ? { day: i.businessDay, paidMinor, orders, vsBp: i.lastWeekToNow ? bp(paidMinor, i.lastWeekToNow.paidMinor) : null, against: "LAST_WEEK" as const } : null)
       : i.yesterday ? { day: i.yesterdayDay, ...i.yesterday, vsBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor), against: "USUAL" as const } : null,
     syncedAt: i.syncedAt,
+    topItems: [...(i.topItems ?? [])].filter((t) => t.quantityMilli > 0).sort((a, b) => b.quantityMilli - a.quantityMilli).slice(0, 3),
   };
 }
 

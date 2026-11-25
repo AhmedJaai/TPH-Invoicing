@@ -7,6 +7,7 @@ import { T } from "@/components/i18n/t";
 import { timeAgo, countNoun, ORDER } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatWeekday } from "@/lib/riyadh-time";
+import { formatUnits } from "@/lib/finance/format";
 import type { PulseView } from "@/lib/pulse";
 
 
@@ -58,6 +59,18 @@ export function CafePulse({ pulse, month }: { pulse: PulseView; month?: PulseMon
               ? <T s="{0} · متوسط الطلب {1}" a={[countNoun(pulse.orders, ORDER), <bdi key="1" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.avgOrderMinor ?? 0)}</bdi>]} />
               : "لم يُسجَّل طلب بعد في يوم العمل هذا"}
           </p>
+          {/* «ما الذي يُطلب الآن؟» — الرقمُ وحده لا يقول ما يُحضَّر خلف البار */}
+          {pulse.topItems.length > 0 && (
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="font-bold text-muted">الأكثر طلباً اليوم</span>
+              {pulse.topItems.map((t) => (
+                <span key={t.name} className="inline-flex items-center gap-1 rounded-full bg-sunken/70 px-2.5 py-1">
+                  <bdi dir="auto" className="font-medium">{t.name}</bdi>
+                  <span className="nums font-bold text-accent">×{formatUnits(t.quantityMilli)}</span>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-3">
