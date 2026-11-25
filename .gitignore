@@ -68,3 +68,7 @@ docs/handbook/handbook.html
 
 # نسخُ العمل المؤقّتة للوكلاء
 .claude/worktrees/
+
+# محرّك التنبّؤ (Python)
+forecast/.venv/
+__pycache__/

@@ -112,6 +112,9 @@ export type AuditAction =
   | "DOCUMENT_EXPIRY_SAVED"
   | "DOCUMENT_EXPIRY_CLOSED"
   | "TASK_SAVED"
+  /* حدثٌ يعرفه أحمد ولا تعرفه البيانات أُضيف إلى التنبّؤ (إغلاق · نفاد · فعاليّة) أو أُلغي */
+  | "FORECAST_EVENT_SAVED"
+  | "FORECAST_EVENT_VOIDED"
   | "TASK_CLOSED"
   /* حدُّ الرصيد الأدنى الذي يُنبَّه تحته «النقد القادم» */
   | "PAYMENT_CASH_FLOOR_SET"

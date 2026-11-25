@@ -1,0 +1,22 @@
+[project]
+name = "tph-forecast"
+version = "1.0.0"
+description = "محرّك التنبّؤ الليليّ — صفحةٌ منعزلة تعرض المتوقَّع ولا تقرّر"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy>=2.1",
+  "pandas>=2.2",
+  "lightgbm>=4.5",
+  "statsmodels>=0.14.4",
+  "scikit-learn>=1.5",
+  "hijridate>=2.5",
+  "requests>=2.32",
+  "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+# النموذجُ المدرَّب مسبقاً (Chronos من أمازون) — يعمل بلا GPU؛ وغيابُه يُسقطه من المزيج ويُقال
+foundation = ["chronos-forecasting>=2.0", "torch>=2.4"]
+
+[tool.uv]
+package = false

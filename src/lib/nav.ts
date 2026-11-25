@@ -133,6 +133,8 @@ export const AREAS: readonly NavArea[] = [
       { href: "/finance/advisor", label: "المستشار", needs: "month:close" },
       { href: "/finance/position", label: "الوضع الآن" },
       { href: "/finance/sales", label: "المبيعات" },
+      /* صفحةٌ منعزلة تعرض المتوقَّع ولا تقرّر شيئاً (أحمد، ٢٥ نوفمبر ٢٠٢٦) */
+      { href: "/finance/forecast", label: "التوقّع" },
       /* لكلّ صنف مخزون: كم اشتُري، كم بِيع منه، وأين ذهب الباقي */
       { href: "/finance/stock", label: "المشترى والمباع" },
     ],

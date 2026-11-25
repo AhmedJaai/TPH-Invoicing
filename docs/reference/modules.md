@@ -184,6 +184,7 @@
 | `src/lib/finance/stock-window.ts` · `stock-flow.ts` · `stock-flow.service.ts` | المعادلةُ من عدٍّ إلى عدّ — لتكلفة المبيعات بالجرد وللفرق المتكرّر في الأصناف |
 | `src/lib/finance/link-evidence.ts` · `stock-link.service.ts` · `/finance/stock/links` | **ربطُ بنود الفواتير بأصناف المخزون** بدليل فودكس (المورّدُ والأيّامُ والمبلغُ نفسُها) — يُقترَح ويُقرّ بضغطة |
 | `sales-analysis.service.ts` · `/finance/sales` | **المبيعات**: يوماً وساعةً وصنفاً بهامشه، ما صعد وما هبط، وما خرج من الإيراد — بإيراد قائمة الدخل نفسِه |
+| `forecast.service.ts` · `/finance/forecast` · `forecast/` (Python) | **التوقّع**: منعزل، لا يقرؤه مال. المحرّكُ الليليّ يقرأ ويكتب عبر `/api/cron/forecast`، والتنبّؤُ الحيّ في `lib/forecast/nowcast.ts`، والأحداثُ بـ`/api/forecast-event` |
 | `finance-position.service.ts` · `/finance/position` | **الوضع الآن**: رصيدُ البنك، المستحقُّ للمورّدين، ضريبةُ الإقرار، النقدُ والصندوق — كلٌّ من مصدره القائم |
 | `src/lib/finance/reading.ts` · `finance-reading.service.ts` | **القراءةُ الذكيّة**: حقائقُ مرقَّمة يحسبها الخادم، ويُتحقَّق أنّ كلَّ رقمٍ ذكره النموذج منها؛ تُحفَظ بمدخلاتها (`npm run finance:reading-eval`) |
 | `src/lib/payroll/calc.ts` · `attendance.ts` · `saudi-rules.ts` · `deductions.ts` · `payroll.service.ts` · `/payroll` · `/a/[token]` | **الموظّفون**: الراتبُ بشهره، المسيّرُ محسوباً (`payslip`)، حاسبةُ التأخير وجزاءاتُ لائحة تنظيم العمل بحدود نظام العمل (`saudi-rules.ts`)، توزيعُ الحوالة بغرضها وأثرُه في قائمة الدخل (`payrollReclass`)، الحضورُ برابطٍ وموقعٍ وشبكة، قسيمةُ الراتب، ملفُّ CSV (`/api/payroll/export`) |

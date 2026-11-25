@@ -2876,3 +2876,63 @@ export const tasks = pgTable("tasks", {
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("tasks_open_due_idx").on(t.dueOn).where(sql`closed_at is null`)]);
+
+/**
+ * التنبّؤ (هجرة 117) — صفحةٌ منعزلة تعرض المتوقَّع ولا تقرّر (أحمد، ٢٥ نوفمبر ٢٠٢٦).
+ *
+ * لا يقرؤها حسابُ مالٍ ولا جردٌ ولا مطابقة، ولا يكتب فيها إلّا المحرّكُ الليليّ
+ * (`/api/cron/forecast`) والإنسانُ في `forecast_events`. والقيمُ هللاتٌ ومِلّي صحيحة.
+ */
+export const forecastRuns = pgTable("forecast_runs", {
+  id: id(),
+  issuedOn: text("issued_on").notNull(),
+  historyFrom: text("history_from").notNull(),
+  historyTo: text("history_to").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  models: jsonb("models").notNull().default({}),
+  summary: jsonb("summary").notNull().default({}),
+  durationMs: integer("duration_ms"),
+  createdAt: now(),
+}, (t) => [index("forecast_runs_issued_idx").on(t.issuedOn, t.createdAt)]);
+
+export const forecastPoints = pgTable("forecast_points", {
+  runId: text("run_id").notNull().references(() => forecastRuns.id, { onDelete: "cascade" }),
+  series: text("series").notNull(),
+  metric: text("metric").notNull(),
+  day: text("day").notNull(),
+  hour: smallint("hour"),
+  p10: bigint("p10", { mode: "number" }).notNull(),
+  p50: bigint("p50", { mode: "number" }).notNull(),
+  p90: bigint("p90", { mode: "number" }).notNull(),
+});
+
+export const forecastDayContext = pgTable("forecast_day_context", {
+  runId: text("run_id").notNull().references(() => forecastRuns.id, { onDelete: "cascade" }),
+  day: text("day").notNull(),
+  context: jsonb("context").notNull(),
+}, (t) => [primaryKey({ columns: [t.runId, t.day] })]);
+
+export const forecastBacktests = pgTable("forecast_backtests", {
+  runId: text("run_id").notNull().references(() => forecastRuns.id, { onDelete: "cascade" }),
+  model: text("model").notNull(),
+  series: text("series").notNull(),
+  metric: text("metric").notNull(),
+  horizon: text("horizon").notNull(),
+  wapeBp: integer("wape_bp").notNull(),
+  biasBp: integer("bias_bp").notNull(),
+  coverageBp: integer("coverage_bp"),
+  n: integer("n").notNull(),
+}, (t) => [primaryKey({ columns: [t.runId, t.model, t.series, t.metric, t.horizon] })]);
+
+export const forecastEvents = pgTable("forecast_events", {
+  id: id(),
+  kind: text("kind").notNull(),
+  label: text("label").notNull(),
+  fromDay: text("from_day").notNull(),
+  toDay: text("to_day").notNull(),
+  posProductId: text("pos_product_id").references(() => posProducts.id, { onDelete: "set null" }),
+  fromHour: smallint("from_hour"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+});

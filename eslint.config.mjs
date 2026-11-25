@@ -68,6 +68,8 @@ const eslintConfig = defineConfig([
     // اختبارُ الطفرات وتقريرُ التغطية — نسخةٌ مؤقّتة من الشجرة ومخرَجاتُ تشغيل
     ".stryker-tmp/**",
     "reports/**",
+    // بيئةُ محرّك التنبّؤ (Python) — حزمُها تحمل ملفّاتِ JS ليست من التطبيق
+    "forecast/.venv/**",
     "coverage/**",
   ]),
 ]);

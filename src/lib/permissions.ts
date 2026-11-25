@@ -83,7 +83,9 @@ export type Capability =
   | "recipe:edit"
   /** قائمةُ المهام والتذكيرات: يراها كلُّ دور، ويكتبها من يعمل (لا المراجع). */
   | "task:view"
-  | "task:edit";
+  | "task:edit"
+  /** أحداثُ التنبّؤ (إغلاق · نفاد · فعاليّة): تمسّ صفحةَ التنبّؤ وحدها، ولا مالَ فيها. */
+  | "forecast:edit";
 
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
@@ -91,7 +93,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view", "payroll:edit",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
-    "task:view", "task:edit",
+    "task:view", "task:edit", "forecast:edit",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
@@ -99,7 +101,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
     "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit",
     "expense:edit", "month:close", "audit:view",
     "inventory:view", "inventory:count", "recipe:edit",
-    "task:view", "task:edit",
+    "task:view", "task:edit", "forecast:edit",
   ],
   // مدير المشتريات يرفع ويتابع الناقص فقط — لا أرقام مالية ولا بنك ولا رواتب
   PURCHASING: ["document:upload", "document:view", "supplier:view", "inventory:view", "inventory:count", "task:view", "task:edit"],
@@ -156,6 +158,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "recipe:edit": "تعديل الوصفات",
   "task:view": "عرض المهام والتذكيرات",
   "task:edit": "كتابة المهام والتذكيرات",
+  "forecast:edit": "تسجيل أحداث التنبّؤ",
 };
 
 /** يُرمى داخل الواجهات البرمجية ليُترجم إلى 403. */

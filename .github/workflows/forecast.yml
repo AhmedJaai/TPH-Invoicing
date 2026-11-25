@@ -1,0 +1,54 @@
+name: التنبّؤ الليليّ
+
+# محرّكُ التنبّؤ (`forecast/`) كلَّ ليلةٍ في ٠٤:٠٠ بتوقيت الرياض (٠١:٠٠ UTC)، بعد أن يُغلق يومُ العمل
+# (المقهى يبيع حتى الثالثة فجراً) وبعد مزامنة فودكس عند الدقيقة ١٧ من كلّ ساعة.
+# يقرأ التاريخ من `/api/cron/forecast` ويرسل إليه ما تنبّأ به — بسرّ CRON_SECRET وحده، بلا اتّصالٍ
+# بالقاعدة. وما يكتبه لا يصل إلّا إلى جداول `forecast_*`: صفحةٌ منعزلة لا مالَ فيها ولا قرار.
+# والفشلُ يُسقط المهمّة فيصل بريدُ GitHub إلى صاحب المستودع، وتقول الصفحةُ «التنبّؤ أقدم من اليوم».
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forecast
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: forecast
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # النموذجُ المدرَّب مسبقاً (Chronos-2، نحو ٥٠٠ ميغابايت) يُحفظ بين الليالي
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-chronos-2
+
+      # torch للمعالج وحده (لا CUDA): أصغرُ بعشر مرّات وأسرعُ تثبيتاً
+      - name: ثبّت المحرّك
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+            numpy pandas lightgbm statsmodels scikit-learn hijridate requests scipy \
+            "torch>=2.4" "chronos-forecasting>=2.0"
+
+      - name: تنبّأ وأرسل
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          HF_HUB_DISABLE_TELEMETRY: "1"
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::سرّ CRON_SECRET غير موجود في أسرار المستودع"; exit 1; fi
+          python -m tph_forecast.cli --url https://tph-invoicing.vercel.app

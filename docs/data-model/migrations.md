@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ١٠٦
+## الجداول — ١١١
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` `supplier_merges` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -21,6 +21,7 @@
 `capture_links` `captures`
 `employees` `employee_rates` `payroll_adjustments` `payroll_attendance` `payroll_weeks` `payroll_links` `attendance_checkins` `payroll_violations`
 `advisor_threads` `advisor_messages` `advisor_plan_items` · `tasks` · `team_messages` · `employee_shifts` `employee_shift_plans` · `team_board` `team_requests` `team_push_subscriptions` · `server_errors`
+`forecast_runs` `forecast_points` `forecast_day_context` `forecast_backtests` `forecast_events`
 
 التعريف في `src/db/schema.ts`.
 
@@ -157,6 +158,7 @@
 | `113_delivery_note.sql` | يضيف نوعَ المستند `DELIVERY_NOTE` (سند تسليم أو أمر توريد): يُؤرشَف ولا يُقيَّد فاتورةً — لا يمسّ مالاً |
 | `114_declaration_memo.sql` | يقبل نوعَ الإدخال `MEMO` («للعلم»: يُعرض تحت الربح ولا يُطرح) في `finance_declarations` — إضافةٌ لا تمسّ مالاً |
 | `115_opening_never_stocked.sql` | يقبل مصدرَ الافتتاحيّ `NEVER_STOCKED` (صفرٌ بدليل: لم يدخل الصنفَ شيءٌ قبل الفترة) في `inventory_count_lines` — إضافةٌ لا تمسّ مالاً |
+| `117_forecast.sql` | جداولُ التوقّع المنعزلة: التشغيلُ ونقاطُه (p10 · p50 · p90 هللاتٍ ومِلّي صحيحة، باليوم والساعة)، وسياقُ كلّ يوم، والاختبارُ الرجوعيّ، وأحداثٌ يسجّلها أحمد — لا يقرؤها حسابُ مال |
 | `116_declaration_days.sql` | يضيف `from_day` و`to_day` إلى `finance_declarations`: توزيعٌ بالأيّام لدفعةٍ تغطّي من يومٍ إلى يوم، وقيدٌ يقصره على `SPREAD` ويطابق شهرَيه — إضافةٌ فارغة لما قبلها |
 | `104_count_parts.sql` | `inventory_count_lines.count_parts` — العدُّ بخاناته (كرتون · حبّة · كيلو · جرام) كما كُتب، بجانب مجموعه — إضافةٌ خالصة |
 | `100_team_board.sql` | «TPH Team»: `team_board` (مرجعُ النظافة والطحنات والوصفات والبن والإعلانات — لا مهامّ) و`team_requests` (اقتراحُ تعديل · إجازة · تبديل · تالف، لا يُنفَّذ إلّا بإقرار) — إضافةٌ خالصة |

@@ -138,6 +138,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   DOCUMENT_EXPIRY_SAVED: "حفظ وثيقة بتاريخ انتهائها",
   DOCUMENT_EXPIRY_CLOSED: "أرشفة وثيقة أو إعادتها",
   TASK_SAVED: "حفظ مهمّة أو تذكير",
+  FORECAST_EVENT_SAVED: "تسجيل حدثٍ في التنبّؤ",
+  FORECAST_EVENT_VOIDED: "إلغاء حدثٍ في التنبّؤ",
   TASK_CLOSED: "إنجاز مهمّة أو إسقاطها أو إعادتها",
   PAYMENT_CASH_FLOOR_SET: "ضبط حدّ الرصيد الأدنى",
   CASH_CUSTODY_SET: "أين نقد الصندوق",

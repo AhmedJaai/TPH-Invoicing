@@ -9,7 +9,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { todayInRiyadh } from "./riyadh-time";
 
-export type CronJob = "foodics" | "drive" | "daily";
+export type CronJob = "foodics" | "drive" | "daily" | "forecast";
 
 /** صفُّ آخر تشغيلٍ في `job_state`. */
 export const cronStateRow = (job: CronJob) => `cron:${job}`;

@@ -121,6 +121,7 @@ const WRITE_WITH_VIEW: Record<string, string> = {
 const CRON_DIR = "src/app/api/cron/";
 const CRON_WRITE_WITH_VIEW: Record<string, string> = {
   "src/app/api/cron/daily/route.ts POST": "يقرأ المبالغ ويكتب لقطتها اليوميّة وحدها (`daily_figures`) — لا مال ولا قرار",
+  "src/app/api/cron/forecast/route.ts POST": "يكتب ما تنبّأ به المحرّكُ الليليّ في جداول `forecast_*` وحدها — صفحةٌ منعزلة لا مالَ فيها ولا قرار",
 };
 
 const isReadOnly = (capability: string) => /:view$/.test(capability);
