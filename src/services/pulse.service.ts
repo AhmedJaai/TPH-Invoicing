@@ -1,6 +1,7 @@
 /**
  * نبضُ المقهى من مرآة فودكس (`foodics_orders`) — قراءةٌ لا كتابة، والمالُ ما دفعه الزبائن
  * (مشروباتُ الموظفين خارجه: `method_type = 5`) كما تحسبه «المبيعات» (`sales-analysis.service.ts`).
+ * والطلبُ المعدود ما دُفع فيه شيء — مشروبُ موظّفٍ أو طلبٌ مخصومٌ كلُّه ليس «طلباً» بمتوسط صفر.
  */
 import { cache } from "react";
 import { sql } from "drizzle-orm";
@@ -24,7 +25,7 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
   const hourly = (d: string, until: Date | null) => conn.execute<{ hour: number; paid: string; orders: number }>(sql`
     select extract(hour from o.opened_at at time zone 'Asia/Riyadh')::int as hour,
            coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint as paid,
-           count(distinct o.id) filter (where o.status = 4)::int as orders
+           count(distinct o.id) filter (where o.status = 4 and p.method_type <> 5 and p.amount_minor > 0)::int as orders
       from foodics_orders o join foodics_order_payments p on p.order_id = o.id
      where o.status in (4, 5) and o.business_date = ${d} and o.opened_at is not null
        ${until ? sql`and o.opened_at <= ${until.toISOString()}` : sql``}
@@ -37,7 +38,7 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
     conn.execute<{ day: string; paid: string; orders: number }>(sql`
       select o.business_date as day,
              coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint as paid,
-             count(distinct o.id) filter (where o.status = 4)::int as orders
+             count(distinct o.id) filter (where o.status = 4 and p.method_type <> 5 and p.amount_minor > 0)::int as orders
         from foodics_orders o join foodics_order_payments p on p.order_id = o.id
        where o.status in (4, 5) and o.business_date in (${sql.join([yesterday, ...sameDays].map((d) => sql`${d}`), sql`, `)})
        group by 1
