@@ -9,6 +9,8 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { MonthClose } from "@/components/month-close";
+import { MonthCorrection } from "@/components/month-correction";
+import { loadMonthsInCorrection } from "@/services/month-correction.service";
 import { previousMonth } from "@/lib/filing";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
@@ -72,7 +74,10 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
   /* `?month=` يفتح شهرَه — بندُ «شهرٌ مفتوح بين أشهرٍ مقفلة» يحيل إليه، وكان يفتح الشهرَ الماضي دائماً */
   const asked = (await searchParams).month;
   const selected = asked && months.includes(asked) ? asked : months.includes(previous) ? previous : months[0];
-  const report = buildMonthClose(selected === previous ? previousFacts : await gatherMonthFacts(selected));
+  const [report, inCorrection] = await Promise.all([
+    selected === previous ? Promise.resolve(buildMonthClose(previousFacts)) : gatherMonthFacts(selected).then(buildMonthClose),
+    loadMonthsInCorrection(),
+  ]);
   const status = closed.some((c) => c.month === selected) ? "CLOSED" : "OPEN";
 
   return (
@@ -82,6 +87,10 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
       eyebrow={`الشهر الماضي: ${formatMonth(previous)}`}
       intro="أكّد أن الشهر اكتمل: وصلت كل فواتيره، وعولجت كل المشكلات أو قبلتها عن علم. بعدها تحصل على حزمة واحدة جاهزة للمحاسب."
     >
+      {/* التصحيحُ في الماضي بخطوتين: فتحٌ جماعيّ بسبب، ثمّ إقفالٌ جماعيّ بعد رؤية الفرق */}
+      <div className="mb-8">
+        <MonthCorrection open={inCorrection} closed={closed.map((c) => c.month)} canReopen={can(user.role, "month:reopen")} />
+      </div>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
         {/* المفتاحُ الشهر: رابطُ «أشهر مقفلة» يعيد بناءه بشهره لا بحاله القديمة */}
         <MonthClose key={selected} months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
