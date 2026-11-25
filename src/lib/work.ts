@@ -22,6 +22,7 @@
  */
 import { loadBackupVerdict } from "@/services/backup-status.service";
 import { loadUnitCostFindings } from "@/services/daily-checks.service";
+import { loadOriginalsCheck } from "@/services/drive-originals.service";
 import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -54,7 +55,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts, budgets] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance, repeats, handDups, payroll, drift, aiLow, dueTasks, backup, unitCosts, budgets, originals] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
     loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(), loadRepeatDeliveries(), loadDuplicateHandPayments(),
     loadPayrollAttentionFacts(todayInRiyadh()),
@@ -67,6 +68,8 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     loadUnitCostFindings().catch(() => null),
     /* تجاوزُ الميزانية — محفوظٌ من فحص الصباح وآخر حفظ (111) */
     loadBudgetFindings().catch(() => []),
+    /* فحصُ الصباح لأصول الدرايف — صفٌّ واحد يُقرأ */
+    loadOriginalsCheck().catch(() => null),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -111,6 +114,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       checkedAt: formatMoment(aiLow.checkedAt),
     } : null,
     unitCostSuspects: unitCosts ? unitCosts.findings.map((f) => ({ name: f.name, ratio: f.invoiceRate / f.catalogRate })) : [],
+    missingOriginals: originals?.missing ?? [],
     budgetOver: budgets.map((b) => ({ label: b.label, budgetMinor: b.budgetMinor, actualMinor: b.actualMinor })),
     backupStale: backup.state === "CORE_STALE" || backup.state === "MIRROR_STALE" ? {
       core: backup.state === "CORE_STALE",

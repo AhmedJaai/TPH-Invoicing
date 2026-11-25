@@ -755,3 +755,14 @@ describe("صنفٌ يُشترى ولا يصرفه فودكس", () => {
     expect(item.evidence?.map((e) => e.signalKey)).toEqual(["foodics-unsold:p1", "foodics-unsold:p2"]);
   });
 });
+
+describe("أصول الدرايف الغائبة", () => {
+  it("تُقال بأسمائها ولكلٍّ رابطُ مستنده، ولا تظهر بلا غائب", async () => {
+    const { buildAttention } = await import("./attention");
+    const base = quiet;
+    const item = buildAttention({ ...base, missingOriginals: [{ documentId: "d1", fileName: "a.pdf", state: "gone" }] }).find((i) => i.id === "drive-originals-missing");
+    expect(item?.title).toBe("أصل مستند غاب من الدرايف");
+    expect(item?.href).toBe("/documents/file/d1");
+    expect(buildAttention({ ...base, missingOriginals: [] }).find((i) => i.id === "drive-originals-missing")).toBeUndefined();
+  });
+});

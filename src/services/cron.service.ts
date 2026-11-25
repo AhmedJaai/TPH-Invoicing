@@ -289,6 +289,8 @@ export interface DailyCronDeps {
   /** وصفاتُ فودكس وأصنافُه تُقرأ كلَّ صباح — ما تغيّر فيه يسري من اليوم (`importParsedCatalog`). */
   refreshCatalog?: () => Promise<{ written: number; skippedHuman: number; unchanged: number; blocked: number }>;
   /** قراءةُ شهرٍ منتهٍ تغيّرت أرقامُه تُعاد (`refreshStaleReadings`) — تعذُّرها يُقال ولا يُسقط اليوم. */
+  /** أصولُ المستندات في الدرايف ما زالت موجودة؟ (`checkDriveOriginals`) — قراءةٌ محضة، وتعذُّرها يُقال. */
+  checkOriginals?: () => Promise<{ checked: number; unknown: number; missing: { fileName: string }[] } | null>;
   refreshReadings?: () => Promise<{ refreshed: string[]; failed: { month: string; reason: string }[] }>;
 }
 
@@ -364,6 +366,12 @@ export async function dailyCronJob(deps: DailyCronDeps): Promise<CronOutcome> {
       parts.push(r.written > 0 ? `وصفات فودكس: تغيّرت ${r.written} فسرت من اليوم` : "وصفات فودكس كما هي");
       if (r.blocked > 0) parts.push(`ووصفات لم تُقرأ (${r.blocked})`);
     }
+  }
+
+  if (deps.checkOriginals) {
+    const r = await deps.checkOriginals().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (r instanceof Error) parts.push(`تعذّر فحص أصول الدرايف: ${r.message.split("\n")[0].slice(0, 160)}`);
+    else if (r) parts.push(r.missing.length > 0 ? `أصول غائبة من الدرايف: ${r.missing.length} من ${r.checked}` : `أصول الدرايف كلها موجودة (${r.checked})`);
   }
 
   if (deps.refreshReadings) {
