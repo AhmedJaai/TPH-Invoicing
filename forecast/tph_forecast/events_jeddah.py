@@ -22,6 +22,9 @@ DESTKSA = "https://destinationksa.com/en/pink-october-jeddah-2026/"
 
 # (اليوم, النوع, الوصف, المصدر)
 EVENTS: list[tuple[str, str, str, str]] = [
+    ("2026-07-17", "concert", "محمد حماقي — عبادي الجوهر أرينا (موسم جدة)", "https://misrconnect.com/en/news/celebrities/mohamed-hamaki-saudi-arabia-concert-july-17-2026"),
+    ("2026-09-17", "concert", "عمرو دياب — عبادي الجوهر أرينا (موسم جدة)", "https://misrconnect.com/en/news/celebrities/amr-diab-to-perform-in-jeddah-on-september-17-concert-details-and-what-fans-can-expect"),
+    ("2026-10-02", "concert", "Tul8te (FAWERHA) — جدة سوبردوم", "https://english.ahram.org.eg/News/577547.aspx"),
     ("2026-10-16", "concert", "ندى القلعة — مسرح ماربل آرتش", "https://jeddah.platinumlist.net/event"),
     ("2026-10-17", "festival", "سباق الكورنيش للتوعية بسرطان الثدي", DESTKSA),
     ("2026-10-22", "festival", "سباق Defe على حلبة الكورنيش", DESTKSA),
