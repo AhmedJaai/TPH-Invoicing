@@ -446,3 +446,15 @@ describe("semiannualSuggestions — يقترح الإيجار من آخر دفع
   });
 });
 
+
+describe("الدفعةُ الموزّعة بالأيّام", () => {
+  it("تاليةُ إيجار ١٠ أغسطس – ٩ فبراير تُستحقّ ١٠ فبراير، ويُقترح تسجيلُه نصف سنويّ", async () => {
+    const { prepaidRenewals, semiannualSuggestions } = await import("./cash-outlook");
+    const d = { kind: "SPREAD", category: "RENT", label: "إيجار", amountMinor: 4_750_000, fromMonth: "2026-08", toMonth: "2027-02", fromDay: "2026-08-10", toDay: "2027-02-09", bankTransactionId: "tx1" };
+    const [r] = prepaidRenewals([d], "2026-11");
+    expect(r.dueMonth).toBe("2027-02");
+    expect(r.dueDay).toBe("2027-02-10");
+    const s = semiannualSuggestions({ declarations: [d], txDay: new Map([["tx1", "2026-08-10"]]), registeredCategories: new Set(), categoryLabel: () => "إيجار", today: "2026-11-25" });
+    expect(s).toHaveLength(1);
+  });
+});

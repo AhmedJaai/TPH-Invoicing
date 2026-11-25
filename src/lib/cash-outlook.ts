@@ -519,8 +519,11 @@ export interface PrepaidRenewal {
   scheduled?: boolean;
 }
 
+/** اليومُ الذي يلي آخرَ يومٍ تغطّيه دفعةٌ موزّعة بالأيّام — موعدُ التالية. */
+const dayAfter = (iso: string) => addDays(iso, 1);
+
 export function prepaidRenewals(
-  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string }[],
+  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string; fromDay?: string | null; toDay?: string | null }[],
   thisMonth: string,
 ): PrepaidRenewal[] {
   /* الأحدثُ لكلّ باب — دفعةُ أغسطس تحلّ محلّ دفعة فبراير */
@@ -530,9 +533,15 @@ export function prepaidRenewals(
     const prev = latest.get(d.category);
     if (!prev || d.toMonth > prev.toMonth) latest.set(d.category, d);
   }
-  return [...latest.values()].map((d) => ({
-    label: d.label, category: d.category, coveredThrough: d.toMonth, dueMonth: addMonths(d.toMonth, 1), estimateMinor: d.amountMinor,
-  })).sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
+  return [...latest.values()].map((d) => {
+    /* الموزَّعةُ بالأيّام تُستحقّ تاليتُها اليومَ الذي يلي آخرَ أيّامها (٩ فبراير ⇐ ١٠ فبراير) لا الشهرَ بعده */
+    const due = d.toDay ? dayAfter(d.toDay) : null;
+    return {
+      label: d.label, category: d.category, coveredThrough: d.toMonth,
+      dueMonth: due ? due.slice(0, 7) : addMonths(d.toMonth, 1), estimateMinor: d.amountMinor,
+      ...(due ? { dueDay: due } : {}),
+    };
+  }).sort((a, b) => a.dueMonth.localeCompare(b.dueMonth));
 }
 
 /** أوّلُ استحقاقٍ لمتكرّر غير شهريّ في `fromMonth` أو بعده — `null` إن لم يُعرف شهرُه أو انتهت مدّتُه. */
@@ -611,7 +620,7 @@ const SUGGESTIBLE = new Set(["RENT", "UTILITY", "GOVERNMENT", "ZAKAT", "OTHER"])
  * لا يُقترح لبابٍ له متكرّرٌ فاعل، ولا ما لا يُعرف يومُ دفعه، ولا ما مدّتُه غيرُ ستّة أشهر.
  */
 export function semiannualSuggestions(input: {
-  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string; bankTransactionId: string | null }[];
+  declarations: readonly { kind: string; category: string; label: string; amountMinor: number; fromMonth: string; toMonth: string; fromDay?: string | null; toDay?: string | null; bankTransactionId: string | null }[];
   /** يومُ كلّ حركةِ بنك (`YYYY-MM-DD`) بمعرّفها. */
   txDay: ReadonlyMap<string, string>;
   registeredCategories: ReadonlySet<string>;
@@ -622,7 +631,11 @@ export function semiannualSuggestions(input: {
   for (const d of input.declarations) {
     if (d.kind !== "SPREAD" || d.amountMinor <= 0 || !d.bankTransactionId || !SUGGESTIBLE.has(d.category)) continue;
     if (input.registeredCategories.has(d.category)) continue;
-    if (monthsBetween(d.fromMonth, d.toMonth) + 1 !== 6) continue;
+    /* ستّةُ أشهر: بالأشهر عدُّها، وبالأيّام من يومٍ إلى ما قبل نظيره بعد ستّة أشهر (١٠ أغسطس – ٩ فبراير) */
+    const span = d.fromDay && d.toDay
+      ? (() => { const n = dayAfter(d.toDay); return n.slice(8) === d.fromDay.slice(8) ? monthsBetween(d.fromDay.slice(0, 7), n.slice(0, 7)) : -1; })()
+      : monthsBetween(d.fromMonth, d.toMonth) + 1;
+    if (span !== 6) continue;
     const day = input.txDay.get(d.bankTransactionId);
     if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
     const prev = latest.get(d.category);

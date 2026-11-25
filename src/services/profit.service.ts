@@ -435,6 +435,9 @@ export interface Declaration {
   amountMinor: number;
   fromMonth: string;
   toMonth: string;
+  /** توزيعٌ بالأيّام (116) — `null` بالأشهر. */
+  fromDay: string | null;
+  toDay: string | null;
   bankTransactionId: string | null;
   note: string | null;
   createdAt: Date;
@@ -444,7 +447,7 @@ export async function loadDeclarations(conn: Conn = db): Promise<Declaration[]> 
   const rows = await conn.select().from(financeDeclarations).where(isNull(financeDeclarations.voidedAt));
   return rows.flatMap((r) => (isTxCategory(r.category) ? [{
     id: r.id, kind: r.kind, category: r.category, label: r.label, amountMinor: r.amountMinor,
-    fromMonth: r.fromMonth, toMonth: r.toMonth, bankTransactionId: r.bankTransactionId, note: r.note, createdAt: r.createdAt,
+    fromMonth: r.fromMonth, toMonth: r.toMonth, fromDay: r.fromDay, toDay: r.toDay, bankTransactionId: r.bankTransactionId, note: r.note, createdAt: r.createdAt,
   }] : []));
 }
 
@@ -526,7 +529,9 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
     /* «للعلم»: رقمٌ محاسبيّ يُعرض تحت الربح ولا يُطرح منه (الإهلاك — أحمد، ٢٤ نوفمبر ٢٠٢٦) */
     else if (d.kind === "MEMO") { if (d.amountMinor > 0) memos.push({ id: `decl-${d.id}`, label: d.label, amountMinor: d.amountMinor }); }
     else {
-      const amountMinor = d.kind === "SPREAD" ? spreadShare(d.amountMinor, d.fromMonth, d.toMonth, month) : d.amountMinor;
+      const amountMinor = d.kind === "SPREAD"
+        ? spreadShare(d.amountMinor, d.fromMonth, d.toMonth, month, d.fromDay && d.toDay ? { fromDay: d.fromDay, toDay: d.toDay } : null)
+        : d.amountMinor;
       if (amountMinor > 0) opex.push({ id: `decl-${d.id}`, category: d.category, label: d.label, amountMinor, source: d.kind, occurredOn: null, bankTransactionId: d.bankTransactionId, declarationId: d.id });
     }
   }
@@ -764,6 +769,9 @@ export interface NewDeclaration {
   amountMinor: number;
   fromMonth: string;
   toMonth: string;
+  /** للتوزيع وحده: من يومٍ إلى يوم — والشهران يُشتقّان منهما. */
+  fromDay?: string | null;
+  toDay?: string | null;
   bankTransactionId: string | null;
   note: string | null;
 }
@@ -778,7 +786,16 @@ export const MAX_MEMO_MONTHS = 60;
  */
 export const DECLARABLE_CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
 
-export async function createDeclaration(input: NewDeclaration, actorId: string, conn?: Tx): Promise<string> {
+export async function createDeclaration(raw: NewDeclaration, actorId: string, conn?: Tx): Promise<string> {
+  const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+  const days = raw.fromDay || raw.toDay ? { fromDay: raw.fromDay ?? "", toDay: raw.toDay ?? "" } : null;
+  if (days) {
+    if (raw.kind !== "SPREAD") throw new DeclarationRefused("التوزيع بالأيام للدفعة الموزّعة وحدها.");
+    if (!DAY.test(days.fromDay) || !DAY.test(days.toDay)) throw new DeclarationRefused("اكتب يوم البداية ويوم النهاية كاملين.");
+    if (days.fromDay > days.toDay) throw new DeclarationRefused("يوم النهاية قبل يوم البداية.");
+  }
+  /* الشهران من اليومين حين يُوزَّع بالأيّام — لا يُصدَّق المتصفّح في شهرٍ يخالف يومه */
+  const input: NewDeclaration = days ? { ...raw, fromMonth: days.fromDay.slice(0, 7), toMonth: days.toDay.slice(0, 7) } : raw;
   if (!DECLARABLE_CATEGORIES.includes(input.category)) throw new DeclarationRefused("هذا الباب لا يُضاف من هنا: الإيجار والرواتب والكهرباء والحكومي وأخرى وحدها.");
   if (input.fromMonth > input.toMonth) throw new DeclarationRefused("الشهر الأخير قبل الشهر الأول.");
   const [fy, fm] = input.fromMonth.split("-").map(Number);
@@ -817,12 +834,13 @@ export async function createDeclaration(input: NewDeclaration, actorId: string, 
     const [row] = await t.insert(financeDeclarations).values({
       kind: input.kind, category: input.category, label, amountMinor,
       fromMonth: input.fromMonth, toMonth: input.toMonth,
+      fromDay: days?.fromDay ?? null, toDay: days?.toDay ?? null,
       bankTransactionId: input.kind === "SPREAD" ? input.bankTransactionId : null,
       note: input.note?.trim() || null, createdById: actorId,
     }).returning({ id: financeDeclarations.id });
     await recordAudit({
       actorId, action: "FINANCE_DECLARATION_CREATED", entityType: "finance_declaration", entityId: row.id,
-      before: null, after: { kind: input.kind, category: input.category, label, amountMinor, fromMonth: input.fromMonth, toMonth: input.toMonth },
+      before: null, after: { kind: input.kind, category: input.category, label, amountMinor, fromMonth: input.fromMonth, toMonth: input.toMonth, ...(days ?? {}) },
     }, t);
     return row.id;
   };

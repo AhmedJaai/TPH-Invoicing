@@ -389,10 +389,36 @@ export function monthsBetween(from: string, to: string): string[] {
  * حصّةُ شهرٍ من مبلغٍ يُوزَّع على أشهر بالتساوي — والباقي من القسمة في الشهر الأخير،
  * فمجموعُ الحصص هو المبلغُ بالهللة. `0` لشهرٍ خارج المدى.
  */
-export function spreadShare(amountMinor: number, from: string, to: string, month: string): number {
+export function spreadShare(amountMinor: number, from: string, to: string, month: string, days?: { fromDay: string; toDay: string } | null): number {
+  if (days) return daySpreadShare(amountMinor, days.fromDay, days.toDay, month);
   const months = monthsBetween(from, to);
   const index = months.indexOf(month);
   if (index < 0) return 0;
   const each = Math.floor(amountMinor / months.length);
   return index === months.length - 1 ? amountMinor - each * (months.length - 1) : each;
+}
+
+const DAY_MS = 86_400_000;
+const dayIndex = (iso: string) => Math.round(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) / DAY_MS);
+
+/**
+ * حصّةُ شهرٍ من دفعةٍ تغطّي **من يومٍ إلى يوم** (الطرفان داخلان) — بأيّامه منها.
+ *
+ * بالتقريب التراكميّ: حصّةُ الشهر = تقريبُ (المبلغ × أيّامِ ما انتهى بنهايته ÷ الأيّام كلّها) ناقصاً
+ * تقريبَ ما قبله. فمجموعُ الحصص هو المبلغُ بالهللة، ولا يتراكم كسرٌ في شهرٍ أخير.
+ * والمقامُ والبسطُ أعدادٌ صحيحة؛ القسمةُ وحدها تُقرَّب (`Math.round` على الموجب).
+ */
+export function daySpreadShare(amountMinor: number, fromDay: string, toDay: string, month: string): number {
+  const start = dayIndex(fromDay);
+  const end = dayIndex(toDay);
+  const total = end - start + 1;
+  if (total <= 0) return 0;
+  const [y, m] = month.split("-").map(Number);
+  const monthStart = Math.round(Date.UTC(y, m - 1, 1) / DAY_MS);
+  const monthEnd = Math.round(Date.UTC(y, m, 0) / DAY_MS);
+  const lo = Math.max(start, monthStart);
+  const hi = Math.min(end, monthEnd);
+  if (hi < lo) return 0;
+  const cum = (lastDay: number) => Math.round((amountMinor * (lastDay - start + 1)) / total);
+  return cum(hi) - (lo === start ? 0 : cum(lo - 1));
 }

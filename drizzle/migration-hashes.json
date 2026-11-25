@@ -113,5 +113,6 @@
   "112_counterparty_names.sql": "18a5288bcb6a1a027cd48bac671d66a7c0c73a8354d9a5ae3b1f16c9e91edc7b",
   "113_delivery_note.sql": "a11cbdfcd4fd829be7c0000c59cfa6add140bbbdcb6fb54fcbb9256c2d111807",
   "114_declaration_memo.sql": "527c99d4d41b89c6cdd0e498736863a851e9dabccac2f735489750abfb593012",
-  "115_opening_never_stocked.sql": "191eac8d64786da7cbccd6b87837a879646fb3458b2a6cc27dbdc1b6c7ea4afd"
+  "115_opening_never_stocked.sql": "191eac8d64786da7cbccd6b87837a879646fb3458b2a6cc27dbdc1b6c7ea4afd",
+  "116_declaration_days.sql": "77a7eb06bda92364824a26bf7b0327500df3300f12d4e91ff8806cfbfa408ed0"
 }

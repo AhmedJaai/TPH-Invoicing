@@ -24,6 +24,9 @@ const Create = z.object({
   amount: z.string().trim().max(20).optional(),
   fromMonth: Month,
   toMonth: Month,
+  /** توزيعٌ بالأيّام: من يومٍ إلى يوم (YYYY-MM-DD) — والشهران يُشتقّان منهما في الخادم. */
+  fromDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب اليوم بصيغة YYYY-MM-DD").optional(),
+  toDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب اليوم بصيغة YYYY-MM-DD").optional(),
   bankTransactionId: z.string().trim().min(1).max(64).nullable().optional(),
   note: z.string().trim().max(300).optional(),
 }).strict();
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
     }
     await createDeclaration({
       kind: body.kind, category: body.category, label: body.label, amountMinor,
-      fromMonth: body.fromMonth, toMonth: body.toMonth,
+      fromMonth: body.fromMonth, toMonth: body.toMonth, fromDay: body.fromDay ?? null, toDay: body.toDay ?? null,
       bankTransactionId: body.bankTransactionId ?? null, note: body.note ?? null,
     }, user.id);
     return NextResponse.json({ ok: true, message: "حُفظ ما أضفته، ويظهر في قائمة الدخل باسمه" });

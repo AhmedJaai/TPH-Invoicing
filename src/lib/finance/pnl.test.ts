@@ -177,3 +177,19 @@ describe("الإهلاك للعلم", () => {
     expect(withMemo.lines.find((l) => l.id === "profit-after-memos")?.amountMinor).toBe((without.profitMinor ?? 0) - 6_211_32);
   });
 });
+
+describe("التوزيع بالأيّام", () => {
+  it("إيجارُ ١٠ أغسطس – ٩ فبراير: كلُّ شهرٍ بأيّامه، والمجموعُ بالهللة", async () => {
+    const { daySpreadShare } = await import("./pnl");
+    const months = ["2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"];
+    const shares = months.map((m) => daySpreadShare(4_750_000, "2026-08-10", "2027-02-09", m));
+    expect(shares).toEqual([567_935, 774_456, 800_272, 774_457, 800_271, 800_272, 232_337]);
+    expect(shares.reduce((a, b) => a + b, 0)).toBe(4_750_000);
+    expect(daySpreadShare(4_750_000, "2026-08-10", "2027-02-09", "2026-07")).toBe(0);
+    expect(daySpreadShare(4_750_000, "2026-08-10", "2027-02-09", "2027-03")).toBe(0);
+  });
+  it("وspreadShare يأخذ الأيّام إن وُجدت ويبقى بالأشهر بدونها", () => {
+    expect(spreadShare(4_750_000, "2026-08", "2027-02", "2026-08", { fromDay: "2026-08-10", toDay: "2027-02-09" })).toBe(567_935);
+    expect(spreadShare(4_750_000, "2026-08", "2027-01", "2026-08")).toBe(791_666);
+  });
+});

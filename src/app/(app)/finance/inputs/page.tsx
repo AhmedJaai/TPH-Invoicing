@@ -96,8 +96,13 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
                       <Badge tone="muted">{CATEGORY_LABEL[d.category]}</Badge>
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                      {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <><T s="من {0} إلى {1} ({2})" a={[formatMonth(d.fromMonth), formatMonth(d.toMonth), countNoun(months.length, MONTH)]} /></>}
-                      {d.kind === "SPREAD" && <> <T s=" · {0} موزّعة، بواقع {1} شهرياً" a={[<Money key="0" minor={d.amountMinor} />, <Money key="1" minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} />]} /></>}
+                      {d.fromDay && d.toDay
+                        ? <T s="من {0} إلى {1} بالأيام" a={[formatDay(d.fromDay), formatDay(d.toDay)]} />
+                        : d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <><T s="من {0} إلى {1} ({2})" a={[formatMonth(d.fromMonth), formatMonth(d.toMonth), countNoun(months.length, MONTH)]} /></>}
+                      {d.kind === "SPREAD" && (d.fromDay && d.toDay
+                        /* بالأيّام: حصّةُ كلّ شهرٍ تختلف — تُسرد لا «بواقع» واحد */
+                        ? <> <T s=" · {0} موزّعة: {1}" a={[<Money key="0" minor={d.amountMinor} />, months.map((m) => `${formatMonth(m)} ${formatRiyalsDisplay(spreadShare(d.amountMinor, d.fromMonth, d.toMonth, m, { fromDay: d.fromDay!, toDay: d.toDay! }))}`).join(" · ")]} /></>
+                        : <> <T s=" · {0} موزّعة، بواقع {1} شهرياً" a={[<Money key="0" minor={d.amountMinor} />, <Money key="1" minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} />]} /></>)}
                       {d.kind === "OFF_BOOK" && <> <T s=" · {0} شهرياً" a={[<Money key="0" minor={d.amountMinor} />]} /></>}
                     </p>
                   </div>

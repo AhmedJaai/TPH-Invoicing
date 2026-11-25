@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { financeDeclarations, monthCloses, users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { bankImports, bankTransactions, financeDeclarations, monthCloses, users } from "@/db/schema";
 import { createDeclaration, voidDeclaration } from "./profit.service";
 import { MonthClosedError } from "./validation.service";
 import { caught, pgErrorOf, withRollback } from "@/test/db";
@@ -45,5 +46,27 @@ describe("finance declarations — الشهر المقفل", () => {
       })));
       expect(e?.code).toBe("P0001");
       expect(e?.message).toMatch(/مقفل/);
+    }));
+
+  it("التوزيعُ بالأيّام يُحفظ بيومَيه وشهرَيه منهما — والقاعدةُ لا تقبل الأيّام لغير التوزيع (116)", () =>
+    withRollback(async (tx) => {
+      const me = await someone(tx);
+      const [imp] = await tx.insert(bankImports).values({ fileName: `rent-${Math.random()}.xlsx` }).returning({ id: bankImports.id });
+      const [rent] = await tx.insert(bankTransactions).values({
+        bankImportId: imp.id, valueDate: new Date("2099-08-10T00:00:00Z"), amountMinor: 47_500_00, direction: "DEBIT", category: "RENT",
+      }).returning({ id: bankTransactions.id });
+      const id = await createDeclaration({
+        kind: "SPREAD", category: "RENT", label: "إيجار", amountMinor: 0,
+        /* شهران خاطئان من المتصفّح: يُشتقّان من اليومين */
+        fromMonth: "2099-01", toMonth: "2099-01", fromDay: "2099-08-10", toDay: "2100-02-09",
+        bankTransactionId: rent.id, note: null,
+      }, me, tx);
+      const [row] = await tx.select().from(financeDeclarations).where(eq(financeDeclarations.id, id));
+      expect([row.fromMonth, row.toMonth, row.fromDay, row.toDay, row.amountMinor]).toEqual(["2099-08", "2100-02", "2099-08-10", "2100-02-09", 47_500_00]);
+
+      const e = pgErrorOf(await caught(tx.transaction(async (sp) => {
+        await sp.insert(financeDeclarations).values({ kind: "OFF_BOOK", category: "OTHER", label: "نقد", amountMinor: 100, fromMonth: "2099-04", toMonth: "2099-04", fromDay: "2099-04-01", toDay: "2099-04-30" });
+      })));
+      expect(e?.code).toBe("23514");
     }));
 });

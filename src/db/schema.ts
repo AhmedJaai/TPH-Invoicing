@@ -2460,6 +2460,9 @@ export const financeDeclarations = pgTable("finance_declarations", {
   amountMinor: integer("amount_minor").notNull(),
   fromMonth: text("from_month").notNull(),
   toMonth: text("to_month").notNull(),
+  /** توزيعٌ بالأيّام (116): من يومٍ إلى يوم، كلُّ شهرٍ بأيّامه — وفراغُهما توزيعٌ بالأشهر بالتساوي. */
+  fromDay: text("from_day"),
+  toDay: text("to_day"),
   bankTransactionId: text("bank_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
   note: text("note"),
   createdById: text("created_by_id").references(() => users.id),

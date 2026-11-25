@@ -36,18 +36,25 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   const [fromMonth, setFromMonth] = useState(defaults.month);
   const [toMonth, setToMonth] = useState(defaults.month);
   const [txId, setTxId] = useState("");
+  /* توزيعٌ بالأيّام: دفعةٌ تغطّي من يومٍ إلى يوم (إيجار ١٠ أغسطس – ٩ فبراير) — كلُّ شهرٍ بأيّامه */
+  const [byDays, setByDays] = useState(false);
+  const [fromDay, setFromDay] = useState("");
+  const [toDay, setToDay] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsAmount = kind === "OFF_BOOK" || kind === "MEMO";
+  const daysOn = kind === "SPREAD" && byDays;
   const options = (candidates[category] ?? []).filter((c) => !c.spread);
   const categoryLabel = categories.find((c) => c.value === category)?.label ?? "";
-  const ready = fromMonth !== "" && toMonth !== "" && fromMonth <= toMonth
+  const ready = (daysOn ? fromDay !== "" && toDay !== "" && fromDay <= toDay : fromMonth !== "" && toMonth !== "" && fromMonth <= toMonth)
     && (!needsAmount || amount.trim() !== "") && (kind !== "SPREAD" || txId !== "");
 
   /* المعطّلُ بسببٍ يُضغط ليقوله (ui-ux.md) — كان «احفظ» معطّلاً صامتاً لا يُعرف ما ينقصه */
-  const missing = fromMonth === "" || toMonth === "" ? "اختر شهر البداية وشهر النهاية."
-    : fromMonth > toMonth ? "شهر النهاية قبل شهر البداية."
+  const missing = daysOn && (fromDay === "" || toDay === "") ? "اختر يوم البداية ويوم النهاية."
+    : daysOn && fromDay > toDay ? "يوم النهاية قبل يوم البداية."
+    : !daysOn && (fromMonth === "" || toMonth === "") ? "اختر شهر البداية وشهر النهاية."
+    : !daysOn && fromMonth > toMonth ? "شهر النهاية قبل شهر البداية."
     : needsAmount && amount.trim() === "" ? "اكتب مبلغ الشهر الواحد."
     : kind === "SPREAD" && txId === "" ? "اختر حركة البنك التي تريد توزيعها."
     : null;
@@ -61,13 +68,14 @@ export function DeclarationForm({ categories, candidates, defaults }: {
       action: "create", kind, category,
       label: label.trim() || (kind === "NONE" ? `لا ${categoryLabel}` : categoryLabel),
       amount: needsAmount ? amount.trim() : undefined,
-      fromMonth, toMonth,
+      fromMonth: daysOn ? fromDay.slice(0, 7) : fromMonth, toMonth: daysOn ? toDay.slice(0, 7) : toMonth,
+      ...(daysOn ? { fromDay, toDay } : {}),
       bankTransactionId: kind === "SPREAD" ? txId : null,
     });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
     toast({ tone: "ok", title: r.data.message ?? "حُفظ ما أضفته" });
-    setLabel(""); setAmount(""); setTxId("");
+    setLabel(""); setAmount(""); setTxId(""); setFromDay(""); setToDay("");
     router.refresh();
   }
 
@@ -106,13 +114,30 @@ export function DeclarationForm({ categories, candidates, defaults }: {
           <label className="text-xs font-medium text-ink-soft">
             <T s="مبلغ الشهر الواحد (ريال){0}" a={[<input key="0" type="text" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} placeholder="0.00" className={`${field} nums text-end`} />]} /></label>
         )}
-        <label className="text-xs font-medium text-ink-soft">
-          <T s="من شهر{0}" a={[<input key="0" type="month" dir="ltr" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
-        <label className="text-xs font-medium text-ink-soft">
-          <T s="إلى شهر{0}" a={[<input key="0" type="month" dir="ltr" value={toMonth} onChange={(e) => setToMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
+        {kind === "SPREAD" && (
+          <label className="flex min-h-11 items-center gap-2 text-xs font-medium text-ink-soft sm:col-span-2">
+            <input type="checkbox" checked={byDays} onChange={(e) => setByDays(e.target.checked)} disabled={busy} />
+            وزّعها بالأيام (من يوم إلى يوم)، فيحمل كل شهر أيامه منها
+          </label>
+        )}
+        {daysOn ? (
+          <>
+            <label className="text-xs font-medium text-ink-soft">
+              <T s="من يوم{0}" a={[<input key="0" type="date" dir="ltr" value={fromDay} onChange={(e) => setFromDay(e.target.value)} disabled={busy} className={field} />]} /></label>
+            <label className="text-xs font-medium text-ink-soft">
+              <T s="إلى يوم (داخلاً){0}" a={[<input key="0" type="date" dir="ltr" value={toDay} onChange={(e) => setToDay(e.target.value)} disabled={busy} className={field} />]} /></label>
+          </>
+        ) : (
+          <>
+            <label className="text-xs font-medium text-ink-soft">
+              <T s="من شهر{0}" a={[<input key="0" type="month" dir="ltr" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
+            <label className="text-xs font-medium text-ink-soft">
+              <T s="إلى شهر{0}" a={[<input key="0" type="month" dir="ltr" value={toMonth} onChange={(e) => setToMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
+          </>
+        )}
       </div>
 
-      {fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">شهر النهاية قبل شهر البداية.</p>}
+      {!daysOn && fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">شهر النهاية قبل شهر البداية.</p>}
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs font-bold text-danger">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button type="submit" disabled={busy} aria-disabled={!ready || undefined} aria-busy={busy} className={`${buttonClass("primary")} ${ready ? "" : "opacity-60"}`}>احفظ</button>
