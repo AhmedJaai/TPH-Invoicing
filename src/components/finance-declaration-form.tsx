@@ -46,6 +46,18 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   const needsAmount = kind === "OFF_BOOK" || kind === "MEMO";
   const daysOn = kind === "SPREAD" && byDays;
   const options = (candidates[category] ?? []).filter((c) => !c.spread);
+  /*
+    يومُ الدفعة بدايةُ مدّتها غالباً، ونهايتُها اليومُ السابق لنظيره بعد ستّة أشهر (١٠ أغسطس ← ٩ فبراير) —
+    يُملأ اقتراحاً حين تُختار الحركة ويُعدَّل باليد، ولا يُكتب فوق يومٍ كتبه صاحبُه.
+  */
+  function suggestDays(id: string, force = false) {
+    const c = options.find((o) => o.id === id);
+    if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(c.day)) return;
+    const [y, m, d] = c.day.split("-").map(Number);
+    const end = new Date(Date.UTC(y, m - 1 + 6, d - 1)).toISOString().slice(0, 10);
+    if (force || fromDay === "") setFromDay(c.day);
+    if (force || toDay === "") setToDay(end);
+  }
   const categoryLabel = categories.find((c) => c.value === category)?.label ?? "";
   const ready = (daysOn ? fromDay !== "" && toDay !== "" && fromDay <= toDay : fromMonth !== "" && toMonth !== "" && fromMonth <= toMonth)
     && (!needsAmount || amount.trim() !== "") && (kind !== "SPREAD" || txId !== "");
@@ -105,7 +117,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
 
         {kind === "SPREAD" && (
           <label className="text-xs font-medium text-ink-soft sm:col-span-2">
-            <T s="حركة البنك التي تريد توزيعها{0}{1}" a={[<select key="0" value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy} className={field}>
+            <T s="حركة البنك التي تريد توزيعها{0}{1}" a={[<select key="0" value={txId} onChange={(e) => { setTxId(e.target.value); if (byDays) suggestDays(e.target.value, true); }} disabled={busy} className={field}>
               <option value="">— اختر —</option>
               {options.map((c) => <option key={c.id} value={c.id}>{c.dayLabel} · {c.amountText} ريال · {c.label}</option>)}
             </select>, options.length === 0 && <span key="1" className="mt-1 block text-[11px] text-warn"><T s="لا توجد في الكشف حركة مصنّفة «{0}» لم تُوزَّع بعد. صنّف الحركة أولاً من «حركة البنك»." a={[categoryLabel]} /></span>]} /></label>
@@ -116,7 +128,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
         )}
         {kind === "SPREAD" && (
           <label className="flex min-h-11 items-center gap-2 text-xs font-medium text-ink-soft sm:col-span-2">
-            <input type="checkbox" checked={byDays} onChange={(e) => setByDays(e.target.checked)} disabled={busy} />
+            <input type="checkbox" checked={byDays} onChange={(e) => { setByDays(e.target.checked); if (e.target.checked && txId) suggestDays(txId); }} disabled={busy} />
             وزّعها بالأيام (من يوم إلى يوم)، فيحمل كل شهر أيامه منها
           </label>
         )}
