@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
+import { isoDay } from "@/lib/riyadh-time";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
@@ -54,7 +55,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
     const c = options.find((o) => o.id === id);
     if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(c.day)) return;
     const [y, m, d] = c.day.split("-").map(Number);
-    const end = new Date(Date.UTC(y, m - 1 + 6, d - 1)).toISOString().slice(0, 10);
+    const end = isoDay(new Date(Date.UTC(y, m - 1 + 6, d - 1)));
     if (force || fromDay === "") setFromDay(c.day);
     if (force || toDay === "") setToDay(end);
   }
