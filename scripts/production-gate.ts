@@ -395,7 +395,9 @@ async function main() {
   const [drive] = (
     await db.execute<Record<string, number>>(sql`
       select (select count(*)::int from documents)                              as docs,
-             (select count(*)::int from documents where drive_file_id is null)  as unlinked
+             /* قيدٌ من سطر كشف المورّد بلا ملفّ (057) ليس كسراً في الأرشيف: ملفُّه ينتظر ويُربط حين يصل */
+             (select count(*)::int from documents where drive_file_id is null and origin is distinct from 'STATEMENT_LINE') as unlinked,
+             (select count(*)::int from documents where drive_file_id is null and origin = 'STATEMENT_LINE') as awaiting
     `)
   ).rows;
   add(
@@ -404,7 +406,8 @@ async function main() {
       : Number(drive?.unlinked ?? 0) === 0 ? "PASS" : "FAIL",
     Number(drive?.docs ?? 0) === 0
       ? "لا مستند — لم يُفحَص"
-      : `المستندات: ${Number(drive?.docs ?? 0)} · بلا رابطٍ إلى أصله: ${Number(drive?.unlinked ?? 0)}`,
+      : `المستندات: ${Number(drive?.docs ?? 0)} · بلا رابطٍ إلى أصله: ${Number(drive?.unlinked ?? 0)}`
+        + (Number(drive?.awaiting ?? 0) > 0 ? ` · قيودٌ من كشف المورّد تنتظر ملفّها: ${Number(drive?.awaiting ?? 0)}` : ""),
     "npm run ops:truth — للمقابلة الكاملة",
   );
 
