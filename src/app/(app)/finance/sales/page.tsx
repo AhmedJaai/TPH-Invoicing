@@ -222,7 +222,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
 function Mover({ title, icon, items, empty }: { title: string; icon: typeof TrendingUp; items: readonly (ItemRow & { delta: number })[]; empty: string }) {
   return (
-    <Section title={title} icon={icon} hint="الفرق بالريال عن الشهر السابق.">
+    <Section title={title} icon={icon} hint="الفرق بالريال عن الشهر السابق، وفي الشهر الجاري عن الأيام نفسها منه.">
       {items.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">{empty}</p> : (
         <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
           {items.map((i) => (

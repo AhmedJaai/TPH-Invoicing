@@ -19,7 +19,7 @@ import { computeConsumption } from "@/lib/inventory/consumption";
 import { varianceCostMinor } from "@/lib/inventory/purchases";
 import { indexRecipeVersions } from "@/lib/inventory/recipe";
 import { previousMonth } from "@/lib/finance/stock-window";
-import { monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { netInsideGross } from "@/lib/vat";
 import { loadSoldForReport } from "./inventory.service";
 import { loadRates, loadRevenue, type MonthRevenue } from "./profit.service";
@@ -77,6 +77,11 @@ export async function loadSalesAnalysis(month: string, conn: Conn = db): Promise
   const today = todayInRiyadh();
   /* اليومُ المقابل في الشهر السابق — شهرٌ جارٍ يُقارَن بما مضى من سابقه لا بكلّه */
   const dayOfMonth = today.startsWith(month) ? today.slice(8, 10) : null;
+  /* آخرُ يومٍ يُقارَن به من الشهر السابق: قبل اليوم المقابل (كمجموع `prevToDate`)، ولا يتجاوز آخرَه */
+  const prevItemsTo = dayOfMonth === null ? prevTo : (() => {
+    const d = addDays(prevFrom, Number(dayOfMonth) - 2);
+    return d < prevFrom ? addDays(prevFrom, -1) : d > prevTo ? prevTo : d;
+  })();
 
   const [revenue, days, hours, methods, types, leakRows, versions, stock, prevToDate] = await Promise.all([
     loadRevenue(conn),
@@ -130,7 +135,11 @@ export async function loadSalesAnalysis(month: string, conn: Conn = db): Promise
   const index = indexRecipeVersions(versions);
   const [lines, prevLines] = await Promise.all([
     loadSoldForReport(from, to, versions, conn),
-    loadSoldForReport(prevFrom, prevTo, versions, conn),
+    /*
+      الشهرُ الجاري يُقارَن صنفاً صنفاً بالأيّام نفسها من سابقه لا بكلّه — كما يُقارَن مجموعُه. كان
+      المجموعُ «−٦٪» وكلُّ صنفٍ تقريباً «−٢٠ إلى −٤٥٪»: أربعةٌ وعشرون يوماً أمام واحدٍ وثلاثين.
+    */
+    loadSoldForReport(prevFrom, prevItemsTo, versions, conn),
   ]);
 
   /* الصنفُ بمفتاح رمزه في نقاط البيع، وإلّا باسمه */
