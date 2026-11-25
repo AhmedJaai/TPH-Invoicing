@@ -9,7 +9,7 @@
  * والحكم في `lib/ops/truth-audit.ts` دوالَّ خالصة؛ وهذا يجلب الطرفين.
  */
 import { writeFileSync } from "node:fs";
-import { eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, documents, invoices, suppliers } from "@/db/schema";
 import { driveForCli, isFolder, listChildren, type DriveFile } from "@/lib/drive";
@@ -111,7 +111,8 @@ async function main() {
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
-    .where(isNotNull(documents.fileName));
+    /* المرفوضُ ليس قيداً في الدفاتر — غيابُ أصله ليس «مفقوداً» (كانت الثمانيةُ «المفقودة» كلُّها مرفوضة) */
+    .where(and(isNotNull(documents.fileName), ne(documents.status, "REJECTED")));
 
   const records: DbRecord[] = rows.map((r) => ({
     documentId: r.documentId,

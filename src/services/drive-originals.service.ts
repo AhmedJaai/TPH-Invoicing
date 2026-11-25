@@ -7,7 +7,7 @@
  *
  * لا يكتب في الدرايف شيئاً (`probeFile` قراءةٌ وحدها)، والمجهولُ (عطلٌ مؤقّت) لا يُعدّ غياباً.
  */
-import { eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings, documents } from "@/db/schema";
 import { probeFile } from "@/lib/drive";
@@ -23,7 +23,8 @@ export interface OriginalsCheck { checkedAt: string; checked: number; unknown: n
 
 export async function checkDriveOriginals(drive: drive_v3.Drive, conn: Conn = db): Promise<OriginalsCheck> {
   const docs = await conn.select({ id: documents.id, fileId: documents.driveFileId, name: documents.fileName })
-    .from(documents).where(isNotNull(documents.driveFileId));
+    /* المرفوضُ ليس في الدفاتر — غيابُ ملفّه لا يطلبه أحد (الثمانيةُ التي وُجدت أوّلاً كلُّها مرفوضة) */
+    .from(documents).where(and(isNotNull(documents.driveFileId), ne(documents.status, "REJECTED")));
   const missing: MissingOriginal[] = [];
   let unknown = 0;
   for (let i = 0; i < docs.length; i += PARALLEL) {
