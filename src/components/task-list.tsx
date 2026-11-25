@@ -25,7 +25,7 @@ export function TaskRow({ item }: { item: AttentionItem }) {
   const Icon = s.icon;
   const detailHref = `/attention?item=${encodeURIComponent(item.id)}`;
 
-  const action = item.actionLabel ?? "افتح السجلات";
+  const action = item.actionLabel ?? "اعرض التفاصيل";
   const amount = amountMinor !== null && amountMinor > 0;
 
   /*

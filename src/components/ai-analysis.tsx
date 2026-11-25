@@ -70,7 +70,7 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 const errorOf = (r: Awaited<ReturnType<typeof postJson>>) =>
   r === null
     ? "تعذّر الاتصال بالخادم، ولم يصل الطلب."
-    : String(r.data.error ?? (r.status === 504 ? "تأخر الخادم في الرد. أعد المحاولة." : `ردّ الخادم بالرمز ${r.status}`));
+    : String(r.data.error ?? (r.status === 504 ? "تأخر الخادم في الرد. أعد المحاولة." : "تعذّر التحليل الآن. أعد المحاولة بعد قليل."));
 
 const SEVERITY_TONE: Record<string, Tone | undefined> = {
   HIGH: "danger",

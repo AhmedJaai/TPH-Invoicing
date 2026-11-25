@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MONTH, countNoun } from "@/lib/arabic";
 import { useRouter } from "next/navigation";
 import { Lock, LockOpen, LoaderCircle } from "lucide-react";
 import { postJson } from "@/lib/http-client";
@@ -48,7 +49,7 @@ export function MonthCorrection({ open, closed, canReopen }: {
   async function reopen() {
     if (picked.size === 0 || reason.trim().length < 3) return;
     if (await run([...picked], "reopen", reason.trim())) {
-      toast({ tone: "warn", title: `فُتح ${picked.size === 1 ? "شهر" : `${picked.size} أشهر`} للتصحيح`, body: "صحّح ما تريد، وتراه هنا بفرقه عمّا خُتم، ثم أقفلها معاً." });
+      toast({ tone: "warn", title: `فُتح ${picked.size === 1 ? "شهر" : countNoun(picked.size, MONTH)} للتصحيح`, body: "صحّح ما تريد، وتراه هنا بفرقه عمّا خُتم، ثم أقفلها معاً." });
       setPicked(new Set()); setReason(""); setPicking(false);
     }
   }
@@ -97,7 +98,7 @@ export function MonthCorrection({ open, closed, canReopen }: {
           </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void reopen()} disabled={busy !== null || picked.size === 0 || reason.trim().length < 3} className={buttonClass("primary", "sm")}>
-              {picked.size > 1 ? `افتح ${picked.size} أشهر` : "افتح"}
+              {picked.size > 1 ? `افتح ${countNoun(picked.size, MONTH)}` : "افتح"}
             </button>
             <button type="button" onClick={() => { setPicking(false); setPicked(new Set()); }} disabled={busy !== null} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>

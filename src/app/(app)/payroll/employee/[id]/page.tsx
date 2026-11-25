@@ -1,6 +1,6 @@
 import { RecordHistory } from "@/components/record-history";
 import { TEAM_APP_NAME } from "@/lib/team-app";
-import { DAY, MINUTE, countNoun } from "@/lib/arabic";
+import { DAY, MINUTE, MONTH, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CalendarClock, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
@@ -145,7 +145,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           )}
           {pendingMinor > 0 && <span className="mt-1 block font-bold">وفي الكشف حوالات له بـ{formatRiyalsDisplay(pendingMinor)} ريال لم توزَّع بعد. <a className="underline" href="#transfers">وزّعها</a></span>}
           {balanceMinor < 0 && " إن كانت سلفة فسجّلها قسطاً، وإن كان راتبه أعلى مما كتبت فعدّل الراتب."}
-          {unknownMonths > 0 && ` (${unknownMonths} شهر بلا راتب مكتوب لم يدخل الحساب)`}
+          {unknownMonths > 0 && ` (${countNoun(unknownMonths, MONTH)} بلا راتب مكتوب لم تدخل الحساب)`}
         </Callout>
       )}
 
@@ -443,7 +443,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 <li key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
                   <span className="min-w-0 flex-1">{d.title}<span className="block text-[11px] text-muted">{isObligationKind(d.kind) ? OBLIGATION_KIND_LABEL[d.kind] : d.kind}{d.reference ? ` · ${d.reference}` : ""}</span></span>
                   <span className="text-xs">تنتهي {formatDay(d.expiresOn)}</span>
-                  {d.closedAt ? <Badge tone="muted">مؤرشفة</Badge> : left < 0 ? <Badge tone="danger">منتهية</Badge> : left <= d.remindDays ? <Badge tone="warn">باقي {left} يوم</Badge> : <Badge tone="ok">سارية</Badge>}
+                  {d.closedAt ? <Badge tone="muted">مؤرشفة</Badge> : left < 0 ? <Badge tone="danger">منتهية</Badge> : left <= d.remindDays ? <Badge tone="warn">باقي {countNoun(left, DAY)}</Badge> : <Badge tone="ok">سارية</Badge>}
                 </li>
               );
             })}

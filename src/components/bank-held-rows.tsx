@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Fragment } from "react";
+import { TRANSACTION, countNoun } from "@/lib/arabic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CircleHelp, TriangleAlert } from "lucide-react";
@@ -38,7 +39,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     <div className="mb-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
       <p className="flex items-center gap-2 text-[13px] font-bold">
         <CircleHelp className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
-        {rows.length === 1 ? "حركة تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها" : `${rows.length} حركات تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها`}
+        {rows.length === 1 ? "حركة تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها" : `${countNoun(rows.length, TRANSACTION)} تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها`}
       </p>
       <ul className="mt-2 divide-y divide-line-soft">
         {rows.map((r) => (

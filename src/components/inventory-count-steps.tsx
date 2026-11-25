@@ -151,7 +151,7 @@ export function InventoryCountSteps({
     },
     flow: {
       title: "ما دخل وما خرج",
-      status: unknownInputs > 0 ? `${unknownInputs} ينقصه رقم` : "المعادلة معروفة",
+      status: unknownInputs > 0 ? `${countNoun(unknownInputs, PRODUCT)} بلا رقم` : "كل الأرقام مكتوبة",
       done: locked || unknownInputs === 0,
       warn: !locked && unknownInputs > 0,
     },

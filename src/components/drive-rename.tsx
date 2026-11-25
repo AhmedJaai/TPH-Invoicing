@@ -55,7 +55,7 @@ export function DriveRename() {
     let json: (Preview & { error?: string; message?: string }) | null = null;
     try { json = JSON.parse(text) as Preview & { error?: string; message?: string }; }
     catch { /* ليس JSON */ }
-    if (!json) throw new Error(`تعذّر الفحص (${res.status}). ${text.slice(0, 120)}`);
+    if (!json) throw new Error("تعذّر الفحص، ولم يتغيّر شيء. أعد المحاولة بعد دقيقة.");
     if (!res.ok) throw new Error(json.error ?? "تعذّر الفحص");
     return json;
   }, []);

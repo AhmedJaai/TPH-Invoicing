@@ -1,4 +1,4 @@
-import { EMPLOYEE, MINUTE, countNoun } from "@/lib/arabic";
+import { DAY, DISCIPLINARY, EMPLOYEE, MINUTE, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarClock, CalendarDays, Clock, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-react";
@@ -200,7 +200,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <li key={r.employee.id}>
                 <Link href={`/payroll/employee/${r.employee.id}?month=${month}`} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm hover:bg-hover">
                   <span className="min-w-0 flex-1 font-bold">{r.employee.name}</span>
-                  <span className="text-xs text-ink-soft">تأخير <span className="nums">{r.slip.lateMinutes + r.slip.earlyMinutes}</span> د · غياب <span className="nums">{r.slip.absentDays}</span> · إجازة <span className="nums">{r.slip.leaveDays}</span>{r.slip.warnings > 0 && <> · <span className="nums">{r.slip.warnings}</span> إنذار</>}{r.slip.penaltiesMinor > 0 && <> · جزاءات <Money minor={r.slip.penaltiesMinor} /></>}</span>
+                  <span className="text-xs text-ink-soft">تأخير {countNoun(r.slip.lateMinutes + r.slip.earlyMinutes, MINUTE)} · غياب {countNoun(r.slip.absentDays, DAY)} · إجازة {countNoun(r.slip.leaveDays, DAY)}{r.slip.warnings > 0 && <> · {countNoun(r.slip.warnings, DISCIPLINARY)}</>}{r.slip.penaltiesMinor > 0 && <> · جزاءات <Money minor={r.slip.penaltiesMinor} /></>}</span>
                 </Link>
               </li>
             ))}

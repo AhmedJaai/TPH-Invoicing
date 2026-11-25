@@ -521,7 +521,7 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
   return (
     <span className="relative z-10 flex max-w-64 flex-col items-end gap-1 text-end">
       <span className="text-[11px] text-warn">
-        <T s="{0} في الكشف ليس لها ملف ({1})" a={[count === 1 ? "فاتورة" : <Fragment key="0"><T s="{0} فواتير" a={[<span key="0" className="nums">{count}</span>]} /></Fragment>, <Money key="1" minor={minor} />]} /></span>
+        <T s="{0} في الكشف ليس لها ملف ({1})" a={[count === 1 ? "فاتورة" : countNoun(count, INVOICE), <Money key="1" minor={minor} />]} /></span>
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
         {busy ? "يسجّل…" : "سجّلها من الكشف"}
       </button>

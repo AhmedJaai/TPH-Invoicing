@@ -19,9 +19,9 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
       <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-warn/30 bg-warn-bg px-4 py-3.5">
         <PlugZap className="mt-0.5 h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
         <div className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-ink-soft">
-          <p className="text-[13px] font-bold text-warn">فودكس غير مربوط بهذا الخادم</p>
+          <p className="text-[13px] font-bold text-warn">فودكس غير مربوط بعد</p>
           <p className="mt-0.5">
-            <T s="مفتاح الربط {0} غير مضبوط في هذه البيئة، فلا تُقرأ بيانات جديدة.{1}" a={[<bdi key="0" dir="ltr" className="font-mono">FOODICS_API_TOKEN</bdi>, status.orders > 0 && <Fragment key="1"> <T s=" والمعروض أدناه بيانات قُرئت من قبل حتى {0}." a={[<bdi key="0">{formatDay(status.lastDay)}</bdi>]} /></Fragment>]} /></p>
+            <T s="لا تُقرأ بيانات جديدة من فودكس حتى يُضاف مفتاحُ الربط.{0}" a={[status.orders > 0 && <Fragment key="0"> <T s=" والمعروض أدناه بيانات قُرئت من قبل حتى {0}." a={[<bdi key="0">{formatDay(status.lastDay)}</bdi>]} /></Fragment>]} /></p>
         </div>
       </div>
     );
@@ -43,7 +43,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
               : "فودكس مربوط، ولم تُقرأ منه بيانات بعد"}
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-muted">
-          {failed && status.lastRun?.error ? <>{status.lastRun.error} · </> : null}
+          {failed && status.lastRun?.error ? <span title={status.lastRun.error}>تعذّرت القراءة من فودكس، وستُعاد في المزامنة القادمة. إن تكرّر فأبلغ من يطوّر النظام. · </span> : null}
           {status.orders > 0
             ? <><T s="{0} من {1} إلى {2} · {3} شراء. القراءة فقط، ولا يُكتب شيء في فودكس." a={[<span key="0" className="nums">{countNoun(status.orders, ORDER).replace(/^\d+/, (d) => Number(d).toLocaleString("en-US"))}</span>, <bdi key="1">{formatDay(status.firstDay)}</bdi>, <bdi key="2">{formatDay(status.lastDay)}</bdi>, <span key="3" className="nums">{countNoun(status.purchases, TRANSACTION)}</span>]} /></>
             : "لم تُقرأ أي طلبات بعد. اضغط «زامن الآن» لقراءة الأيام الأخيرة."}

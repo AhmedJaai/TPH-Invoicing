@@ -110,7 +110,7 @@ export function DriveSync() {
       try { json = JSON.parse(text) as { message?: string; error?: string }; }
       catch { /* ليس JSON */ }
       setRenamed(
-        !json ? { ok: false, text: `تعذّرت إعادة التسمية (رمز الخطأ ${res.status})` }
+        !json ? { ok: false, text: "تعذّرت إعادة التسمية، ولم يتغيّر شيء. أعد المحاولة بعد دقيقة." }
         : res.ok ? { ok: true, text: json.message ?? "سُمّي من جديد" }
         : { ok: false, text: json.error ?? "تعذّرت إعادة التسمية" },
       );
@@ -150,7 +150,7 @@ export function DriveSync() {
           throw new Error(
             res.status === 504 || /timeout|timed out/i.test(text)
               ? "استغرقت القراءة وقتاً أطول من المسموح. ألغِ خيار «الأرشيف كله» أو أعد المحاولة، وستكمل من حيث توقفت."
-              : `تعذّرت المزامنة (رمز الخطأ ${res.status}). ${text.slice(0, 120)}`,
+              : "تعذّرت المزامنة، ولم يتغيّر شيء. أعد المحاولة بعد دقيقة.",
           );
         }
         if (!res.ok) throw new Error(json.error ?? "تعذّرت المزامنة");

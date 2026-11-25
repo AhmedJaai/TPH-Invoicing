@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { DAY, countNoun } from "@/lib/arabic";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ObligationSuggestions } from "@/components/obligation-suggestions";
@@ -142,7 +143,7 @@ export default async function ObligationsPage() {
               cell: (r) => (
                 <span className="flex flex-col items-start gap-1">
                   <Badge tone={LEVEL_TONE[r.level]} dot>{EXPIRY_LEVEL_LABEL[r.level]}</Badge>
-                  <span className="text-[11px] text-muted"><T s="{0} · التذكير قبل {1} يوماً{2}" a={[describeDaysLeft(r.left), r.remindDays, r.snoozed && " · أجّلتَ التذكير"]} /></span>
+                  <span className="text-[11px] text-muted"><T s="{0} · التذكير قبل {1}{2}" a={[describeDaysLeft(r.left), countNoun(r.remindDays, DAY), r.snoozed && " · أجّلتَ التذكير"]} /></span>
                 </span>
               ),
             },

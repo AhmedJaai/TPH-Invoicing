@@ -123,7 +123,7 @@ export function MarkInvoicePaid({
     setMessage(
       r === null
         ? "تعذّر الاتصال بالخادم ولم يصل الطلب."
-        : String(r.data.error ?? `تعذّر الحفظ (رمز الخطأ ${r.status})`),
+        : String(r.data.error ?? "تعذّر الحفظ، ولم يُسجَّل شيء. أعد المحاولة."),
     );
     setState(back);
   }

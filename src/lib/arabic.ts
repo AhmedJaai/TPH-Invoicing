@@ -180,6 +180,15 @@ export const SUPPLIER: NounForms = {
   zero: "لا مورّدين",
 };
 
+/** إنذارُ الموظّف — غيرُ «تنبيه» النظام. */
+export const DISCIPLINARY: NounForms = {
+  one: "إنذار واحد",
+  two: "إنذاران",
+  few: "إنذارات",
+  many: "إنذاراً",
+  zero: "لا إنذارات",
+};
+
 export const WARNING: NounForms = {
   one: "تنبيه واحد",
   two: "تنبيهان",
