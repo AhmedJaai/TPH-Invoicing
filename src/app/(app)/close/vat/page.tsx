@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DownloadButton } from "@/components/download-button";
 import { Suspense, Fragment } from "react";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, CircleCheck, ClipboardList, FileWarning, Landmark, Receipt, SearchCheck, TriangleAlert } from "lucide-react";
 import { db } from "@/db";
 import { currentUser } from "@/lib/session";
@@ -27,6 +27,11 @@ import {
 import { formatRiyals } from "@/lib/money";
 import { loadVatReturn, type VatInvoiceRow, type VatMonthSlice, type VatTxRow } from "@/services/vat-return.service";
 import { T } from "@/components/i18n/t";
+import { suppliers as suppliersTable } from "@/db/schema";
+import { WhatsAppLink } from "@/components/pay-run-planner";
+import { whatsappHref } from "@/lib/supplier-edit";
+import { buildTaxInvoiceRequest } from "@/lib/vat-request";
+import { companyConfig } from "@/config/drive";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +109,29 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   /* مستوفيةٌ أخرجها انتظارُ المراجعة وحده — تُسمّى بمبلغها، فلا يرتفع المستحقّ بلا تفسير */
   const awaiting = confirmable.filter((i) => i.awaitingReview && i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null);
   const derived = confirmable.filter((i) => i.vatMinor === null);
-  const lost = lostBySupplier(notDeductible);
+  /*
+    الطلبُ من المورّد بأرقام فواتيره: ما لا يُعلَم إلّا من ورقته (رقمُنا، أو ورقةٌ مبسّطة) — لا ما رقمُ
+    مورّده معروفٌ من سجلّه (يُحسب من هنا بزرّه). ورقمُ جواله من ملفّه، وإلّا قيل أين يُكتب.
+  */
+  const askable = notDeductible.filter((i) => !i.knownFromRecord);
+  const phones = askable.length === 0 ? new Map<string, string | null>() : new Map(
+    (await db.select({ id: suppliersTable.id, phone: suppliersTable.phoneE164 }).from(suppliersTable)
+      .where(inArray(suppliersTable.id, [...new Set(askable.map((i) => i.supplierId))]))).map((r) => [r.id, r.phone]),
+  );
+  const lost = lostBySupplier(notDeductible).map((g) => {
+    const mine = askable.filter((i) => i.supplierId === g.supplierId);
+    const phone = phones.get(g.supplierId) ?? null;
+    return {
+      ...g,
+      request: mine.length === 0 ? null : {
+        phone,
+        href: whatsappHref(phone, buildTaxInvoiceRequest({
+          supplierName: g.supplier, companyName: companyConfig.nameAr, companyVat: companyConfig.vatNumber ?? null,
+          invoices: mine.map((i) => ({ number: i.number, day: i.day, missing: i.reasons })),
+        })),
+      },
+    };
+  });
   const supplierGroups = new Map<string, { supplierId: string; supplier: string; ids: string[] }>();
   for (const i of confirmable) {
     const g = supplierGroups.get(i.supplierId) ?? { supplierId: i.supplierId, supplier: i.supplier, ids: [] };
@@ -524,7 +551,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                     ))}
                   </div>
                 )}
-                {lost.length > 1 && (
+                {lost.length > 0 && (
                   <details className="group mb-3 rounded-xl border border-line bg-raised shadow-raised">
                     <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-bold sm:px-5">
                       <span>ضريبة ضائعة حسب المورّد: اطلب منهم فاتورة ضريبية باسم المؤسسة ورقمها الضريبي</span>
@@ -606,7 +633,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   );
 }
 
-interface LostGroup { supplierId: string; supplierSlug: string; supplier: string; count: number; vatKnownMinor: number; unknownCount: number }
+interface LostGroup { supplierId: string; supplierSlug: string; supplier: string; count: number; vatKnownMinor: number; unknownCount: number; request?: { phone: string | null; href: string } | null }
 
 /** ما لا يُخصم مجموعاً بالمورّد — الأكبرُ ضياعاً أوّلاً. */
 function lostBySupplier(rows: readonly VatInvoiceRow[]): LostGroup[] {
@@ -629,6 +656,14 @@ const lostColumns: Column<LostGroup>[] = [
     header: "ضريبتها المقروءة",
     numeric: true,
     cell: (g) => <span><Money minor={g.vatKnownMinor} />{g.unknownCount > 0 && <span className="ms-1 text-[11px] text-muted"><T s="+ {0} لم تُقرأ" a={[g.unknownCount]} /></span>}</span>,
+  },
+  {
+    key: "ask",
+    header: "اطلبها",
+    /* رسالةٌ جاهزة بأرقام فواتيره وما ينقص كلّاً منها — تُرسَل من الجوال، ولا يُرسَل من هنا شيء */
+    cell: (g) => !g.request ? <span className="text-[11px] text-muted">رقمه معروف، احسبها من أعلى</span>
+      : g.request.phone ? <WhatsAppLink href={g.request.href} />
+      : <span className="text-[11px] text-muted">أضف رقم جواله في ملفه لتصلك الرسالة جاهزة</span>,
   },
 ];
 
