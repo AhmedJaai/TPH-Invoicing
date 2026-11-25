@@ -106,10 +106,18 @@ export function pushOutcome(status: number): "sent" | "gone" | "failed" {
  * نصُّ الإشعار — **بلا مبالغ**: يظهر على شاشة القفل، ويراه من يمسك الجوّال.
  * فيقول ما ينتظر ويدعو إلى «اليوم»؛ والأرقامُ هناك بعد الدخول.
  */
-export function pushBriefText(f: { knowsNothing: boolean; pending: number; runReady: boolean; tasksDue?: number; attendanceWeek?: { late: number; early: number; absent: number } | null }): { title: string; body: string } {
+export function pushBriefText(f: {
+  knowsNothing: boolean; pending: number; runReady: boolean; tasksDue?: number; attendanceWeek?: { late: number; early: number; absent: number } | null;
+  /** فرقُ مبيعات أمس عن معتاد يومها بنقاط الأساس — نسبةٌ بلا مبلغ، فشاشةُ القفل لا تحمل مالاً. */
+  salesVsUsualBp?: number | null;
+}): { title: string; body: string } {
   const title = "إحاطة الصباح";
   if (f.knowsNothing) return { title, body: "لم يقرأ النظام بعد أي مستند أو كشف. افتح التطبيق لتبدأ." };
+  const sales = f.salesVsUsualBp === undefined || f.salesVsUsualBp === null ? null
+    : Math.abs(f.salesVsUsualBp) < 300 ? "مبيعات أمس قريبة من معتادها."
+    : `مبيعات أمس ${f.salesVsUsualBp > 0 ? "أعلى" : "أقل"} من معتادها بـ${Math.abs(Math.round(f.salesVsUsualBp / 100))}٪.`;
   const parts = [
+    sales,
     /* الجملةُ نفسُها التي على «اليوم» */
     f.pending === 0 ? "لا شيء يحتاج قرارك اليوم." : `${countNoun(f.pending, ITEM)} بانتظار قرارك.`,
     f.runReady ? "ودفعة المورّدين جاهزة للتحويل." : null,

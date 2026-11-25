@@ -102,3 +102,12 @@ describe("ملخّصُ حضور الأسبوع في إشعار الأحد", () =
     expect(attendanceLine({ late: 0, early: 0, absent: 0 })).toBe("وحضور الأسبوع الماضي بلا تأخير ولا غياب.");
   });
 });
+
+describe("مبيعات أمس في إحاطة الصباح", () => {
+  it("نسبةٌ بلا مبلغ، وما قارب المعتاد يُقال كذلك", async () => {
+    const { pushBriefText } = await import("./web-push");
+    expect(pushBriefText({ knowsNothing: false, pending: 0, runReady: false, salesVsUsualBp: 1800 }).body).toMatch(/^مبيعات أمس أعلى من معتادها بـ18٪\./);
+    expect(pushBriefText({ knowsNothing: false, pending: 0, runReady: false, salesVsUsualBp: -150 }).body).toMatch(/^مبيعات أمس قريبة من معتادها\./);
+    expect(pushBriefText({ knowsNothing: false, pending: 0, runReady: false }).body).not.toMatch(/مبيعات/);
+  });
+});

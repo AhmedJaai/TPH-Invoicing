@@ -16,6 +16,7 @@ import { weekAttendanceSummary } from "@/services/payroll.service";
 import { loadStartState } from "@/services/start.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
 import { loadDueTasks } from "@/services/task.service";
+import { loadPulse } from "@/services/pulse.service";
 
 export const runtime = "nodejs";
 
@@ -36,13 +37,14 @@ async function handle() {
   const today = todayInRiyadh();
   /* الأحدُ أوّلُ الأسبوع: ملخّصُ حضور الأسبوع الماضي لمن يرى الرواتب */
   const sunday = new Date(`${today}T00:00:00Z`).getUTCDay() === 0;
-  const [pending, start, run, tasksDue, attendanceWeek] = await Promise.all([
+  const [pending, start, run, tasksDue, attendanceWeek, pulse] = await Promise.all([
     workCount(user.role),
     loadStartState(),
     canPay ? loadPaymentRun(previousMonth(currentMonthRiyadh())) : Promise.resolve(null),
     can(user.role, "task:view") ? loadDueTasks().then((t) => t.length) : Promise.resolve(0),
     sunday && can(user.role, "payroll:view") ? weekAttendanceSummary(today) : Promise.resolve(null),
+    loadPulse().catch(() => null),
   ]);
-  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0, tasksDue, attendanceWeek });
+  const text = pushBriefText({ knowsNothing: start.knowsNothing, pending, runReady: !!run && run.readyTotalMinor > 0, tasksDue, attendanceWeek, salesVsUsualBp: pulse?.lastDay?.against === "USUAL" ? pulse.lastDay.vsBp : null });
   return NextResponse.json({ ...text, url: "/" }, { headers: { "cache-control": "no-store" } });
 }
