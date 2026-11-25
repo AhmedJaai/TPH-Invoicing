@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { RotateCw, ZoomIn, ZoomOut } from "lucide-react";
+import { NETWORK_ERROR, readResponse } from "@/lib/http-client";
+import { buttonClass } from "./ui-tokens";
 
 /*
   الورقةُ معروضةً — صورةٌ بتكبيرٍ وتدوير، وPDF في إطار. كانت في شاشة الرفع وحدها،
@@ -83,24 +85,43 @@ function ImagePaper({ url, name }: { url: string; name: string }) {
  */
 function PdfPaper({ url, name }: { url: string; name: string }) {
   const local = url.startsWith("blob:");
-  const [fetched, setFetched] = useState<{ from: string; blob: string | null } | null>(null);
+  const [fetched, setFetched] = useState<{ from: string; blob: string | null; error?: string } | null>(null);
+  /* يزيد مع «أعد المحاولة» فيُعاد الجلب — كانت الورقةُ التي تعذّرت تطلب إغلاقَ البطاقة وفتحها */
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (local) return;
     let alive = true;
     let made: string | null = null;
-    fetch(url)
-      .then((res) => (res.ok ? res.blob() : null))
-      .then((b) => {
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          /* سببُ الخادم يُقال (لا صلاحية · لم يُعثر عليها · انتهت الجلسة) — وانتهاءُ الجلسة يُبلَّغ للقشرة */
+          const r = await readResponse(res);
+          if (alive) setFetched({ from: url, blob: null, error: r.ok ? undefined : r.error });
+          return;
+        }
+        const b = await res.blob();
         if (!alive) return;
-        made = b ? URL.createObjectURL(b) : null;
+        made = URL.createObjectURL(b);
         setFetched({ from: url, blob: made });
-      })
-      .catch(() => { if (alive) setFetched({ from: url, blob: null }); });
+      } catch {
+        if (alive) setFetched({ from: url, blob: null, error: NETWORK_ERROR });
+      }
+    })();
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
-  }, [url, local]);
-  const src = local ? url : fetched?.from === url ? fetched.blob : undefined;
+  }, [url, local, attempt]);
+  const current = fetched?.from === url ? fetched : null;
+  const src = local ? url : current ? current.blob : undefined;
   if (src === undefined) return <p className="p-4 text-xs text-muted">يجهّز الورقة…</p>;
-  if (src === null) return <p className="p-4 text-xs text-danger">تعذّر عرض الورقة. أعد فتح البطاقة.</p>;
+  if (src === null) {
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-2 p-4 text-xs text-danger">
+        <span className="min-w-0 flex-1">{current?.error ?? "تعذّر عرض الورقة."}</span>
+        <button type="button" onClick={() => { setFetched(null); setAttempt((n) => n + 1); }} className={buttonClass("secondary", "sm")}>أعد المحاولة</button>
+      </div>
+    );
+  }
   /* `iframe` لا `object`: سياسةُ المحتوى تمنع `object-src` كلَّه (`next.config.ts`) */
   return <iframe src={src} title={`الورقة: ${name}`} className="h-[70vh] w-full rounded-lg border-0 bg-raised" />;
 }

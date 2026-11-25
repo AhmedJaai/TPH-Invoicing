@@ -86,7 +86,14 @@ export function HandDuplicateVoid({ paymentId, supplierName }: { paymentId: stri
   return (
     <div className="w-full rounded-xl border border-line bg-raised p-3 text-xs text-ink shadow-raised" aria-busy={!preview && !error}>
       {!preview ? (
-        <p className="text-muted">{error ?? "يحسب ما سيتغيّر…"}</p>
+        error ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-danger">
+            <span className="min-w-0 flex-1">{error}</span>
+            <button type="button" onClick={() => void load()} className={buttonClass("secondary", "sm")}>أعد المحاولة</button>
+          </div>
+        ) : (
+          <p className="text-muted">يحسب ما سيتغيّر…</p>
+        )
       ) : preview.refusal || !o ? (
         <p role="alert" className="rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 leading-relaxed text-danger">
           {preview.refusal ?? "تعذّرت المعاينة. حدّث الصفحة."}

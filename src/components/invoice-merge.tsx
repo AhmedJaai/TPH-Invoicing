@@ -172,9 +172,14 @@ export function InvoiceMerge({ current, twin }: { current: Side; twin: Side }) {
       </fieldset>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">الورقة الأخرى ترفض وتبقى في الدرايف كما هي، وكل ذلك في سجل التدقيق.</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={run} disabled={busy || !preview} aria-busy={busy} className={buttonClass("primary", "sm")}>
-          {busy ? "يدمج…" : !preview ? "يحسب…" : `احذف ${dropped.number} وأبقِ ${kept.number}`}
-        </button>
+        {/* معاينةٌ فشلت لا تبقى «يحسب…» كأنّها تعمل — الزرُّ يعيدها */}
+        {!preview && error ? (
+          <button type="button" onClick={() => void openPanel()} className={buttonClass("primary", "sm")}>أعد المحاولة</button>
+        ) : (
+          <button type="button" onClick={run} disabled={busy || !preview} aria-busy={busy || !preview} className={buttonClass("primary", "sm")}>
+            {busy ? "يدمج…" : !preview ? "يحسب…" : `احذف ${dropped.number} وأبقِ ${kept.number}`}
+          </button>
+        )}
         <button type="button" onClick={() => setOpen(false)} disabled={busy} className={buttonClass("quiet", "sm")}>تراجع</button>
         {error && <span role="alert" className="text-danger">{error}</span>}
       </div>
