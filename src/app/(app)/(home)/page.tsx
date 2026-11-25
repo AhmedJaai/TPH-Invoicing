@@ -34,6 +34,8 @@ import { loadPayrollDues, loadRecurringInputs, weekDue } from "@/services/cash-o
 import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 import { T } from "@/components/i18n/t";
+import { CafePulse } from "@/components/cafe-pulse";
+import { loadPulse } from "@/services/pulse.service";
 
 export const dynamic = "force-dynamic";
 
@@ -183,7 +185,16 @@ export default async function HomePage() {
         على الجوّال «ما يحتاج قرارك» قبل الأرقام: كان يقع بعد ثلاث شاشات (الجديد ثمّ أربعة أرقام)،
         وسؤالُ الصباح «ماذا أفعل اليوم؟» جوابُه القائمة. وعلى الشاشة الواسعة الترتيبُ كما كان.
       */}
-      <div className="flex flex-col">
+      {/* نبضُ اليوم أوّلاً: كيف يمشي البيع الآن مقارنةً بالساعة نفسها قبل أسبوع — يصل بعد الصفحة ولا يؤخّرها */}
+      {!start.knowsNothing && can(user.role, "amounts:view") && (
+        <SectionBoundary what="مبيعات اليوم">
+          <Suspense fallback={<PulseSkeleton />}>
+            <PulseCard />
+          </Suspense>
+        </SectionBoundary>
+      )}
+
+      <div className="mt-8 flex flex-col">
       {!start.knowsNothing && (
         <div className="order-2 mt-10 lg:order-1 lg:mt-0">
         <StatGrid>
@@ -371,6 +382,21 @@ async function ChangesList({ factsP }: { factsP: Promise<ChangeFacts> }) {
 }
 
 /** بمقاس `KeyFigure` — كهيكل الصفحة (`page-skeleton.tsx`)، فلا تقفز الشبكة حين يصل. */
+async function PulseCard() {
+  const pulse = await loadPulse();
+  return pulse ? <CafePulse pulse={pulse} /> : null;
+}
+
+function PulseSkeleton() {
+  return (
+    <div className="rounded-2xl border border-line bg-raised p-6 shadow-raised" aria-hidden>
+      <div className="skeleton h-4 w-32 rounded" />
+      <div className="skeleton mt-4 h-10 w-56 rounded" />
+      <div className="skeleton mt-6 h-28 w-full rounded-lg" />
+    </div>
+  );
+}
+
 function FigureSkeleton() {
   return (
     <div aria-busy="true" className="rounded-2xl border border-line bg-raised p-5">
