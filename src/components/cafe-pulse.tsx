@@ -59,18 +59,6 @@ export function CafePulse({ pulse, month }: { pulse: PulseView; month?: PulseMon
               ? <T s="{0} · متوسط الطلب {1}" a={[countNoun(pulse.orders, ORDER), <bdi key="1" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.avgOrderMinor ?? 0)}</bdi>]} />
               : "لم يُسجَّل طلب بعد في يوم العمل هذا"}
           </p>
-          {/* «ما الذي يُطلب الآن؟» — الرقمُ وحده لا يقول ما يُحضَّر خلف البار */}
-          {pulse.topItems.length > 0 && (
-            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="font-bold text-muted">الأكثر طلباً اليوم</span>
-              {pulse.topItems.map((t) => (
-                <span key={t.name} className="inline-flex items-center gap-1 rounded-full bg-sunken/70 px-2.5 py-1">
-                  <bdi dir="auto" className="font-medium">{t.name}</bdi>
-                  <span className="nums font-bold text-accent">×{formatUnits(t.quantityMilli)}</span>
-                </span>
-              ))}
-            </p>
-          )}
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -99,6 +87,18 @@ export function CafePulse({ pulse, month }: { pulse: PulseView; month?: PulseMon
         </div>
       </div>
 
+        {/* «ما الذي يُطلب الآن؟» — الرقمُ وحده لا يقول ما يُحضَّر خلف البار */}
+        {pulse.topItems.length > 0 && (
+          <p className="mt-4 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-bold text-muted">الأكثر طلباً اليوم</span>
+            {pulse.topItems.map((t) => (
+              <span key={t.name} className="inline-flex items-center gap-1 rounded-full bg-sunken/70 px-2.5 py-1">
+                <bdi dir="auto" className="font-medium">{t.name}</bdi>
+                <bdi dir="ltr" className="nums font-bold text-accent">×{formatUnits(t.quantityMilli)}</bdi>
+              </span>
+            ))}
+          </p>
+        )}
       {pulse.hours.length > 0 && (
         <figure className="mt-6">
           <div className="flex h-28 items-end gap-[2px] sm:gap-1" role="img" aria-label="المبيعات بالساعة: اليوم مقارنة باليوم نفسه قبل أسبوع">
