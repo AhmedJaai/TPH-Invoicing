@@ -737,7 +737,7 @@ function txColumns(kind: "debit" | "credit" | "vat", filed?: string): Column<Vat
       primary: true,
       cell: (t) => (
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="truncate">{t.label}</span>
+          <span className="break-words">{t.label}</span>
           {t.coveredByInvoice && t.direction === "DEBIT" && <Badge tone="ok">فاتورتها محسوبة في الخصم</Badge>}
           {t.bounced && <Badge tone="muted">مردودة</Badge>}
           {t.caution !== null && <Badge tone={t.included ? "warn" : "muted"}>{t.included ? "تصنيف لا ضريبة فيه غالباً، فاحتفظ بفاتورته" : "لا ضريبة فيه غالباً"}</Badge>}

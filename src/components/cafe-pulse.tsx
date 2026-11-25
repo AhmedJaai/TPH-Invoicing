@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hourLabel } from "@/lib/finance/sales-heatmap";
 import { Activity, ArrowLeft } from "lucide-react";
 import { Money } from "./money";
 import { Delta } from "./ui";
@@ -8,7 +9,6 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { formatWeekday } from "@/lib/riyadh-time";
 import type { PulseView } from "@/lib/pulse";
 
-const hourLabel = (h: number) => (h === 0 ? "12 ص" : h < 12 ? `${h} ص` : h === 12 ? "12 م" : `${h - 12} م`);
 
 /**
  * «نبض المقهى» أعلى الرئيسيّة — سؤالُ صاحب المقهى الأوّل بعد «ماذا أفعل؟»: كيف يمشي اليوم؟

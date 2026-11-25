@@ -58,7 +58,7 @@ export function WaitingCard({
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3 px-4 pt-4 sm:px-5">
         <Monogram name={r.supplierName ?? "؟"} className="h-10 w-10 text-sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{r.supplierName ?? "مورّد غير معروف"}</p>
+          <p className="line-clamp-2 break-words text-[15px] font-bold">{r.supplierName ?? "مورّد غير معروف"}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span>{kindLabel}</span>
             {r.periodMonth && <><span aria-hidden>·</span><span>{formatMonth(r.periodMonth)}</span></>}
@@ -132,7 +132,7 @@ function Read({ label, children }: { label: string; children: React.ReactNode })
   return (
     <div className="min-w-0">
       <dt className="text-[11px] text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate text-[13px] font-bold">{children}</dd>
+      <dd className="mt-0.5 break-words text-[13px] font-bold">{children}</dd>
     </div>
   );
 }

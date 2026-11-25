@@ -328,8 +328,9 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
                 <Read label="الرقم الضريبي للبائع" value={p.reading.sellerVat} ltr />
                 <Read label="رقم الفاتورة" value={p.reading.invoiceNumber} ltr />
                 <Read label="التاريخ" value={p.reading.invoiceDate} ltr />
-                <Read label="الإجمالي" value={showAmounts ? p.reading.total : null} ltr />
-                <Read label="الضريبة" value={showAmounts ? p.reading.vat : null} ltr />
+                {/* مَن لا يرى المبالغ لا يُقال له «لم يُقرأ» — قُرئ وحُجب عنه */}
+                {showAmounts && <Read label="الإجمالي" value={p.reading.total} ltr />}
+                {showAmounts && <Read label="الضريبة" value={p.reading.vat} ltr />}
                 <Read label="البنود" value={p.reading.lineCount > 0 ? `${p.reading.lineCount}` : null} ltr />
               </dl>
             )}
@@ -403,7 +404,7 @@ function Read({ label, value, ltr = false }: { label: string; value: string | nu
   return (
     <div className="min-w-0">
       <dt className="text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate font-bold">
+      <dd className="mt-0.5 break-words font-bold">
         {value ? <bdi dir={ltr ? "ltr" : undefined} className={ltr ? "nums" : ""}>{value}</bdi> : <span className="font-normal text-muted">لم يُقرأ</span>}
       </dd>
     </div>

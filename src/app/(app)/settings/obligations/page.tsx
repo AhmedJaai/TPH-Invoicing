@@ -117,7 +117,7 @@ export default async function ObligationsPage() {
               cell: (r) => (
                 <span className="min-w-0">
                   <span className="block truncate font-bold">{r.title}</span>
-                  <span className="block truncate text-[11px] text-muted">
+                  <span className="block break-words text-[11px] text-muted">
                     {OBLIGATION_KIND_LABEL[r.kind]}
                     {r.holder && <> · {r.holder}</>}
                     {r.issuer && <> · {r.issuer}</>}
@@ -177,7 +177,7 @@ export default async function ObligationsPage() {
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
             {view.archived.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 break-words">
                   <span className="font-bold">{o.title}</span>
                   <span className="ms-2 text-[11px] text-muted"><T s="{0} · كان تاريخ انتهائها {1}" a={[OBLIGATION_KIND_LABEL[o.kind], <bdi key="1">{formatDay(o.expiresOn)}</bdi>]} /></span>
                 </span>

@@ -106,7 +106,7 @@ export default async function RecurringPage() {
                       <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
                         {note.kind === "TWICE" && <Copy className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />}
                         {note.kind === "ROSE" && <TrendingUp className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />}
-                        <span className="min-w-0 truncate">{s.label}</span>
+                        <span className="min-w-0 break-words">{s.label}</span>
                         <Badge tone="warn">{note.kind === "TWICE" ? "خصم مرتين" : note.kind === "ROSE" ? "ارتفع" : "لم يُخصم"}</Badge>
                       </p>
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
@@ -153,7 +153,7 @@ export default async function RecurringPage() {
                   primary: true,
                   cell: (s) => (
                     <span className="min-w-0">
-                      <span className="block truncate font-bold">{s.label}</span>
+                      <span className="block break-words font-bold">{s.label}</span>
                       <span className="block text-[11px] text-muted">{CATEGORY_LABEL[s.category]} · {countNoun(s.months, MONTH)}</span>
                     </span>
                   ),

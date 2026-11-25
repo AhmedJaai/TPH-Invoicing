@@ -387,7 +387,7 @@ export default async function ExpensesPage({
                 */
                 cell: (e) => (
                   <span className="block min-w-0">
-                    <span className="block truncate font-bold">{CATEGORY_LABEL[e.category] ?? e.label}</span>
+                    <span className="block break-words font-bold">{CATEGORY_LABEL[e.category] ?? e.label}</span>
                     {e.label && e.label !== CATEGORY_LABEL[e.category] && (
                       <span className="mt-0.5 block max-w-[22rem] truncate text-[11px] font-normal text-muted" dir="auto">{e.label}</span>
                     )}

@@ -275,7 +275,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                 ) : d.statementId !== null ? (
                   <Note>كشف حساب مسجّل، ولا يحتاج إلى رقم فاتورة.</Note>
                 ) : (
-                  <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-sunken/60 px-3 py-2.5 sm:grid-cols-5">
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-sunken/60 px-3 py-2.5 sm:grid-cols-3 xl:grid-cols-5">
                     <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
                     <ReadField label="التاريخ" value={d.invoiceDate ? <bdi className="nums">{formatDay(d.invoiceDate)}</bdi> : "غير معروف"} />
                     <ReadField label="قبل الضريبة" value={d.subtotalMinor === null ? "غير معروف" : <Money minor={d.subtotalMinor} />} />
@@ -327,7 +327,7 @@ function ReadField({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="min-w-0">
       <dt className="text-[11px] text-muted">{label}</dt>
-      <dd className="truncate text-xs font-bold">{value}</dd>
+      <dd className="break-words text-xs font-bold">{value}</dd>
     </div>
   );
 }

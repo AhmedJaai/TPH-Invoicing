@@ -1,4 +1,4 @@
-import { EMPLOYEE, countNoun } from "@/lib/arabic";
+import { EMPLOYEE, MINUTE, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarClock, CalendarDays, Clock, Link2, MapPin, ShieldCheck, Users, Wifi } from "lucide-react";
@@ -8,7 +8,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { PostAction } from "@/components/post-action";
 import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/forms";
-import { Badge, Callout, Card, DataTable, EmptyState, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
+import { Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { activeIn } from "@/lib/payroll/calc";
 import { dayShiftRange, riyadhClock, shiftOn, trusted, VERDICT_LABEL, WEEKDAY_LABEL, type DayShift } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
@@ -109,7 +109,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         : <span className="text-muted">—</span>) : (
         <span className="flex flex-wrap gap-1">{b.status.map((s, i) => (
           <Badge key={i} tone={s.kind === "LEAVE" ? "muted" : "danger"}>
-            {s.kind === "LATE" ? `تأخر ${s.minutes} د` : s.kind === "EARLY" ? `خرج مبكراً ${s.minutes} د` : s.kind === "ABSENT" ? "غائب" : "إجازة"}
+            {s.kind === "LATE" ? `تأخر ${countNoun(s.minutes ?? 0, MINUTE)}` : s.kind === "EARLY" ? `خرج مبكراً ${countNoun(s.minutes ?? 0, MINUTE)}` : s.kind === "ABSENT" ? "غائب" : "إجازة"}
           </Badge>
         ))}</span>
       ),
@@ -154,7 +154,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       </div>
 
       <Section title={day === today ? "اليوم" : formatDay(day)} icon={CalendarDays} count={board.length} hint={missing.length > 0 ? `${countNoun(missing.length, EMPLOYEE)} ${missing.length === 1 ? "لم يسجّل" : missing.length === 2 ? "لم يسجّلا" : "لم يسجّلوا"} حضوراً في يوم عملهم. إن غاب أحدهم فاضغط «غائب» ليُخصم يومه، أو «إجازة» فلا يُخصم.` : undefined}>
-        {board.length === 0 ? <EmptyState icon={Users} title="لا موظفين يعملون في هذا اليوم." /> : <DataTable columns={columns} rows={board} keyOf={(b) => b.employee.id} hrefOf={(b) => `/payroll/employee/${b.employee.id}?month=${month}`} />}
+        {board.length === 0 ? <EmptyState icon={Users} title="لا موظفين يعملون في هذا اليوم." hint="أضف الموظفين وأوقات دوامهم أولاً، فيظهر هنا حضورُ كلٍّ منهم." action={<LinkButton href="/payroll/employees#shifts" size="sm">جدول الدوام</LinkButton>} /> : <DataTable columns={columns} rows={board} keyOf={(b) => b.employee.id} hrefOf={(b) => `/payroll/employee/${b.employee.id}?month=${month}`} />}
       </Section>
 
       <Section id="review" title="تسجيلات تحتاج حكمك" icon={ShieldCheck} count={unreviewed.length} hint="سُجّلت والجوال بعيد عن المقهى، أو بلا موقع، ولم يكن على شبكة المقهى. اقبلها إن كان في المقهى فعلاً، أو ردّها فلا تُحسب ويسقط ما حُسب منها. وإن سجّل وهو خارج المقهى عمداً فهي مخالفة «التلاعب في إثبات الحضور» (البند 2/7).">

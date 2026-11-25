@@ -884,7 +884,7 @@ function ReadRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className={`min-w-0 truncate text-sm font-bold ${value ? "" : "text-danger"}`} dir="auto">
+      <dd className={`min-w-0 break-words text-sm font-bold ${value ? "" : "text-danger"}`} dir="auto">
         {value ?? "لم يُقرأ"}
       </dd>
     </div>

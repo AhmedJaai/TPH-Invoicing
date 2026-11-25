@@ -100,7 +100,7 @@ export default async function TasksPage() {
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
             {view.closed.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
-                <span className="min-w-0 truncate text-muted">
+                <span className="min-w-0 break-words text-muted">
                   <span className="font-bold line-through decoration-muted/60">{t.title}</span>
                   <span className="ms-2 text-[11px]">{t.outcome === "DONE" ? "أُنجزت" : "أُسقطت"} · <bdi>{formatDay(t.closedOn)}</bdi></span>
                 </span>
@@ -134,12 +134,12 @@ function TaskSection({ title, icon, rows, today, canEdit, hint }: {
           <li key={t.id} className="flex items-center gap-2 py-1.5 ps-2 pe-3">
             {canEdit ? <TaskCheck id={t.id} title={t.title} /> : <span className="h-11 w-3 shrink-0 sm:h-8" aria-hidden />}
             <div className="min-w-0 flex-1 py-1">
-              <p dir="auto" className="truncate text-[14px] font-bold">{t.title}</p>
+              <p dir="auto" className="line-clamp-2 break-words text-[14px] font-bold">{t.title}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                 {t.dueOn && <span><bdi>{formatDay(t.dueOn)}</bdi> · {describeDue(t.dueOn, today)}</span>}
                 {t.level === "REMINDER" && t.remindOn && <Badge tone="info" dot>تذكير منذ <bdi>{formatDay(t.remindOn)}</bdi></Badge>}
                 {t.repeat !== "NONE" && <span className="inline-flex items-center gap-1"><Repeat className="h-3 w-3" strokeWidth={2} aria-hidden />{TASK_REPEAT_LABEL[t.repeat]}</span>}
-                {t.note && <span dir="auto" className="truncate">{t.note}</span>}
+                {t.note && <span dir="auto" className="line-clamp-2 basis-full break-words">{t.note}</span>}
               </p>
             </div>
             <span className="flex shrink-0 items-center gap-1">

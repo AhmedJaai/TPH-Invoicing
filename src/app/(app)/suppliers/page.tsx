@@ -195,7 +195,7 @@ export default async function SuppliersPage({
         <span className="flex min-w-0 items-center gap-3">
           <Monogram name={r.nameAr} className="h-9 w-9 text-sm" />
           <span className="min-w-0">
-            <Link href={`/suppliers/${r.slug}`} className="relative block truncate font-bold hover:text-accent">
+            <Link href={`/suppliers/${r.slug}`} className="relative block line-clamp-2 break-words font-bold hover:text-accent">
               {r.nameAr}
             </Link>
             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-normal text-muted">

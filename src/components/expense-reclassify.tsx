@@ -74,7 +74,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
           <li key={s.id} className={`px-4 py-3 ${finished ? "bg-ok-bg" : ""}`}>
             <div className="flex items-start justify-between gap-3">
               <span className="min-w-0">
-                <span className="block truncate text-[13px] font-bold" dir="auto">{s.label}</span>
+                <span className="block break-words text-[13px] font-bold" dir="auto">{s.label}</span>
                 <span className="mt-0.5 block text-[11px] text-muted">
                   <T s="مصنّفة «{0}» · وتحمل اسم المورّد «{1}»" a={[s.categoryLabel, s.supplier]} /></span>
               </span>

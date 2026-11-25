@@ -32,7 +32,8 @@ export function TaskRow({ item }: { item: AttentionItem }) {
     على الجوّال: النصُّ يأخذ العرضَ كلَّه (العنوانُ سطران لا «…» بعد ثلاث كلمات)،
     والمبلغُ والفعلُ تحته. كان الزرُّ يأخذ نصفَ الصفّ فيُقصّ العنوان — وكان
     مقصوداً أن يُخفى (`hidden sm:inline-flex`) فغلبه `inline-flex` في `buttonClass`.
-    وعلى الحاسوب صفٌّ واحد: النصّ، ثمّ المبلغ، ثمّ الفعل.
+    وعلى الحاسوب صفٌّ واحد: النصّ، ثمّ المبلغ، ثمّ الفعل — والنصُّ سطران لا «…»؛
+    العنوانُ المقصوص («٢ صناديق يختلف المعدود فيها…») لا يقول ما البند.
   */
   return (
     <li
@@ -47,10 +48,10 @@ export function TaskRow({ item }: { item: AttentionItem }) {
       </span>
 
       <span className="min-w-0 flex-1">
-        <Link href={detailHref} className="line-clamp-2 text-[14px] font-bold leading-snug hover:text-accent sm:block sm:truncate">
+        <Link href={detailHref} className="line-clamp-2 text-[14px] font-bold leading-snug text-pretty hover:text-accent">
           {item.title}
         </Link>
-        <span className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:block sm:truncate">{item.detail}</span>
+        <span className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted">{item.detail}</span>
         <span className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:hidden">
           <Link href={item.href} className={buttonClass("secondary", "sm")}>{action}</Link>
           {amount && (

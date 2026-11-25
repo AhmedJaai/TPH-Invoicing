@@ -133,10 +133,10 @@ export function CashTimeline({
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
                             {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "PAYROLL" ? <Users className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[13px]">
+                          <span className="min-w-0 flex-1 text-[13px] leading-snug">
                             {l.label}
                             {l.sub && <span className="ms-2 text-[11px] text-muted">{l.sub}</span>}
-                            {moved && <span className="ms-2 text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
+                            {moved && <span className="block text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
                           </span>
                           <span className="nums-col shrink-0 text-[13px] font-bold"><Money minor={l.amountMinor} /></span>
                         </Link>
@@ -145,10 +145,10 @@ export function CashTimeline({
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
                             {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "PAYROLL" ? <Users className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[13px]">
+                          <span className="min-w-0 flex-1 text-[13px] leading-snug">
                             {l.label}
                             {l.sub && <span className="ms-2 text-[11px] text-muted">{l.sub}</span>}
-                            {moved && <span className="ms-2 text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
+                            {moved && <span className="block text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
                           </span>
                           <span className="nums-col shrink-0 text-[13px] font-bold"><Money minor={l.amountMinor} /></span>
                         </div>
@@ -221,8 +221,8 @@ function BalanceSteps({ balanceMinor, buckets }: { balanceMinor: number; buckets
       <ol className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
         {steps.map((s) => (
           <li key={s.id} className="min-w-0 text-center">
-            <span className="block truncate text-[10px] text-muted">{s.label}</span>
-            <span className={`block truncate text-[11px] font-bold ${s.minor < 0 ? "text-danger" : ""}`}><Money minor={s.minor} /></span>
+            <span className="block truncate text-[10px] text-muted" title={s.label}>{s.label}</span>
+            <span className={`block text-[10px] font-bold [overflow-wrap:anywhere] sm:text-[11px] ${s.minor < 0 ? "text-danger" : ""}`}><Money minor={s.minor} /></span>
           </li>
         ))}
       </ol>

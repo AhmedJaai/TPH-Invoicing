@@ -247,7 +247,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
 
       <Section title={`ما وُزّع عن ${formatMonth(month)}`} icon={Link2} count={allLinks.length} hint="كل حوالة وما نُسب منها لكل موظف بغرضه. فكّ أي جزء يعيده إلى «لم توزَّع».">
         {allLinks.length === 0 ? (
-          <EmptyState icon={Link2} title="لم توزَّع حوالات على هذا الشهر بعد." />
+          <EmptyState icon={Link2} title="لم توزَّع حوالات على هذا الشهر بعد." hint="وزّعها من «لم توزَّع» أعلاه، أو اختر شهراً آخر." />
         ) : (
           <ul className="space-y-2">
             {groups.map((g) => (

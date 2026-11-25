@@ -205,7 +205,7 @@ function NoticeRow({ n, unread }: { n: Notice; unread: boolean }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
-            <span className={`truncate text-[13px] ${unread ? "font-bold" : "font-medium text-ink-soft"}`}>{n.title}</span>
+            <span className={`min-w-0 break-words text-[13px] ${unread ? "font-bold" : "font-medium text-ink-soft"}`}>{n.title}</span>
             <span className="shrink-0 text-[11px] text-muted">{timeAgo(n.at)}</span>
           </span>
           {n.body && <span className="mt-0.5 block text-xs leading-relaxed text-muted">{n.body}</span>}

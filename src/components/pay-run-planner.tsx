@@ -380,11 +380,11 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
                 </label>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-[14px] font-bold">
-                    {s.slug ? <Link href={`/suppliers/${s.slug}`} className="truncate hover:text-accent">{s.name}</Link> : <span className="truncate">{s.name}</span>}
+                    {s.slug ? <Link href={`/suppliers/${s.slug}`} className="truncate hover:text-accent" title={s.name}>{s.name}</Link> : <span className="truncate">{s.name}</span>}
                     {state === "ok" && <CircleCheck className="h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="سُجّل" />}
                     {state === "failed" && <CircleAlert className="h-4 w-4 shrink-0 text-danger" strokeWidth={2} aria-label="لم يُسجَّل" />}
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] text-muted">
+                  <p className="mt-0.5 text-[11px] text-muted">
                     {plan.skippedInvoices > 0
                       ? <><T s="{0} من {1}" a={[<span key="0" className="nums">{plan.invoiceIds.length}</span>, countNoun(s.invoices.length, INVOICE)]} /></>
                       : countNoun(s.invoices.length, INVOICE)}

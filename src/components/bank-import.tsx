@@ -131,7 +131,7 @@ function UnknownRow({
     <li className={`px-4 py-3 ${state === "saved" ? "bg-ok-bg" : ""}`}>
       <div className="flex items-baseline gap-3">
         <bdi className="w-20 shrink-0 text-[11px] text-muted">{formatDay(tx.date)}</bdi>
-        <p className="min-w-0 flex-1 truncate text-xs text-ink-soft" dir="auto" title={tx.description}>
+        <p className="min-w-0 flex-1 break-words text-xs text-ink-soft" dir="auto">
           {tx.description}
         </p>
         <span className="shrink-0 text-xs font-bold"><Money minor={tx.amountMinor} /></span>
@@ -167,6 +167,12 @@ function UnknownRow({
           <button aria-busy={state === "saving"} onClick={save} disabled={!ready || state === "saving"} className={buttonClass("primary", "sm")}>
             صنّفها
           </button>
+          {/* الزرُّ المعطَّل يقول لماذا — لا رماديٌّ صامت */}
+          {!ready && (
+            <p className="w-full text-[11px] text-muted">
+              {pattern.trim().length < 3 ? "اكتب ثلاثة أحرف على الأقل من وصف الحركة." : "اختر المورّد أولاً."}
+            </p>
+          )}
 
           {needsSupplier && (
             /* المستفيدُ الذي لا يُعرف مورّداً يُنشأ هنا — ما يُستورَد به الكشفُ لا ينحصر في المسجَّل */

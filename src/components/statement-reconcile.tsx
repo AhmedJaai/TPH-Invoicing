@@ -141,7 +141,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                 <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
                   <Monogram name={a.supplierName} className="h-9 w-9 text-sm" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-bold">{a.supplierName}</span>
+                    <span className="block line-clamp-2 break-words text-[14px] font-bold">{a.supplierName}</span>
                     <span className="block text-[11px] text-muted">{formatRange(a.periodStart, a.periodEnd)}</span>
                   </span>
                   <span className="text-end">
@@ -190,9 +190,9 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                   <Monogram name={a.supplierName} />
                   <span className="min-w-0">
                     {a.supplierSlug ? (
-                      <Link href={`/suppliers/${a.supplierSlug}?tab=statements#detail`} className="relative block truncate font-bold hover:text-accent">{a.supplierName}</Link>
+                      <Link href={`/suppliers/${a.supplierSlug}?tab=statements#detail`} className="relative block line-clamp-2 break-words font-bold hover:text-accent">{a.supplierName}</Link>
                     ) : (
-                      <span className="block truncate font-bold">{a.supplierName}</span>
+                      <span className="block line-clamp-2 break-words font-bold">{a.supplierName}</span>
                     )}
                     <span className="block text-[11px] font-normal text-muted">{formatRange(a.periodStart, a.periodEnd)}</span>
                   </span>

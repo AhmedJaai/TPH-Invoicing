@@ -116,7 +116,7 @@ export default async function OwnerPage() {
               primary: true,
               cell: (l) => (
                 <span className="min-w-0">
-                  <span className="block truncate font-bold">{l.label}</span>
+                  <span className="block break-words font-bold">{l.label}</span>
                   <span className="mt-0.5 block"><Badge tone={l.kind === "TOOK_OUT" ? "warn" : "ok"}>{OWNER_ENTRY_LABEL[l.kind]}</Badge></span>
                   {l.payment && canDecide && <OwnerPaymentSource paymentId={l.payment.id} fromTransfers={l.payment.fromTransfers} />}
                 </span>

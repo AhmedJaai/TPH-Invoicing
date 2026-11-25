@@ -295,10 +295,13 @@ export default async function BankPage({
                       <DirectionIcon direction={t.direction} />
                       {/* نصُّ الكشف طويل: كان يمدّ العمود فيُقصّ عمودُ «الحالة» على شاشة ١٢٨٠ — والكاملُ في `title` */}
                       <span className="min-w-0 max-w-[20rem] 2xl:max-w-[26rem]">
-                        <span className="block truncate font-bold" dir="auto">{t.who || t.description?.trim().slice(0, 60) || "حركة بلا وصف"}</span>
-                        <span className="mt-0.5 block truncate text-[11px] font-normal text-muted" dir="auto" title={t.description ?? undefined}>
-                          {t.description}
-                        </span>
+                        <span className="block truncate font-bold" dir="auto" title={t.who || t.description || undefined}>{t.who || t.description?.trim().slice(0, 60) || "حركة بلا وصف"}</span>
+                        {/* بلا اسم مستفيد صار الوصفُ هو السطرَ الأوّل — فلا يُكرَّر تحته */}
+                        {t.who && t.description && (
+                          <span className="mt-0.5 block truncate text-[11px] font-normal text-muted" dir="auto" title={t.description}>
+                            {t.description}
+                          </span>
+                        )}
                       </span>
                     </span>
                   ),

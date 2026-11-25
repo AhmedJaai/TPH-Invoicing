@@ -156,9 +156,9 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                     {p.invoices.items.map((it) => (
                       <li key={it.documentId} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
                         <span className="min-w-0">
-                          <span className="block truncate font-bold">{it.supplierName}</span>
-                          <span className="block truncate text-muted" dir="auto">
-                            {it.kind === "STATEMENT" ? "كشف حساب" : it.invoiceNumber} · {formatDay(it.invoiceDate)}
+                          <span className="block line-clamp-2 break-words font-bold">{it.supplierName}</span>
+                          <span className="block truncate text-muted">
+                            {it.kind === "STATEMENT" ? "كشف حساب" : <bdi className="nums">{it.invoiceNumber}</bdi>} · {formatDay(it.invoiceDate)}
                             {it.wasArchived ? " · أُرشفت ولم تُسجَّل" : ""}
                           </span>
                         </span>
@@ -301,7 +301,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                         className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-sunken"
                       >
                         <span className="min-w-0">
-                          <span className="block truncate font-bold">{u.supplierName}</span>
+                          <span className="block line-clamp-2 break-words font-bold">{u.supplierName}</span>
                           <span className="block truncate text-muted" dir="auto">
                             {formatDay(u.day)}{u.invoices.length > 0 ? ` · ${u.invoices.map((i) => i.number).join("، ")}` : " · لم تُخصَّص على فاتورة"}
                           </span>

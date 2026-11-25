@@ -19,6 +19,7 @@ import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { canonicalToQuantity, formatSignedQuantity, milliToDecimal, unitChoices } from "@/lib/inventory/units";
 import { formatBp } from "@/lib/inventory/equation";
+import { share } from "./loss-trend";
 import { describeCoverage, READINESS_LABEL, type CoverageGap, type Readiness } from "@/lib/inventory/coverage";
 import {
   FLAG_LABEL, OPENING_SOURCE_LABEL, VALUATION_LABEL, allVariances, restOfScope, type EngineReport,
@@ -573,11 +574,11 @@ function CoverageBanner({
                     {g.label} <span className="nums text-muted">· {g.count}</span>
                     {/* «٣ منتجات» لا تقول شيئاً؛ وحصّتُها من المبيع تقول أيصلح التقرير */}
                     {g.unitsShareBp !== null && g.unitsShareBp > 0 && (
-                      <span className="text-warn"> <T s=" · تمثّل {0} من الوحدات المباعة" a={[<span key="0" className="nums">{(g.unitsShareBp / 100).toFixed(1)}٪</span>]} /></span>
+                      <span className="text-warn"> <T s=" · تمثّل {0} من الوحدات المباعة" a={[<span key="0" className="nums">{share(g.unitsShareBp)}</span>]} /></span>
                     )}
                     {showAmounts && g.totalMinor > 0 && <span className="font-medium text-muted"> <T s=" · بقيمة {0}" a={[<Money key="0" minor={g.totalMinor} />]} /></span>}
                   </p>
-                  {g.examples.length > 0 && <p className="mt-0.5 truncate text-muted">{g.examples.join(" · ")}</p>}
+                  {g.examples.length > 0 && <p className="mt-0.5 line-clamp-3 break-words text-muted">{g.examples.join(" · ")}</p>}
                 </div>
                 {fix && (
                   <Link href={fix.href} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">

@@ -195,10 +195,10 @@ export function DriveRename() {
                       className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-[11px] text-muted line-through" dir="ltr">
+                      <span className="block break-all text-[11px] text-muted line-through" dir="ltr">
                         {p.current}
                       </span>
-                      <span className="block truncate text-[11px] font-bold" dir="ltr">
+                      <span className="block break-all text-[11px] font-bold" dir="ltr">
                         {p.proposed}
                       </span>
                       <span className="block text-[11px] text-muted">
@@ -224,7 +224,7 @@ export function DriveRename() {
                 {data.cannot.filter((c) => !c.byDesign).map((c, i) => (
                   <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-raised px-3 py-2 text-[11px]">
                     <span className="min-w-0">
-                      <span className="block truncate font-bold" dir="ltr">{c.current}</span>
+                      <span className="block break-all font-bold" dir="ltr">{c.current}</span>
                       <span className="text-muted">{c.reason}</span>
                     </span>
                     {c.fixHref && (

@@ -442,7 +442,7 @@ export default async function DocumentsPage({
                       {recent.map((d) => (
                         <li key={d.id}>
                           <Link
-                            href={link({ status: "ALL", q: d.fileName })}
+                            href={documentHref(d.id)}
                             className="flex min-h-12 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-hover"
                           >
                             <span className="min-w-0 flex-1">
@@ -519,7 +519,7 @@ export default async function DocumentsPage({
                       <span className="flex min-w-0 items-center gap-3" title={r.fileName}>
                         <Monogram name={r.supplierName ?? KIND_LABEL[r.kind] ?? "م"} />
                         <span className="min-w-0">
-                          <span className="block truncate font-bold">{r.supplierName ?? "مورّد غير معروف"}</span>
+                          <span className="block line-clamp-2 break-words font-bold">{r.supplierName ?? "مورّد غير معروف"}</span>
                           <span className="block truncate text-[11px] font-normal text-muted">
                             {r.invoiceNumber
                               ? <bdi className="nums">{r.invoiceNumber}</bdi>

@@ -340,7 +340,7 @@ function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Le
         </div>
 
         {/* سببُ البند تحت عنوانه دائماً — كان العملُ الترتيبيّ عنواناً وحده، فلا يُعرف لماذا ظهر حتّى يُفتح */}
-        <p className={`mt-1 text-xs leading-relaxed text-ink-soft ${signal ? "line-clamp-2" : "line-clamp-1"}`}>
+        <p className={`mt-1 text-xs leading-relaxed text-ink-soft line-clamp-2`}>
           <Prose text={item.detail} />
         </p>
 

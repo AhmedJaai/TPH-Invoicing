@@ -120,7 +120,7 @@ export default async function PerformancePage() {
   if (!k) {
     return (
       <PageShell user={user} width="wide" title="الأداء">
-        <EmptyState icon={Activity} title="لا شهر مكتمل المبيعات بعد." hint="يظهر الأداء بعد أن يقرأ النظام مبيعات شهر كامل من فودكس." />
+        <EmptyState icon={Activity} title="لا شهر مكتمل المبيعات بعد." hint="يظهر الأداء بعد أن يقرأ النظام مبيعات شهر كامل من فودكس." action={<LinkButton href="/money/foodics" size="sm">افتح فودكس والبنك</LinkButton>} />
       </PageShell>
     );
   }

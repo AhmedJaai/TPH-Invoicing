@@ -54,6 +54,8 @@ export interface SalesAnalysis {
   days: { day: string; paidMinor: number; orders: number }[];
   hours: { hour: number; paidMinor: number; orders: number }[];
   weekdays: { weekday: number; paidMinor: number; orders: number; days: number }[];
+  /** كلُّ ساعةٍ من كلِّ يوم — لخريطة الأسبوع (`buildHeatmap`). */
+  heat: { hour: number; weekday: number; paidMinor: number; orders: number }[];
   methods: { name: string; type: number; amountMinor: number; payments: number }[];
   types: { type: number; label: string; paidMinor: number; orders: number }[];
   items: ItemRow[];
@@ -209,6 +211,7 @@ export async function loadSalesAnalysis(month: string, conn: Conn = db): Promise
     /* بترتيب يوم العمل (يفتح السابعة ويغلق الثالثة فجراً) — منتصفُ الليل آخرُ اليوم لا أوّلُه */
     hours: [...hourAcc].map(([hour, v]) => ({ hour, ...v })).sort((a, b) => businessHourOrder(a.hour) - businessHourOrder(b.hour)),
     weekdays: [...dayAcc].map(([weekday, v]) => ({ weekday, ...v })).sort((a, b) => a.weekday - b.weekday),
+    heat: hours.rows.map((r) => ({ hour: r.hour, weekday: r.weekday, paidMinor: Number(r.paid), orders: r.orders })),
     methods: methods.rows.map((r) => ({ name: r.name, type: r.type, amountMinor: Number(r.amount), payments: r.n })),
     types: types.rows.map((r) => ({ type: r.type, label: ORDER_TYPE_LABEL[r.type] ?? `نوع ${r.type}`, paidMinor: Number(r.paid), orders: r.orders })),
     items,

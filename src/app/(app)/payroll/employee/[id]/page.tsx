@@ -1,6 +1,6 @@
 import { RecordHistory } from "@/components/record-history";
 import { TEAM_APP_NAME } from "@/lib/team-app";
-import { DAY, countNoun } from "@/lib/arabic";
+import { DAY, MINUTE, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CalendarClock, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
@@ -170,7 +170,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                 <Line key={a.id} label={ADJUSTMENT_LABEL[a.kind]} note={a.note ?? undefined} minor={a.amountMinor} sign="−" />
               ))}
               {slip!.lateMinutes + slip!.earlyMinutes > 0 && (
-                <Line label="أجر دقائق التأخير والانصراف المبكر" note={`${slip!.lateMinutes + slip!.earlyMinutes} دقيقة لم يعملها${employee.lateGraceMinutes > 0 ? ` · ما كان في حدود سماح ${employee.lateGraceMinutes} دقيقة لم يُحسب` : ""}`} minor={slip!.lateMinor} sign="−" />
+                <Line label="أجر دقائق التأخير والانصراف المبكر" note={`${countNoun(slip!.lateMinutes + slip!.earlyMinutes, MINUTE)} لم يعملها${employee.lateGraceMinutes > 0 ? ` · ما كان في حدود سماح ${countNoun(employee.lateGraceMinutes, MINUTE)} لم يُحسب` : ""}`} minor={slip!.lateMinor} sign="−" />
               )}
               {absenceLineLabel(slip!) && <Line label={absenceLineLabel(slip!)!} minor={slip!.absenceMinor} sign="−" />}
               {(slip!.penaltiesMinor > 0 || slip!.warnings > 0) && (
@@ -487,7 +487,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       {eos && (
         <Section title="مكافأة نهاية الخدمة (تقدير)" icon={HandCoins} hint="بنظام العمل: نصف راتب عن كل سنة من الخمس الأولى، وراتب كامل عن كل سنة بعدها. وفي الاستقالة: لا شيء قبل سنتين، وثلثها حتى خمس، وثلثاها حتى عشر. تقدير على آخر راتب، لا حكم نظامي.">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-            <Card><p className="text-xs text-muted">مدة الخدمة</p><p className="mt-1 text-lg font-bold">{serviceDays} يوماً</p></Card>
+            <Card><p className="text-xs text-muted">مدة الخدمة</p><p className="mt-1 text-lg font-bold">{countNoun(serviceDays, DAY)}</p></Card>
             <Card><p className="text-xs text-muted">إن انتهى العقد من جهتك</p><p className="mt-1 text-lg font-bold"><Money minor={eos.fullMinor} currency /></p></Card>
             <Card><p className="text-xs text-muted">إن استقال هو</p><p className="mt-1 text-lg font-bold"><Money minor={eos.resignationMinor} currency /></p></Card>
           </div>

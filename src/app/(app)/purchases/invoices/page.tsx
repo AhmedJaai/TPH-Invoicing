@@ -326,7 +326,7 @@ export default async function InvoicesPage({
                     <span className="flex min-w-0 items-center gap-3">
                       <Monogram name={r.supplier ?? "؟"} />
                       <span className="min-w-0">
-                        <span className="block truncate font-bold">{r.supplier ?? "بلا مورّد"}</span>
+                        <span className="block line-clamp-2 break-words font-bold">{r.supplier ?? "بلا مورّد"}</span>
                         {/*
                           `isolate` يعزل ترتيب الرقم الداخليّ ويُبقي الكتلة في
                           اتّجاه الصفحة، فيقع تحت الاسم محاذياً له.

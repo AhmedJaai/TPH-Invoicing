@@ -8,6 +8,13 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellRing, Check, FileText, Undo2, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
+import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
+
+/** ما قرأه النموذج نصٌّ خامّ («1250.5») — يُعرض كسائر المال («1,250.50»)، وما لا يُفهم يبقى كما قُرئ. */
+function readTotal(raw: string): string {
+  const minor = parseRiyals(raw);
+  return minor === null ? raw : formatRiyalsDisplay(minor);
+}
 
 export interface InboxItem {
   id: string;
@@ -65,7 +72,7 @@ function Row({ token, item, onOpen }: { token: string; item: InboxItem; onOpen: 
           <span className="block text-sm font-bold">{item.read?.supplier ?? "مورّد لم يُقرأ"}</span>
           <span className="block text-xs text-ink-soft">
             {item.read?.invoiceNumber && <>رقم <span className="nums">{item.read.invoiceNumber}</span> · </>}
-            {item.read?.total && <><span className="nums">{item.read.total}</span> ريال</>}
+            {item.read?.total && <><span className="nums">{readTotal(item.read.total)}</span> ريال</>}
           </span>
           <span className="mt-0.5 block text-[11px] text-muted">من {item.sender} · {when(item.createdAt)}</span>
           {item.enteredAt && <span className="mt-0.5 block text-[11px] font-bold text-ok">أدخلها {item.enteredBy ?? ""}</span>}
@@ -109,7 +116,7 @@ function Viewer({ token, item, onClose }: { token: string; item: InboxItem; onCl
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
             <dt className="text-muted">الرقم</dt><dd className="nums font-bold">{item.read.invoiceNumber ?? "—"}</dd>
             <dt className="text-muted">التاريخ</dt><dd className="nums font-bold">{item.read.invoiceDate ?? "—"}</dd>
-            <dt className="text-muted">الإجمالي</dt><dd className="nums font-bold">{item.read.total ? `${item.read.total} ريال` : "—"}</dd>
+            <dt className="text-muted">الإجمالي</dt><dd className="nums font-bold">{item.read.total ? `${readTotal(item.read.total)} ريال` : "—"}</dd>
           </dl>
         )}
         {item.note && <p className="text-xs">ملاحظة المصوِّر: {item.note}</p>}

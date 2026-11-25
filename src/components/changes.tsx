@@ -37,13 +37,13 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-3">
-                <span className="truncate text-[13px] font-bold">{c.label}</span>
+                <span className="line-clamp-2 text-[13px] font-bold leading-snug">{c.label}</span>
                 <span className="shrink-0 text-[13px] font-bold">
                   {c.currentMinor !== undefined ? <Money minor={c.currentMinor} /> : <span className="nums">{c.currentCount ?? "—"}</span>}
                 </span>
               </span>
               <span className="mt-0.5 flex items-baseline justify-between gap-3 text-[11px] leading-relaxed text-muted">
-                <span className="min-w-0 truncate"><Prose text={`${c.detail} · ${c.baseline}`} /></span>
+                <span className="line-clamp-2 min-w-0"><Prose text={`${c.detail} · ${c.baseline}`} /></span>
                 {/* الاتّجاهُ بسهمه لا بسهم الأيقونة وحده — «100٪» بلا علامةٍ تُقرأ ارتفاعاً وهي هبوط */}
                 <span className="shrink-0">
                   {c.direction === "NEW" ? <span className="font-bold">جديد</span> : <Delta pct={c.pct} favourable={c.favourable} abs={countDelta(c)} />}
@@ -53,7 +53,7 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
           </>
         );
 
-        const cls = "flex items-center gap-3 px-4 py-3";
+        const cls = "flex items-start gap-3 px-4 py-3";
         return (
           <li key={c.id}>
             {c.href ? (

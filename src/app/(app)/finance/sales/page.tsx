@@ -1,7 +1,7 @@
 import { formatRiyalsDisplay } from "@/lib/money";
 import { DAY, ORDER, countNoun, countNounGen } from "@/lib/arabic";
 import { redirect } from "next/navigation";
-import { CalendarDays, Clock, Coffee, CreditCard, Info, ShoppingBag, TrendingDown, TrendingUp, Utensils } from "lucide-react";
+import { CalendarDays, Clock, Coffee, Flame, CreditCard, Info, ShoppingBag, TrendingDown, TrendingUp, Utensils } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -13,6 +13,8 @@ import { currentMonthRiyadh, formatDay, formatMonth, formatWeekday } from "@/lib
 import { loadRevenue } from "@/services/profit.service";
 import { loadSalesAnalysis, type ItemRow } from "@/services/sales-analysis.service";
 import { T } from "@/components/i18n/t";
+import { SalesHeatmap } from "@/components/sales-heatmap";
+import { buildHeatmap } from "@/lib/finance/sales-heatmap";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
   const prevTicket = a.previous && a.previous.orders > 0 ? Math.round(a.previous.paidMinor / a.previous.orders) : null;
   const maxDay = Math.max(1, ...a.days.map((d) => d.paidMinor));
   const maxHour = Math.max(1, ...a.hours.map((h) => h.paidMinor));
+  const heat = buildHeatmap(a.heat, new Map(a.weekdays.map((w) => [w.weekday, w.days])));
   const weekdayAvg = a.weekdays.map((w) => ({ ...w, avgMinor: w.days > 0 ? Math.round(w.paidMinor / w.days) : 0 }));
   const maxWeekday = Math.max(1, ...weekdayAvg.map((w) => w.avgMinor));
   const methodTotal = a.methods.filter((m) => m.type !== 5).reduce((s, m) => s + m.amountMinor, 0);
@@ -128,6 +131,12 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
         </div>
       </Section>
 
+      {heat.peak && (
+        <Section title="خريطة الأسبوع" icon={Flame} hint="متى يزدحم المقهى فعلاً: كلُّ يومٍ بساعاته، فيُبنى عليها جدولُ الدوام وعددُ من يقف خلف البار.">
+          <SalesHeatmap view={heat} />
+        </Section>
+      )}
+
       <div id="when" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-2">
         <Section title="متى يُباع، بالساعة" icon={Clock} hint="مجموع ما بيع في كل ساعة من ساعات اليوم خلال الشهر.">
           <ul className="space-y-1 rounded-2xl border border-line bg-raised p-4 shadow-raised">
@@ -178,11 +187,11 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
         <Mover title="ما ارتفع" icon={TrendingUp} items={risers} empty="لم يرتفع أي صنف عن الشهر السابق." />
         <Mover title="ما انخفض" icon={TrendingDown} items={fallers} empty="لم ينخفض أي صنف عن الشهر السابق." />
         <Section id="margins" title="أضعف الهوامش" icon={Coffee} hint="من بين الأصناف التي بيع منها بثلاثمئة ريال فأكثر.">
-          {weak.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا يوجد صنف له وصفة وتكلفة بعد.</p> : (
+          {weak.length === 0 ? <EmptyState compact title="لا يوجد صنف له وصفة وتكلفة بعد." action={<LinkButton href="/inventory/recipes" size="sm">الوصفات</LinkButton>} /> : (
             <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
               {weak.map((i) => (
                 <li key={i.key} className="flex items-baseline justify-between gap-2 py-2.5 text-[13px]">
-                  <span className="min-w-0 truncate">{i.name}</span>
+                  <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
                   <span className="shrink-0 font-bold">{formatShare(i.marginBp)} <span className="text-[11px] font-normal text-muted"><T s="من {0}" a={[<Money key="0" minor={i.salesMinor} />]} /></span></span>
                 </li>
               ))}
@@ -227,7 +236,7 @@ function Mover({ title, icon, items, empty }: { title: string; icon: typeof Tren
         <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
           {items.map((i) => (
             <li key={i.key} className="flex items-baseline justify-between gap-2 py-2.5 text-[13px]">
-              <span className="min-w-0 truncate">{i.name}</span>
+              <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
               <span className="shrink-0 font-bold"><Money minor={i.delta} signed /></span>
             </li>
           ))}

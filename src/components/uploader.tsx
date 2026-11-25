@@ -1936,7 +1936,7 @@ function ReviewCard({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 font-mono text-xs sm:min-h-9"
               />
               <p className="mt-2 text-[11px] text-muted">المجلد</p>
-              <p className="mt-0.5 truncate font-mono text-[11px]" dir="ltr">{r.proposedFolderPath}</p>
+              <p className="mt-0.5 break-all font-mono text-[11px]" dir="ltr">{r.proposedFolderPath}</p>
             </details>
           )}
 

@@ -282,7 +282,7 @@ export default async function ItemsAndPricesPage({
                     <span className="flex min-w-0 items-center gap-2.5">
                       <Monogram name={i.supplierName} />
                       <span className="min-w-0">
-                        <span className="block truncate font-bold" dir="auto">{i.displayName}</span>
+                        <span className="line-clamp-2 block break-words font-bold" dir="auto">{i.displayName}</span>
                         <span className="block text-[11px] font-normal text-muted"><T s="{0} · طُلب {1}" a={[<Fragment key="0">{supplierCell(i)}</Fragment>, countNoun(i.orderCount, TIME)]} /></span>
                       </span>
                     </span>
@@ -359,7 +359,7 @@ export default async function ItemsAndPricesPage({
                 {dueSoon.map((x) => (
                   <li key={x.item.key} className="flex items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
+                      <span className="line-clamp-2 block break-words text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
                       <span className="block text-[11px] leading-relaxed text-muted">
                         <T s="{0} · عادةً كل {1} · آخر شراء قبل {2}" a={[x.item.supplierName, countNoun(x.cycle, DAY), countNoun(x.since, DAY)]} /></span>
                     </span>
@@ -390,7 +390,7 @@ export default async function ItemsAndPricesPage({
                 key: "item", header: "الصنف", primary: true,
                 cell: (i) => (
                   <span className="block min-w-0">
-                    <span className="block truncate font-bold" dir="auto">{i.displayName}</span>
+                    <span className="line-clamp-2 block break-words font-bold" dir="auto">{i.displayName}</span>
                     <span className="block text-[11px] font-normal text-muted">{supplierCell(i)}</span>
                   </span>
                 ),

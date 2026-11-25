@@ -461,7 +461,7 @@ function RowBody({ row }: { row: Row }) {
     return (
       <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
         <span className="min-w-0 truncate text-[13px] font-medium">{row.verb.label}</span>
-        <span className="shrink-0 truncate text-[11px] text-muted">{row.hit.title}</span>
+        <span className="min-w-0 max-w-[45%] shrink truncate text-[11px] text-muted">{row.hit.title}</span>
       </span>
     );
   }
@@ -469,7 +469,7 @@ function RowBody({ row }: { row: Row }) {
     return (
       <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
         <span className="min-w-0 truncate text-sm font-medium">{row.command.label}</span>
-        {row.command.hint && <span className="shrink-0 truncate text-[11px] text-muted">{row.command.hint}</span>}
+        {row.command.hint && <span className="min-w-0 max-w-[45%] shrink truncate text-[11px] text-muted">{row.command.hint}</span>}
       </span>
     );
   }
@@ -477,7 +477,7 @@ function RowBody({ row }: { row: Row }) {
     return (
       <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
         <span className="min-w-0 truncate text-sm">{row.recent.label}</span>
-        {row.recent.hint && <span className="shrink-0 truncate text-[11px] text-muted">{row.recent.hint}</span>}
+        {row.recent.hint && <span className="min-w-0 max-w-[45%] shrink truncate text-[11px] text-muted">{row.recent.hint}</span>}
       </span>
     );
   }

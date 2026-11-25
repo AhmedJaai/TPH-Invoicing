@@ -194,8 +194,8 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
             const [from, to] = l.split(" ← ");
             return (
               <li key={l} className="min-w-0">
-                <span dir="ltr" className="block truncate text-end text-[11px] text-muted line-through">{from}</span>
-                {to && <span dir="ltr" className="block truncate text-end text-[11px] font-bold text-ink-soft">{to}</span>}
+                <span dir="ltr" className="block break-all text-end text-[11px] text-muted line-through">{from}</span>
+                {to && <span dir="ltr" className="block break-all text-end text-[11px] font-bold text-ink-soft">{to}</span>}
               </li>
             );
           })}

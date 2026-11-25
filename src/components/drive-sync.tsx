@@ -412,7 +412,7 @@ export function DriveSync() {
                 <T s="سُمّي {0} من جديد في الدرايف تلقائياً" a={[countNoun(result.renamed.length, FILE)]} /></summary>
               <ul className="mt-1.5 space-y-0.5 text-muted">
                 {result.renamed.map((r) => (
-                  <li key={r.to} className="truncate" dir="ltr">{r.from} → {r.to}</li>
+                  <li key={r.to} className="break-all" dir="ltr">{r.from} → {r.to}</li>
                 ))}
               </ul>
             </details>
@@ -465,10 +465,10 @@ export function DriveSync() {
                         }
                       />
                       <span className="min-w-0">
-                        <span className="block truncate text-[11px] text-muted line-through" dir="ltr">
+                        <span className="block break-all text-[11px] text-muted line-through" dir="ltr">
                           {r.current}
                         </span>
-                        <span className="block truncate text-[11px] font-bold" dir="ltr">
+                        <span className="block break-all text-[11px] font-bold" dir="ltr">
                           {r.proposed}
                         </span>
                       </span>

@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { MaybeMoney } from "@/components/finance-bits";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileSpreadsheet } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -79,7 +80,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
       <section aria-label="ما يشمله وما ينقصه" className="mt-6">
         <h2 className="mb-2 text-sm font-bold">ما يشمله هذا الرقم وما ينقصه</h2>
         <ul className="list-disc space-y-1 ps-5 text-[12px] leading-relaxed">
-          <li><T s="الإيراد: ما دفعه الزبائن في فودكس (نقداً وبالبطاقة) بعد المرتجعات {0}، مطروحاً منه ضريبة المبيعات {1}. ومشروبات الموظفين («House Account») ليست إيراداً." a={[<Money key="0" minor={view.revenue?.paidMinor ?? 0} />, <Money key="1" minor={view.revenue?.vatMinor ?? 0} />]} /></li>
+          <li><T s="الإيراد: ما دفعه الزبائن في فودكس (نقداً وبالبطاقة) بعد المرتجعات {0}، مطروحاً منه ضريبة المبيعات {1}. ومشروبات الموظفين («House Account») ليست إيراداً." a={[<MaybeMoney key="0" minor={view.revenue?.paidMinor ?? null} />, <MaybeMoney key="1" minor={view.revenue?.vatMinor ?? null} />]} /></li>
           <li>
             <T s="تكلفة المبيعات: {0}" a={[p.cogsMethod === "STOCK" && c.stock
               ? <Fragment key="0"><T s="بالجرد: مشتريات الشهر + مخزون عُدّ في {0} ({1}) − مخزون عُدّ في {2} ({3})، والمعدود {4}، مقيَّماً بآخر تكلفة معروفة." a={[<bdi key="0">{formatDay(c.stock.openingDay)}</bdi>, <Money key="1" minor={c.stock.openingValueMinor} />, <bdi key="2">{formatDay(c.stock.closingDay)}</bdi>, <Money key="3" minor={c.stock.closingValueMinor} />, countNoun(c.stock.countedItems, PRODUCT)]} /></Fragment>
