@@ -224,7 +224,17 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
       /* مَن خرج من الشهر وبقي له فيه مالٌ مربوط أو بند لا يختفي */
       if (!activeIn(employee, month) && myLinks.length === 0 && myAdj.length === 0) continue;
       const myWeeks = mine(weeksAll).filter((w) => weekMonth(w.weekStart) === month);
-      const myAtt = mine(att);
+      /*
+        مَن ترك العمل بعد ٢٦ من شهره (٢٧–٣١) يُدفع له عن تلك الأيّام في شهره الأخير، وحضورُها يقع في
+        فترة الشهر التالي — وهو لا يعمل فيه فلا يُقرأ. فكان غيابُ أيّامه الأخيرة لا يُخصم أبداً.
+        فتمتدّ فترةُ شهره الأخير إلى يوم خروجه، ولا يُقرأ ما حتى يومِ خروجه في شهرٍ بعده (لا يُخصم مرّتين).
+      */
+      const left = employee.leftOn;
+      const myAtt = left && left.slice(0, 7) === month && left > period.to
+        ? mine(attAll).filter((a) => a.day >= period.from && a.day <= left)
+        : left && left.slice(0, 7) < month
+          ? mine(att).filter((a) => a.day > left)
+          : mine(att);
       const rateMinor = rateFor(employee.rates, month);
       /* دوامُ الفترة لا دوامُ اليوم (106) */
       const usual = usualOn(period.to, employee, employee.shiftRules);

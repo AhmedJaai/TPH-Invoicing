@@ -163,6 +163,14 @@ interface PurchaseDay { day: string; netMinor: number; invoices: number; grossOn
 const CREDIT_NOTE_NET = sql`(pa.amount_minor - case when i.vat_minor is not null and i.total_minor > 0
   then round(pa.amount_minor::numeric * i.vat_minor / i.total_minor) else 0 end)`;
 const CREDIT_NOTE_DAY = sql`to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD')`;
+/*
+  وما لم يُخصَّص من الإشعار بعدُ لفاتورة ينقص المشتريات أيضاً — بإجماليّه (لا ضريبةَ معروفة له) ويومَ
+  الإشعار. كان الإشعارُ على حساب المورّد ينقص بقدر ما خُصّص منه وحده: إشعارٌ بألفٍ خُصّص منه ثلاثمئة
+  ينقص ثلاثمئة، والباقي لا ينقص شيئاً حتى يُخصَّص — ثمّ يقع في شهر الإشعار وقد أُقفل.
+*/
+const CREDIT_NOTE_OPEN = sql`(p.amount_minor - coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.payment_id = p.id), 0))`;
+const CREDIT_NOTE_OPEN_FROM = sql`payments p join suppliers su on su.id = p.supplier_id
+  where p.method = 'CREDIT_NOTE' and p.status not in ('REVERSED', 'VOID') and ${CREDIT_NOTE_OPEN} > 0`;
 const CREDIT_NOTE_FROM = sql`payment_allocations pa
   join payments p on p.id = pa.payment_id and p.method = 'CREDIT_NOTE' and p.status not in ('REVERSED', 'VOID')
   join invoices i on i.id = pa.invoice_id and i.is_fixed_asset = false`;
@@ -186,7 +194,7 @@ const NO_INVOICE_PAY_FROM = sql`payments p join suppliers su on su.id = p.suppli
     and ${NO_INVOICE_PAY_NET} > 0`;
 
 async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<PurchaseDay[]> {
-  const [rows, notes, noInvoice] = await Promise.all([
+  const [rows, notes, noInvoice, openNotes] = await Promise.all([
     conn.execute<{ day: string; net: string; n: number; gross_only: number }>(sql`
       select ${EFFECTIVE_DAY} as day, sum(${INVOICE_NET})::bigint as net, count(*)::int as n,
              count(*) filter (where i.subtotal_minor is null and i.vat_minor is null)::int as gross_only
@@ -206,9 +214,19 @@ async function loadPurchaseDays(from: string, to: string, conn: Conn): Promise<P
          and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
        group by 1
     `),
+    conn.execute<{ day: string; net: string }>(sql`
+      select ${CREDIT_NOTE_DAY} as day, sum(${CREDIT_NOTE_OPEN})::bigint as net
+        from ${CREDIT_NOTE_OPEN_FROM}
+         and ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
+       group by 1
+    `),
   ]);
   const byDay = new Map<string, PurchaseDay>(rows.rows.map((r) => [r.day, { day: r.day, netMinor: Number(r.net), invoices: r.n, grossOnly: r.gross_only }]));
   for (const n of notes.rows) {
+    const d = byDay.get(n.day) ?? { day: n.day, netMinor: 0, invoices: 0, grossOnly: 0 };
+    byDay.set(n.day, { ...d, netMinor: d.netMinor - Number(n.net) });
+  }
+  for (const n of openNotes.rows) {
     const d = byDay.get(n.day) ?? { day: n.day, netMinor: 0, invoices: 0, grossOnly: 0 };
     byDay.set(n.day, { ...d, netMinor: d.netMinor - Number(n.net) });
   }
@@ -249,7 +267,13 @@ export async function loadPurchaseInvoices(from: string, to: string, conn: Conn 
       from ${NO_INVOICE_PAY_FROM}
        and ${NO_INVOICE_PAY_DAY} >= ${from} and ${NO_INVOICE_PAY_DAY} <= ${to}
   `);
+  const openNotes = await conn.execute<{ id: string; supplier_name: string; day: string; net: string }>(sql`
+    select p.id || ':open' as id, su.name_ar as supplier_name, ${CREDIT_NOTE_DAY} as day, ${CREDIT_NOTE_OPEN}::bigint as net
+      from ${CREDIT_NOTE_OPEN_FROM}
+       and ${CREDIT_NOTE_DAY} >= ${from} and ${CREDIT_NOTE_DAY} <= ${to}
+  `);
   return [
+    ...openNotes.rows.map((r) => ({ id: r.id, invoiceNumber: "إشعار دائن لم يُخصَّص بعد لفاتورة", supplierName: r.supplier_name, day: r.day, netMinor: -Number(r.net), grossOnly: true })),
     ...rows.rows.map((r) => ({ id: r.id, invoiceNumber: r.invoice_number, supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: Boolean(r.gross_only) })),
     ...noInvoice.rows.map((r) => ({ id: r.id, invoiceNumber: "سداد لم تقابله فاتورة (المورّد لا يصدر فواتير)", supplierName: r.supplier_name, day: r.day, netMinor: Number(r.net), grossOnly: true })),
     ...notes.rows.map((r) => ({ id: r.id, invoiceNumber: `إشعار دائن على ${r.invoice_number}`, supplierName: r.supplier_name, day: r.day, netMinor: -Number(r.net), grossOnly: false })),
