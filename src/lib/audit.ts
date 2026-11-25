@@ -35,6 +35,7 @@ export type AuditAction =
   /* تعطيلُ مستخدمٍ أو إعادةُ تفعيله، وإنهاءُ جلساته — من «المستخدمون» في الإعدادات */
   | "USER_ACCESS_CHANGED"
   | "USER_SESSIONS_ENDED"
+  | "USER_NAME_SET"
   | "DRIVE_SYNCED"
   | "BANK_IMPORTED"
   | "INVOICES_MARKED_PAID"

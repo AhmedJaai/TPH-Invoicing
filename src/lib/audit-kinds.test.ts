@@ -15,7 +15,7 @@ describe("أبواب سجلّ التدقيق", () => {
 
   it("كلّ فعل مسمّى له باب غير «أخرى» — إلّا إدارة المستخدمين", () => {
     const orphans = Object.keys(ACTION_LABEL).filter((a) => auditKind(a) === "other");
-    expect(orphans).toEqual(["USER_ROLE_CHANGED", "USER_ACCESS_CHANGED", "USER_SESSIONS_ENDED"]);
+    expect(orphans).toEqual(["USER_ROLE_CHANGED", "USER_ACCESS_CHANGED", "USER_SESSIONS_ENDED", "USER_NAME_SET"]);
   });
 
   it("يرفض باباً غير معروف في العنوان", () => {

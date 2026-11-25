@@ -81,6 +81,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   USER_ROLE_CHANGED: "تغيير دور",
   USER_ACCESS_CHANGED: "تعطيل مستخدم أو تفعيله",
   USER_SESSIONS_ENDED: "إنهاء جلسات مستخدم",
+  USER_NAME_SET: "تغيير الاسم الظاهر",
   DRIVE_SYNCED: "مزامنة الدرايف",
   BANK_IMPORTED: "استيراد كشف بنك",
   INVOICES_MARKED_PAID: "تسجيل فواتير مسدّدة",

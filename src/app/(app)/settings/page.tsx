@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProfileName } from "@/components/profile-name";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { Activity, BellRing, CalendarClock, Camera, Cpu, HardDrive, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
@@ -169,6 +170,7 @@ export default async function SettingsPage() {
                   { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "تدير الأدوار والتعطيل والجلسات من قسم «المستخدمون» أدناه. ويُضاف البريد الجديد إلى قائمة الدخول عند النشر." : "يديرهم مالك الحساب." },
                 ]}
               />
+              {!isAuthBypassed() && can(user.role, "document:upload") && <ProfileName current={user.name ?? null} />}
               {isAuthBypassed() && (
                 <Callout tone="danger" icon={ShieldAlert} className="mt-4" title="وضع التجربة مفعّل، وتسجيل الدخول معطّل">
                   <T s="كل من يعرف الرابط يدخل بدور «{0}». هذا الوضع لا يعمل في الإنتاج مهما كانت الإعدادات." a={[ROLE_LABEL[user.role]]} /></Callout>

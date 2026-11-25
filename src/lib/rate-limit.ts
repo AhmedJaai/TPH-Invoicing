@@ -120,6 +120,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "payment-orphan": { limit: 60, windowSeconds: 3600 },
   /* «راجِع الحسابات» — معاينةٌ ثمّ تنفيذ، ولا نموذجَ فيه */
   "account-review": { limit: 60, windowSeconds: 3600 },
+  "profile-name": { limit: 20, windowSeconds: 3600 },
   /* ربطُ بنود الفواتير بأصناف الجرد — صنفٌ صنفٌ في جلسة */
   "inventory-purchase-link": { limit: 400, windowSeconds: 3600 },
   "inventory-invoice-received": { limit: 300, windowSeconds: 3600 },
