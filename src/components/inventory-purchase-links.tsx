@@ -155,7 +155,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           {row.pack && <> <T s=" · في الوحدة الواحدة {0} {1}" a={[<span key="0" className="nums">{row.pack.packSize} × {row.pack.contentQuantity}</span>, storedUnitLabel(row.pack.contentUnit)]} /></>}
           {row.countedText && <> <T s=" · دخل في الجرد {0}" a={[<span key="0" className="nums font-medium text-ink">{row.countedText}</span>]} /></>}
           {canEdit && !editing && (
-            <button type="button" onClick={() => setEditing(true)} className="ms-2 text-xs font-medium text-accent hover:underline">
+            <button type="button" onClick={() => setEditing(true)} className="ms-1 inline-flex min-h-11 items-center px-2 text-xs font-medium text-accent hover:underline sm:min-h-0">
               غيّر
             </button>
           )}

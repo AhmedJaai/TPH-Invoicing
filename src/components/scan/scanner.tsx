@@ -749,31 +749,34 @@ function Adjust({
       <p className="text-xs text-muted">
         {stage.detected ? "اسحب أي زاوية إن لم تكن على طرف الورقة." : "لم يجد النظام حواف الورقة. اسحب الزوايا الأربع إلى أطرافها."}
       </p>
-      <div
-        ref={box}
-        className="relative mx-auto mt-3 w-full touch-none select-none overflow-hidden rounded-xl bg-sunken"
-        style={{ aspectRatio: `${source.width} / ${source.height}`, maxHeight: "62dvh", maxWidth: `calc(62dvh * ${source.width / source.height})` }}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerCancel={end}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ للصورة الملتقطة */}
-        <img src={url} alt="الصورة الملتقطة" className="absolute inset-0 h-full w-full" draggable={false} />
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
-          <polygon points={poly} fill="rgb(90 84 68 / 0.18)" stroke="#fff" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
-        </svg>
-        {quad.map((p, i) => (
-          <button
-            key={i}
-            type="button"
-            aria-label={`زاوية ${i + 1}`}
-            className="absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full"
-            style={pct(p)}
-            onPointerDown={(e) => { drag.current = i; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
-          >
-            <span className="h-5 w-5 rounded-full border-[3px] border-white bg-accent shadow-[0_0_0_1px_rgb(0_0_0/0.3)]" />
-          </button>
-        ))}
+      {/* هامشٌ لمقابض الزوايا: كانت تُقصّ ثلاثةُ أرباعها حين تقع الزاويةُ على حافة الصورة */}
+      <div className="px-5 py-2">
+        <div
+          ref={box}
+          className="relative mx-auto mt-3 w-full touch-none select-none rounded-xl bg-sunken"
+          style={{ aspectRatio: `${source.width} / ${source.height}`, maxHeight: "62dvh", maxWidth: `calc(62dvh * ${source.width / source.height})` }}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerCancel={end}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ للصورة الملتقطة */}
+          <img src={url} alt="الصورة الملتقطة" className="absolute inset-0 h-full w-full rounded-xl" draggable={false} />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+            <polygon points={poly} fill="rgb(90 84 68 / 0.18)" stroke="#fff" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {quad.map((p, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`زاوية ${i + 1}`}
+              className="absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full"
+              style={pct(p)}
+              onPointerDown={(e) => { drag.current = i; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
+            >
+              <span className="h-5 w-5 rounded-full border-[3px] border-white bg-accent shadow-[0_0_0_1px_rgb(0_0_0/0.3)]" />
+            </button>
+          ))}
+        </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button type="button" onClick={onRetake} className={buttonClass("secondary", "md")}>

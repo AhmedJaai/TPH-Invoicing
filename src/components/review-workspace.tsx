@@ -598,6 +598,7 @@ function Row({
               أسوأ من غيابه** — يُقرأ عملاً بقي وهو عملٌ لا سبيل إليه.
             */}
             {settleable(i) ? (
+              <>
               <button
                 aria-busy={busy}
                 type="button"
@@ -611,6 +612,9 @@ function Row({
                 {ACT.settleOnAccount}
                 <KeyHint>A</KeyHint>
               </button>
+              {/* أثرُه الماليّ يُقرأ على الجوّال — كان في التلميح وحده */}
+              <span className="basis-full text-[11px] leading-relaxed text-muted lg:hidden">يسجّل سداداً لهذا المورّد ويخصمه من أقدم فواتيره، وما بقي يبقى بلا فاتورة.</span>
+              </>
             ) : (
             <button
               aria-busy={busy}

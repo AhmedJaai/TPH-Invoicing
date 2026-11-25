@@ -221,7 +221,7 @@ export function InventoryWorkspace({
               return (
                 <li key={l.productId} className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                       <Link href={`/inventory/items/${l.productId}`} className="block truncate text-[13px] font-bold hover:text-accent hover:underline hover:underline-offset-4">
                         {l.productName}
                       </Link>

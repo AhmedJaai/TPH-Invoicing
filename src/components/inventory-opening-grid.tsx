@@ -101,10 +101,11 @@ export function OpeningGrid({
       <ul className="mt-3 divide-y divide-line-soft">
         {visible.map((row, at) => (
           <li key={row.productId} className="flex flex-wrap items-center gap-2 py-2.5">
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-              {row.productName}
+            {/* الاسمُ سطرٌ كامل على الجوّال والرصيدُ تحته — كان يُقصّ الرصيدُ (كمّيّةٌ) بجوار الحقلين */}
+            <span className="min-w-0 basis-full text-[13px] font-medium sm:flex-1 sm:basis-auto">
+              <span className="block truncate">{row.productName}</span>
               {row.openingText !== null && (
-                <span className="text-muted"> <T s=" — الرصيد الحالي {0} {1}" a={[row.openingText, row.openingSourceLabel]} /></span>
+                <span className="block text-[11px] text-muted"><T s="الرصيد الحالي {0} {1}" a={[row.openingText, row.openingSourceLabel]} /></span>
               )}
             </span>
             <input

@@ -1590,7 +1590,8 @@ export function Uploader({
                   title={mergePick.length < 2 ? "اختر صفحتين على الأقل" : undefined}
                   className={buttonClass("primary", "sm")}
                 >
-                  <span>{mergePick.length >= 2 ? `ضمّ ${mergePick.length} صفحات` : "اضممها"}</span>
+                  {/* سببُ التعطيل على الزرّ نفسه — اللمسُ لا يُظهر التلميح */}
+                  <span>{mergePick.length >= 2 ? `ضمّ ${mergePick.length} صفحات` : "اختر صفحتين على الأقل"}</span>
                 </button>
               </>
             }
@@ -1670,7 +1671,7 @@ function Row({
         <span className="flex items-center gap-2">
           <Steps at={steps} />
           {onRemove && (
-            <button type="button" onClick={onRemove} aria-label="أزله من القائمة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+            <button type="button" onClick={onRemove} aria-label="أزله من القائمة" className="-me-1 grid h-11 w-11 place-items-center sm:h-9 sm:w-9 rounded-lg text-muted hover:bg-hover hover:text-ink">
               <X className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           )}
@@ -1757,7 +1758,7 @@ function ReviewCard({
         <span className="flex items-center gap-2">
           <Steps at={["done", item.archiving ? "done" : "current", item.archiving ? "current" : "todo"]} />
           {!item.archiving && (
-            <button type="button" onClick={onRemove} aria-label="أزله دون أرشفة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+            <button type="button" onClick={onRemove} aria-label="أزله دون أرشفة" className="-me-1 grid h-11 w-11 place-items-center sm:h-9 sm:w-9 rounded-lg text-muted hover:bg-hover hover:text-ink">
               <X className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           )}

@@ -116,7 +116,7 @@ function LinkRow({
             aria-label="الصنف المعياري"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
-            className="min-h-11 min-w-[9rem] rounded-lg border border-line-input bg-raised px-2.5 text-xs sm:min-h-9"
+            className="min-h-11 w-full min-w-[9rem] max-w-full rounded-lg sm:w-auto border border-line-input bg-raised px-2.5 text-xs sm:min-h-9"
           >
             <option value="">صنف معياري جديد…</option>
             {products.map((p) => (
