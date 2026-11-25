@@ -244,13 +244,21 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
 function Mover({ title, icon, items, empty }: { title: string; icon: typeof TrendingUp; items: readonly (ItemRow & { delta: number })[]; empty: string }) {
   return (
-    <Section title={title} icon={icon} hint="الفرق بالريال عن الشهر السابق، وفي الشهر الجاري عن الأيام نفسها منه.">
+    <Section title={title} icon={icon} hint="الفرق بالريال عن الشهر السابق، وفي الشهر الجاري عن الأيام نفسها منه. وتحته ما بيع من الصنف مقابل ما بيع منه حينها.">
       {items.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">{empty}</p> : (
         <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
           {items.map((i) => (
-            <li key={i.key} className="flex items-baseline justify-between gap-2 py-2.5 text-[13px]">
-              <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
-              <span className="shrink-0 font-bold"><Money minor={i.delta} signed /></span>
+            <li key={i.key} className="py-2.5 text-[13px]">
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate" title={i.name}>{i.name}</span>
+                <span className="shrink-0 font-bold"><Money minor={i.delta} signed /></span>
+              </span>
+              {/* الفرقُ بالريال لا يقول سببه: أكوابٌ أقلّ أم سعرٌ تغيّر؟ — الكمّيّتان تقولانه */}
+              {i.previousQuantityMilli !== null && (
+                <span className="mt-0.5 block text-[11px] text-muted">
+                  <T s="بيع {0} مقابل {1}" a={[<span key="0" className="nums">{formatUnits(i.quantityMilli)}</span>, <span key="1" className="nums">{formatUnits(i.previousQuantityMilli)}</span>]} />
+                </span>
+              )}
             </li>
           ))}
         </ul>
