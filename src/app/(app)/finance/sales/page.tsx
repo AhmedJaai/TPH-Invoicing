@@ -119,13 +119,14 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
       </div>
 
       <Section title="يوماً بيوم" icon={CalendarDays} hint="ما دفعه الزبائن كل يوم، واليوم الذي لا يظهر له شريط لم تُسجَّل فيه طلبات.">
-        <div className="overflow-x-auto rounded-2xl border border-line bg-raised p-4 shadow-raised">
-          <ol className="flex h-40 min-w-[36rem] items-end gap-1" aria-label="مبيعات الأيام">
+        {/* الشهرُ كلُّه في عرض الجوّال — كان يتمرّر من اليوم الأوّل فيختفي آخرُ الأيّام وهو ما يُسأل عنه */}
+        <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
+          <ol className="flex h-40 items-end gap-[2px] sm:gap-1" aria-label="مبيعات الأيام">
             {a.days.map((d) => (
               <li key={d.day} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end" title={`${formatWeekday(d.day)} ${formatDay(d.day)}`}>
                 <span className="sr-only"><T s="{0}: {1} ريال" a={[formatDay(d.day), formatRiyalsDisplay(d.paidMinor)]} /></span>
                 <span aria-hidden className="block w-full rounded-t bg-accent/80 transition-colors group-hover:bg-accent" style={{ height: `${Math.max(2, (d.paidMinor / maxDay) * 100)}%` }} />
-                <span aria-hidden className="mt-1 block text-center text-[9px] text-muted">{Number(d.day.slice(8, 10))}</span>
+                <span aria-hidden className={`mt-1 block text-center text-[9px] text-muted ${Number(d.day.slice(8, 10)) % 2 === 0 ? "max-sm:invisible" : ""}`}>{Number(d.day.slice(8, 10))}</span>
               </li>
             ))}
           </ol>
