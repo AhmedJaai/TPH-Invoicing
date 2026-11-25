@@ -57,6 +57,7 @@ export const ATTENTION_IDS = [
   "statement-payment-missing",
   "backup-stale",
   "unit-cost-suspect",
+  "inventory-count-late",
   "budget-over",
   "statement-credit-unrecorded",
   "line-qty-misread",

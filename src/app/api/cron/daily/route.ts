@@ -24,9 +24,6 @@ import { fetchFoodicsCatalog } from "@/services/foodics-sync.service";
 import { importParsedCatalog } from "@/services/catalog-import.service";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { refreshStaleReadings } from "@/services/finance-reading.service";
-import { checkDriveOriginals } from "@/services/drive-originals.service";
-import { refreshTokenFor } from "@/services/drive.service";
-import { driveForUser } from "@/lib/drive";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -65,10 +62,5 @@ export async function POST(request: Request) {
       : undefined,
     /* القراءةُ الذكيّة لا تبقى على أرقامٍ قديمة — شهران على الأكثر، كلٌّ تحت موعده */
     refreshReadings: () => withDeadline(90_000, () => refreshStaleReadings(actorId, 2)),
-    /* بتفويض المالك نفسه، قراءةً وحدها — وبلا تفويضٍ لا فحص (لا «غائب» من مجهول) */
-    checkOriginals: () => withDeadline(60_000, async () => {
-      const token = await refreshTokenFor(actorId);
-      return token ? checkDriveOriginals(driveForUser(token)) : null;
-    }),
   }));
 }

@@ -288,8 +288,6 @@ export interface AttentionFacts {
   unitCostSuspects?: { name: string; ratio: number }[];
   /** جردُ الأسبوع الماضي لم يُقفل بعد يومين من نهايته (`lateWeeklyCount`). */
   lateCount?: { weekStart: string; weekEnd: string; daysLate: number; draft: boolean } | null;
-  /** أصولُ مستنداتٍ غابت من الدرايف (٤٠٤ أو سلّة المحذوفات) في آخر فحص صباح. */
-  missingOriginals?: { documentId: string; fileName: string; state: "gone" | "trashed" }[];
   /** أبوابٌ تجاوزت ميزانيةَ الشهر الجاري (111). */
   budgetOver?: { label: string; budgetMinor: number; actualMinor: number }[];
   /** النسخةُ الاحتياطيّة على جهاز المالك متأخّرة (`backup-status.service.ts`). الغائبُ: سليمة أو غير معروفة. */
@@ -1066,10 +1064,6 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     });
   }
 
-  /*
-    أصلُ المستند غاب من الدرايف — القيدُ في الدفاتر بلا ورقة، والمحاسبُ والهيئةُ يطلبانها. وُجد بتدقيقٍ
-    يدويّ (ثمانيةُ أصول، ٢٥ نوفمبر ٢٠٢٦) فصار فحصَ صباح. لا يُحذف قيدٌ ولا يُمسّ الدرايف من هنا.
-  */
   /* جردُ الأسبوع متأخّر — كلُّ يومٍ يُبعد العدَّ عن يومه فيكبر ما لا يُفسَّر من الفرق */
   if (f.lateCount) {
     const c = f.lateCount;
@@ -1086,23 +1080,6 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: 1,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: [],
-    });
-  }
-
-  const mo = f.missingOriginals ?? [];
-  if (mo.length > 0) {
-    out.push({
-      id: "drive-originals-missing",
-      area: "DATA",
-      severity: "MEDIUM",
-      title: mo.length === 1 ? "أصل مستند غاب من الدرايف" : `${countNoun(mo.length, DOCUMENT)} غابت أصولها من الدرايف`,
-      detail: "القيد في الدفاتر، لكن ملفه في الدرايف حُذف أو نُقل إلى المحذوفات أو لم يعد مشاركاً مع حساب التطبيق. والمحاسب والهيئة يطلبان الورقة.",
-      action: "ابحث عن الملف في محذوفات الدرايف وأعده، أو ارفع صورته من جديد من صفحة المستند. لا تحذف القيد.",
-      actionLabel: "افتح المستند",
-      href: `/documents/file/${mo[0].documentId}`,
-      count: mo.length,
-      impact: { kind: "UNATTRIBUTED", amountMinor: null },
-      evidence: mo.slice(0, 10).map((m) => ({ label: m.fileName, sub: m.state === "trashed" ? "في محذوفات الدرايف" : "غير موجود في الدرايف", href: `/documents/file/${m.documentId}` })),
     });
   }
 
