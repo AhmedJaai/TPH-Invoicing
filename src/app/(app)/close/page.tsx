@@ -35,7 +35,8 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const previous = previousMonth(currentMonthRiyadh());
+  const current = currentMonthRiyadh();
+  const previous = previousMonth(current);
 
   /*
     الأشهرُ والمقفلُ منها وحقائقُ الشهر المنقضي تُطلَب معاً — كانت ثلاثَ مراحل
@@ -56,7 +57,7 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
     gatherMonthFacts(previous),
   ]);
 
-  const months = [...new Set([previous, ...rows.map((r) => r.month)])].sort().reverse();
+  const months = [...new Set([current, previous, ...rows.map((r) => r.month)])].sort().reverse();
 
   if (rows.length === 0) {
     return (
@@ -73,7 +74,13 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
 
   /* `?month=` يفتح شهرَه — بندُ «شهرٌ مفتوح بين أشهرٍ مقفلة» يحيل إليه، وكان يفتح الشهرَ الماضي دائماً */
   const asked = (await searchParams).month;
-  const selected = asked && months.includes(asked) ? asked : months.includes(previous) ? previous : months[0];
+  /*
+    بلا `?month=` يُفتح الشهرُ الذي ينتظر عملاً: الماضي ما لم يُقفل، وإلّا الجاري — كان يفتح
+    أكتوبرَ المقفلَ في نوفمبر فيرى صاحبُ العمل «الشهر مقفل» ولا شيءَ يفعله، والرئيسيّةُ تقول
+    «إقفال نوفمبر: عائقٌ واحد».
+  */
+  const previousClosed = closed.some((c) => c.month === previous);
+  const selected = asked && months.includes(asked) ? asked : previousClosed ? current : previous;
   const [report, inCorrection] = await Promise.all([
     selected === previous ? Promise.resolve(buildMonthClose(previousFacts)) : gatherMonthFacts(selected).then(buildMonthClose),
     loadMonthsInCorrection(),
@@ -84,7 +91,7 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
     <PageShell
       user={user}
       title="إقفال الشهر"
-      eyebrow={`الشهر الماضي: ${formatMonth(previous)}`}
+      eyebrow={previousClosed ? `${formatMonth(previous)} مقفل · يُجهَّز ${formatMonth(current)}` : `الشهر الماضي: ${formatMonth(previous)}`}
       intro="أكّد أن الشهر اكتمل: وصلت كل فواتيره، وعولجت كل المشكلات أو قبلتها عن علم. بعدها تحصل على حزمة واحدة جاهزة للمحاسب."
     >
       {/* التصحيحُ في الماضي بخطوتين: فتحٌ جماعيّ بسبب، ثمّ إقفالٌ جماعيّ بعد رؤية الفرق */}
