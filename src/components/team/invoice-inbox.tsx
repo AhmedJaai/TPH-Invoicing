@@ -7,7 +7,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellRing, Check, FileText, Undo2, X } from "lucide-react";
-import { postJson } from "@/lib/http-client";
+import { postJson, request } from "@/lib/http-client";
 import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 
 /** ما قرأه النموذج نصٌّ خامّ («1250.5») — يُعرض كسائر المال («1,250.50»)، وما لا يُفهم يبقى كما قُرئ. */
@@ -162,15 +162,17 @@ function PushToggle({ token, subscribed: initial }: { token: string; subscribed:
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") { setError("لم يُسمح بالتنبيهات. اسمح بها من إعدادات الجوال ثم أعد المحاولة."); return; }
-      const k = await (await fetch("/api/team/push", { cache: "no-store" })).text();
-      const publicKey = (JSON.parse(k) as { publicKey?: string | null }).publicKey;
+      const k = await request<{ publicKey?: string | null }>("/api/team/push", { cache: "no-store" });
+      if (!k.ok) { setError(k.error); return; }
+      const publicKey = k.data.publicKey;
       if (!publicKey) { setError("التنبيهات غير مفعّلة على الخادم بعد. أخبر الإدارة."); return; }
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: `/a/${token}` });
       await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
       const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
       const r = await postJson("/api/team/push", { token, endpoint: json.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth });
-      if (!r.ok) { setError(r.error); return; }
+      /* الخادمُ لم يحفظه: يُلغى الاشتراك في الجوال كي لا يبقى مشتركاً بلا تنبيهٍ يصله أبداً */
+      if (!r.ok) { await sub.unsubscribe().catch(() => {}); setError(r.error); return; }
       setOn(true);
     } catch {
       setError("تعذّر تفعيل التنبيه على هذا الجوال.");
