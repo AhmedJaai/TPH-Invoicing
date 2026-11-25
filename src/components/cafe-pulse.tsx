@@ -17,7 +17,17 @@ const hourLabel = (h: number) => (h === 0 ? "12 ص" : h < 12 ? `${h} ص` : h ===
  * نفسها** (`lib/pulse.ts`). وتحته الساعاتُ: اليومُ بلون العلامة، والأسبوعُ الماضي ظلاً خلفه — فيُرى
  * أين تأخّر اليومُ وأين سبق. لا زينة: كلُّ عمودٍ رقمٌ يُقرأ بالتحويم وفي الجدول المخفيّ.
  */
-export function CafePulse({ pulse }: { pulse: PulseView }) {
+export interface PulseMonth {
+  /** «نوفمبر 2026» */
+  label: string;
+  profitMinor: number | null;
+  /** اسمُ الرقم بما يشمله (`pnl.profitLabel`). */
+  profitLabel: string;
+  /** الربحُ بعد كلّ ما عليك للشهر — `null` لا شيءَ باقٍ أو لا يُعرف. */
+  afterMinor: number | null;
+}
+
+export function CafePulse({ pulse, month }: { pulse: PulseView; month?: PulseMonth | null }) {
   /* اسمُ يوم الأسبوع وحده («الثلاثاء») — الرقمُ بعده في `formatWeekday` يومُ هذا الأسبوع لا الماضي */
   const lastWeekDay = formatWeekday(pulse.businessDay).split(" ")[0];
   const peak = Math.max(pulse.peakMinor, 1);
@@ -50,6 +60,7 @@ export function CafePulse({ pulse }: { pulse: PulseView }) {
           </p>
         </div>
 
+        <div className="flex flex-wrap gap-3">
         {y && (
           <div className="rounded-xl bg-sunken/60 px-4 py-3 text-xs">
             <p className="font-bold text-muted">أمس</p>
@@ -61,6 +72,18 @@ export function CafePulse({ pulse }: { pulse: PulseView }) {
             </p>
           </div>
         )}
+        {/* «كم ربحتُ هذا الشهر؟» بجانب «كيف يمشي اليوم؟» — من `loadPnl` نفسِه وباسمه */}
+        {month && (
+          <Link href="/finance" className="rounded-xl bg-sunken/60 px-4 py-3 text-xs transition-colors hover:bg-accent-soft/60">
+            <p className="font-bold text-muted">الربح · {month.label} حتى اليوم</p>
+            <p className="mt-1 text-lg font-bold">{month.profitMinor === null ? <span className="text-sm text-muted">غير معروف</span> : <Money minor={month.profitMinor} signed />}</p>
+            <p className="mt-1 max-w-[16rem] text-[11px] leading-relaxed text-muted">{month.profitLabel}</p>
+            {month.afterMinor !== null && (
+              <p className="mt-1 text-ink-soft"><T s="بعد كل ما عليك للشهر: {0}" a={[<Money key="0" minor={month.afterMinor} signed />]} /></p>
+            )}
+          </Link>
+        )}
+        </div>
       </div>
 
       {pulse.hours.length > 0 && (

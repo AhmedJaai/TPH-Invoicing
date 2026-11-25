@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
-  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, TrendingUp, Wallet,
+  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -265,13 +265,6 @@ export default async function HomePage() {
               )}
             </KeyFigure>
           )}
-          {can(user.role, "amounts:view") && (
-            <SectionBoundary what="ربح الشهر">
-              <Suspense fallback={<FigureSkeleton />}>
-                <ProfitFigure />
-              </Suspense>
-            </SectionBoundary>
-          )}
           <SectionBoundary what="مشتريات الشهر">
             <Suspense fallback={<FigureSkeleton />}>
               <PurchasesFigure factsP={factsP} />
@@ -385,44 +378,32 @@ async function PurchasesFigure({ factsP }: { factsP: Promise<ChangeFacts> }) {
   );
 }
 
-/**
- * «كم ربحتُ هذا الشهر؟» على الرئيسيّة — من `loadPnl` نفسِه الذي في «المالية» وباسمه الذي يشمله
- * («صافي الربح — بتكلفة المشتريات — حتى اليوم»)، وتحته الربحُ بعد كلّ ما عليك للشهر (`loadOutstanding`):
- * الرواتبُ الباقية والخصمُ الشهريّ المعتاد الذي لم يأتِ بعد.
- */
-async function ProfitFigure() {
-  const month = currentMonthRiyadh();
-  const view = await loadPnl(month);
-  const profit = view.pnl.profitMinor;
-  const after = profit === null ? null : await loadOutstanding(month, profit).catch(() => null);
-  return (
-    <KeyFigure
-      icon={TrendingUp}
-      label="الربح"
-      period={`${formatMonth(month)} حتى اليوم`}
-      href="/finance"
-      value={profit === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={profit} signed />}
-      tone={profit !== null && profit < 0 ? "danger" : undefined}
-      sub={view.pnl.profitLabel}
-    >
-      {after && after.totalMinor > 0 && after.profitAfterMinor !== null && (
-        <p className="text-xs text-ink-soft">
-          <T s="بعد كل ما عليك للشهر: {0}" a={[<Money key="0" minor={after.profitAfterMinor} signed />]} />
-        </p>
-      )}
-    </KeyFigure>
-  );
-}
-
 async function ChangesList({ factsP }: { factsP: Promise<ChangeFacts> }) {
   const changes = notable(buildChanges(await factsP)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
   return <Changes changes={changes} />;
 }
 
 /** بمقاس `KeyFigure` — كهيكل الصفحة (`page-skeleton.tsx`)، فلا تقفز الشبكة حين يصل. */
+/**
+ * نبضُ اليوم وربحُ الشهر معاً — «كيف يمشي العمل؟». الربحُ من `loadPnl` نفسِه الذي في «المالية» وباسمه
+ * الذي يشمله، وتحته الربحُ بعد كلّ ما عليك للشهر (`loadOutstanding`): الرواتبُ الباقية والخصمُ المعتاد.
+ * وتعثُّرُ الربح لا يُسقط النبض.
+ */
 async function PulseCard() {
-  const pulse = await loadPulse();
-  return pulse ? <CafePulse pulse={pulse} /> : null;
+  const thisMonth = currentMonthRiyadh();
+  const [pulse, view] = await Promise.all([loadPulse(), loadPnl(thisMonth).catch(() => null)]);
+  if (!pulse) return null;
+  const profit = view?.pnl.profitMinor ?? null;
+  const after = profit === null ? null : await loadOutstanding(thisMonth, profit).catch(() => null);
+  return (
+    <CafePulse
+      pulse={pulse}
+      month={view ? {
+        label: formatMonth(thisMonth), profitMinor: profit, profitLabel: view.pnl.profitLabel,
+        afterMinor: after && after.totalMinor > 0 ? after.profitAfterMinor : null,
+      } : null}
+    />
+  );
 }
 
 function PulseSkeleton() {
