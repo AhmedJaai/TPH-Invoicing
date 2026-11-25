@@ -245,7 +245,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
                 transactionId: id,
                 reason: "تراجع من إشعار «يحتاج قرارك»",
               });
-              if (!u.ok) return false;
+              if (!u.ok) return u.error;
               setDone((d) => {
                 const next = new Map(d);
                 next.delete(id);

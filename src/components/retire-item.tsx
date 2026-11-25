@@ -36,7 +36,7 @@ export function RetireItem({ productId, name }: { productId: string; name: strin
               label: "أعده إلى الجرد",
               run: async () => {
                 const back = await postJson("/api/inventory/item", { action: "restore", productId });
-                if (!back.ok) return false;
+                if (!back.ok) return back.error;
                 router.refresh();
                 return true;
               },

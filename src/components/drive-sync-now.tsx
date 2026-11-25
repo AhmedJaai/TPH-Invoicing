@@ -227,7 +227,7 @@ export function DriveSyncNow({
           <span className="min-w-0 flex-1 basis-56 font-bold">{error.text}</span>
           {error.auth && reconnect && (
             <form action={reconnect}>
-              <button type="submit" className={buttonClass("secondary", "sm")}>أعد ربط الدرايف</button>
+              <SubmitButton className={buttonClass("secondary", "sm")}>أعد ربط الدرايف</SubmitButton>
             </form>
           )}
         </div>
