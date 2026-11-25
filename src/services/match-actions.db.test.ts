@@ -4,6 +4,7 @@ import { bankImports, bankTransactions, payments, users } from "@/db/schema";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import { Conflict, NotFound, Refused } from "@/lib/domain-error";
 import { confirmMatch } from "./match-confirm.service";
+import { allocate, createPayment } from "./payment.service";
 import { confirmMatchesBulk } from "./match-confirm-bulk.service";
 import { undoMatch } from "./match-undo.service";
 import { matchCandidates } from "./match-recompute.service";
@@ -98,6 +99,31 @@ describe("confirmMatch", () => {
       expect(pay.status).toBe("REVERSED");
       const [a] = (await tx.execute<{ n: number }>(sql`select count(*)::int as n from payment_allocations where invoice_id = ${p.invoiceId}`)).rows;
       expect(a.n).toBe(0);
+    }));
+
+  it("حوالتان معاً، والثانيةُ تتبنّى دفعةً مخصَّصةً من إيصالها: يُوزَّع ما بقي منها وحده، والأثرُ بما كُتب", () =>
+    withRollback(async (tx) => {
+      const p = await setup(tx, { amountMinor: 200_00 });
+      /* فاتورةٌ أحدث، وحوالةٌ ثانية ١٥٠٠ سبقها إيصالُها وخُصّص منه ٦٠٠ لها */
+      const newer = await makeInvoice(tx, p.supplierId, 600_00, "2099-07-05");
+      const older2 = await makeInvoice(tx, p.supplierId, 2000_00, "2099-07-02");
+      const [second] = await tx.insert(bankTransactions).values({
+        bankImportId: p.importId, valueDate: day("2099-07-12"), amountMinor: 1500_00, direction: "DEBIT",
+        category: "SUPPLIER", supplierId: p.supplierId, description: "تحويل اختبار ثانٍ",
+      }).returning({ id: bankTransactions.id });
+      const receipt = await createPayment(tx, { supplierId: p.supplierId, paidAt: day("2099-07-12"), amountMinor: 1500_00, method: "BANK_TRANSFER" });
+      await allocate(tx, receipt, [{ invoiceId: newer, amountMinor: 600_00 }]);
+
+      const r = await confirmMatch(p.userId, { transactionId: p.txId, transactionIds: [p.txId, second.id], settleSupplier: true }, tx);
+      /* الأولى (٢٠٠) للأقدم (١٠٠٠)، والثانيةُ ما بقي منها (٩٠٠): ٨٠٠ تكمل الأقدم و١٠٠ للتي بعدها — لا «١٥٠٠» */
+      expect(r).toMatchObject({ ok: true, settled: 2, allocated: 1100_00, unapplied: 0 });
+      const row = await read(tx, second.id);
+      expect(row.matchedPaymentId).toBe(receipt);
+      expect(row.matchOutcome).toBe("SUPPLIER_SETTLED");
+      const [a] = (await tx.execute<{ s: string }>(sql`select sum(amount_minor)::text as s from payment_allocations where payment_id = ${receipt}`)).rows;
+      expect(Number(a.s)).toBe(1500_00);
+      const [o] = (await tx.execute<{ s: string }>(sql`select coalesce(sum(amount_minor), 0)::text as s from payment_allocations where invoice_id = ${older2}`)).rows;
+      expect(Number(o.s)).toBe(100_00);
     }));
 
   it("المالُ الداخل لا يُسجَّل سداداً لمورّد", () =>

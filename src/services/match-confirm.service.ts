@@ -325,7 +325,7 @@ async function settleAccounts(
     const remaining = new Map(open.map((i) => [i.invoiceId, i.outstandingMinor]));
 
     for (const tx of ordered) {
-      const plan = settleSupplierAccount(
+      let plan = settleSupplierAccount(
         tx.amountMinor,
         tx.valueDate,
         open.map((i) => ({ ...i, outstandingMinor: remaining.get(i.invoiceId) ?? 0 })),
@@ -349,10 +349,28 @@ async function settleAccounts(
         /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
         appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
       });
-      if (wasAdopted) adopted++;
+      if (wasAdopted) {
+        adopted++;
+        /*
+          الواقعةُ المتبنّاة قد تكون مخصَّصةً من إيصالها — فالقابلُ للتوزيع ما بقي منها لا مبلغُ الحوالة.
+          كان يُخطَّط على المبلغ كلِّه فيكتب «خصّص ٩٤٥ لفاتورتين» والقاعدةُ لم تكتب شيئاً (`allocate` يقصّ
+          إلى الصفر)، وتُعدّ الفاتورتان مسدّدتين فتتخطّاهما الحوالةُ التالية — فينكسر «الأقدم أوّلاً».
+        */
+        const [taken] = (await t.execute<{ s: string | null }>(sql`
+          select sum(amount_minor)::bigint::text as s from payment_allocations where payment_id = ${paymentId}
+        `)).rows;
+        const already = Number(taken?.s ?? 0);
+        if (already > 0) {
+          plan = settleSupplierAccount(
+            Math.max(0, tx.amountMinor - already),
+            tx.valueDate,
+            open.map((i) => ({ ...i, outstandingMinor: remaining.get(i.invoiceId) ?? 0 })),
+          );
+        }
+      }
 
       if (plan.allocations.length > 0) {
-        await allocate(t, paymentId, tx.amountMinor, plan.allocations);
+        await allocate(t, paymentId, plan.allocations);
         for (const a of plan.allocations) {
           remaining.set(a.invoiceId, (remaining.get(a.invoiceId) ?? 0) - a.amountMinor);
         }
