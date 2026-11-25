@@ -4,7 +4,7 @@
  * من الأرقام نفسها التي على «اليوم» (لا حسابَ ثانٍ)، وبقاعدتها: **المجهولُ يُقال
  * «غير معروف» ولا يُكتب صفراً**، وما صفرُه معلومٌ يُقال جملةً لا «0.00».
  */
-import { ITEM, SUPPLIER, countNoun } from "./arabic";
+import { ITEM, ORDER, SUPPLIER, countNoun } from "./arabic";
 import { formatRiyalsDisplay } from "./money";
 
 export interface BriefFacts {
@@ -19,6 +19,8 @@ export interface BriefFacts {
   /** آخرُ رصيدٍ معروف — `null` مجهول، و`undefined` لمن لا يرى البنك (لا يُذكَر). */
   balanceMinor: number | null | undefined;
   pending: number;
+  /** مبيعاتُ أمس من فودكس وفرقُها عن معتاد يومه بنقاط الأساس — `undefined` لا يُذكر (لا يرى المبالغ أو لا مبيعات). */
+  yesterdaySales?: { paidMinor: number; orders: number; vsBp: number | null; against: "LAST_WEEK" | "USUAL" };
 }
 
 export function buildBrief(f: BriefFacts): string {
@@ -33,6 +35,10 @@ export function buildBrief(f: BriefFacts): string {
       : f.weekMinor > 0 ? `• يخرج هذا الأسبوع ${formatRiyalsDisplay(f.weekMinor)} ريال` : "• لا مبالغ معروفة ستخرج هذا الأسبوع",
     f.balanceMinor === undefined ? null
       : f.balanceMinor === null ? "• رصيد البنك غير معروف" : `• آخر رصيد معروف ${formatRiyalsDisplay(f.balanceMinor)} ريال`,
+    f.yesterdaySales
+      ? `• مبيعات أمس ${formatRiyalsDisplay(f.yesterdaySales.paidMinor)} ريال (${countNoun(f.yesterdaySales.orders, ORDER)})${
+        f.yesterdaySales.vsBp === null ? "" : `، ${f.yesterdaySales.vsBp >= 0 ? "أعلى" : "أقل"} ${f.yesterdaySales.against === "USUAL" ? "من معتاد يومه" : "من يومه قبل أسبوع"} بـ${Math.abs(Math.round(f.yesterdaySales.vsBp / 100))}٪`}`
+      : null,
     f.pending > 0 ? `• ينتظر قرارك ${countNoun(f.pending, ITEM)}` : "• لا شيء ينتظر قرارك",
   ];
   return lines.filter(Boolean).join("\n");

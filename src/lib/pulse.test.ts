@@ -38,4 +38,10 @@ describe("نبض المقهى", () => {
     expect(businessDayOf("2026-11-25", 9, addDays)).toBe("2026-11-25");
     expect(BUSINESS_HOURS.slice(-2)).toEqual([3, 4]);
   });
+
+  it("«أمس» قبل الخامسة فجراً هو يومُ العمل الذي أُغلق للتوّ، وبعدها أمسُ بمعتاده", () => {
+    expect(buildPulse(base).lastDay).toEqual({ paidMinor: 4_200_00, orders: 140, vsBp: 2000, against: "USUAL" });
+    const late = buildPulse({ ...base, nowHour: 4 });
+    expect(late.lastDay).toEqual({ paidMinor: 400_00, orders: 14, vsBp: 2500, against: "LAST_WEEK" });
+  });
 });

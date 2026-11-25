@@ -5,7 +5,7 @@ import { buildBrief } from "@/lib/morning-brief";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import {
   ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
 } from "lucide-react";
@@ -37,7 +37,7 @@ import { T } from "@/components/i18n/t";
 import { CafePulse } from "@/components/cafe-pulse";
 import { loadPnl } from "@/services/profit.service";
 import { loadOutstanding } from "@/services/outstanding.service";
-import { loadPulse } from "@/services/pulse.service";
+import { loadPulseOnce } from "@/services/pulse.service";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +96,9 @@ export default async function HomePage() {
     /* الرواتبُ من المسيّر — كانت «مدفوعات هذا الأسبوع ٢٤٠» ورواتبُ الشهر تُستحقّ يوم الصرف (٢٧) */
     canPay || canBank ? loadPayrollDues([runMonth, currentMonthRiyadh()]) : Promise.resolve([]),
   ]);
+  /* مبيعاتُ أمس في جملة الحال والإحاطة — النبضُ نفسُه الذي يُرسم تحت، مرّةً للطلب كلّه */
+  const pulseForBrief = can(user.role, "amounts:view") && !start.knowsNothing ? await loadPulseOnce().catch(() => null) : null;
+  const yesterdaySales = pulseForBrief?.lastDay && pulseForBrief.lastDay.paidMinor > 0 ? pulseForBrief.lastDay : undefined;
   /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر والرواتب، كما في «النقد القادم» */
   const week = run ? weekDue(run, recurring, payroll) : null;
 
@@ -120,6 +123,11 @@ export default async function HomePage() {
   if (start.knowsNothing) {
     summary.push("لم يقرأ النظام أي بيانات حتى الآن. خطوتان فقط، ويعرف لمن تدين وأين ذهبت أموالك.");
   } else {
+    if (yesterdaySales) {
+      const vs = yesterdaySales.vsBp;
+      const base = yesterdaySales.against === "USUAL" ? "معتاد يومه" : "يومه قبل أسبوع";
+      summary.push(`بعتَ أمس ${formatRiyalsDisplay(yesterdaySales.paidMinor)} ريال${vs === null ? "" : Math.abs(vs) < 300 ? `، قريباً من ${base}` : `، ${vs > 0 ? "أعلى" : "أقل"} من ${base} بـ${Math.abs(Math.round(vs / 100))}٪`}.`);
+    }
     summary.push(attention.length === 0 ? "لا شيء يحتاج قرارك اليوم." : `${countNoun(attention.length, ITEM)} بانتظار قرارك.`);
     if (canPay && run && run.readyTotalMinor > 0) summary.push(`ودفعة ${formatMonth(runMonth)} جاهزة للتحويل (${countNoun(run.ready.length, SUPPLIER)}).`);
   }
@@ -145,6 +153,7 @@ export default async function HomePage() {
                 weekMinor: week ? week.totalMinor : null,
                 balanceMinor: cash ? cash.balanceMinor : undefined,
                 pending: attention.length,
+                yesterdaySales,
               })}
             />
           )}
@@ -391,7 +400,7 @@ async function ChangesList({ factsP }: { factsP: Promise<ChangeFacts> }) {
  */
 async function PulseCard() {
   const thisMonth = currentMonthRiyadh();
-  const [pulse, view] = await Promise.all([loadPulse(), loadPnl(thisMonth).catch(() => null)]);
+  const [pulse, view] = await Promise.all([loadPulseOnce(), loadPnl(thisMonth).catch(() => null)]);
   if (!pulse) return null;
   const profit = view?.pnl.profitMinor ?? null;
   const after = profit === null ? null : await loadOutstanding(thisMonth, profit).catch(() => null);

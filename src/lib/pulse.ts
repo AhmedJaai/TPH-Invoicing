@@ -45,6 +45,11 @@ export interface PulseView {
   hours: { hour: number; todayMinor: number | null; lastWeekMinor: number }[];
   peakMinor: number;
   yesterday: { paidMinor: number; orders: number; vsUsualBp: number | null } | null;
+  /**
+   * آخرُ يوم عملٍ اكتمل — «أمس» بلسان صاحب المقهى. بعد منتصف الليل وقبل الخامسة يومُ العمل الجاري
+   * أُغلق للتوّ (المقهى يُغلق نحو الثانية والنصف) فهو هو، ويُقارَن بنظيره قبل أسبوع؛ وبعدها أمسُ بمعتاده.
+   */
+  lastDay: { paidMinor: number; orders: number; vsBp: number | null; against: "LAST_WEEK" | "USUAL" } | null;
   syncedAt: string | null;
 }
 
@@ -80,6 +85,9 @@ export function buildPulse(i: PulseInput): PulseView {
     hours,
     peakMinor,
     yesterday: i.yesterday ? { ...i.yesterday, vsUsualBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor) } : null,
+    lastDay: i.nowHour < BUSINESS_DAY_START_HOUR && i.nowHour >= 3
+      ? (orders > 0 ? { paidMinor, orders, vsBp: i.lastWeekToNow ? bp(paidMinor, i.lastWeekToNow.paidMinor) : null, against: "LAST_WEEK" as const } : null)
+      : i.yesterday ? { ...i.yesterday, vsBp: bp(i.yesterday.paidMinor, i.yesterdayUsualMinor), against: "USUAL" as const } : null,
     syncedAt: i.syncedAt,
   };
 }

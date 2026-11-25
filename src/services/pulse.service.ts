@@ -2,6 +2,7 @@
  * نبضُ المقهى من مرآة فودكس (`foodics_orders`) — قراءةٌ لا كتابة، والمالُ ما دفعه الزبائن
  * (مشروباتُ الموظفين خارجه: `method_type = 5`) كما تحسبه «المبيعات» (`sales-analysis.service.ts`).
  */
+import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildPulse, businessDayOf, type HourSales, type PulseView } from "@/lib/pulse";
@@ -63,3 +64,6 @@ export async function loadPulse(now = new Date(), conn: Conn = db): Promise<Puls
     syncedAt: sync.rows[0]?.at ? new Date(sync.rows[0].at).toISOString() : null,
   });
 }
+
+/** مرّةً لكلّ طلب صفحة — الجملةُ أعلى الرئيسيّة ولوحةُ النبض تقرآن الأرقامَ نفسها. */
+export const loadPulseOnce = cache(() => loadPulse());
