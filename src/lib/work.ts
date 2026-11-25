@@ -24,7 +24,7 @@ import { loadBackupVerdict } from "@/services/backup-status.service";
 import { loadUnitCostFindings } from "@/services/daily-checks.service";
 import { lateWeeklyCount } from "@/lib/inventory/count-due";
 import { lowSalesDay } from "@/lib/pulse";
-import { loadPulse } from "@/services/pulse.service";
+import { loadPulseOnce } from "@/services/pulse.service";
 import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -75,7 +75,7 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
       select status::text as status, period_start, period_end from inventory_counts order by period_end desc limit 12
     `).then((r) => r.rows).catch(() => []),
     /* أمسُ مقابلَ معتاده — النبضُ نفسُه الذي على الرئيسيّة */
-    loadPulse().catch(() => null),
+    loadPulseOnce().catch(() => null),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
