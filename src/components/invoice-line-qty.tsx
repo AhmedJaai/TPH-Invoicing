@@ -75,7 +75,7 @@ export function InvoiceLineQty({ lineId, qty, lineTotalMinor, canEdit }: {
         run: async () => {
           const u = await postJson("/api/invoice-line", { lineId, quantity: qty });
           if (u.ok) router.refresh();
-          return u.ok;
+          return u.ok ? true : u.error;
         },
       },
     });

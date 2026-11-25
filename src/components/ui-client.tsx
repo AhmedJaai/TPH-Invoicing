@@ -855,7 +855,8 @@ export interface ToastInput {
    * التراجعُ حيث يسمح المجال به وحده — ولا يُعرض لفعلٍ ماليٍّ لا يُنقَض.
    * يُرجع `false` إن فشل التراجع.
    */
-  undo?: { label?: string; run: () => Promise<boolean | void> | boolean | void };
+  /** `false` أو نصٌّ يعني أنّ التراجع فشل — والنصُّ سببُه من الخادم («الشهر أُقفل…») يُقال لصاحبه. */
+  undo?: { label?: string; run: () => Promise<boolean | string | void> | boolean | string | void };
   /** موضعُ الإصلاح — إشعارٌ يقول «توقّف كذا» يفتح حيث يُصلَح، لا يقف عند الخبر. */
   link?: { label: string; href: string };
   /** بالمللي ثانية — والإشعارُ بتراجعٍ يبقى أطول كي يُلحَق. */
@@ -872,6 +873,7 @@ export function toast(input: ToastInput) {
 type LiveToast = ToastInput & {
   id: number;
   state: "idle" | "undoing" | "undone" | "undo-failed";
+  undoError?: string;
   leaving?: boolean;
 };
 
@@ -943,13 +945,16 @@ export function Toaster() {
     if (!t.undo || t.state !== "idle") return;
     setItems((xs) => xs.map((x) => (x.id === t.id ? { ...x, state: "undoing" } : x)));
     let ok = true;
+    let why: string | undefined;
     try {
-      ok = (await t.undo.run()) !== false;
+      const out = await t.undo.run();
+      if (typeof out === "string") { ok = false; why = out; } else ok = out !== false;
     } catch {
       ok = false;
     }
-    setItems((xs) => xs.map((x) => (x.id === t.id ? { ...x, state: ok ? "undone" : "undo-failed" } : x)));
-    arm(t.id, 3000);
+    setItems((xs) => xs.map((x) => (x.id === t.id ? { ...x, state: ok ? "undone" : "undo-failed", undoError: why } : x)));
+    /* سببُ الفشل يُقرأ — يبقى أطول من «تراجعتَ» */
+    arm(t.id, ok ? 3000 : 7000);
   }, [arm]);
 
   /*
@@ -998,6 +1003,7 @@ export function Toaster() {
                 {t.state === "undone" ? "تراجعتَ." : t.state === "undo-failed" ? "تعذّر التراجع، ولم يتغيّر شيء." : t.title}
               </p>
               {t.body && t.state === "idle" && <p className="mt-0.5 text-xs leading-relaxed text-muted">{t.body}</p>}
+              {t.state === "undo-failed" && t.undoError && <p className="mt-0.5 text-xs leading-relaxed text-muted">{t.undoError}</p>}
             </div>
             {t.undo && (t.state === "idle" || t.state === "undoing") && (
               <button

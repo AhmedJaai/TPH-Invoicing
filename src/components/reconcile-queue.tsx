@@ -199,7 +199,7 @@ export function ReconcileQueue({
     run: async () => {
       const u = await postJson("/api/match-undo", { transactionId: txId, reason: "تراجع من إشعار الطابور" });
       if (u.ok) router.refresh();
-      return u.ok;
+      return u.ok ? true : u.error;
     },
   });
 

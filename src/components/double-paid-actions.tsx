@@ -61,7 +61,7 @@ export function DoublePaidActions({
           run: async () => {
             const u = await send(previous);
             if (u.ok) router.refresh();
-            return u.ok;
+            return u.ok ? true : u.error;
           },
         },
       });

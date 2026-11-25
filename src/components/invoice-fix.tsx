@@ -130,7 +130,7 @@ export function InvoiceFix({
             setForm(initial);
             router.refresh();
           }
-          return u.ok;
+          return u.ok ? true : u.error;
         },
       },
     });

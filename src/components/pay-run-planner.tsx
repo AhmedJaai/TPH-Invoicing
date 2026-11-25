@@ -252,7 +252,7 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
           run: async () => {
             const u = await postJson<{ message: string }>("/api/mark-paid/undo", { paymentIds, drawn });
             if (u.ok) router.refresh();
-            return u.ok;
+            return u.ok ? true : u.error;
           },
         } : undefined,
       });
@@ -263,8 +263,14 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
     }
   }
 
+  /* ضغطتان على «أعدها» كانتا طلبين وإشعارين — الزرُّ ينشغل بفاتورته */
+  const [restoring, setRestoring] = useState<string | null>(null);
+
   async function restoreHold(invoice: PlannerInvoice) {
+    if (restoring) return;
+    setRestoring(invoice.id);
     const r = await postJson<{ message?: string }>("/api/payment-run/hold", { month, invoiceIds: [invoice.id], action: "restore" });
+    setRestoring(null);
     if (!r.ok) {
       setError(r.error);
       return;
@@ -472,7 +478,7 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
                           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
                             <span className="min-w-0 flex-1">
                               <T s="{0} {1}. سببك: «{2}»" a={[<b key="0" className="text-warn">موقوفة وأضفتها بقرارك:</b>, i.owner.hold, i.owner.note]} /></span>
-                            <button type="button" disabled={busy} onClick={() => restoreHold(i)} className="min-h-11 sm:min-h-8 shrink-0 font-bold text-accent hover:underline">
+                            <button type="button" disabled={busy || restoring !== null} aria-busy={restoring === i.id} onClick={() => restoreHold(i)} className="min-h-11 sm:min-h-8 shrink-0 font-bold text-accent hover:underline">
                               أعدها إلى الموقوفة
                             </button>
                           </div>
@@ -622,7 +628,7 @@ export function HoldOverride({
         run: async () => {
           const u = await postJson<{ message?: string }>("/api/payment-run/hold", { month, invoiceIds, action: "restore" });
           if (u.ok) router.refresh();
-          return u.ok;
+          return u.ok ? true : u.error;
         },
       },
     });

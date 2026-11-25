@@ -30,7 +30,7 @@ export function TaskCheck({ id, title }: { id: string; title: string }) {
         run: async () => {
           const u = await postJson("/api/task", { action: "reopen", id });
           if (u.ok) router.refresh();
-          return u.ok;
+          return u.ok ? true : u.error;
         },
       },
     });

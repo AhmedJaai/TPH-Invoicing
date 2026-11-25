@@ -36,7 +36,7 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
         run: async () => {
           const u = await postJson("/api/attention-snooze", { itemId, until: null });
           if (u.ok) router.refresh();
-          return u.ok;
+          return u.ok ? true : u.error;
         },
       },
     });

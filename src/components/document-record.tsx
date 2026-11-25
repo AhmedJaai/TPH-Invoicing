@@ -125,7 +125,8 @@ export function DocumentRecord({
       });
       router.refresh();
     }
-    return true;
+    /* التسجيلُ الذي ردّه الخادم بموانعه ليس «تمّ» — الزرُّ لا يومض نجاحاً والموانعُ تحته */
+    return preview || r.data.recorded === true;
   }
 
   async function createSupplier(confirmNew = false) {

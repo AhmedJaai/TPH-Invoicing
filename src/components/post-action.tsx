@@ -66,7 +66,7 @@ export function PostAction({
             run: async () => {
               const u = await send(undo.url ?? url, undo.method ?? method, undo.body);
               if (u.ok) router.refresh();
-              return u.ok;
+              return u.ok ? true : u.error;
             },
           }
         : undefined,

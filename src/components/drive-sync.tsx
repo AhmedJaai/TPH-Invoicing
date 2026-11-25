@@ -1,6 +1,6 @@
 "use client";
 
-import { NETWORK_ERROR } from "@/lib/http-client";
+import { NETWORK_ERROR, postJson } from "@/lib/http-client";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -98,29 +98,17 @@ export function DriveSync() {
   const applyRenames = useCallback(async (fileIds: string[]) => {
     setRenaming(true);
     setRenamed(null);
-    try {
-      const res = await fetch("/api/drive-rename", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ apply: true, fileIds }),
-      });
-      /* يُقرأ نصّاً قبل ادّعاء أنّه JSON — صفحةُ خطأٍ ليست JSON */
-      const text = await res.text();
-      let json: { message?: string; error?: string } | null = null;
-      try { json = JSON.parse(text) as { message?: string; error?: string }; }
-      catch { /* ليس JSON */ }
-      setRenamed(
-        !json ? { ok: false, text: "تعذّرت إعادة التسمية، ولم يتغيّر شيء. أعد المحاولة بعد دقيقة." }
-        : res.ok ? { ok: true, text: json.message ?? "سُمّي من جديد" }
-        : { ok: false, text: json.error ?? "تعذّرت إعادة التسمية" },
-      );
-      if (res.ok) setChosen(new Set());
-    } catch {
-      setRenamed({ ok: false, text: "تعذّر الاتصال بالخادم ولم يصل الطلب. تأكد من الشبكة ثم أعد المحاولة." });
-    } finally {
-      setRenaming(false);
-    }
-  }, []);
+    /* `postJson` المشترك: 401 يُعيد إلى الدخول، والمهلةُ تقول «ربما حُفظ بعضه» */
+    const r = await postJson<{ message?: string }>("/api/drive-rename", { apply: true, fileIds });
+    setRenaming(false);
+    if (!r.ok) { setRenamed({ ok: false, text: r.error }); return; }
+    setRenamed({ ok: true, text: r.data.message ?? "سُمّي من جديد" });
+    setChosen(new Set());
+    /* ما سُمّي يخرج من قائمة «اسمه غير واضح» — كان يبقى بخطٍّ مشطوب فيُختار ويُسمّى ثانيةً */
+    const applied = new Set(fileIds);
+    setResult((prev) => (prev ? { ...prev, renameSuggestions: (prev.renameSuggestions ?? []).filter((x) => !applied.has(x.fileId)) } : prev));
+    router.refresh();
+  }, [router]);
 
   const call = useCallback(
     async (apply: boolean) => {

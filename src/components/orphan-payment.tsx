@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { CircleAlert, CircleCheck, ExternalLink } from "lucide-react";
 import { buttonClass } from "./ui";
-import { toast } from "./ui-client";
+import { ConfirmAction, toast } from "./ui-client";
 import { T } from "@/components/i18n/t";
 
 /**
@@ -34,8 +34,8 @@ export function OrphanPayment({
   /* للمورّد سدادٌ بالمبلغ واليوم نفسيهما — يُسأل قبل أن تُنسب نسخةٌ ثانية */
   const [twin, setTwin] = useState(false);
 
-  async function submit(acknowledgeTwin = false) {
-    if (busy) return;
+  async function submit(acknowledgeTwin = false): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     setError(null);
     const body = mode === "assign"
@@ -46,13 +46,14 @@ export function OrphanPayment({
     if (!r.ok) {
       setTwin(mode === "assign" && r.status === 409 && r.data.twin === true);
       setError(r.error);
-      return;
+      return false;
     }
     setTwin(false);
     /* بلا «تراجع»: مسارُ الدفعة اليتيمة لا يملك ردّاً، والزرُّ الذي لا يعمل أسوأ من غيابه */
     setDone(r.data.message);
     toast({ tone: "ok", title: r.data.message });
     router.refresh();
+    return true;
   }
 
   if (done) {
@@ -115,10 +116,18 @@ export function OrphanPayment({
               placeholder="ما هي؟ مثلاً: أجرة، تحويل شخصي، مصروف…"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
             />
-            <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={() => submit()} className={buttonClass("danger", "sm")}>
-              ألغِ تسجيلها
-            </button>
+            {/* بلا تراجعٍ في هذا المسار — فالإلغاءُ يُقَرّ قبل أن يقع */}
+            <ConfirmAction
+              label="ألغِ تسجيلها"
+              title="إلغاء تسجيلها سداداً؟"
+              consequence="تخرج الدفعة من حساب المورّد ولا تُحسب سداداً لأيّ فاتورة. لا تراجع عنها من هنا، وتبقى في السجل بسببها."
+              acknowledgement="هذه الدفعة ليست سداداً لمورّد"
+              confirmLabel="ألغِ تسجيلها"
+              disabled={busy || reason.trim().length < 3}
+              onConfirm={() => submit()}
+            />
           </div>
+          {reason.trim().length < 3 && <p className="text-[11px] text-muted">اكتب ما هي الدفعة (ثلاثة أحرف على الأقل) ليُفتح الإلغاء.</p>}
           <p className="text-[11px] leading-relaxed text-muted">
             يُلغى تسجيلها سداداً دون حذفها: تبقى الدفعة في السجل مع سبب الإلغاء، ويبقى الإيصال في الأرشيف.
           </p>

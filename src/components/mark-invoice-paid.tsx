@@ -46,25 +46,13 @@ interface Preview {
 
 type State = "idle" | "choose" | "previewing" | "confirm-owner" | "confirm-bank" | "busy" | "done";
 
-async function post(body: unknown): Promise<{ ok: boolean; status: number; data: Record<string, unknown> } | null> {
-  let res: Response;
-  try {
-    res = await fetch("/api/mark-paid", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    return null;
-  }
-  const text = await res.text().catch(() => "");
-  let data: Record<string, unknown> = {};
-  try {
-    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
-  } catch {
-    /* ليس JSON — صفحة خطأٍ من المنصّة */
-  }
-  return { ok: res.ok, status: res.status, data };
+/*
+  عبر `postJson` المشترك: كانت نسخةً خاصّة تُسقط حدثَ انتهاء الجلسة (401) فيبقى صاحبُ العمل
+  أمام «تعذّر الحفظ» بلا طريقٍ إلى الدخول، وتُسقط تحذيرَ المهلة («ربما حُفظ بعضه»)
+  فيعيد كتابةَ دفعةٍ لعلّها كُتبت.
+*/
+function post(body: unknown) {
+  return postJson<Record<string, unknown>>("/api/mark-paid", body);
 }
 
 function describePreview(p: Preview, invoiceDay?: string, from: "OWNER" | "TILL" = "OWNER"): string[] {
@@ -120,11 +108,7 @@ export function MarkInvoicePaid({
   const dayOk = /^\d{4}-\d{2}-\d{2}$/.test(paidOn) && paidOn <= today;
 
   function fail(r: Awaited<ReturnType<typeof post>>, back: State) {
-    setMessage(
-      r === null
-        ? "تعذّر الاتصال بالخادم ولم يصل الطلب."
-        : String(r.data.error ?? "تعذّر الحفظ، ولم يُسجَّل شيء. أعد المحاولة."),
-    );
+    setMessage(r.ok ? "تعذّر الحفظ، ولم يُسجَّل شيء. أعد المحاولة." : r.error);
     setState(back);
   }
 
@@ -133,7 +117,7 @@ export function MarkInvoicePaid({
     setState("previewing");
     setMessage(null);
     const r = await post({ invoiceIds: [invoiceId], source: "OWNER", preview: true });
-    if (!r || !r.ok) return fail(r, "choose");
+    if (!r.ok) return fail(r, "choose");
     setPreview(r.data.preview as Preview);
     setState("confirm-owner");
   }
@@ -146,8 +130,8 @@ export function MarkInvoicePaid({
         ? { invoiceIds: [invoiceId], source }
         : { invoiceIds: [invoiceId], source, paidOn, ...(acknowledgeTwin ? { acknowledgeTwin: true } : {}) },
     );
-    if (!r || !r.ok) {
-      setTwin(source === "BANK" && r?.status === 409 && r.data.twin === true);
+    if (!r.ok) {
+      setTwin(source === "BANK" && r.status === 409 && r.data.twin === true);
       return fail(r, source !== "BANK" ? "confirm-owner" : "confirm-bank");
     }
     setTwin(false);
