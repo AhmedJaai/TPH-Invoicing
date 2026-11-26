@@ -16,6 +16,7 @@ import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
 import { lineHasSameDayInvoice } from "@/services/statement-reconcile.service";
+import { loadStatementCredits } from "@/services/statement-credit.service";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,8 @@ export default async function StatementsPage({
     db.select({ n: sql<number>`count(*)::int` }).from(invoices).where(eq(invoices.periodMonth, missingMonth)),
   ]);
   const monthHasInvoices = Number(monthInvoices?.n ?? 0) > 0;
+  /* إشعاراتُ كلّ كشفٍ مقابلَ ما قيّدناه — «دائنٌ في الكشف بلا إشعار مسجَّل» يُقيَّد من صفّه */
+  const credits = await loadStatementCredits(rows.rows.map((r) => r.id));
 
   const focusSupplier = params.supplier ? supplierRows.find((r) => r.slug === params.supplier) ?? null : null;
   const focusMissing = params.missing === "1";
@@ -169,6 +172,7 @@ export default async function StatementsPage({
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <StatementReconcile
+          canApprove={can(user.role, "payment:approve")}
           archived={rows.rows.map((r) => ({
             id: r.id,
             supplierName: r.supplier_name ?? "—",
@@ -182,6 +186,15 @@ export default async function StatementsPage({
             matchedCount: Number(r.matched),
             missingCount: Number(r.missing),
             missingMinor: Number(r.missing_minor),
+            credits: (() => {
+              const c = credits.get(r.id)?.result;
+              return {
+                matched: c?.matched.length ?? 0,
+                suggested: c?.suggested.length ?? 0,
+                unrecorded: (c?.unrecorded ?? []).flatMap((l) => (l.id ? [{ lineId: l.id, date: l.day, ref: l.ref ?? l.description, amountMinor: l.amountMinor }] : [])),
+                notInStatement: c?.notInStatement.length ?? 0,
+              };
+            })(),
           }))}
         />
         <aside className="min-w-0 space-y-6">

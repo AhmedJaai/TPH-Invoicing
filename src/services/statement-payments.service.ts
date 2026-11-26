@@ -8,6 +8,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { compareSettlements, RECEIPT_AFTER_DAYS, type OurSettlement, type SettlementComparison, type StatementCreditLine } from "@/lib/statement-payments";
 import { addDays } from "@/lib/riyadh-time";
+import { creditNoteReferenceOf } from "@/lib/credit-notes";
+import { knownReversedInvoices } from "./statement-credit.service";
 import type { Conn } from "./types";
 
 export interface SupplierSettlements {
@@ -45,15 +47,15 @@ export async function loadSettlementComparisons(
   const latestEnd = latest.reduce((m, l) => (l.pe > m ? l.pe : m), latest[0].pe);
 
   const [credits, payments] = await Promise.all([
-    conn.execute<{ statement_id: string; d: string; ref: string | null; description: string | null; credit: number }>(sql`
-      select sl.statement_id, (sl.date at time zone 'UTC')::date::text as d, sl.ref, sl.description, sl.credit_minor as credit
+    conn.execute<{ id: string; statement_id: string; d: string; ref: string | null; description: string | null; credit: number }>(sql`
+      select sl.id, sl.statement_id, (sl.date at time zone 'UTC')::date::text as d, sl.ref, sl.description, sl.credit_minor as credit
         from statement_lines sl
        where sl.statement_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)}) and sl.credit_minor > 0
     `),
     /* المردودُ والملغى لم يخرج مالُهما — لا يُنتظر لهما سطر */
-    conn.execute<{ id: string; supplier_id: string; d: string; amount: number; fee: number; method: string }>(sql`
+    conn.execute<{ id: string; supplier_id: string; d: string; amount: number; fee: number; method: string; label: string | null }>(sql`
       select p.id, p.supplier_id, to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as d,
-             p.amount_minor as amount, p.fee_minor as fee, p.method::text as method
+             p.amount_minor as amount, p.fee_minor as fee, p.method::text as method, p.beneficiary_name_raw as label
         from payments p
        where p.supplier_id in (${sql.join(suppliers.map((id) => sql`${id}`), sql`, `)})
          and p.status not in ('REVERSED', 'VOID')
@@ -63,15 +65,19 @@ export async function loadSettlementComparisons(
 
   const linesBy = new Map<string, StatementCreditLine[]>();
   for (const c of credits.rows) {
-    linesBy.set(c.statement_id, [...(linesBy.get(c.statement_id) ?? []), { day: c.d, ref: c.ref, description: c.description, amountMinor: Number(c.credit) }]);
+    linesBy.set(c.statement_id, [...(linesBy.get(c.statement_id) ?? []), { id: c.id, day: c.d, ref: c.ref, description: c.description, amountMinor: Number(c.credit) }]);
   }
   const paidBy = new Map<string, OurSettlement[]>();
   for (const p of payments.rows) {
     paidBy.set(p.supplier_id, [...(paidBy.get(p.supplier_id) ?? []), {
       paymentId: p.id, day: p.d, amountMinor: Number(p.amount), feeMinor: Number(p.fee),
       isCreditNote: p.method === "CREDIT_NOTE", method: p.method,
+      reference: p.method === "CREDIT_NOTE" ? creditNoteReferenceOf(p.label) : null,
     }]);
   }
+
+  /* الإشعارُ الذي يعكس فاتورةً يُسأل: أهي عندنا؟ */
+  const known = await knownReversedInvoices(conn, suppliers, credits.rows);
 
   return latest.map((l) => ({
     supplierId: l.supplier_id, supplierName: l.name_ar, slug: l.slug, statementId: l.id,
@@ -80,6 +86,7 @@ export async function loadSettlementComparisons(
       linesBy.get(l.id) ?? [],
       (paidBy.get(l.supplier_id) ?? []).filter((p) => p.day >= addDays(l.ps, -RECEIPT_AFTER_DAYS) && p.day <= l.pe),
       { from: l.ps, to: l.pe },
+      { knownInvoices: known.get(l.supplier_id) ?? new Set() },
     ),
   }));
 }

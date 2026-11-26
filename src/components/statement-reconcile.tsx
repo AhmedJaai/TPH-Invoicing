@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, Copy, FileSearch, GitCompareArrows, MessageCircle, ScrollText, Upload } from "lucide-react";
 import { postJson, request } from "@/lib/http-client";
 import { INVOICE, LINE, countNoun } from "@/lib/arabic";
-import { formatRange } from "@/lib/riyadh-time";
+import { formatDay, formatRange } from "@/lib/riyadh-time";
 import { whatsappHref } from "@/lib/supplier-edit";
 import { Money } from "./money";
 import { Badge, Callout, DataTable, EmptyState, Monogram, Section } from "./ui";
 import { Sheet, toast } from "./ui-client";
+import { StatementCreditAction } from "./statement-credit-action";
 import { buttonClass } from "./ui-tokens";
 import { T } from "@/components/i18n/t";
 
@@ -33,6 +34,16 @@ export interface ArchivedStatement {
   /** فواتيرُ يذكرها الكشفُ ولا ملفَّ لها عندنا — ومبلغُها */
   missingCount: number;
   missingMinor: number;
+  /**
+   * إشعاراتُ كشفه مقابلَ ما قيّدناه (`matchCreditNotes`). `unrecorded` «دائنٌ في الكشف بلا إشعار
+   * مسجَّل» بمعرّف سطره — يُقيَّد منه بضغطة.
+   */
+  credits: {
+    matched: number;
+    suggested: number;
+    unrecorded: { lineId: string; date: string; ref: string | null; amountMinor: number }[];
+    notInStatement: number;
+  };
 }
 
 export interface SupplierOption {
@@ -60,6 +71,15 @@ interface Result {
   extra: { invoiceNumber: string; date: string; amountMinor: number }[];
   /** أسطرٌ لم يُقرأ مبلغها أو تاريخها — لم تُطابَق ولم تُحذف. */
   unreadLines?: { date: string; description: string; amountText: string }[];
+  /** إشعاراتُ كشفه مقابلَ ما قيّدناه — بالرقم ثمّ بالمبلغ بالهللة، والالتباسُ اقتراح */
+  credits?: {
+    matched: { date: string; ref: string; amountMinor: number; noteDate: string; by: "REF" | "AMOUNT" }[];
+    suggested: { date: string; ref: string; amountMinor: number; why: string; candidates: { date: string; amountMinor: number; reference: string | null }[] }[];
+    /** `lineId` في الكشف المحفوظ وحده — الفحصُ الذي لم يُحفظ لا يُقيَّد منه */
+    unrecorded: { lineId: string | null; date: string; ref: string; amountMinor: number }[];
+    reversesUnknown: { date: string; ref: string; amountMinor: number; invoiceNumber: string }[];
+    notInStatement: { date: string; amountMinor: number; reference: string | null }[];
+  };
   memo: string;
 }
 
@@ -113,7 +133,7 @@ function useReconcile() {
  * الصفحة حيث ضُغط الزرّ — كانت تُلحَق بذيل الصفحة بعد قائمةٍ طويلة فلا
  * يُرى أنّ شيئاً حدث.
  */
-export function StatementReconcile({ archived }: { archived: ArchivedStatement[] }) {
+export function StatementReconcile({ archived, canApprove = false }: { archived: ArchivedStatement[]; canApprove?: boolean }) {
   const { busy, error, send, sheet } = useReconcile();
 
   const match = (id: string) => {
@@ -226,6 +246,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                   {a.missingCount > 0 && (
                     <RecordMissing statementId={a.id} count={a.missingCount} minor={a.missingMinor} />
                   )}
+                  {a.credits.unrecorded.length > 0 && <UnrecordedCredits lines={a.credits.unrecorded} canApprove={canApprove} />}
                   {error?.key === a.id && <span role="alert" className="max-w-56 text-[11px] text-danger">{error.text}</span>}
                 </span>
               ),
@@ -330,7 +351,9 @@ function ResultView({ result }: { result: Result }) {
   /* العنوانُ يقول العددَ كاملاً — فالقائمةُ تُوسَّع إليه ولا تقف دونه بلا سبيل */
   const [allExtra, setAllExtra] = useState(false);
   const [allUnread, setAllUnread] = useState(false);
-  const clean = s.missingFromArchive === 0 && s.amountMismatches === 0 && s.billedDifferenceMinor === 0;
+  const credits = result.credits;
+  const creditOpen = (credits?.unrecorded.length ?? 0) + (credits?.suggested.length ?? 0) + (credits?.notInStatement.length ?? 0);
+  const clean = s.missingFromArchive === 0 && s.amountMismatches === 0 && s.billedDifferenceMinor === 0 && creditOpen === 0;
 
   return (
     <div className="space-y-5">
@@ -340,7 +363,7 @@ function ResultView({ result }: { result: Result }) {
         </Callout>
       ) : (
         <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="كشفه يختلف عن فواتيرك">
-          <T s="{0}{1}المذكرة أسفله جاهزة لإرسالها إلى المورّد." a={[s.missingFromArchive > 0 && <Fragment key="0"><T s="{0} سجّلها عليك وليس لها ملف عندك. " a={[countNoun(s.missingFromArchive, INVOICE)]} /></Fragment>, s.amountMismatches > 0 && <Fragment key="1"><T s="و{0} فيها فرق في المبلغ. " a={[s.amountMismatches]} /></Fragment>]} /></Callout>
+          <T s="{0}{1}{2}المذكرة أسفله جاهزة لإرسالها إلى المورّد." a={[s.missingFromArchive > 0 && <Fragment key="0"><T s="{0} سجّلها عليك وليس لها ملف عندك. " a={[countNoun(s.missingFromArchive, INVOICE)]} /></Fragment>, s.amountMismatches > 0 && <Fragment key="1"><T s="و{0} فيها فرق في المبلغ. " a={[s.amountMismatches]} /></Fragment>, creditOpen > 0 && <Fragment key="2">وفي الإشعارات الدائنة ما يحتاج قرارك. </Fragment>]} /></Callout>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -465,6 +488,8 @@ function ResultView({ result }: { result: Result }) {
         </section>
       )}
 
+      {credits && <CreditsView credits={credits} />}
+
       {/* ── مذكّرة الفروق ── */}
       <section>
         <h3 className="text-sm font-bold">مذكرة جاهزة للمورّد</h3>
@@ -527,5 +552,130 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
       </button>
       {error && <span role="alert" className="text-[11px] text-danger">{error}</span>}
     </span>
+  );
+}
+
+
+/**
+ * دائنٌ في الكشف بلا إشعار مسجَّل — في صفّ الكشف، بزرٍّ يقيّده من سطره. كان الإشعارُ يُذكر في كشف
+ * المورّد ولا يقابله شيء، فيبقى ما عندنا له أكبرَ ممّا يطالب به.
+ */
+function UnrecordedCredits({ lines, canApprove }: { lines: { lineId: string; date: string; ref: string | null; amountMinor: number }[]; canApprove: boolean }) {
+  return (
+    <span className="relative z-10 flex max-w-72 flex-col items-end gap-1.5 text-end">
+      <span className="text-[11px] text-warn">
+        {lines.length === 1 ? "دائنٌ في الكشف بلا إشعار مسجَّل" : <T s="{0} أسطر دائنة في الكشف بلا إشعار مسجَّل" a={[<span key="0" className="nums">{lines.length}</span>]} />}
+      </span>
+      {lines.map((l) => (
+        <span key={l.lineId} className="flex flex-col items-end gap-1">
+          <span className="text-[11px] text-ink-soft">
+            <bdi className="nums">{formatDay(l.date)}</bdi>{l.ref && <> · <bdi dir="auto">{l.ref}</bdi></>} · <Money minor={l.amountMinor} />
+          </span>
+          {canApprove && <StatementCreditAction statementLineId={l.lineId} />}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** إشعاراتُ الكشف في لوح النتيجة: ما طوبق، وما يُقترح، وما لا يقابله شيء من الطرفين. */
+function CreditsView({ credits }: { credits: NonNullable<Result["credits"]> }) {
+  const any = credits.matched.length + credits.suggested.length + credits.unrecorded.length + credits.reversesUnknown.length + credits.notInStatement.length;
+  if (any === 0) return null;
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-bold">الإشعارات الدائنة</h3>
+
+      {credits.unrecorded.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-warn"><T s="دائنٌ في الكشف بلا إشعار مسجَّل: {0}" a={[<span key="0" className="nums">{credits.unrecorded.length}</span>]} /></p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">المورّد خصم هذا من حسابك ولم نسجّله، فما تدين له به عندنا أكبر من الحقيقة.</p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-warn/25">
+            {credits.unrecorded.map((m, i) => (
+              <li key={m.lineId ?? i} className="flex flex-wrap items-center justify-between gap-2 bg-warn-bg px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
+                {m.lineId
+                  ? <StatementCreditAction statementLineId={m.lineId} />
+                  : <span className="w-full text-[11px] text-muted sm:w-auto">أرشف الكشف ليُسجَّل الإشعار من سطره.</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {credits.suggested.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-warn"><T s="يشبه إشعاراً مسجّلاً ولم يُحسم: {0}" a={[<span key="0" className="nums">{credits.suggested.length}</span>]} /></p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">قارنه بورقة الإشعار، ولا تسجّله مرة ثانية إن كان هو نفسه.</p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-warn/25">
+            {credits.suggested.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 bg-warn-bg px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
+                <span className="w-full text-[11px] text-ink-soft">
+                  {m.why} · <T s="المسجَّل: {0}" a={[m.candidates.map((c, j) => (
+                    <span key={j}>{j > 0 && "، "}<Money minor={c.amountMinor} /> <bdi className="nums">{formatDay(c.date)}</bdi>{c.reference && <> <bdi dir="auto">{c.reference}</bdi></>}</span>
+                  ))]} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {credits.notInStatement.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-warn"><T s="إشعار سجّلناه ولم يرد في كشفه: {0}" a={[<span key="0" className="nums">{credits.notInStatement.length}</span>]} /></p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">خصمناه من حسابه ولم يخصمه هو، فسيطالبك به. المذكرة أسفله تطلب منه قيده.</p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-warn/25">
+            {credits.notInStatement.map((n, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 bg-warn-bg px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{n.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{n.reference ?? "بلا رقم"}</span>
+                <span className="shrink-0 font-bold"><Money minor={n.amountMinor} /></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {credits.reversesUnknown.length > 0 && (
+        <div>
+          <p className="text-xs font-bold">يلغي فاتورة ليست في سجلاتك</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">المورّد سجّل الفاتورة ثم ألغاها، فلا أثر لها على ما تدين له به، ولا تسجّلها إشعاراً.</p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
+            {credits.reversesUnknown.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {credits.matched.length > 0 && (
+        <div>
+          <p className="flex items-center gap-1.5 text-xs font-bold text-ok">
+            <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden />
+            <T s="يقابل إشعاراً مسجّلاً: {0}" a={[<span key="0" className="nums">{credits.matched.length}</span>]} />
+          </p>
+          <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
+            {credits.matched.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                <bdi className="nums shrink-0 text-muted">{m.date}</bdi>
+                <span className="min-w-0 flex-1 truncate" dir="auto">{m.ref}</span>
+                <span className="text-ink-soft">{m.by === "REF" ? "بالرقم والمبلغ" : "بالمبلغ"} · <T s="سجّلناه {0}" a={[<bdi key="0" className="nums">{formatDay(m.noteDate)}</bdi>]} /></span>
+                <span className="shrink-0 font-bold"><Money minor={m.amountMinor} /></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
