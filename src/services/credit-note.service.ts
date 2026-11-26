@@ -12,11 +12,23 @@
 import { eq, sql } from "drizzle-orm";
 import { invoices, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { CREDIT_NOTE_LABEL_PREFIX } from "@/lib/credit-notes";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay } from "@/lib/riyadh-time";
 import { allocate, createPayment } from "./payment.service";
 import { applySupplierCredit } from "./supplier-credit.service";
 import type { Tx } from "./types";
+
+/**
+ * من أين جاء الإشعار حين لا يُكتب بيد — سطرُ كشف المورّد بنصّه. يُحفظ مع القيد في سجلّ التدقيق
+ * دليلاً، كما تُحفظ أدلّةُ المطابقة بنصّها مع قرارها.
+ */
+export interface CreditNoteOrigin {
+  statementId: string;
+  statementLineId: string;
+  /** نصُّ السطر كما في الكشف: تاريخُه ومرجعُه ووصفُه ومبلغُه. */
+  lineText: string;
+}
 
 export class CreditNoteRefused extends Error {
   /** `duplicate`: يشبه إشعاراً مقيَّداً على الفاتورة — يُسأل ويمضي بإقرار، لا يُمنَع. */
@@ -28,7 +40,7 @@ export class CreditNoteRefused extends Error {
 
 /** الاسمُ الذي يُحفظ به الإشعار على دفعته — ومنه يُعرف مرجعُه عند السؤال عن تكراره. */
 export function creditNoteLabel(reference: string | null): string {
-  return reference ? `إشعار دائن ${reference}` : "إشعار دائن";
+  return reference ? `${CREDIT_NOTE_LABEL_PREFIX} ${reference}` : CREDIT_NOTE_LABEL_PREFIX;
 }
 
 export async function recordCreditNote(
@@ -37,6 +49,7 @@ export async function recordCreditNote(
     invoiceId: string; amountMinor: number; issuedOn: string; reference: string | null; reason: string | null;
     /** أُقِرّ أنّه إشعارٌ آخر غيرُ المقيَّد الذي يشبهه. */
     acknowledgeDuplicate?: boolean;
+    origin?: CreditNoteOrigin;
   },
   actorId: string,
 ): Promise<{ paymentId: string; remainingMinor: number }> {
@@ -122,6 +135,7 @@ export async function recordCreditNote(
       السبب: input.reason,
       التاريخ: input.issuedOn,
       الدفعة: paymentId,
+      ...(input.origin ? { "من كشف المورّد": input.origin } : {}),
     },
   }, tx);
   return { paymentId, remainingMinor: outstanding - input.amountMinor };
@@ -142,6 +156,7 @@ export async function recordAccountCreditNote(
   input: {
     supplierId: string; amountMinor: number; issuedOn: string; reference: string | null; reason: string | null;
     acknowledgeDuplicate?: boolean;
+    origin?: CreditNoteOrigin;
   },
   actorId: string,
 ): Promise<{ paymentId: string; appliedMinor: number; creditLeftMinor: number }> {
@@ -205,6 +220,7 @@ export async function recordAccountCreditNote(
       السبب: input.reason,
       التاريخ: input.issuedOn,
       الدفعة: paymentId,
+      ...(input.origin ? { "من كشف المورّد": input.origin } : {}),
     },
   }, tx);
   return { paymentId, appliedMinor: out.appliedMinor, creditLeftMinor };

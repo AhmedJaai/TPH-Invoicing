@@ -27,6 +27,8 @@ import {
 import { parseStatementExtras, readingBalances } from "@/lib/extraction/statement-extras";
 import { companyConfig } from "@/config/drive";
 import { reconcileAndPersist } from "@/services/statement-reconcile.service";
+import { creditsForLines, loadStatementCredits } from "@/services/statement-credit.service";
+import type { CreditNoteReconciliation } from "@/lib/credit-notes";
 import { withDeadline } from "@/lib/ai/deadline";
 import { signatureMatches, sniffMimeType } from "@/lib/file-signature";
 import { isoDay } from "@/lib/riyadh-time";
@@ -246,7 +248,17 @@ async function handle(request: Request) {
     persist,
   });
 
-  const memo = buildDiscrepancyMemo(supplier?.nameAr ?? "المورّد", periodLabel, result);
+  /*
+    إشعاراتُ الكشف مقابلَ ما قيّدناه — من الأسطر المحفوظة (بمعرّفاتها، فيُقيَّد الإشعارُ من سطره)،
+    أو من الأسطر المقروءة الآن في الفحص الذي لم يُحفظ.
+  */
+  const period = { from: isoDay(start), to: isoDay(end) };
+  const credits: CreditNoteReconciliation = persist
+    ? (await loadStatementCredits([statementId])).get(statementId)?.result
+      ?? await creditsForLines(db, supplierId, parsedLines, period)
+    : await creditsForLines(db, supplierId, parsedLines, period);
+
+  const memo = buildDiscrepancyMemo(supplier?.nameAr ?? "المورّد", periodLabel, result, credits);
 
   const payload = {
     ok: true,
@@ -301,6 +313,17 @@ async function handle(request: Request) {
       amountMinor: i.totalMinor,
     })),
     findings: result.findings,
+    credits: {
+      matched: credits.matched.map((m) => ({ date: m.line.day, ref: m.line.ref ?? m.line.description ?? "—", amountMinor: m.line.amountMinor, noteDate: m.note.day, by: m.by })),
+      suggested: credits.suggested.map((x) => ({
+        date: x.line.day, ref: x.line.ref ?? x.line.description ?? "—", amountMinor: x.line.amountMinor, why: x.why,
+        candidates: x.candidates.map((c) => ({ date: c.day, amountMinor: c.amountMinor, reference: c.reference })),
+      })),
+      /* بمعرّف السطر في الكشف المحفوظ وحده — «سجّله إشعاراً» يُرسله ولا يُرسل مبلغاً */
+      unrecorded: credits.unrecorded.map((l) => ({ lineId: persist ? l.id ?? null : null, date: l.day, ref: l.ref ?? l.description ?? "—", amountMinor: l.amountMinor })),
+      reversesUnknown: credits.reversesUnknown.map((x) => ({ date: x.line.day, ref: x.line.ref ?? "—", amountMinor: x.line.amountMinor, invoiceNumber: x.invoiceNumber })),
+      notInStatement: credits.notInStatement.map((n) => ({ date: n.day, amountMinor: n.amountMinor, reference: n.reference })),
+    },
     unreadLines,
     memo,
   };

@@ -127,6 +127,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "unbacked-credit": { limit: 120, windowSeconds: 3600 },
   /* الإشعارُ الدائن — إدخالٌ بيد، فاتورةً فاتورة */
   "credit-note": { limit: 120, windowSeconds: 3600 },
+  /* الإشعارُ من سطر كشف المورّد — سطراً سطراً */
+  "statement-credit": { limit: 120, windowSeconds: 3600 },
   /* دمجُ صيغة صنفٍ بأصله — صنفاً صنفاً من صفحة المورّد */
   "supplier-item-merge": { limit: 200, windowSeconds: 3600 },
   "supplier-item-unmerge": { limit: 200, windowSeconds: 3600 },

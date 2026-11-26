@@ -48,6 +48,7 @@ import { formatRiyals } from "@/lib/money";
 import { AccountReview } from "@/components/account-review";
 import { SupplierSettleCredit } from "@/components/supplier-settle-credit";
 import { CreditNoteForm } from "@/components/credit-note-form";
+import { StatementCreditAction } from "@/components/statement-credit-action";
 import { SupplierHandDuplicates } from "@/components/hand-duplicate";
 import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
 import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
@@ -273,6 +274,7 @@ export async function SupplierView({
   const settlement = settlementRows[0]?.comparison ?? null;
   const paidNotCredited = settlement?.oursOnly ?? [];
   const creditedUnknown = settlement?.theirsOnly ?? [];
+  const creditSuggested = settlement?.creditSuggested ?? [];
   const statementRows = statementRes.rows;
   const paymentRows = paymentRes?.rows ?? [];
 
@@ -550,7 +552,7 @@ export async function SupplierView({
                 {paidAfterStatement > 0 && <> <T s=" · ودفعت له بعد تاريخ كشفه {0}" a={[<Money key="0" minor={paidAfterStatement} />]} /></>}
                 {account.allocatedAfterStatementMinor ? <> <T s=" · وخُصّص بعده على فواتير أقدم من الكشف {0}" a={[<Money key="0" minor={account.allocatedAfterStatementMinor} />]} /></> : null}
               </p>
-              {why && (why.missing.length + why.ambiguous.length + why.priceDiffs.length + why.notInStatement.length + paidNotCredited.length + creditedUnknown.length > 0) && (
+              {why && (why.missing.length + why.ambiguous.length + why.priceDiffs.length + why.notInStatement.length + paidNotCredited.length + creditedUnknown.length + creditSuggested.length > 0) && (
                 <div className="mt-3 space-y-2.5 border-t border-line-soft pt-3 text-xs">
                   <p className="font-bold"><T s="أسباب الفرق، من كشفه حتى {0}" a={[formatDay(why.periodEnd)]} /></p>
                   {why.missing.length > 0 && (
@@ -624,11 +626,25 @@ export async function SupplierView({
                   )}
                   {creditedUnknown.length > 0 && (
                     <div>
-                      <p className="text-ink-soft">في كشفه سداد أو إشعار دائن لم نسجّله. إن كان دفعة منك فسجّلها، وإن كان إشعاراً فسجّله على فاتورته:</p>
-                      <ul className="mt-1 space-y-0.5">
+                      <p className="text-ink-soft">في كشفه سداد أو إشعار دائن لم نسجّله. إن كان دفعة منك فسجّلها، وإن كان إشعاراً فسجّله من سطره:</p>
+                      <ul className="mt-1 space-y-1.5">
                         {creditedUnknown.map((t, i) => (
-                          <li key={i} className="flex justify-between gap-3">
-                            <span>{t.kind === "CREDIT_NOTE" ? "إشعار دائن" : "سداد"} · {formatDay(t.line.day)}{t.line.ref ? <> · <bdi className="nums">{t.line.ref}</bdi></> : null}</span>
+                          <li key={t.line.id ?? i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <span>{t.kind === "CREDIT_NOTE" ? "إشعار دائن" : "سداد"} · {formatDay(t.line.day)}{t.line.ref ? <> · <bdi dir="auto">{t.line.ref}</bdi></> : null}</span>
+                            <Money minor={t.line.amountMinor} />
+                            {t.kind === "CREDIT_NOTE" && t.line.id && canApprove && <span className="w-full"><StatementCreditAction statementLineId={t.line.id} /></span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {creditSuggested.length > 0 && (
+                    <div>
+                      <p className="text-warn">إشعار في كشفه يشبه إشعاراً سجّلناه ولم يُحسم. قارنه بورقته، ولا تسجّله مرة ثانية إن كان هو نفسه:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {creditSuggested.map((t, i) => (
+                          <li key={t.line.id ?? i} className="flex flex-wrap justify-between gap-x-3">
+                            <span>{formatDay(t.line.day)}{t.line.ref ? <> · <bdi dir="auto">{t.line.ref}</bdi></> : null} · {t.why}</span>
                             <Money minor={t.line.amountMinor} />
                           </li>
                         ))}

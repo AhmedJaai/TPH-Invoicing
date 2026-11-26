@@ -116,7 +116,7 @@ Vitest 4.1.12 · zod 4.6.7 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## مبنيٌّ ولا يصل إليه أحد
 
-`credit-notes.ts` (يصنّف دائنَ الكشف؛ والإشعارُ يُقيَّد الآن من الفاتورة — `credit-note.service.ts` — ولا يقابله الكشفُ بعد) · `extraction/benchmark.ts` · جدول `branches`.
+`extraction/benchmark.ts` · جدول `branches`.
 بُنيت واختُبرت ولم تُوصَل بشاشة، فـ**تُظنّ عاملة**. التفصيل في `docs/reference/modules.md`.
 **قبل أن تُضيف وحدةً جديدة: أوصِل واحدةً من هذه.**
 

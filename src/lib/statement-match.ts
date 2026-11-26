@@ -11,7 +11,7 @@
 import { ISSUE, ISSUE_TEXT } from "./issue-codes";
 import type { Finding } from "./validation";
 import { HALALA_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
-import { classifyCredit } from "./credit-notes";
+import { classifyCredit, type CreditNoteReconciliation } from "./credit-notes";
 import { formatDay, MS_PER_DAY, isoDay } from "./riyadh-time";
 
 export interface StatementLineInput {
@@ -515,6 +515,8 @@ export function buildDiscrepancyMemo(
   supplierName: string,
   periodLabel: string,
   r: Reconciliation,
+  /** إشعاراتُ الكشف مقابلَ ما قيّدناه (`matchCreditNotes`) — ما قيّدناه ولم يرد في كشفه يُطلب منه */
+  credits?: Pick<CreditNoteReconciliation, "notInStatement">,
 ): string {
   /* من الهللات نصّاً — لا قسمةَ عشريّة في رسالةٍ تُرسَل إلى مورّد */
   const riyals = formatRiyalsDisplay;
@@ -556,6 +558,13 @@ export function buildDiscrepancyMemo(
     out.push(``, `فواتير عندنا لم ترد في كشفكم:`);
     for (const i of r.notInStatement) {
       out.push(`  - ${i.invoiceNumber} · ${formatDay(i.invoiceDate)} · ${riyals(i.totalMinor)} ريال`);
+    }
+  }
+
+  if (credits && credits.notInStatement.length > 0) {
+    out.push(``, `إشعارات دائنة منكم سجّلناها ولم ترد في كشفكم، نرجو قيدها:`);
+    for (const n of credits.notInStatement) {
+      out.push(`  - ${n.reference ?? "بلا رقم"} · ${formatDay(n.day)} · ${riyals(n.amountMinor)} ريال`);
     }
   }
 
