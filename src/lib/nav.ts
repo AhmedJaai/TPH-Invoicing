@@ -231,6 +231,8 @@ export const AREAS: readonly NavArea[] = [
       { href: "/inventory/history", label: "سجل الجرد", needs: "amounts:view" },
       { href: "/inventory/recipes", label: "الوصفات", needs: "recipe:edit" },
       { href: "/inventory/items", label: "الأصناف" },
+      /* ما ينفد قريباً مجموعاً بمورّده، ورسالةُ طلبٍ تُنسخ — لا يُرسَل شيء (`lib/inventory/order-list.ts`) */
+      { href: "/inventory/order", label: "قائمة الطلب" },
       /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
       { href: "/inventory/habit", label: "عادة البيع" },
     ],

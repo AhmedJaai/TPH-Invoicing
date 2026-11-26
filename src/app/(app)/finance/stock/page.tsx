@@ -10,7 +10,7 @@ import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { SignalControls } from "@/components/signal-controls";
 import { Callout, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
-import { BALANCE_NOTE_LABEL, COVER_WARN_DAYS, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
+import { BALANCE_NOTE_LABEL, COVER_WARN_DAYS, PURCHASE_SOURCE_LABEL, runningOut as runningOutItems, type BalanceItem } from "@/lib/finance/stock-balance";
 import { readableQuantity } from "@/lib/finance/quantity";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
@@ -149,9 +149,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
     },
   ];
 
-  const runningOut = b.items
-    .filter((x) => x.cover?.daysLeft !== null && x.cover?.daysLeft !== undefined && x.cover.daysLeft < COVER_WARN_DAYS)
-    .sort((a, b2) => (a.cover!.daysLeft ?? 0) - (b2.cover!.daysLeft ?? 0));
+  const runningOut = runningOutItems(b.items);
 
   return (
     <PageShell
@@ -245,7 +243,8 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
 
       {/* ما ينفد خلال أسبوع — من آخر عدٍّ لا من كلّ ما اشتُري: يُطلب قبل أن ينفد */}
       {runningOut.length > 0 && (
-        <Callout tone="warn" icon={Timer} className="mt-4" title={`${countNoun(runningOut.length, PRODUCT)} قد ينفد خلال أسبوع`}>
+        <Callout tone="warn" icon={Timer} className="mt-4" title={`${countNoun(runningOut.length, PRODUCT)} قد ينفد خلال أسبوع`}
+          action={<LinkButton href="/inventory/order" size="sm" icon={ShoppingCart}>جهّز قائمة الطلب</LinkButton>}>
           <ul className="mt-1 space-y-0.5">
             {runningOut.map((x) => (
               <li key={x.productId}>

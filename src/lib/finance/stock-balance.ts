@@ -111,6 +111,17 @@ export interface BalanceItem {
   cover: { onShelfMilli: number; dailyUseMilli: number; daysLeft: number | null } | null;
 }
 
+/**
+ * ما قد ينفد: يكفي أقلَّ من `days` يوماً، الأقربُ نفاداً أوّلاً — القاعدةُ الواحدة لتنبيه
+ * «قد ينفد خلال أسبوع» في المشترى والمباع ولقائمة الطلب. وما لا صرفَ معروفاً له
+ * (`daysLeft` فارغ) ليس «ينفد»: لا يُعرَف متى.
+ */
+export function runningOut<T extends Pick<BalanceItem, "cover">>(items: readonly T[], days: number = COVER_WARN_DAYS): T[] {
+  return items
+    .filter((x) => x.cover !== null && x.cover.daysLeft !== null && x.cover.daysLeft < days)
+    .sort((a, b) => a.cover!.daysLeft! - b.cover!.daysLeft!);
+}
+
 /** الأكملُ من المصدرين حتى تاريخ: كمّيّتُه وقيمتُه. `null` لا يُعرَف من أيّهما. */
 function best(r: RangeFigures): { milli: number; minor: number } | null {
   const ours = r.invoicesMilli === null ? null : { milli: r.invoicesMilli, minor: r.invoicesMinor };

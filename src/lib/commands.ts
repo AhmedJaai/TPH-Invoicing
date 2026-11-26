@@ -116,6 +116,15 @@ const ACTIONS: readonly Command[] = [
     keywords: ["جرد", "عد", "مخزون", "count", "inventory"],
   },
   {
+    id: "order-list",
+    label: "جهّز قائمة الطلب",
+    hint: "ما ينفد قريباً، مجموعاً حسب المورّد، برسالة طلب تُنسخ",
+    group: "ACTION",
+    href: "/inventory/order",
+    needs: "inventory:view",
+    keywords: ["طلب", "طلبية", "مورد", "ينفد", "شراء", "واتساب", "order", "reorder"],
+  },
+  {
     id: "sales-import",
     label: "استورد مبيعات فودكس أو الكتالوج",
     hint: "الجرد",
