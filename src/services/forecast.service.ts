@@ -13,9 +13,10 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { forecastBacktests, forecastDayContext, forecastEvents, forecastPoints, forecastRuns } from "@/db/schema";
+import { forecastBacktests, forecastDayContext, forecastEvents, forecastPeriods, forecastPoints, forecastRuns } from "@/db/schema";
 import { createId } from "@/lib/id";
-import { addDays, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, hourInRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
+import { businessDayOf } from "@/lib/pulse";
 import { recordAudit } from "@/lib/audit";
 import type { ForecastEventKind } from "@/lib/forecast/events";
 
@@ -63,9 +64,11 @@ export async function loadForecastHistory(opts: { events?: boolean } = {}): Prom
     opts.events === false ? Promise.resolve([]) : db.select().from(forecastEvents).where(sql`${forecastEvents}.voided_at is null`),
   ]);
   const days = [...new Set(totals.rows.map((r) => r.d))].sort();
+  /* يومُ العمل لا يومُ التقويم: قبل الخامسة فجراً ما زال يومُ أمس جارياً — لا يُتعلَّم منه ناقصاً */
+  const now = new Date();
   return {
-    generatedAt: new Date().toISOString(),
-    today: todayInRiyadh(),
+    generatedAt: now.toISOString(),
+    today: businessDayOf(todayInRiyadh(now), hourInRiyadh(now), addDays),
     totals: totals.rows.map((r) => [r.d, r.h, Number(r.paid), r.orders]),
     items: items.rows.map((r) => [r.d, r.h, r.pid, Number(r.q)]),
     products: products.rows,
@@ -104,6 +107,12 @@ export const forecastRunSchema = z.object({
     coverageBp: INT.min(0).max(10_000).nullable(),
     n: INT.positive(),
   })).max(5_000),
+  /** [شهر, مقياس, من يوم, أيّام, p10, p50, p90, meta] — غائبٌ في المحرّكات الأقدم */
+  periods: z.array(z.tuple([
+    z.string().regex(/^\d{4}-\d{2}$/), z.enum(["NET_MINOR", "ORDERS"]), DAY, INT.min(1).max(31),
+    INT.nonnegative(), INT.nonnegative(), INT.nonnegative(), z.record(z.string(), z.unknown()),
+  ])).max(100).default([])
+    .refine((ps) => ps.every(([period, , from, , a, b, c]) => from.startsWith(period) && a <= b && b <= c), "شهرٌ غير متّسق"),
 });
 export type ForecastRunInput = z.infer<typeof forecastRunSchema>;
 
@@ -126,6 +135,11 @@ export async function ingestForecastRun(input: ForecastRunInput): Promise<{ runI
     if (input.context.length) await t.insert(forecastDayContext).values(input.context.map((c) => ({ runId, day: c.day, context: c.context })));
     for (let i = 0; i < input.backtests.length; i += BATCH) {
       await t.insert(forecastBacktests).values(input.backtests.slice(i, i + BATCH).map((b) => ({ runId, ...b })));
+    }
+    if (input.periods.length) {
+      await t.insert(forecastPeriods).values(input.periods.map(([period, metric, fromDay, days, p10, p50, p90, meta]) => ({
+        runId, period, metric, fromDay, days, p10, p50, p90, meta,
+      })));
     }
     /* ساعاتُ الأصناف في التنبّؤات القديمة لا يقرؤها أحد — وتبقى أيّامُها للدقّة */
     const cutoff = addDays(input.issuedOn, -HOURLY_ITEM_RETENTION_DAYS);
@@ -157,7 +171,7 @@ export interface ForecastContext {
 export interface ForecastItem {
   id: string;
   name: string;
-  /** [اليوم الأوّل، الثاني] بالمِلّي، ومجموعُ الأيّام السبعة. */
+  /** أيّامُ الأسبوع الأوّل بالمِلّي، ومجموعُها. */
   days: ForecastBand[];
   week: ForecastBand;
 }
@@ -185,6 +199,34 @@ export interface ForecastEventRow {
   productName: string | null;
   fromHour: number | null;
 }
+/**
+ * شهرٌ في التوقّع. الجاري = ما بيع فعلاً قبل اليوم + اليوم (يضيفه الحيُّ في الصفحة) + ما بعده.
+ * والقادم كلُّه متوقَّع. والمالُ ما دفعه الزبائن شاملاً الضريبة — إيرادُ قائمة الدخل قبل ضريبتها.
+ */
+export interface ForecastMonth {
+  period: string;
+  /** ما بيع فعلاً في أيّامٍ انتهت من هذا الشهر (قبل يوم العمل الجاري). */
+  actualMinor: number;
+  /** متوقَّعُ اليوم الجاري إن كان من هذا الشهر — الصفحةُ تستبدل به التنبّؤَ الحيّ. */
+  today: ForecastBand | null;
+  /** متوقَّعُ ما بعد اليوم حتى آخر الشهر. */
+  rest: ForecastBand;
+  /** الطلبات: الفعليُّ والمتوقَّع (الأوسط). */
+  ordersActual: number;
+  ordersRest: number;
+  days: number;
+  source: "daily" | "structural" | "mixed";
+  unmeasured: string[];
+  tags: string[];
+}
+export interface ForecastHealth {
+  lastSyncAt: Date | null;
+  lastSyncOk: boolean | null;
+  lastSaleDay: string | null;
+  /** أيّامٌ في آخر ستّين بلا طلبٍ واحد — مغلقةٌ أو لم تُقرأ. */
+  emptyDays: string[];
+  upcomingEvents: number;
+}
 export interface ForecastView {
   run: { id: string; issuedOn: string; historyFrom: string; historyTo: string; createdAt: Date; engineVersion: string; durationMs: number | null; models: Record<string, unknown>; summary: Record<string, unknown> } | null;
   days: ForecastDay[];
@@ -196,20 +238,30 @@ export interface ForecastView {
   backtests: ForecastBacktestRow[];
   events: ForecastEventRow[];
   products: { id: string; name: string }[];
+  /** يومُ العمل الجاري — يبدأ الخامسةَ فجراً كـ«نبض المقهى»، لا منتصفَ الليل. */
   today: string;
+  /** ساعةُ الرياض الآن — للتنبّؤ الحيّ. */
+  nowHour: number;
   /** ما بيع اليوم بالساعة حتى الآن — للتنبّؤ الحيّ. */
   todaySold: Map<number, number>;
   /** تنبّؤُ ساعات اليوم الجاري (إن كان في التنبّؤ) — للتنبّؤ الحيّ. */
   todayHours: { hour: number; p10: number; p50: number; p90: number }[];
+  months: ForecastMonth[];
+  /** ما بيع فعلاً في كلّ شهرٍ مضى (وجزءُ الجاري) — للمقارنة. */
+  pastMonths: { period: string; actualMinor: number; days: number; orders: number }[];
+  health: ForecastHealth;
 }
 
 type Band3 = { p10: string | number; p50: string | number; p90: string | number };
 const band = (r: Band3): ForecastBand => ({ p10: Number(r.p10), p50: Number(r.p50), p90: Number(r.p90) });
+const PAID = sql`coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint`;
 
-export async function loadForecastView(opts: { day?: string } = {}): Promise<ForecastView> {
-  const today = todayInRiyadh();
-  const [runRow] = await db.select().from(forecastRuns).orderBy(sql`${forecastRuns}.created_at desc`).limit(1);
-  const [events, products] = await Promise.all([
+export async function loadForecastView(opts: { day?: string; at?: Date } = {}): Promise<ForecastView> {
+  const at = opts.at ?? new Date();
+  const nowHour = hourInRiyadh(at);
+  const today = businessDayOf(todayInRiyadh(at), nowHour, addDays);
+  const [[runRow], events, products, past, health] = await Promise.all([
+    db.select().from(forecastRuns).orderBy(sql`${forecastRuns}.created_at desc`).limit(1),
     db.execute<{ id: string; kind: string; label: string; from_day: string; to_day: string; pos_product_id: string | null; name: string | null; from_hour: number | null }>(sql`
       select e.id, e.kind, e.label, e.from_day, e.to_day, e.pos_product_id, p.name, e.from_hour
         from forecast_events e left join pos_products p on p.id = e.pos_product_id
@@ -219,17 +271,28 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
     db.execute<{ id: string; name: string }>(sql`
       select id, name from pos_products where kind = 'PRODUCT' and coalesce(category, '') <> 'Test' order by name
     `),
+    db.execute<{ period: string; paid: string; days: number; orders: number }>(sql`
+      select substr(o.business_date, 1, 7) as period, ${PAID} as paid,
+             count(distinct o.business_date)::int as days,
+             count(distinct o.id) filter (where o.status = 4 and p.method_type <> 5)::int as orders
+        from foodics_orders o join foodics_order_payments p on p.order_id = o.id
+       where o.status in (4, 5) and o.business_date < ${today}
+       group by 1 order by 1
+    `),
+    loadHealth(today),
   ]);
   const base = {
-    today,
+    today, nowHour,
     events: events.rows.map((e) => ({ id: e.id, kind: e.kind, label: e.label, fromDay: e.from_day, toDay: e.to_day, posProductId: e.pos_product_id, productName: e.name, fromHour: e.from_hour })),
     products: products.rows,
+    pastMonths: past.rows.map((r) => ({ period: r.period, actualMinor: Number(r.paid), days: r.days, orders: r.orders })),
+    health,
   };
   if (!runRow) {
-    return { run: null, days: [], hours: [], selectedDay: null, items: [], accuracy: [], backtests: [], todaySold: new Map(), todayHours: [], ...base };
+    return { run: null, days: [], hours: [], selectedDay: null, items: [], accuracy: [], backtests: [], todaySold: new Map(), todayHours: [], months: [], ...base };
   }
   const runId = runRow.id;
-  const [dayPts, ctx, itemPts, bts, accuracy, sold] = await Promise.all([
+  const [dayPts, ctx, itemPts, bts, accuracy, sold, periods] = await Promise.all([
     db.execute<{ day: string; metric: string } & Band3>(sql`
       select day, metric, p10, p50, p90 from forecast_points
        where run_id = ${runId} and series = 'total' and hour is null order by day
@@ -237,7 +300,7 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
     db.select().from(forecastDayContext).where(sql`${forecastDayContext}.run_id = ${runId}`),
     db.execute<{ series: string; day: string } & Band3>(sql`
       select series, day, p10, p50, p90 from forecast_points
-       where run_id = ${runId} and series like 'item:%' and hour is null and day < ${addDays(runRow.issuedOn, 7)}
+       where run_id = ${runId} and series like 'item:%' and hour is null and day >= ${today} and day < ${addDays(today, 7)}
        order by series, day
     `),
     db.select().from(forecastBacktests).where(sql`${forecastBacktests}.run_id = ${runId}`),
@@ -253,7 +316,7 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
           from issued i join forecast_points p on p.run_id = i.id
          where p.series = 'total' and p.metric = 'NET_MINOR' and p.hour is null and p.day = i.issued_on
       ), act as (
-        select o.business_date as day, coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint as actual
+        select o.business_date as day, ${PAID} as actual
           from foodics_orders o join foodics_order_payments p on p.order_id = o.id
          where o.status in (4, 5) and o.business_date in (select day from fc)
          group by 1
@@ -262,19 +325,20 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
        where fc.day < ${today} order by fc.day desc limit 30
     `),
     db.execute<{ h: number; paid: string }>(sql`
-      select extract(hour from coalesce(o.opened_at, o.closed_at) at time zone 'Asia/Riyadh')::int as h,
-             coalesce(sum(p.amount_minor) filter (where p.method_type <> 5), 0)::bigint as paid
+      select extract(hour from coalesce(o.opened_at, o.closed_at) at time zone 'Asia/Riyadh')::int as h, ${PAID} as paid
         from foodics_orders o join foodics_order_payments p on p.order_id = o.id
        where o.status in (4, 5) and o.business_date = ${today} and coalesce(o.opened_at, o.closed_at) is not null
        group by 1
     `),
+    db.select().from(forecastPeriods).where(sql`${forecastPeriods}.run_id = ${runId}`),
   ]);
 
   const ctxOf = new Map(ctx.map((c) => [c.day, c.context as ForecastContext]));
   const net = dayPts.rows.filter((r) => r.metric === "NET_MINOR");
   const ord = new Map(dayPts.rows.filter((r) => r.metric === "ORDERS").map((r) => [r.day, band(r)]));
-  const days: ForecastDay[] = net.map((r) => ({ day: r.day, ...band(r), orders: ord.get(r.day) ?? null, context: ctxOf.get(r.day) ?? null }));
-  const selectedDay = opts.day && days.some((d) => d.day === opts.day) ? opts.day : days.find((d) => d.day >= today)?.day ?? days[0]?.day ?? null;
+  /* الأيّامُ التي مضت منذ صدور التنبّؤ لا تُعرض توقّعاً — صارت واقعاً */
+  const days: ForecastDay[] = net.filter((r) => r.day >= today).map((r) => ({ day: r.day, ...band(r), orders: ord.get(r.day) ?? null, context: ctxOf.get(r.day) ?? null }));
+  const selectedDay = opts.day && days.some((d) => d.day === opts.day) ? opts.day : days[0]?.day ?? null;
 
   const todaySold = new Map(sold.rows.map((r) => [r.h, Number(r.paid)]));
   const hoursOf = async (day: string) => (await db.execute<{ hour: number } & Band3>(sql`
@@ -301,6 +365,11 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
     };
   }).sort((a, b) => b.week.p50 - a.week.p50);
 
+  const months = buildMonths({
+    today, periods, netDays: net.map((r) => ({ day: r.day, ...band(r) })),
+    ordDays: [...ord].map(([day, b]) => ({ day, ...b })), past: base.pastMonths,
+  });
+
   return {
     run: {
       id: runRow.id, issuedOn: runRow.issuedOn, historyFrom: runRow.historyFrom, historyTo: runRow.historyTo,
@@ -312,7 +381,94 @@ export async function loadForecastView(opts: { day?: string } = {}): Promise<For
     backtests: bts.map((b) => ({ model: b.model, series: b.series, metric: b.metric, horizon: b.horizon, wapeBp: b.wapeBp, coverageBp: b.coverageBp, n: b.n })),
     todaySold,
     todayHours,
+    months,
     ...base,
+  };
+}
+
+/**
+ * الأشهر من نقاط اليوم (ما يقع في الأيّام الواحد والثلاثين) ومن أشهر المحرّك (ما بعدها).
+ * دالّةٌ خالصة: ما مضى من الشهر الجاري واقعٌ من فودكس، واليومُ الجاري مستقلّ، وما بعده متوقَّع.
+ */
+export function buildMonths(i: {
+  today: string;
+  periods: { period: string; metric: string; fromDay: string; days: number; p10: number; p50: number; p90: number; meta: unknown }[];
+  netDays: ({ day: string } & ForecastBand)[];
+  ordDays: ({ day: string } & ForecastBand)[];
+  past: { period: string; actualMinor: number; orders: number }[];
+}): ForecastMonth[] {
+  const lastDaily = i.netDays.at(-1)?.day ?? null;
+  const net = i.periods.filter((p) => p.metric === "NET_MINOR").sort((a, b) => a.period.localeCompare(b.period));
+  const ordP = new Map(i.periods.filter((p) => p.metric === "ORDERS").map((p) => [p.period, p]));
+  const pastOf = new Map(i.past.map((p) => [p.period, p]));
+  const thisMonth = i.today.slice(0, 7);
+  return net.filter((p) => p.period >= thisMonth).map((p) => {
+    const meta = (p.meta ?? {}) as { source?: string; unmeasured?: string[]; tags?: string[] };
+    const ratioLo = p.p50 > 0 ? p.p10 / p.p50 : 1;
+    const ratioHi = p.p50 > 0 ? p.p90 / p.p50 : 1;
+    const inMonth = (d: string) => d.startsWith(p.period);
+    const tomorrow = addDays(i.today, 1);
+    /* بعد آخر يومٍ يوميّ: معدّلُ المحرّك البنيويّ لأيّام هذا الشهر */
+    const tailFrom = [`${p.period}-01`, tomorrow, lastDaily ? addDays(lastDaily, 1) : tomorrow].sort().at(-1)!;
+    const tailDays = remainingDays(p.period, tailFrom);
+    const perDay = (x: { p50: number; days: number } | undefined) => (x && x.days > 0 ? x.p50 / x.days : 0);
+    const todayBand = i.netDays.find((d) => d.day === i.today && inMonth(d.day)) ?? null;
+    const restP50 = i.netDays.filter((d) => inMonth(d.day) && d.day > i.today).reduce((s, d) => s + d.p50, 0) + perDay(p) * tailDays;
+    const o = ordP.get(p.period);
+    const ordRest = i.ordDays.filter((d) => inMonth(d.day) && d.day >= i.today).reduce((s, d) => s + d.p50, 0) + perDay(o) * tailDays;
+    const past = pastOf.get(p.period);
+    const current = p.period === thisMonth;
+    return {
+      period: p.period,
+      actualMinor: current ? past?.actualMinor ?? 0 : 0,
+      today: todayBand ? { p10: todayBand.p10, p50: todayBand.p50, p90: todayBand.p90 } : null,
+      rest: { p10: Math.round(restP50 * ratioLo), p50: Math.round(restP50), p90: Math.round(restP50 * ratioHi) },
+      ordersActual: current ? past?.orders ?? 0 : 0,
+      ordersRest: Math.round(ordRest),
+      days: daysInPeriod(p.period),
+      source: tailDays === 0 ? "daily" : tailDays >= daysInPeriod(p.period) ? "structural" : "mixed",
+      unmeasured: meta.unmeasured ?? [],
+      tags: meta.tags ?? [],
+    };
+  });
+}
+
+function daysInPeriod(period: string): number {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+/** أيّامُ الشهر من `from` (شاملاً) إلى آخره. */
+function remainingDays(period: string, from: string): number {
+  if (!from.startsWith(period)) return from < period ? daysInPeriod(period) : 0;
+  return daysInPeriod(period) - Number(from.slice(8, 10)) + 1;
+}
+
+async function loadHealth(today: string): Promise<ForecastHealth> {
+  const [sync, last, empty, upcoming] = await Promise.all([
+    /* الاستعلامُ الخامّ يُرجع الوقتَ نصّاً — يُحوَّل تاريخاً هنا لا في الصفحة */
+    db.execute<{ finished_at: string | Date | null; status: string }>(sql`
+      select finished_at, status from foodics_sync_runs where finished_at is not null order by finished_at desc limit 1
+    `),
+    db.execute<{ d: string | null }>(sql`select max(business_date) as d from foodics_orders where status in (4, 5)`),
+    db.execute<{ d: string }>(sql`
+      select to_char(g, 'YYYY-MM-DD') as d
+        from generate_series(${addDays(today, -60)}::date, ${addDays(today, -1)}::date, interval '1 day') g
+       where to_char(g, 'YYYY-MM-DD') >= (select min(business_date) from foodics_orders)
+         and not exists (select 1 from foodics_orders o where o.business_date = to_char(g, 'YYYY-MM-DD') and o.status in (4, 5))
+       order by 1
+    `),
+    db.execute<{ n: number }>(sql`
+      select count(*)::int as n from forecast_events where voided_at is null and to_day >= ${today}
+    `),
+  ]);
+  const s = sync.rows[0];
+  return {
+    lastSyncAt: s?.finished_at ? new Date(s.finished_at) : null,
+    /* «OK» اكتملت، و«PARTIAL» قرأت بعضاً — وكلاهما من `foodics-sync.service.ts` */
+    lastSyncOk: s ? s.status === "OK" : null,
+    lastSaleDay: last.rows[0]?.d ?? null,
+    emptyDays: empty.rows.map((r) => r.d),
+    upcomingEvents: upcoming.rows[0]?.n ?? 0,
   };
 }
 

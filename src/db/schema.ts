@@ -2936,3 +2936,16 @@ export const forecastEvents = pgTable("forecast_events", {
   createdAt: now(),
   voidedAt: timestamp("voided_at", { withTimezone: true }),
 });
+
+/** التوقّع بالأشهر (هجرة 118): مجموعُ المتوقَّع لكلّ شهرٍ من `fromDay` إلى آخره. */
+export const forecastPeriods = pgTable("forecast_periods", {
+  runId: text("run_id").notNull().references(() => forecastRuns.id, { onDelete: "cascade" }),
+  period: text("period").notNull(),
+  metric: text("metric").notNull(),
+  fromDay: text("from_day").notNull(),
+  days: smallint("days").notNull(),
+  p10: bigint("p10", { mode: "number" }).notNull(),
+  p50: bigint("p50", { mode: "number" }).notNull(),
+  p90: bigint("p90", { mode: "number" }).notNull(),
+  meta: jsonb("meta").notNull().default({}),
+}, (t) => [primaryKey({ columns: [t.runId, t.period, t.metric] })]);

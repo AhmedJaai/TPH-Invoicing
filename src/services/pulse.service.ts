@@ -8,16 +8,14 @@ import { decimalToMilli } from "@/lib/inventory/units";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildPulse, businessDayOf, type HourSales, type PulseView } from "@/lib/pulse";
-import { addDays } from "@/lib/riyadh-time";
+import { addDays, hourInRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
 import type { Conn } from "./types";
 
-const riyadhHour = (d: Date) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", hour12: false }).format(d)) % 24;
 /* يومُ اللحظة نفسها بتوقيت الرياض — لا ساعةُ الخادم */
-const riyadhDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 export async function loadPulse(now = new Date(), conn: Conn = db): Promise<PulseView | null> {
-  const hour = riyadhHour(now);
-  const day = businessDayOf(riyadhDay(now), hour, addDays);
+  const hour = hourInRiyadh(now);
+  const day = businessDayOf(todayInRiyadh(now), hour, addDays);
   const weekAgo = addDays(day, -7);
   const yesterday = addDays(day, -1);
   const sameDays = [8, 15, 22, 29].map((n) => addDays(day, -n));

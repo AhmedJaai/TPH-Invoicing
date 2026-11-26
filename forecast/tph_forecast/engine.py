@@ -31,6 +31,7 @@ import pandas as pd
 
 from . import calendar_sa as cal
 from . import events_jeddah
+from . import long_range
 from .weather import AIR_FEATURES, AIR_HORIZON, WEATHER_FEATURES
 
 warnings.filterwarnings("ignore")
@@ -786,10 +787,23 @@ def run(history: dict, weather_df: pd.DataFrame, weather_meta: dict, use_chronos
             c["drivers"] = _drivers(contrib.loc[d])
         context.append({"day": d.date().isoformat(), "context": c})
 
+    # الأشهرُ القادمة: الأيّامُ الواحدُ والثلاثون من المزيج، وما بعدها بالبناء الصريح (`long_range.py`)
+    periods: list[list] = []
+    months_meta: dict = {}
+    first_day = fut[0].date()
+    for k, metric in ((TOTAL_NET, "NET_MINOR"), (TOTAL_ORDERS, "ORDERS")):
+        dp = {d.date(): float(day_p50[k][i]) for i, d in enumerate(fut)}
+        rows, meta = long_range.monthly(data.Y[k], first_day, dp, H)
+        months_meta[metric] = {**meta, "backtest": long_range.backtest_months(data.Y[k])}
+        for r in rows:
+            periods.append([r["period"], metric, r["fromDay"], r["days"], *_ints(r["p10"], r["p50"], r["p90"]),
+                            {"source": r["source"], "unmeasured": r["unmeasured"], "tags": r["tags"]}])
+
     head = {m["horizon"]: m for m in met if m["model"] == "ensemble" and m["series"] == "total" and m["metric"] == "NET_MINOR"}
     summary = {
         "trainingDays": T,
         "backtestOrigins": n_origins,
+        "months": months_meta,
         "items": [{"key": k.split("|")[0], "name": data.names.get(k.split("|")[0].removeprefix("item:"), k), "tier": data.item_tier[k]}
                   for k in data.Y.columns if k.startswith("item:")],
         "headline": {h: {"wapeBp": v["wapeBp"], "coverageBp": v["coverageBp"], "n": v["n"]} for h, v in head.items()},
@@ -810,6 +824,7 @@ def run(history: dict, weather_df: pd.DataFrame, weather_meta: dict, use_chronos
         "points": points,
         "context": context,
         "backtests": met,
+        "periods": periods,
     }
 
 

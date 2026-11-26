@@ -17,6 +17,11 @@ function parts(at: Date): { year: string; month: string; day: string } {
 }
 
 /** YYYY-MM-DD بتوقيت الرياض. */
+/** ساعةُ الرياض الآن (0–23). */
+export function hourInRiyadh(at: Date = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: RIYADH, hour: "2-digit", hour12: false }).format(at)) % 24;
+}
+
 export function todayInRiyadh(at: Date = new Date()): string {
   const { year, month, day } = parts(at);
   return `${year}-${month}-${day}`;
