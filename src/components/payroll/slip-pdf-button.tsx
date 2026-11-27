@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Download, FileText, MessageCircle, Send } from "lucide-react";
+import { Download, Eye, FileText, MessageCircle, Send } from "lucide-react";
 import { buttonClass } from "../ui-tokens";
 import { NETWORK_ERROR, readResponse } from "@/lib/http-client";
 import { whatsappLink } from "@/lib/whatsapp";
@@ -101,9 +101,12 @@ export function SlipPdfButton({ employeeId, month, name, monthLabel, phone, comp
             <FileText className="h-4 w-4" aria-hidden />{busy ? "يُجهَّز…" : compact ? "PDF" : "جهّز القسيمة PDF"}
           </button>
         ) : (
-          <button type="button" onClick={() => void shareMobile()} className={buttonClass("primary", size)}>
-            <Send className="h-4 w-4" aria-hidden />أرسلها
-          </button>
+          <>
+            <a href={file.url} target="_blank" rel="noopener" className={buttonClass("quiet", size)}><Eye className="h-4 w-4" aria-hidden />اعرضها</a>
+            <button type="button" onClick={() => void shareMobile()} className={buttonClass("primary", size)}>
+              <Send className="h-4 w-4" aria-hidden />أرسلها
+            </button>
+          </>
         )
       ) : (
         <>
@@ -115,6 +118,10 @@ export function SlipPdfButton({ employeeId, month, name, monthLabel, phone, comp
           ) : (
             <span className="text-[11px] text-muted" title="اكتب رقم جواله في صفحته ← البيانات">بلا رقم جوال</span>
           )}
+          {/* تُعرض في تبويبٍ قبل أن تُنزَّل أو تُرسل (أحمد، ٢٧ نوفمبر ٢٠٢٦) — المسارُ يردّها `inline` */}
+          <a href={`/payroll/slip/${employeeId}/pdf?month=${month}`} target="_blank" rel="noopener" className={buttonClass("quiet", size)}>
+            <Eye className="h-4 w-4" aria-hidden />اعرضها
+          </a>
           <button type="button" onClick={() => void downloadOnly()} disabled={busy} className={buttonClass("quiet", size)} aria-label="نزّل القسيمة PDF">
             <Download className="h-4 w-4" aria-hidden />{compact ? "" : "PDF"}
           </button>
