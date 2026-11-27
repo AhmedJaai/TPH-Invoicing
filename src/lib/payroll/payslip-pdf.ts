@@ -54,9 +54,8 @@ export interface SlipSection {
 
 export interface SlipPdfInput {
   title: string;
-  /** «مؤسسة ذا بوبليك هاوس · النسيم، جدة». */
+  /** «مؤسسة ذا بوبليك هاوس». */
   issuer: string;
-  issuerIds: string;
   /** خاناتُ الموظّف: الاسم · المسمّى · الهويّة · الفترة. */
   employee: [string, string][];
   /** الأرقامُ الكبيرة في رأس القسيمة. */
@@ -186,11 +185,10 @@ export async function payslipPdf(input: SlipPdfInput): Promise<Buffer> {
       ctx.textAlign = "right";
       ctx.fillStyle = INK;
       ctx.font = "22px TPHSansBold";
-      ctx.fillText(input.title, right - 62, 44);
+      ctx.fillText(input.title, right - 62, 48);
       ctx.fillStyle = MUTED;
       ctx.font = "11px TPHSans";
-      ctx.fillText(input.issuer, right - 62, 64);
-      ctx.fillText(input.issuerIds, right - 62, 79);
+      ctx.fillText(input.issuer, right - 62, 70);
 
       /* خاناتُ الموظّف: عمودان */
       const boxY = BOX_Y;

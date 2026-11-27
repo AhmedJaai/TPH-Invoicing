@@ -164,22 +164,12 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
     });
   }
 
-  const notes = [
-    `الحضور والخصومات والعمل الإضافي من ${formatDay(period.from)} إلى ${formatDay(period.to)}، والإضافات والسلف بشهرها.`,
-    monthly ? "أجر الدقيقة = الراتب ÷ (30 يوماً × دقائق الدوام)، وأجر اليوم = الراتب ÷ 30. وجزاءات التأخير والانصراف والغياب من جدول لائحة تنظيم العمل بمرتها خلال 180 يوماً، ولا تزيد في الشهر على أجر خمسة أيام." : null,
-    additions.some((a) => a.kind === "OVERTIME") ? "العمل الإضافي ما بعد نهاية الدوام من تسجيل الحضور، بأجر الساعة ونصفه (نظام العمل، م 107)." : null,
-    s.leaveDays - s.unpaidLeaveDays > 0 ? `أخذ ${countNoun(s.leaveDays - s.unpaidLeaveDays, DAY)} إجازة بأجر لا يُخصم عنها.` : null,
-    row.loanMinor > 0 ? `عليه سلف متبقية بـ${formatRiyalsDisplay(row.loanMinor)} ريال.` : null,
-    "لك أن تراجع أي بند مع الإدارة.",
-  ].filter((n): n is string => n !== null);
 
   const input: SlipPdfInput = {
     title: `قسيمة راتب ${formatMonth(month)}`,
-    issuer: "مؤسسة ذا بوبليك هاوس · النسيم، جدة",
-    issuerIds: "السجل التجاري 7052766941",
+    issuer: "مؤسسة ذا بوبليك هاوس",
     employee: [
       ["الموظف", e.name],
-      ["المسمى", e.jobTitle ?? (monthly ? "دوام كامل" : "دوام جزئي")],
       ...(e.nationalId ? [["رقم الهوية", e.nationalId] as [string, string]] : []),
       ["فترة الحضور", `${formatDay(period.from)} – ${formatDay(period.to)}`],
     ],
@@ -197,7 +187,8 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
       { title: "الصافي وما دُفع", lines: payments },
     ],
     attendance: attRows.length > 0 ? { columns: ["اليوم", "الدوام", "حضر", "انصرف", "ملاحظة"], widths: [24, 24, 13, 13, 26], rows: attRows } : null,
-    notes,
+    /* بلا شرحٍ في ذيلها (أحمد، ٢٧ نوفمبر ٢٠٢٦) — القسيمةُ أرقامُها وسجلُّ حضورها */
+    notes: [],
     issuedAt: formatDay(today),
   };
   return { input, row };
