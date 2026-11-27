@@ -21,7 +21,7 @@ import { inDeductionPeriod } from "./period";
 import type { AttendanceKind } from "@/db/schema";
 import { isoDay } from "@/lib/riyadh-time";
 import { isWorkday } from "./attendance";
-import { divRound } from "./calc";
+import { divRound, EARLY_GRACE_MINUTES } from "./calc";
 
 export const DAYS_IN_WAGE_MONTH = 30;
 export const REPEAT_WINDOW_DAYS = 180;
@@ -269,6 +269,16 @@ export interface ManualViolation {
   note: string | null;
 }
 
+/**
+ * سماحُ الانصراف المبكّر (أحمد، ٢٧ نوفمبر ٢٠٢٦: «خروجٌ قبل الدوام بعشر دقائق يُعتبر في السماح ولا يحسبه
+ * النظام»): عتبةٌ كسماح التأخير — ما دونها لا يُحسب أصلاً، وما فوقها يُحسب كلُّه.
+ */
+export { EARLY_GRACE_MINUTES };
+
+export function countsAsEarly(minutes: number): boolean {
+  return minutes > EARLY_GRACE_MINUTES;
+}
+
 /** التأخيرُ في حدود السماح لا يُعدّ مخالفةً ولا يُحسم أجرُه — سماحُ صاحب العمل فوق اللائحة. */
 export function countsAsLate(minutes: number, graceMinutes: number): boolean {
   return minutes > graceMinutes;
@@ -291,7 +301,7 @@ export function monthViolations(input: {
   for (const a of input.history) {
     if (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) {
       events.push({ id: a.id, code: lateCode(a.minutes, a.disrupted), day: a.day, waived: a.penaltyWaived, detail: `تأخر ${a.minutes} دقيقة` });
-    } else if (a.kind === "EARLY" && a.minutes !== null) {
+    } else if (a.kind === "EARLY" && a.minutes !== null && countsAsEarly(a.minutes)) {
       events.push({ id: a.id, code: earlyCode(a.minutes), day: a.day, waived: a.penaltyWaived, detail: `انصرف قبل الموعد بـ${a.minutes} دقيقة` });
     }
   }

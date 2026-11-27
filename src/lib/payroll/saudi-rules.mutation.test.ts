@@ -119,13 +119,15 @@ describe("مخالفاتُ الشهر من الحضور", () => {
 
   it("الانصرافُ المبكّر بنده بطوله، والإجازةُ لا شيء", () => {
     const r = run([
-      rec("e1", "2026-10-01", { kind: "EARLY", minutes: 10 }),
-      rec("e2", "2026-10-02", { kind: "EARLY", minutes: 20 }),
-      rec("p", "2026-10-03", { kind: "LEAVE", minutes: null }),
-      rec("n", "2026-10-04", { kind: "EARLY", minutes: null }),
+      /* عشرُ دقائق في السماح (٢٧ نوفمبر ٢٠٢٦) لا تُعدّ */
+      rec("g", "2026-10-01", { kind: "EARLY", minutes: 10 }),
+      rec("e1", "2026-10-02", { kind: "EARLY", minutes: 12 }),
+      rec("e2", "2026-10-03", { kind: "EARLY", minutes: 20 }),
+      rec("p", "2026-10-04", { kind: "LEAVE", minutes: null }),
+      rec("n", "2026-10-05", { kind: "EARLY", minutes: null }),
     ]);
     expect(r.items.map((v) => [v.code, v.detail])).toEqual([
-      ["1/8", "انصرف قبل الموعد بـ10 دقيقة"], ["1/9", "انصرف قبل الموعد بـ20 دقيقة"],
+      ["1/8", "انصرف قبل الموعد بـ12 دقيقة"], ["1/9", "انصرف قبل الموعد بـ20 دقيقة"],
     ]);
   });
 

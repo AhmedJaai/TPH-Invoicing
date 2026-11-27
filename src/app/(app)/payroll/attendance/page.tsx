@@ -9,7 +9,7 @@ import { Money } from "@/components/money";
 import { PostAction } from "@/components/post-action";
 import { AttendancePlaceForm, CheckinLinkPanel } from "@/components/payroll/forms";
 import { Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
-import { activeIn } from "@/lib/payroll/calc";
+import { activeIn, EARLY_GRACE_MINUTES } from "@/lib/payroll/calc";
 import { dayShiftRange, riyadhClock, shiftOn, trusted, VERDICT_LABEL, WEEKDAY_LABEL, type DayShift } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList, type DeductionRow } from "@/components/payroll/deduction-list";
@@ -69,7 +69,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       employee,
       ins: mine.filter((c) => c.kind === "IN"),
       outs: mine.filter((c) => c.kind === "OUT"),
-      status: (row?.attendance ?? []).filter((a) => a.day === day).map((a) => ({ kind: a.kind, minutes: a.minutes, source: a.source })),
+      /* ما في السماح لا يُعرض حالاً — لا يُحسب ولا يُعدّ */
+      status: (row?.attendance ?? []).filter((a) => a.day === day && !(a.kind === "LATE" && (a.minutes ?? 0) <= employee.lateGraceMinutes) && !(a.kind === "EARLY" && (a.minutes ?? 0) <= EARLY_GRACE_MINUTES)).map((a) => ({ kind: a.kind, minutes: a.minutes, source: a.source })),
       /* الجزئيُّ بلا جدولٍ ثابت: غيابُه عن يومٍ ليس غياباً */
       workday: employee.kind === "MONTHLY" && !shiftOn(day, employee, employee.shiftRules).off,
       shift: shiftOn(day, employee, employee.shiftRules),

@@ -10,7 +10,7 @@
  */
 import type { AttendanceKind, LeaveType } from "@/db/schema";
 import { DAYS_PER_MONTH, divRound } from "./calc";
-import { countsAsLate, penaltyLabel, type AssessedViolation } from "./saudi-rules";
+import { countsAsEarly, countsAsLate, penaltyLabel, type AssessedViolation } from "./saudi-rules";
 
 /**
  * يقسم قيمةَ مجموعٍ على أجزائه بلا فرق تقريب: `valueOf(n)` قيمةُ n وحدةً مجتمعة (متزايدة).
@@ -79,7 +79,7 @@ export function deductionItems(input: {
 }): DeductionItem[] {
   const monthly = input.kind === "MONTHLY";
   const counted = (a: DeductionAttendance) => !a.waivedAt && (
-    (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) || (a.kind === "EARLY" && a.minutes !== null));
+    (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) || (a.kind === "EARLY" && a.minutes !== null && countsAsEarly(a.minutes)));
   /* بترتيب الأيّام — والمجموعُ لا يتغيّر بالترتيب */
   const timed = input.attendance.filter(counted);
   /* الغيابُ والإجازةُ بلا أجر: أجرُ اليوم — والمجموعُ يساوي القسيمة (`payslip` يجمعهما كذلك) */
@@ -91,7 +91,8 @@ export function deductionItems(input: {
 
   return input.attendance.map((a) => {
     const late = a.kind === "LATE" && a.minutes !== null;
-    const withinGrace = late && !countsAsLate(a.minutes!, input.graceMinutes);
+    const withinGrace = (late && !countsAsLate(a.minutes!, input.graceMinutes))
+      || (a.kind === "EARLY" && a.minutes !== null && !countsAsEarly(a.minutes));
     let wageMinor: number | null = 0;
     if (monthly) {
       const t = timed.indexOf(a), d = absent.indexOf(a);

@@ -1,6 +1,6 @@
 import { RecordHistory } from "@/components/record-history";
 import { TEAM_APP_NAME } from "@/lib/team-app";
-import { DAY, MINUTE, MONTH, TIME, countNoun } from "@/lib/arabic";
+import { DAY, MINUTE, MONTH, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CalendarClock, Timer, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
@@ -90,7 +90,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const deductions = row ? deductionItems({
     kind: employee.kind, rateMinor: rate, shiftMinutes: row?.shiftMinutes ?? employee.shiftMinutes, graceMinutes: employee.lateGraceMinutes,
     attendance: row.attendance, violations: row.violations,
-  }).map((d) => ({ ...d, employeeId: id })) : [];
+    /* ما في السماح لا يُعرض ولا يُعدّ (أحمد، ٢٧ نوفمبر ٢٠٢٦: «فترات السماح ما أبغاها تطلع في سجلات الخصومات») */
+  }).filter((d) => !d.withinGrace).map((d) => ({ ...d, employeeId: id })) : [];
   /* حوالاتُه هو (برقم المستفيد) في كلّ الأشهر، وتحويلاتُك لحسابك حول هذا الشهر وحده */
   const windowEnd = addDays(monthEndDay(month), 10);
   const mine = open.filter((o) => o.suggestion?.employeeId === id || (o.viaOwner && o.day >= `${month}-01` && o.day <= windowEnd));
@@ -113,9 +114,6 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const balanceMinor = closedMonths.reduce((sum, h) => sum + (h.slip.dueMinor ?? 0) - h.slip.paidMinor, 0);
   const gaps = closedMonths.filter((h) => h.slip.dueMinor !== null && h.slip.dueMinor !== h.slip.paidMinor)
     .map((h) => ({ month: h.month, diff: (h.slip.dueMinor ?? 0) - h.slip.paidMinor }));
-  /* تأخيرٌ في حدود السماح لا يُخصم بقرارك (٢٧ نوفمبر ٢٠٢٦)، ويُقال نمطاً إن تكرّر */
-  const graceLates = deductions.filter((d) => d.withinGrace);
-  const graceMinutes = graceLates.reduce((sum, d) => sum + (d.minutes ?? 0), 0);
   const otDays = (overtime?.days ?? []).filter((d) => d.status !== "BELOW_MIN" || d.approvedId !== null);
   const otPending = otDays.filter((d) => d.approvedId === null && d.status === "SUGGESTED" && !d.dismissed);
   const otPendingMinor = otPending.reduce((sum, d) => sum + (d.amountMinor ?? 0), 0);
@@ -232,11 +230,6 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       {row && deductions.length > 0 && (
         <Section id="deductions" title="التأخير والغياب وخصمه" icon={Clock} count={deductions.length}
           hint={`كل يوم بما يُحسم عنه: أجر الوقت الذي لم يُعمل، وفوقه جزاء اللائحة. عدّل الدقائق، أو اعفُ عن الجزاء ويبقى أجر الوقت، أو ألغِ خصم اليوم كله. من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}>
-          {graceLates.length >= 4 && (
-            <Callout tone="info" icon={Clock} className="mb-3" title={`تأخّر ${countNoun(graceLates.length, TIME)} في حدود السماح (${countNoun(graceMinutes, MINUTE)})`}>
-              لا يُخصم شيء منها لأن كل مرة دون سماحه ({countNoun(employee.lateGraceMinutes, MINUTE)})، لكنه يتكرر. إن أردت أن تُحسب فقلّل السماح من «جدول الدوام»، أو نبّهه.
-            </Callout>
-          )}
           <DeductionList items={deductions} canEdit={canEdit} salaryKnown={rate !== null} />
           {slip && slip.penaltiesDroppedMinor > 0 && (
             <p className="mt-2 text-[11px] font-bold text-warn">زادت جزاءات الشهر على أجر خمسة أيام، فلا يُحسم منها {formatRiyalsDisplay(slip.penaltiesDroppedMinor)} ريال — القسيمة تحسب الحد.</p>

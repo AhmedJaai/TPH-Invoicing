@@ -77,7 +77,7 @@ function Line({ item: i, canEdit, salaryKnown }: { item: DeductionRow; canEdit: 
         <div className="shrink-0 text-end text-sm">
           {i.waivedAt ? <span className="text-xs font-bold text-ok">أُعفي — كان <Money minor={(i.waivedWageMinor ?? 0) + (i.waivedPenaltyMinor ?? 0)} /></span>
             : i.kind === "LEAVE" && i.leaveType !== "UNPAID" ? <span className="text-xs text-muted">لا يُخصم</span>
-            : i.withinGrace ? <span className="text-xs text-muted">في حدود السماح، لا يُخصم</span>
+            : i.withinGrace ? <span className="text-xs text-muted">{i.kind === "EARLY" ? "في سماح العشر دقائق، لا يُخصم" : "في حدود السماح، لا يُخصم"}</span>
             : total === null ? <span className="text-xs text-muted">{salaryKnown ? "غير معروف" : "الراتب غير مكتوب"}</span>
             : <span className="font-bold"><span className="text-muted">− </span><Money minor={total} /></span>}
         </div>

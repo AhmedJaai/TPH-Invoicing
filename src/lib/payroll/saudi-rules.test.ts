@@ -109,3 +109,14 @@ describe("مخالفات الشهر من الحضور", () => {
     expect(r.article80).toEqual([{ start: "2026-10-01", days: 11 }]);
   });
 });
+
+describe("سماحُ الانصراف المبكّر", () => {
+  it("عشرُ دقائق لا تُعدّ مخالفةً ولا تتراكم في التكرار", async () => {
+    const { monthViolations } = await import("./saudi-rules");
+    const rec = (id: string, day: string, minutes: number) => ({ id, day, kind: "EARLY" as const, minutes, disrupted: false, penaltyWaived: false });
+    const r = monthViolations({ month: "2026-11", monthlyMinor: 300_000, graceMinutes: 15, daysOff: "", manual: [],
+      history: [rec("a", "2026-11-02", 10), rec("b", "2026-11-03", 5), rec("c", "2026-11-04", 12)] });
+    expect(r.items.map((i) => i.id)).toEqual(["c"]);
+    expect(r.items[0].occurrence).toBe(1);
+  });
+});

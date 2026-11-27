@@ -19,6 +19,9 @@ import { DAY, countNoun } from "@/lib/arabic";
 
 export const DAYS_PER_MONTH = 30;
 
+/** سماحُ الانصراف المبكّر بالدقائق — ما دونه وعنده لا يُحسب (أحمد، ٢٧ نوفمبر ٢٠٢٦). */
+export const EARLY_GRACE_MINUTES = 10;
+
 export const ADJUSTMENT_LABEL: Record<PayrollAdjustmentKind, string> = {
   DEDUCTION: "خصم بموافقته الخطية",
   FINE: "تعويض ضرر أو مخالفة بلدية بخطئه",
@@ -356,7 +359,8 @@ export function payslip(input: PayslipInput): Payslip {
   const att = input.attendance.filter((a) => !a.waivedAt);
   /* السماحُ عتبة: ما دونه لا يُحسب أصلاً، وما فوقه يُحسب كلُّه (اللائحةُ تعدّ التأخير من أوّل دقيقة) */
   const lateMinutes = sumOf(att.filter((a) => a.kind === "LATE" && (a.minutes ?? 0) > input.policy.graceMinutes).map((a) => a.minutes ?? 0));
-  const earlyMinutes = sumOf(att.filter((a) => a.kind === "EARLY").map((a) => a.minutes ?? 0));
+  /* والانصرافُ المبكّر بعشر دقائق في السماح (`EARLY_GRACE_MINUTES`) */
+  const earlyMinutes = sumOf(att.filter((a) => a.kind === "EARLY" && (a.minutes ?? 0) > EARLY_GRACE_MINUTES).map((a) => a.minutes ?? 0));
   const absentDays = att.filter((a) => a.kind === "ABSENT").length;
   const leaveDays = att.filter((a) => a.kind === "LEAVE").length;
   /* الإجازةُ بلا أجر يُخصم أجرُ يومها كالغياب، ولا جزاءَ عليها (109) */

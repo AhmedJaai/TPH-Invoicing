@@ -7,7 +7,7 @@
  */
 import { DAY, MINUTE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL, divRound } from "@/lib/payroll/calc";
+import { ADJUSTMENT_LABEL, divRound, EARLY_GRACE_MINUTES } from "@/lib/payroll/calc";
 import { clock12, dayShiftRange, riyadhClock, shiftOn, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { deductionPeriod } from "@/lib/payroll/period";
@@ -126,8 +126,8 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
     const what = a.kind === "LATE" ? `تأخر ${countNoun(a.minutes ?? 0, MINUTE)}` : a.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(a.minutes ?? 0, MINUTE)}` : "غياب";
     return {
       label: `${shortDay(a.day)} · ${what}`,
-      detail: `كان سيُخصم ${formatRiyalsDisplay(wage + pen)}${pen > 0 ? ` (أجر الوقت ${formatRiyalsDisplay(wage)} + جزاء ${formatRiyalsDisplay(pen)})` : ""}`,
-      value: "أُعفي", tone: "plus" as const,
+      detail: `${a.kind === "ABSENT" ? "أجر اليوم" : "أجر الوقت"} ${formatRiyalsDisplay(wage)}${pen > 0 ? ` + جزاء ${formatRiyalsDisplay(pen)}` : ""} — لم يُخصم`,
+      value: `أُعفي ${formatRiyalsDisplay(wage + pen)}`, tone: "plus" as const,
     };
   });
   /* مجموعُ ما كان سيُخصم بحدّ الجزاءات في الشهر (أجرُ خمسة أيّام) — لا يُقال أكثرُ ممّا كان يجوز */
@@ -137,7 +137,12 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
   const waivedTotal = waivedWage + Math.min(waivedPen, Math.max(0, penCap - s.penaltiesMinor));
 
   /* ── ما أُلغي من الخصم: يُكتب ليعرف الموظّف أنّه كان ثمّ أُلغي، ولا مالَ فيه ── */
-  const cancelled: SlipLine[] = cancelledList.map((c) => ({ label: c.day ? `${shortDay(c.day)} · ${c.what}` : c.what, value: "أُلغي", tone: "muted" as const }));
+  const cancelled: SlipLine[] = cancelledList.map((c) => ({
+    label: c.day ? `${shortDay(c.day)} · ${c.what}` : c.what,
+    detail: c.detail ? `${c.detail} — لم يُخصم` : undefined,
+    value: c.amountMinor === null ? "أُلغي" : `أُلغي ${formatRiyalsDisplay(c.amountMinor)}`, tone: "plus" as const,
+  }));
+  const cancelledTotal = cancelledList.reduce((n, c) => n + (c.amountMinor ?? 0), 0);
   /* وجزاءٌ عُفي عنه وبقي أجرُ وقته: يُقال في سطر يومه بين الخصومات */
 
   /* ── السلف نقداً — تُنقص الصافي. والحوالاتُ وما بقي له لا تُذكر في القسيمة (أحمد، ٢٧ نوفمبر ٢٠٢٦) ── */
@@ -160,8 +165,9 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
     const recs = row.attendance.filter((a) => a.day === day);
     const notes: string[] = [];
     for (const a of recs) {
-      if (a.kind === "LATE") notes.push(`تأخر ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : (a.minutes ?? 0) <= e.lateGraceMinutes ? " (في السماح)" : ""}`);
-      else if (a.kind === "EARLY") notes.push(`مبكراً ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : ""}`);
+      /* ما في السماح لا يُكتب أصلاً */
+      if (a.kind === "LATE") { if ((a.minutes ?? 0) > e.lateGraceMinutes) notes.push(`تأخر ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : ""}`); }
+      else if (a.kind === "EARLY") { if ((a.minutes ?? 0) > EARLY_GRACE_MINUTES) notes.push(`مبكراً ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : ""}`); }
       else if (a.kind === "ABSENT") notes.push("غياب");
       else if (a.kind === "LEAVE") notes.push(LEAVE_TYPE_LABEL[a.leaveType ?? "ANNUAL"]);
     }
@@ -208,8 +214,8 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
       { title: "المستحقات", subtitle: hasOvertime && overtime?.hourMinor ? `العمل الإضافي بأجر الساعة ونصفه (نظام العمل، م 107): الساعة ${formatRiyalsDisplay(overtime.hourMinor)}` : undefined,
         total: s.baseMinor === null ? undefined : formatRiyalsDisplay(s.baseMinor + s.additionsMinor), lines: earnings },
       { title: "الخصومات", total: s.deductionsMinor ? minus(s.deductionsMinor) : undefined, lines: deductions },
-      { title: "تأخيرات أُعفي منها", subtitle: waived.length > 0 ? `إعفاء من الإدارة: لم يُخصم منها شيء، وكانت ستُخصم ${formatRiyalsDisplay(waivedTotal)}` : undefined, lines: waived },
-      { title: "خصومات أُلغيت", subtitle: cancelled.length > 0 ? "كانت ستُخصم وألغتها الإدارة، فلم يُحسم منها شيء" : undefined, lines: cancelled },
+      { title: "تأخيرات أُعفي منها", subtitle: waived.length > 0 ? "إعفاء من الإدارة: لم يُخصم منها شيء" : undefined, total: waived.length > 0 ? `أُعفي ${formatRiyalsDisplay(waivedTotal)}` : undefined, lines: waived },
+      { title: "خصومات أُلغيت", subtitle: cancelled.length > 0 ? "ألغتها الإدارة، فلم يُحسم منها شيء" : undefined, total: cancelledTotal > 0 ? `أُلغي ${formatRiyalsDisplay(cancelledTotal)}` : undefined, lines: cancelled },
       { title: "السلف", total: s.advancesMinor ? minus(s.advancesMinor) : undefined, lines: advances },
     ],
     net: ["صافي الراتب", money(s.dueMinor)],

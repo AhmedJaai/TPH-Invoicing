@@ -104,6 +104,11 @@ describe("payslip — كم لازم أحوّل", () => {
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-09")).toEqual({ worked: 10, of: 30 });
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-10")).toBeNull();
   });
+  it("الانصرافُ المبكّر بعشر دقائق في السماح، وما فوقها يُحسب كلُّه", () => {
+    expect(payslip({ ...base, attendance: [{ kind: "EARLY", minutes: 10 }] }).earlyMinutes).toBe(0);
+    expect(payslip({ ...base, attendance: [{ kind: "EARLY", minutes: 10 }] }).lateMinor).toBe(0);
+    expect(payslip({ ...base, attendance: [{ kind: "EARLY", minutes: 11 }] }).earlyMinutes).toBe(11);
+  });
   it("الإعفاءُ الكامل (120): التأخيرُ يبقى ولا يُحسم منه شيء", () => {
     const waived = payslip({ ...base, attendance: [{ kind: "LATE", minutes: 60, waivedAt: new Date() }, { kind: "LATE", minutes: 30 }] });
     const only30 = payslip({ ...base, attendance: [{ kind: "LATE", minutes: 30 }] });

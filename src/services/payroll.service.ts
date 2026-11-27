@@ -20,7 +20,7 @@ import {
 import { recordAudit } from "@/lib/audit";
 import { formatRiyalsDisplay } from "@/lib/money";
 import {
-  activeIn, beneficiaryIdOf, beneficiaryNameOf, hoursPayMinor, loanBalance, PAYS_SALARY, payslip, rateFor, reclassTarget,
+  activeIn, beneficiaryIdOf, EARLY_GRACE_MINUTES, beneficiaryNameOf, hoursPayMinor, loanBalance, PAYS_SALARY, payslip, rateFor, reclassTarget,
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
 } from "@/lib/payroll/calc";
 import {
@@ -746,48 +746,96 @@ export async function unwaiveMonthLates(month: string, actorId: string): Promise
 
 export interface CancelledDeduction {
   day: string | null;
-  /** «تأخر ٤٠ دقيقة» · «غياب» · «خصم بموافقته الخطية ١٠٠» · بندُ مخالفة. */
+  /** «تأخر ٤٠ دقيقة» · «غياب» · «خصم بموافقته الخطية» · بندُ مخالفة. */
   what: string;
   kind: "ATTENDANCE" | "VIOLATION" | "ADJUSTMENT";
   /** لبنود الحضور: نوعُها ودقائقُها — لسجلّ الحضور في القسيمة. */
   attKind?: AttendanceKind;
   minutes?: number | null;
+  /** ما كان سيُحسم لو لم يُلغَ: أجرُ الوقت + جزاءُ البند بمرّته — `null` بلا راتبٍ معروف. */
+  amountMinor: number | null;
+  /** تفصيلُه: «أجر الوقت ٨٫٦٤ + جزاء ٢٩٫١٧». */
+  detail?: string;
 }
 
 /**
  * خصومٌ ألغاها المالك في الشهر (أحمد، ٢٧ نوفمبر ٢٠٢٦: «أيّ خصمٍ ألغيته يُكتب في القسيمة أنّه كان
- * ثمّ أُلغي، ليعرف الموظّف»): يومُ تأخيرٍ أو انصرافٍ أو غيابٍ أُلغي بـ«ألغِ الخصم» (سجلُّ التدقيق يميّزه
- * عمّا استبدله النظامُ أو تعديلُ الدقائق) ولم يحلّ محلَّه بندٌ من نوعه، ومخالفةٌ سُحبت، وخصمٌ يدويٌّ سُحب.
+ * ثمّ أُلغي، ليعرف الموظّف» — «وجنبه المبلغ»): يومُ تأخيرٍ أو انصرافٍ أو غيابٍ أُلغي بـ«ألغِ الخصم»
+ * (سجلُّ التدقيق يميّزه عمّا استبدله النظامُ أو تعديلُ الدقائق) ولم يحلّ محلَّه بندٌ من نوعه، ومخالفةٌ
+ * سُحبت، وخصمٌ يدويٌّ سُحب. والمبلغُ يُحسب كأنّه لم يُلغَ: البنودُ الملغاة تُعاد إلى السجلّ في حسابٍ
+ * افتراضيّ (`monthViolations` · `deductionItems`) فيُعرف أجرُ وقتها وجزاؤها بمرّته. لا يُكتب شيء.
  */
 export async function loadCancelledDeductions(employeeId: string, month: string, graceMinutes: number, conn: Conn = db): Promise<CancelledDeduction[]> {
   const period = deductionPeriod(month);
-  const [att, active, viol, adj] = await Promise.all([
-    conn.select({ id: payrollAttendance.id, day: payrollAttendance.day, kind: payrollAttendance.kind, minutes: payrollAttendance.minutes }).from(payrollAttendance)
+  const historyFrom = addDays(period.from, -(REPEAT_WINDOW_DAYS * 2));
+  const [[emp], rates, cleared, history, viol, manualLive, adj] = await Promise.all([
+    conn.select().from(employees).where(eq(employees.id, employeeId)),
+    conn.select().from(employeeRates).where(eq(employeeRates.employeeId, employeeId)),
+    conn.select().from(payrollAttendance)
       .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to),
         inArray(payrollAttendance.kind, ["LATE", "EARLY", "ABSENT"]), sql`${payrollAttendance}.voided_at is not null`,
         sql`exists (select 1 from ${auditLogs} where ${auditLogs}.action = 'PAYROLL_ATTENDANCE_CLEARED' and ${auditLogs}.entity_id = ${payrollAttendance}.id)`)),
-    conn.select({ day: payrollAttendance.day, kind: payrollAttendance.kind }).from(payrollAttendance)
-      .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to), isNull(payrollAttendance.voidedAt))),
-    conn.select({ day: payrollViolations.day, code: payrollViolations.code, note: payrollViolations.note }).from(payrollViolations)
+    conn.select().from(payrollAttendance)
+      .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, historyFrom), lte(payrollAttendance.day, period.to), isNull(payrollAttendance.voidedAt))),
+    conn.select().from(payrollViolations)
       .where(and(eq(payrollViolations.employeeId, employeeId), gte(payrollViolations.day, period.from), lte(payrollViolations.day, period.to), sql`${payrollViolations}.voided_at is not null`)),
+    conn.select().from(payrollViolations)
+      .where(and(eq(payrollViolations.employeeId, employeeId), gte(payrollViolations.day, historyFrom), lte(payrollViolations.day, period.to), isNull(payrollViolations.voidedAt))),
     conn.select({ kind: payrollAdjustments.kind, amountMinor: payrollAdjustments.amountMinor, note: payrollAdjustments.note }).from(payrollAdjustments)
       .where(and(eq(payrollAdjustments.employeeId, employeeId), eq(payrollAdjustments.month, month), inArray(payrollAdjustments.kind, ["DEDUCTION", "FINE", "LOAN_REPAYMENT"]), sql`${payrollAdjustments}.voided_at is not null`)),
   ]);
+  if (!emp) return [];
   /* بقي لليوم بندٌ من نوعه (عُدّلت دقائقه) أو غيابٌ أو إجازةٌ تنفيه: ليس إلغاءً */
-  const live = new Set(active.map((a) => `${a.day}:${a.kind}`));
+  const inPeriod = history.filter((a) => a.day >= period.from);
+  const live = new Set(inPeriod.map((a) => `${a.day}:${a.kind}`));
   const replaced = (day: string, kind: AttendanceKind) => live.has(`${day}:${kind}`) || live.has(`${day}:ABSENT`) || live.has(`${day}:LEAVE`);
   const seen = new Set<string>();
-  const out: CancelledDeduction[] = [];
-  for (const a of [...att].sort((x, y) => x.day.localeCompare(y.day))) {
+  const picked: typeof cleared = [];
+  for (const a of [...cleared].sort((x, y) => x.day.localeCompare(y.day) || (y.voidedAt?.getTime() ?? 0) - (x.voidedAt?.getTime() ?? 0))) {
     const key = `${a.day}:${a.kind}`;
     if (seen.has(key) || replaced(a.day, a.kind)) continue;
-    /* تأخيرٌ في حدود السماح لم يكن خصماً */
+    /* ما كان في السماح لم يكن خصماً */
     if (a.kind === "LATE" && (a.minutes ?? 0) <= graceMinutes) continue;
+    if (a.kind === "EARLY" && (a.minutes ?? 0) <= EARLY_GRACE_MINUTES) continue;
     seen.add(key);
-    out.push({ day: a.day, kind: "ATTENDANCE", attKind: a.kind, minutes: a.minutes, what: a.kind === "LATE" ? `تأخر ${countNoun(a.minutes ?? 0, MINUTE)}` : a.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(a.minutes ?? 0, MINUTE)}` : "غياب" });
+    picked.push(a);
   }
-  for (const v of viol) out.push({ day: v.day, kind: "VIOLATION", what: `مخالفة البند ${v.code}${v.note ? ` (${v.note})` : ""}` });
-  for (const a of adj) out.push({ day: null, kind: "ADJUSTMENT", what: `${a.kind === "DEDUCTION" ? "خصم بموافقته الخطية" : a.kind === "FINE" ? "تعويض ضرر أو مخالفة بلدية" : "قسط سلفة"} ${formatRiyalsDisplay(a.amountMinor)}${a.note ? ` (${a.note})` : ""}` });
+
+  /* الحسابُ الافتراضيّ: الملغى قائمٌ (بلا إعفاءٍ ولا عفو)، والمسحوبُ من المخالفات قائم */
+  const rate = emp.kind === "MONTHLY" ? rateFor(rates, month) : null;
+  const { base, rules } = await shiftContext(conn, emp);
+  const usual = usualOn(period.to, base, rules);
+  const restored = picked.map((a) => ({ ...a, voidedAt: null, waivedAt: null, penaltyWaived: false }));
+  const hypHistory = [...history, ...restored];
+  const hypManual = [...manualLive, ...viol.map((v) => ({ ...v, voidedAt: null, waived: false }))];
+  const regs = rate === null ? null : monthViolations({
+    month, monthlyMinor: rate, graceMinutes, daysOff: usual.daysOff,
+    history: hypHistory, manual: hypManual.map((v) => ({ id: v.id, day: v.day, code: v.code, waived: v.waived, note: v.note })),
+  });
+  const items = rate === null || !regs ? [] : deductionItems({
+    kind: emp.kind, rateMinor: rate, shiftMinutes: usual.shiftMinutes, graceMinutes,
+    attendance: [...inPeriod, ...restored], violations: regs.items,
+  });
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  const violById = new Map((regs?.items ?? []).map((v) => [v.id, v]));
+
+  const out: CancelledDeduction[] = [];
+  for (const a of picked) {
+    const i = itemById.get(a.id);
+    const wage = i?.wageMinor ?? null;
+    const pen = i?.penalty && !i.penalty.warning && i.penalty.amountMinor !== null ? i.penalty.amountMinor : 0;
+    out.push({
+      day: a.day, kind: "ATTENDANCE", attKind: a.kind, minutes: a.minutes,
+      what: a.kind === "LATE" ? `تأخر ${countNoun(a.minutes ?? 0, MINUTE)}` : a.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(a.minutes ?? 0, MINUTE)}` : "غياب",
+      amountMinor: wage === null ? null : wage + pen,
+      detail: wage === null ? undefined : `${a.kind === "ABSENT" ? "أجر اليوم" : "أجر الوقت"} ${formatRiyalsDisplay(wage)}${pen > 0 ? ` + جزاء ${formatRiyalsDisplay(pen)}` : i?.penalty?.warning ? " + إنذار" : ""}`,
+    });
+  }
+  for (const v of viol) {
+    const x = violById.get(v.id);
+    out.push({ day: v.day, kind: "VIOLATION", what: `مخالفة البند ${v.code}${v.note ? ` (${v.note})` : ""}`, amountMinor: x?.amountMinor ?? null });
+  }
+  for (const a of adj) out.push({ day: null, kind: "ADJUSTMENT", what: `${a.kind === "DEDUCTION" ? "خصم بموافقته الخطية" : a.kind === "FINE" ? "تعويض ضرر أو مخالفة بلدية" : "قسط سلفة"}${a.note ? ` (${a.note})` : ""}`, amountMinor: a.amountMinor });
   return out.sort((x, y) => (x.day ?? "9999").localeCompare(y.day ?? "9999"));
 }
 
@@ -1418,7 +1466,7 @@ export async function myPeriod(employee: CheckinEmployee, today = todayInRiyadh(
   const rows = await db.select({ kind: payrollAttendance.kind, minutes: payrollAttendance.minutes }).from(payrollAttendance)
     .where(and(eq(payrollAttendance.employeeId, employee.id), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to), isNull(payrollAttendance.voidedAt)));
   const late = rows.filter((r) => r.kind === "LATE" && (r.minutes ?? 0) > employee.lateGraceMinutes);
-  const early = rows.filter((r) => r.kind === "EARLY");
+  const early = rows.filter((r) => r.kind === "EARLY" && (r.minutes ?? 0) > EARLY_GRACE_MINUTES);
   return {
     from: period.from, to: period.to,
     lateDays: late.length, lateMinutes: late.reduce((s, r) => s + (r.minutes ?? 0), 0),
@@ -1646,7 +1694,7 @@ export async function weekAttendanceSummary(today = todayInRiyadh(), conn: Conn 
     const r = await conn.execute<{ late: number; early: number; absent: number; known: number }>(sql`
       select
         count(*) filter (where a.kind = 'LATE' and a.minutes > e.late_grace_minutes)::int as late,
-        count(*) filter (where a.kind = 'EARLY')::int as early,
+        count(*) filter (where a.kind = 'EARLY' and a.minutes > ${EARLY_GRACE_MINUTES})::int as early,
         count(*) filter (where a.kind = 'ABSENT')::int as absent,
         (select count(*)::int from employees x where x.shift_start is not null and (x.left_on is null or x.left_on >= ${today})) as known
       from payroll_attendance a join employees e on e.id = a.employee_id

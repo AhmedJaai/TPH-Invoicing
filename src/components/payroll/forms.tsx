@@ -7,12 +7,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { whatsappLink } from "@/lib/whatsapp";
 import { Calculator, Copy, Link2, MessageCircle, Plus, X } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { formatRiyals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 import { countNoun, DAY, EMPLOYEE } from "@/lib/arabic";
 import {
-  ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, divRound, hoursLabel, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
+  ADJUSTMENT_HINT, ADJUSTMENT_LABEL, ADJUSTMENT_KINDS, DAYS_PER_MONTH, EARLY_GRACE_MINUTES, divRound, hoursLabel, PURPOSE_HINT, PURPOSE_LABEL, PURPOSES, unitValues,
 } from "@/lib/payroll/calc";
 import { clockMinutes, shiftLength, shiftRange, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { earlyCode, lateCode, MANUAL_CODES, ORDINAL, penaltyLabel, RULES } from "@/lib/payroll/saudi-rules";
@@ -99,7 +100,7 @@ export function EmployeeForm({ initial }: { initial: EmployeeFormValues }) {
         <label className={label}>يوم الخروج <span className="font-normal text-muted">(إن ترك العمل)</span><input type="date" dir="ltr" className={`${field} mt-1.5`} value={v.leftOn} onChange={(e) => set("leftOn", e.target.value)} /></label>
         <label className={label}>رقم المستفيد في البنك <span className="font-normal text-muted">(BEN ID)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="numeric" value={v.bankBeneficiaryId} onChange={(e) => set("bankBeneficiaryId", e.target.value.replace(/\D/g, ""))} placeholder="1129311518" /></label>
         <label className={label}>الآيبان <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" value={v.iban} onChange={(e) => set("iban", e.target.value)} placeholder="SA…" /></label>
-        <label className={label}>الجوال <span className="font-normal text-muted">(لإرسال رابط الحضور)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="tel" value={v.phone} onChange={(e) => set("phone", e.target.value)} placeholder="9665…" /></label>
+        <label className={label}>الجوال <span className="font-normal text-muted">(لإرسال رابط الحضور وقسيمة الراتب واتساب)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="tel" value={v.phone} onChange={(e) => set("phone", e.target.value)} placeholder="05xxxxxxxx" /></label>
         <label className={label}>رقم الهوية أو الإقامة <span className="font-normal text-muted">(اختياري)</span><input className={`${field} nums mt-1.5`} dir="ltr" inputMode="numeric" value={v.nationalId} onChange={(e) => set("nationalId", e.target.value.replace(/\D/g, ""))} /></label>
         {isNew && <>
         <label className={label}>الدوام من الساعة <span className="font-normal text-muted">(لحساب التأخير)</span><input type="time" dir="ltr" className={`${field} mt-1.5`} value={v.shiftStart} onChange={(e) => set("shiftStart", e.target.value)} /></label>
@@ -474,11 +475,11 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
   const n = Number(minutes);
   const byMinutes = kind === "LATE" || kind === "EARLY";
   const valid = byMinutes && Number.isInteger(n) && n > 0;
-  const withinGrace = kind === "LATE" && valid && n <= graceMinutes;
+  const withinGrace = (kind === "LATE" && valid && n <= graceMinutes) || (kind === "EARLY" && valid && n <= EARLY_GRACE_MINUTES);
   const units = salaryMinor !== null ? unitValues(salaryMinor, shiftMinutes) : null;
   /* أجرُ الوقت للعين — والجزاءُ ومرّتُه يحسبهما الخادم من سجلّه */
   const timeWage = units === null ? null : byMinutes ? (valid && !withinGrace ? divRound(salaryMinor! * n, DAYS_PER_MONTH * shiftMinutes) : 0) : kind === "ABSENT" ? units.dayMinor : 0;
-  const rule = kind === "LATE" && valid && !withinGrace ? RULES[lateCode(n, disrupted)] : kind === "EARLY" && valid ? RULES[earlyCode(n)] : kind === "ABSENT" ? RULES["1/11"] : null;
+  const rule = kind === "LATE" && valid && !withinGrace ? RULES[lateCode(n, disrupted)] : kind === "EARLY" && valid && !withinGrace ? RULES[earlyCode(n)] : kind === "ABSENT" ? RULES["1/11"] : null;
 
   return (
     <form className="space-y-3" onSubmit={async (e) => {
@@ -506,7 +507,7 @@ export function DayForm({ employeeId, salaryMinor, shiftMinutes, graceMinutes, d
         <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
         {units === null ? <span>اكتب راتب الموظف ليحسب الخصم.</span>
           : kind === "LEAVE" ? <span>الإجازة أو العذر المقبول لا يُخصم عليه.</span>
-          : withinGrace ? <span>في حدود السماح ({graceMinutes} دقيقة)، فلا يُحسب.</span>
+          : withinGrace ? <span>في حدود السماح ({kind === "EARLY" ? EARLY_GRACE_MINUTES : graceMinutes} دقيقة)، فلا يُحسب.</span>
           : <span className="space-y-1">
               <span className="block">
                 {byMinutes ? <>أجر الدقائق: <strong className="text-ink">{formatRiyalsDisplay(timeWage ?? 0)}</strong> ريال</> : <>أجر اليوم: <strong className="text-ink">{formatRiyalsDisplay(units.dayMinor)}</strong> ريال</>}
@@ -725,7 +726,8 @@ export function CheckinLinkPanel({ employeeId, name, phone, hasLink }: { employe
     const r = await send<{ token?: string; message?: string }>("/api/payroll/employee", { action: "link-issue", id: employeeId });
     if (r?.token) setUrl(`${window.location.origin}${teamAppPath(r.token)}`);
   };
-  const wa = url ? `https://wa.me/${(phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(teamInvite(name, url))}` : null;
+  /* «05…» يصير «9665…» — كان الرقمُ يُرسل كما كُتب فيفتح واتساب على رقمٍ خطأ */
+  const wa = url ? whatsappLink(phone, teamInvite(name, url)) ?? `https://wa.me/?text=${encodeURIComponent(teamInvite(name, url))}` : null;
   return (
     <div className="space-y-2">
       {url ? (
