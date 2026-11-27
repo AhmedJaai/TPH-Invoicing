@@ -49,6 +49,10 @@ export interface SlipLine {
 
 export interface SlipSection {
   title: string;
+  /** سطرٌ صغير تحت العنوان — ما يُقال مرّةً للقسم كلّه. */
+  subtitle?: string;
+  /** مجموعُ القسم في طرف عنوانه — بدل سطر «المجموع». */
+  total?: string;
   lines: SlipLine[];
 }
 
@@ -64,6 +68,8 @@ export interface SlipPdfInput {
   /** سجلُّ الحضور يوماً بيوم — أعمدتُه من اليمين. */
   attendance: { columns: string[]; widths: number[]; rows: { cells: string[]; muted?: boolean }[] } | null;
   notes: string[];
+  /** الصافي في شريطٍ بارزٍ بعد الأقسام. */
+  net?: [string, string];
   issuedAt: string;
 }
 
@@ -91,7 +97,8 @@ const toneColor = (t?: SlipTone) => (t === "plus" ? PLUS : t === "minus" ? MINUS
 
 /** ما يُرسم: كتلٌ تُقاس ثمّ تُوزَّع على الصفحات. */
 type Block =
-  | { kind: "heading"; text: string; h: number }
+  | { kind: "heading"; text: string; total?: string; subtitle?: string; h: number }
+  | { kind: "net"; label: string; value: string; h: number }
   | { kind: "line"; line: SlipLine; labelLines: string[]; detailLines: string[]; zebra: boolean; h: number }
   | { kind: "tableHead"; h: number }
   | { kind: "tableRow"; cells: string[]; muted: boolean; zebra: boolean; h: number }
@@ -117,7 +124,7 @@ export async function payslipPdf(input: SlipPdfInput): Promise<Buffer> {
   const blocks: Block[] = [];
   for (const sec of input.sections) {
     if (sec.lines.length === 0) continue;
-    blocks.push({ kind: "gap", h: 10 }, { kind: "heading", text: sec.title, h: 24 });
+    blocks.push({ kind: "gap", h: 12 }, { kind: "heading", text: sec.title, total: sec.total, subtitle: sec.subtitle, h: sec.subtitle ? 38 : 26 });
     sec.lines.forEach((line, i) => {
       ctx.font = `${line.strong ? 12 : 11}px ${line.strong ? "TPHSansBold" : "TPHSans"}`;
       const labelLines = wrap(ctx, line.label, labelMax);
@@ -126,6 +133,7 @@ export async function payslipPdf(input: SlipPdfInput): Promise<Buffer> {
       blocks.push({ kind: "line", line, labelLines, detailLines, zebra: i % 2 === 1, h: 8 + labelLines.length * LABEL_LINE_H + detailLines.length * 12 + 4 });
     });
   }
+  if (input.net) blocks.push({ kind: "gap", h: 14 }, { kind: "net", label: input.net[0], value: input.net[1], h: 40 });
   /* الشرحُ مع الأرقام، وسجلُّ الحضور ملحقٌ في الآخر */
   if (input.notes.length > 0) {
     blocks.push({ kind: "gap", h: 10 });
@@ -240,11 +248,34 @@ export async function payslipPdf(input: SlipPdfInput): Promise<Buffer> {
         case "heading": {
           ctx.textAlign = "right";
           ctx.fillStyle = OLIVE;
-          ctx.font = "13px TPHSansBold";
+          ctx.font = "14px TPHSansBold";
           ctx.fillText(b.text, right, ry + 10);
+          if (b.total) {
+            ctx.textAlign = "left";
+            ctx.font = "13px TPHSansBold";
+            ctx.fillText(b.total, left + 8, ry + 10);
+          }
+          if (b.subtitle) {
+            ctx.textAlign = "right";
+            ctx.fillStyle = MUTED;
+            ctx.font = "9px TPHSans";
+            ctx.fillText(b.subtitle, right, ry + 25);
+          }
           ctx.strokeStyle = OLIVE;
           ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(left, ry + 21); ctx.lineTo(right, ry + 21); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(left, ry + b.h - 4); ctx.lineTo(right, ry + b.h - 4); ctx.stroke();
+          break;
+        }
+        case "net": {
+          ctx.fillStyle = OLIVE;
+          ctx.fillRect(left, ry, right - left, b.h);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "15px TPHSansBold";
+          ctx.textAlign = "right";
+          ctx.fillText(b.label, right - 14, ry + b.h / 2);
+          ctx.textAlign = "left";
+          ctx.font = "17px TPHSansBold";
+          ctx.fillText(b.value, left + 14, ry + b.h / 2);
           break;
         }
         case "line": {

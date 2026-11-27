@@ -165,7 +165,7 @@ export interface PayrollRow {
   shiftMinutes: number;
   slip: Payslip;
   /** `workDay`: يومُ العمل الإضافيّ المُقرّ من التسجيل (119). */
-  adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date; workDay: string | null }[];
+  adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date; workDay: string | null; minutes: number | null }[];
   attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean; leaveType: LeaveType | null }[];
   /** مخالفاتُ الشهر بجزائها من جدول اللائحة — من الحضور ومن المسجَّل بيده. */
   violations: (AssessedViolation & { source: "ATTENDANCE" | "MANUAL" })[];
@@ -260,7 +260,7 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
           penalties: regs?.capped,
           paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((sum, l) => sum + l.amountMinor, 0),
         }),
-        adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt, workDay: a.workDay })),
+        adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt, workDay: a.workDay, minutes: a.minutes })),
         attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived, leaveType: a.leaveType })),
         violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
         article80: regs?.article80 ?? [],
