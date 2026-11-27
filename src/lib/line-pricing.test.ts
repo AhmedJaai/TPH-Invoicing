@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "./line-pricing";
+import { packQuantity, parseLineQuantity, reconcileInvoiceLines, resolveLinePricing, resolveReadLines, unitPriceCandidates } from "./line-pricing";
 
 const r = (quantity: number, unitPriceMinor: number | null, lineTotalMinor: number | null) =>
   resolveLinePricing({ quantity, unitPriceMinor, lineTotalMinor });
@@ -144,5 +144,75 @@ describe("parseLineQuantity — الكمّيّة كما كتبت، والمجه�
     expect(parseLineQuantity("-2")).toBeNull();
     expect(parseLineQuantity("12 × 500")).toBeNull();
     expect(parseLineQuantity("كرتون")).toBeNull();
+  });
+});
+
+describe("الكرتونُ مكانَ الحبّة — قراءاتُ نادك الحقيقيّة", () => {
+  /* «حبّاتُ الكرتون 6» في خانة الكمّيّة، والمجموعُ شاملٌ الضريبة، وسعرُ الحبّة ٩٫١٠ */
+  const read = (quantity: string, unitPrice: string, lineTotal: string, usual: number | null = null, subtotal: number | null = null) =>
+    resolveReadLines([{ description: "MLK FF 1.75L", quantity, unitPrice, lineTotal }], subtotal, () => usual)[0];
+
+  it("سعران في الخانة («54.60 / 9.10»): الأصغرُ للحبّة والكمّيّةُ من المجموع", () => {
+    expect(unitPriceCandidates("54.60 / 9.10")).toEqual([5_460, 910]);
+    expect(read("6", "54.60 / 9.10", "146.51")).toMatchObject({ qtyText: "14", effectiveUnitMinor: 910, netTotalMinor: 12_740, basis: "PACK_QTY" });
+    expect(read("6", "54.60 / 9.10", "10.47")).toMatchObject({ qtyText: "1", effectiveUnitMinor: 910, netTotalMinor: 910 });
+  });
+
+  it("سعرُ الكرتون والكمّيّةُ حبّاتُه: الكرتون ÷ حبّاته سعرُ الحبّة", () => {
+    expect(read("6", "54.60", "188.37")).toMatchObject({ qtyText: "18", effectiveUnitMinor: 910, basis: "PACK_QTY" });
+    expect(read("6", "54.60", "136.50")).toMatchObject({ qtyText: "15", effectiveUnitMinor: 910, netTotalMinor: 13_650 });
+    expect(read("6", "54.60", "10.47", 910)).toMatchObject({ qtyText: "1", effectiveUnitMinor: 910 });
+  });
+
+  it("سعرُ الحبّة والمجموعُ أكبر من الضرب: الكمّيّةُ هي الخطأ", () => {
+    expect(read("6", "9.10", "156.98")).toMatchObject({ qtyText: "15", effectiveUnitMinor: 910, netTotalMinor: 13_650 });
+  });
+
+  it("بلا سعرٍ مقروء: بالسعر المعتاد للصنف وحده — وبلا معتادٍ يبقى كما كان", () => {
+    expect(read("6", "", "156.98", 910)).toMatchObject({ qtyText: "15", effectiveUnitMinor: 910, basis: "PACK_QTY" });
+    expect(read("6", "", "156.98", null)).toMatchObject({ qtyText: "6", basis: "DERIVED" });
+    /* المجموعُ لا يقسم على المعتاد: لعلّ السعر تغيّر — لا يُخترع عدد */
+    expect(read("6", "", "150.00", 910)).toMatchObject({ qtyText: "6", basis: "DERIVED" });
+  });
+
+  it("ما يستقيم بالكمّيّة المقروءة لا يُمسّ", () => {
+    expect(read("6", "9.10", "54.60")).toMatchObject({ qtyText: "6", basis: "CONSISTENT" });
+    expect(read("6", "54.60 / 9.10", "54.60")).toMatchObject({ qtyText: "6", effectiveUnitMinor: 910, basis: "CONSISTENT" });
+  });
+
+  it("الخصمُ الحقيقيّ لا يصير كرتوناً: عشرةٌ بمئة بخصم ١٠٪ تبقى عشرة", () => {
+    expect(packQuantity(10, [10_000], 90_000, null)).toBeNull();
+    const line = resolveReadLines([{ description: "بن", quantity: "10", unitPrice: "100", lineTotal: "900" }], null)[0];
+    expect(line).toMatchObject({ qtyText: "10", basis: "DISCOUNTED" });
+  });
+
+  it("سعران لا يتضاعفان لا يُقرآن", () => {
+    expect(unitPriceCandidates("54.60 / 9.00")).toEqual([]);
+    expect(unitPriceCandidates("12 x 500")).toEqual([]);
+  });
+});
+
+describe("الكرتونُ مكانَ الحبّة — ما بقي", () => {
+  const read = (quantity: string, unitPrice: string, lineTotal: string, usual: number | null) =>
+    resolveReadLines([{ description: "MLK LF 1.75L", quantity, unitPrice, lineTotal }], null, () => usual)[0];
+
+  it("سعرُ الحبّة المعتاد والمجموعُ حبّةٌ بضريبتها: حبّةٌ لا خصمُ ٨٠٪", () => {
+    expect(read("6", "9.10", "10.47", 910)).toMatchObject({ qtyText: "1", effectiveUnitMinor: 910, basis: "PACK_QTY" });
+    /* بلا معتادٍ يُعرف لا يُحسم */
+    expect(read("6", "9.10", "10.47", null).basis).toBe("DISCOUNTED");
+    /* خصمٌ حقيقيّ عند مورّدٍ سعرُه المعتاد مئة لا يصير «تسعاً» */
+    expect(packQuantity(10, [10_000], 90_000, 10_000)).toBeNull();
+  });
+
+  it("بلا سعرٍ والكمّيّةُ صحيحة: المعتادُ يحسم أنّ المجموعَ شاملٌ الضريبة", () => {
+    expect(read("1", "", "10.47", 910)).toMatchObject({ qtyText: "1", effectiveUnitMinor: 910, netTotalMinor: 910, basis: "TOTAL_INCLUDES_VAT" });
+  });
+});
+
+describe("الخصمُ الحقيقيّ عند مورّدٍ معروف السعر", () => {
+  it("غاناش «4 × 100 = 200»: أربعٌ بنصف السعر لا حبّتان", () => {
+    expect(packQuantity(4, [10_000], 20_000, 10_000)).toBeNull();
+    const line = resolveReadLines([{ description: "Cheesecake Date Brulee L", quantity: "4.00", unitPrice: "100.00", lineTotal: "200.00" }], 59_600, () => 10_000)[0];
+    expect(line).toMatchObject({ qtyText: "4", effectiveUnitMinor: 5_000, basis: "DISCOUNTED" });
   });
 });

@@ -10,7 +10,7 @@
  */
 import { normalizeItem } from "./items";
 import { resolveReadLines, type ReadLine } from "./line-pricing";
-import { movesAtReview, type PriceLine, type PriceMove } from "./price-watch";
+import { movesAtReview, usualPrices, type PriceLine, type PriceMove } from "./price-watch";
 
 export type { PriceMove } from "./price-watch";
 
@@ -18,6 +18,22 @@ export type { PriceMove } from "./price-watch";
  * بنودُ القراءة مقابل تاريخ المورّد. `aliases` صيغٌ أقرّها إنسانٌ أنّها صنفٌ آخر (056)،
  * فيُقارَن البندُ باسمه الذي سيُقيَّد به.
  */
+/**
+ * السعرُ المعتاد لكلّ بندٍ بوصفه كما قُرئ — ليصحّح `resolveReadLines` كمّيّةَ الكرتون
+ * (نادك: «6» حبّاتُ الكرتون مكانَ ١٥ حبّة). `aliases` كما في `priceMovesAtReview`.
+ */
+export function usualUnitLookup(
+  lines: readonly ReadLine[],
+  history: readonly PriceLine[],
+  aliases: ReadonlyMap<string, string>,
+  todayDay: string,
+): (description: string) => number | null {
+  const nameOf = (d: string) => { const read = normalizeItem(d); return aliases.get(read) ?? read; };
+  const names = lines.map((l) => (l.description?.trim() ? nameOf(l.description.trim()) : "")).filter(Boolean);
+  const usual = usualPrices(names, history, todayDay);
+  return (d) => usual.get(nameOf(d))?.minor ?? null;
+}
+
 export function priceMovesAtReview(
   lines: readonly ReadLine[],
   subtotalMinor: number | null,
@@ -25,7 +41,7 @@ export function priceMovesAtReview(
   aliases: ReadonlyMap<string, string>,
   todayDay: string,
 ): PriceMove[] {
-  const resolved = resolveReadLines(lines, subtotalMinor).map((l) => {
+  const resolved = resolveReadLines(lines, subtotalMinor, usualUnitLookup(lines, history, aliases, todayDay)).map((l) => {
     const read = normalizeItem(l.description);
     return {
       description: l.description,

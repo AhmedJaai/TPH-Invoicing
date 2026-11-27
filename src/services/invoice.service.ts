@@ -14,6 +14,8 @@ import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { invoiceNumberKey } from "@/lib/invoice-twin";
 import { normalizeItem } from "@/lib/items";
 import { resolveReadLines } from "@/lib/line-pricing";
+import { usualUnitLookup } from "@/lib/price-at-review";
+import { loadPriceLines } from "./price-watch.service";
 import { checkInvoiceTotals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { Conn, RawLine, Tx } from "./types";
@@ -249,7 +251,15 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
   })
     .from(invoiceLines).where(eq(invoiceLines.invoiceId, input.invoiceId)).orderBy(invoiceLines.id);
 
-  const lines = resolveReadLines(input.lines, input.subtotalMinor);
+  /* صيغةٌ أقرّها إنسانٌ أنّها صنفٌ آخر لهذا المورّد تُكتب باسمه (056) */
+  const canonical = await itemAliases(tx, input.supplierId);
+  /*
+    السعرُ المعتاد لكلّ صنفٍ عند مورّده، من فواتيره الأخرى — به تُصحَّح كمّيّةُ الكرتون
+    (`packQuantity`): نادك تُقرأ «6» حبّاتِ الكرتون مكانَ ١٥ حبّة في كلّ فاتورة.
+  */
+  const history = (await loadPriceLines({ supplierId: input.supplierId }, tx)).filter((l) => l.invoiceId !== input.invoiceId);
+  const read = input.lines.map((l) => ({ description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, lineTotal: l.lineTotal }));
+  const lines = resolveReadLines(read, input.subtotalMinor, usualUnitLookup(read, history, canonical, todayInRiyadh()));
   /* قراءةٌ لا بندَ مسعَّراً فيها لا تمحو بنوداً صالحة — «لم يُقرأ» ليس «لا بنود» */
   if (lines.length === 0 && previous.length > 0) return 0;
 
@@ -273,8 +283,6 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
     return list.splice(i, 1)[0].id;
   };
 
-  /* صيغةٌ أقرّها إنسانٌ أنّها صنفٌ آخر لهذا المورّد تُكتب باسمه (056) */
-  const canonical = await itemAliases(tx, input.supplierId);
   const plan: { reuse: string | undefined; values: Omit<typeof invoiceLines.$inferInsert, "invoiceId"> }[] = [];
   for (const l of lines) {
     const read = normalizeItem(l.description);

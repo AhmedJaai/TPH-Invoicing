@@ -73,3 +73,21 @@ describe("مقارنة السعر لحظة المراجعة", () => {
     expect(text).not.toContain("بنّ");
   });
 });
+
+describe("نادك: الكرتونُ مكانَ الحبّة لا يصير «ارتفع ١٣٣٪»", () => {
+  it("فاتورة ٢٦ نوفمبر كما قُرئت: لا حركةَ سعر", () => {
+    const history = usual([["MLK FF 1.75L", 910], ["MLK LF 1.75L", 910]]);
+    const moves = at([
+      { description: "MLK FF 1.75L", quantity: "6", unitPrice: "54.60 / 9.10", lineTotal: "146.51" },
+      { description: "MLK LF 1.75L", quantity: "6", unitPrice: "54.60 / 9.10", lineTotal: "10.47" },
+    ], history, 13_650);
+    expect(moves).toEqual([]);
+  });
+
+  it("بلا سعرٍ مقروء يُحسب بالمعتاد — ولا يُخفي ارتفاعاً لا يقسم عليه المجموع", () => {
+    const history = usual([["MLK FF 1.75L", 910]]);
+    expect(at([{ description: "MLK FF 1.75L", quantity: "6", unitPrice: "", lineTotal: "156.98" }], history, 13_650)).toEqual([]);
+    const [m] = at([{ description: "MLK FF 1.75L", quantity: "15", unitPrice: "9.75", lineTotal: "146.25" }], history, 14_625);
+    expect(m).toMatchObject({ nowMinor: 975, wasMinor: 910, reason: null });
+  });
+});

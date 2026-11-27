@@ -14,7 +14,7 @@
  *
  * القاعدة: ما دفعناه فعلاً هو الحقيقة، وسعر القائمة يُحفظ للمقارنة لا للتحليل.
  */
-import { grossOfNetExact, netInsideGross } from "./vat";
+import { VAT_PERCENT, grossOfNetExact, netInsideGross } from "./vat";
 import { latinDigits } from "./digits";
 import { parseRiyals } from "./money";
 
@@ -30,7 +30,9 @@ export type PricingBasis =
   /** تعارض لا يُفسَّر بخصم ولا بضريبة */
   | "INCONSISTENT"
   /** الكمّيّةُ لم تُقرأ — فلا سعرَ وحدةٍ يُبنى عليه، والكمّيّةُ «غير معروفة» لا ١ */
-  | "QTY_UNREAD";
+  | "QTY_UNREAD"
+  /** قُرئ عددُ الحبّات في الكرتون مكانَ الكمّيّة، فالكمّيّةُ من المجموع ÷ سعر الحبّة (`packQuantity`) */
+  | "PACK_QTY";
 
 export interface LinePricingInput {
   quantity: number;
@@ -218,6 +220,106 @@ export function reconcileInvoiceLines<T extends LineToReconcile>(
   return { lines: [...lines], verdict: "UNVERIFIED" };
 }
 
+/* ─────────────────── الكرتونُ والحبّة ─────────────────── */
+
+/**
+ * أرقامُ خانة سعر الوحدة. رقمٌ واحد سعرٌ واحد؛ و«54.60 / 9.10» سعران — للكرتون وللحبّة —
+ * يُقبلان إن كان الأكبرُ مضاعفاً صحيحاً للأصغر (حبّاتُ الكرتون). وما سوى ذلك لا يُقرأ.
+ */
+export function unitPriceCandidates(raw: string | null | undefined): number[] {
+  if (!raw || !raw.trim()) return [];
+  const one = parseRiyals(raw);
+  if (one !== null) return [one];
+  const parts = latinDigits(raw).replace(/٫/g, ".").match(/\d[\d,٬]*(?:\.\d{1,3})?/g) ?? [];
+  if (parts.length !== 2) return [];
+  const prices = parts.map((p) => parseRiyals(p));
+  if (prices.some((p) => p === null || p <= 0)) return [];
+  const [hi, lo] = (prices as number[]).sort((a, b) => b - a);
+  return hi % lo === 0 && hi / lo >= 2 ? [hi, lo] : [];
+}
+
+/** كم حبّةً بسعر `price` يساويها المجموع — صافياً أو شاملاً الضريبة — بهللتين؟ `null` إن لم يكن عدداً صحيحاً. */
+function wholeUnits(totalMinor: number, priceMinor: number, grossOnly = false): number | null {
+  if (priceMinor <= 0 || totalMinor <= 0) return null;
+  const net = Math.round(totalMinor / priceMinor);
+  if (!grossOnly && net >= 1 && Math.abs(net * priceMinor - totalMinor) <= 2) return net;
+  /* ‎|n×السعر×(١٠٠+الضريبة) − المجموع×١٠٠| ≤ ٢٠٠ — بلا عددٍ عشريّ */
+  const grossFactor = 100 + VAT_PERCENT;
+  const gross = Math.round((totalMinor * 100) / (priceMinor * grossFactor));
+  if (gross >= 1 && Math.abs(gross * priceMinor * grossFactor - totalMinor * 100) <= 200) return gross;
+  return null;
+}
+
+/**
+ * الكمّيّةُ الحقيقيّة حين قُرئ عددُ حبّات الكرتون مكانها.
+ *
+ * فاتورةُ نادك تطبع للبند «حبّات الكرتون: 6» و«54.60 / 9.10» (الكرتون/الحبّة) والمجموعَ
+ * شاملاً الضريبة — فيقرأ النموذجُ الكمّيّةَ ٦ في كلّ فاتورة (٢٥ من ٢٥ حتّى ٢٦ نوفمبر ٢٠٢٦)
+ * وقد اشترينا ١٤ أو ١٥ حبّة، فيصير سعرُ الحبّة ٢١٫٢٣ ويُقال «ارتفع ١٣٣٪». والتوجيهُ في
+ * الموجِّه لم يكفِ. فإن لم يستقم الضربُ بالكمّيّة المقروءة، وكان المجموعُ عدداً صحيحاً من
+ * الحبّات بسعر حبّةٍ ثابتٍ بالدليل، فذاك العددُ هو الكمّيّة. وسعرُ الحبّة يثبت بأحد:
+ *
+ *   1. سعران في الخانة، الأكبرُ مضاعفٌ للأصغر («54.60 / 9.10») — الأصغرُ للحبّة.
+ *   2. المجموعُ أكبرُ من الكمّيّة × السعر بما لا تفسّره الضريبة — فالسعرُ للحبّة والكمّيّةُ خطأ.
+ *   3. السعرُ ÷ الكمّيّة عددٌ صحيح بالهللات (كرتونٌ ÷ حبّاته)، وهو السعرُ المعتاد للصنف عند
+ *      مورّده — أو بلا معتادٍ يُعرف: الضربُ يزيد المجموعَ ضعفاً ونصفاً فأكثر (لا خصمَ بهذا القدر؛
+ *      وخصمُ ١٠٪ على عشرةٍ بمئة لا يصير «٩٠ حبّة بعشرة»).
+ *   4. السعرُ هو المعتادُ للحبّة، والضربُ يزيد المجموعَ ضعفاً ونصفاً فأكثر، والمجموعُ حبّاتٌ
+ *      بضريبتها بالضبط («6 × 9.10 = 10.47») — لا خصمٌ يصادف ×١٫١٥.
+ *   5. لا سعرَ مقروءاً، والمجموعُ عددٌ صحيح بالسعر المعتاد للصنف.
+ *
+ * `usualMinor` السعرُ المعتاد للصنف عند مورّده (`usualPrices`) — `null` إن لم يُعرف.
+ */
+export function packQuantity(
+  quantity: number,
+  candidates: readonly number[],
+  totalMinor: number | null,
+  usualMinor: number | null,
+): { quantity: number; unitMinor: number } | null {
+  if (totalMinor === null || totalMinor <= 0) return null;
+  const tryPrice = (p: number, sameQtyOk = false, grossOnly = false) => {
+    const n = wholeUnits(totalMinor, p, grossOnly);
+    return n !== null && (sameQtyOk || n !== quantity) ? { quantity: n, unitMinor: p } : null;
+  };
+  /* الضربُ بالكمّيّة المقروءة يزيد المجموعَ ضعفاً ونصفاً فأكثر — لا خصمَ بهذا القدر */
+  const farAbove = (unit: number) => unit * quantity * 2 >= totalMinor * 3;
+  const isUsual = (p: number) => usualMinor !== null && Math.abs(p - usualMinor) * 100 <= usualMinor;
+  const fits = (unit: number) => {
+    const r = resolveLinePricing({ quantity, unitPriceMinor: unit, lineTotalMinor: totalMinor });
+    return r !== null && (r.basis === "CONSISTENT" || r.basis === "TOTAL_INCLUDES_VAT");
+  };
+
+  if (candidates.length === 2) {
+    if (candidates.some(fits)) return null;
+    return tryPrice(candidates[1]) ?? tryPrice(candidates[0]);
+  }
+  if (candidates.length === 1) {
+    const u = candidates[0];
+    if (fits(u)) return null;
+    const expected = u * quantity;
+    if (totalMinor * 100 > expected * (100 + VAT_PERCENT) + 100 * quantity) {
+      const r = tryPrice(u);
+      if (r) return r;
+    }
+    if (quantity >= 2 && u % quantity === 0) {
+      const piece = u / quantity;
+      const vouched = usualMinor !== null ? isUsual(piece) : farAbove(u);
+      if (vouched) {
+        const r = tryPrice(piece);
+        if (r) return r;
+      }
+    }
+    /*
+      سعرُ الحبّة المعتاد نفسُه والمجموعُ حبّاتٌ بضريبتها بالضبط: «6 × 9.10 = 10.47» حبّةٌ واحدة.
+      بالشامل وحده: «4 × 100 = 200» عند غاناش خصمُ نصفٍ حقيقيّ لا «حبّتان»، والخصمُ لا يقع على ×١٫١٥.
+    */
+    if (isUsual(u) && farAbove(u)) return tryPrice(u, false, true);
+    return null;
+  }
+  /* لا سعرَ مقروءاً: المعتادُ يُعطي الكمّيّة — أو يحسم أنّ المجموعَ شاملٌ الضريبة بالكمّيّة نفسها */
+  return usualMinor !== null ? tryPrice(usualMinor, true) : null;
+}
+
 /* ─────────────────── من القراءة إلى البنود ─────────────────── */
 
 export interface ReadLine {
@@ -232,19 +334,38 @@ export interface ReadLine {
  * بابٌ واحد يقرؤه القيدُ (`replaceLines`) وبطاقةُ المراجعة — فلا تقارن البطاقةُ سعرَ
  * القائمة أو السعرَ الشامل للضريبة بما قُيِّد صافياً بعد الخصم.
  */
-export function resolveReadLines(lines: readonly ReadLine[], subtotalMinor: number | null | undefined) {
+export function resolveReadLines(
+  lines: readonly ReadLine[],
+  subtotalMinor: number | null | undefined,
+  /** السعرُ المعتاد للصنف عند مورّده بوصفه كما قُرئ — لتصحيح كمّيّة الكرتون (`packQuantity`) */
+  usualOf: (description: string) => number | null = () => null,
+) {
   const resolved: (LinePricing & { description: string; quantity: number; qtyText: string | null })[] = [];
   for (const l of lines) {
     const description = l.description?.trim();
     if (!description) continue;
-    const qtyText = parseLineQuantity(l.quantity);
-    const quantity = qtyText === null ? 1 : Number(qtyText);
+    let qtyText = parseLineQuantity(l.quantity);
+    let quantity = qtyText === null ? 1 : Number(qtyText);
+    const candidates = unitPriceCandidates(l.unitPrice);
+    const lineTotalMinor = parseRiyals(l.lineTotal ?? "");
+    /* سعران في الخانة: ما يستقيم ضربُه بالكمّيّة المقروءة هو سعرُ الوحدة */
+    let unitPriceMinor = candidates.length === 1 ? candidates[0]
+      : candidates.find((c) => {
+        const b = resolveLinePricing({ quantity, unitPriceMinor: c, lineTotalMinor })?.basis;
+        return b === "CONSISTENT" || b === "TOTAL_INCLUDES_VAT";
+      }) ?? null;
+    /* الكرتونُ مكانَ الحبّة: الكمّيّةُ من المجموع ÷ سعر الحبّة، والسببُ يُحفظ */
+    const pack = qtyText === null ? null : packQuantity(quantity, candidates, lineTotalMinor, usualOf(description));
+    if (pack) {
+      quantity = pack.quantity;
+      qtyText = String(pack.quantity);
+      unitPriceMinor = pack.unitMinor;
+    }
     // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد كل متوسط بعده
-    const priced = resolveLinePricing({
-      quantity,
-      unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
-      lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
-    });
+    const resolvedLine = resolveLinePricing({ quantity, unitPriceMinor, lineTotalMinor });
+    const priced = resolvedLine && pack && pack.quantity !== Number(parseLineQuantity(l.quantity))
+      ? { ...resolvedLine, basis: "PACK_QTY" as const }
+      : resolvedLine;
     if (!priced) continue;
     /* بلا كمّيّةٍ لا يُعرف أيّ الرقمين سعرُ الوحدة — فلا يدخل تتبّعَ الأسعار */
     const pricing = qtyText === null ? { ...priced, basis: "QTY_UNREAD" as const } : priced;
