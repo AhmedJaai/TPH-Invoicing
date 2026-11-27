@@ -292,7 +292,8 @@ export interface PayslipInput {
   weeksMinor: readonly number[];
   policy: LatePolicy;
   adjustments: readonly { kind: PayrollAdjustmentKind; amountMinor: number }[];
-  attendance: readonly { kind: AttendanceKind; minutes: number | null; leaveType?: LeaveType | null }[];
+  /** `waivedAt`: أُعفي منه كلُّه (120) — يبقى في السجلّ ولا يُحسم منه شيء. */
+  attendance: readonly { kind: AttendanceKind; minutes: number | null; leaveType?: LeaveType | null; waivedAt?: Date | null }[];
   /** جزاءاتُ لائحة تنظيم العمل بعد حدودها (`saudi-rules.ts` · `monthViolations`). */
   penalties?: { chargedMinor: number; droppedMinor: number; warnings: number };
   /** ما رُبط من حوالات بغرض «راتب» أو «سلفة على الراتب» لهذا الشهر. */
@@ -351,13 +352,15 @@ export function payslip(input: PayslipInput): Payslip {
   const advancesMinor = pick((k) => k === "ADVANCE");
   const paidOutsideMinor = pick((k) => k === "PAID_OUTSIDE");
   const paidMinor = input.paidMinor + paidOutsideMinor;
+  /* المُعفى منه كلُّه لا يُحسم (120) */
+  const att = input.attendance.filter((a) => !a.waivedAt);
   /* السماحُ عتبة: ما دونه لا يُحسب أصلاً، وما فوقه يُحسب كلُّه (اللائحةُ تعدّ التأخير من أوّل دقيقة) */
-  const lateMinutes = sumOf(input.attendance.filter((a) => a.kind === "LATE" && (a.minutes ?? 0) > input.policy.graceMinutes).map((a) => a.minutes ?? 0));
-  const earlyMinutes = sumOf(input.attendance.filter((a) => a.kind === "EARLY").map((a) => a.minutes ?? 0));
-  const absentDays = input.attendance.filter((a) => a.kind === "ABSENT").length;
-  const leaveDays = input.attendance.filter((a) => a.kind === "LEAVE").length;
+  const lateMinutes = sumOf(att.filter((a) => a.kind === "LATE" && (a.minutes ?? 0) > input.policy.graceMinutes).map((a) => a.minutes ?? 0));
+  const earlyMinutes = sumOf(att.filter((a) => a.kind === "EARLY").map((a) => a.minutes ?? 0));
+  const absentDays = att.filter((a) => a.kind === "ABSENT").length;
+  const leaveDays = att.filter((a) => a.kind === "LEAVE").length;
   /* الإجازةُ بلا أجر يُخصم أجرُ يومها كالغياب، ولا جزاءَ عليها (109) */
-  const unpaidLeaveDays = input.attendance.filter((a) => a.kind === "LEAVE" && a.leaveType === "UNPAID").length;
+  const unpaidLeaveDays = att.filter((a) => a.kind === "LEAVE" && a.leaveType === "UNPAID").length;
   /* أجرُ الوقت الذي لم يُعمل يُقاس على راتب الشهر كاملاً — والجزئيُّ يُدفع بساعاته فلا يُحسم عليه */
   const rate = monthly ? input.salaryMinor : 0;
   const lateMinor = !monthly || lateMinutes + earlyMinutes === 0 ? 0

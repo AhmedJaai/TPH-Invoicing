@@ -160,6 +160,7 @@
 | `115_opening_never_stocked.sql` | يقبل مصدرَ الافتتاحيّ `NEVER_STOCKED` (صفرٌ بدليل: لم يدخل الصنفَ شيءٌ قبل الفترة) في `inventory_count_lines` — إضافةٌ لا تمسّ مالاً |
 | `118_forecast_periods.sql` | التوقّع بالأشهر: مجموعُ المتوقَّع لكلّ شهرٍ من يومه الأوّل المتوقَّع إلى آخره (p10 · p50 · p90 صحيحة)، ووسومُه وما فيه بلا مثالٍ سابق — جدولٌ منعزل كبقيّة `forecast_*` |
 | `119_payroll_overtime_days.sql` | العملُ الإضافيّ المُقرّ من تسجيل الحضور: `work_day` · `minutes` على `payroll_adjustments` (لـ`OVERTIME` وحده)، وفهرسٌ فريد على الموظّف واليوم لما لم يُسحب — اليومُ لا يُحسب مرّتين |
+| `120_payroll_attendance_waiver.sql` | الإعفاءُ الكامل من خصم يوم: `waived_at` · `waived_by_id` · `waived_wage_minor` · `waived_penalty_minor` (ما كان سيُحسم) · `waived_prev_penalty` على `payroll_attendance` — البندُ قائمٌ ولا يُحسم |
 | `117_forecast.sql` | جداولُ التوقّع المنعزلة: التشغيلُ ونقاطُه (p10 · p50 · p90 هللاتٍ ومِلّي صحيحة، باليوم والساعة)، وسياقُ كلّ يوم، والاختبارُ الرجوعيّ، وأحداثٌ يسجّلها أحمد — لا يقرؤها حسابُ مال |
 | `116_declaration_days.sql` | يضيف `from_day` و`to_day` إلى `finance_declarations`: توزيعٌ بالأيّام لدفعةٍ تغطّي من يومٍ إلى يوم، وقيدٌ يقصره على `SPREAD` ويطابق شهرَيه — إضافةٌ فارغة لما قبلها |
 | `104_count_parts.sql` | `inventory_count_lines.count_parts` — العدُّ بخاناته (كرتون · حبّة · كيلو · جرام) كما كُتب، بجانب مجموعه — إضافةٌ خالصة |

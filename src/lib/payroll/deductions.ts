@@ -38,6 +38,10 @@ export interface DeductionAttendance {
   note: string | null;
   /** للإجازة: بلا أجرٍ يُخصم أجرُ يومها كالغياب (109). */
   leaveType?: LeaveType | null;
+  /** إعفاءٌ كامل (120): لا يُحسم منه شيء، وما كان سيُحسم محفوظ. */
+  waivedAt?: Date | null;
+  waivedWageMinor?: number | null;
+  waivedPenaltyMinor?: number | null;
 }
 
 export interface DeductionPenalty {
@@ -74,12 +78,12 @@ export function deductionItems(input: {
   violations: readonly AssessedViolation[];
 }): DeductionItem[] {
   const monthly = input.kind === "MONTHLY";
-  const counted = (a: DeductionAttendance) =>
-    (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) || (a.kind === "EARLY" && a.minutes !== null);
+  const counted = (a: DeductionAttendance) => !a.waivedAt && (
+    (a.kind === "LATE" && a.minutes !== null && countsAsLate(a.minutes, input.graceMinutes)) || (a.kind === "EARLY" && a.minutes !== null));
   /* بترتيب الأيّام — والمجموعُ لا يتغيّر بالترتيب */
   const timed = input.attendance.filter(counted);
   /* الغيابُ والإجازةُ بلا أجر: أجرُ اليوم — والمجموعُ يساوي القسيمة (`payslip` يجمعهما كذلك) */
-  const absent = input.attendance.filter((a) => a.kind === "ABSENT" || (a.kind === "LEAVE" && a.leaveType === "UNPAID"));
+  const absent = input.attendance.filter((a) => !a.waivedAt && (a.kind === "ABSENT" || (a.kind === "LEAVE" && a.leaveType === "UNPAID")));
   const rate = input.rateMinor;
   const timeShares = rate === null ? null : splitShares(timed.map((a) => a.minutes ?? 0), (n) => (n === 0 ? 0 : divRound(rate * n, DAYS_PER_MONTH * input.shiftMinutes)));
   const dayShares = rate === null ? null : splitShares(absent.map(() => 1), (n) => (n === 0 ? 0 : divRound(rate * n, DAYS_PER_MONTH)));

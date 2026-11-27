@@ -191,6 +191,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PAYROLL_SLIP_PUBLISHED: "نشر قسائم الراتب للموظفين",
   PAYROLL_OVERTIME_APPROVED: "إقرار عمل إضافي من تسجيل الحضور",
   PAYROLL_OVERTIME_DISMISSED: "يوم عمل إضافي: ليس عملاً إضافياً أو أُعيد",
+  PAYROLL_LATES_WAIVED: "إعفاء جماعي من تأخيرات الشهر",
+  PAYROLL_LATES_UNWAIVED: "سحب الإعفاء الجماعي من تأخيرات الشهر",
   PAYROLL_WEEK_SET: "تسجيل أسبوع موظف جزئي",
   PAYROLL_WEEK_CLEARED: "مسح أسبوع موظف جزئي",
   PAYROLL_LINKED: "ربط حوالة بموظف",

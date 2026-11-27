@@ -75,14 +75,15 @@ function Line({ item: i, canEdit, salaryKnown }: { item: DeductionRow; canEdit: 
           </p>
         </div>
         <div className="shrink-0 text-end text-sm">
-          {i.kind === "LEAVE" && i.leaveType !== "UNPAID" ? <span className="text-xs text-muted">لا يُخصم</span>
+          {i.waivedAt ? <span className="text-xs font-bold text-ok">أُعفي — كان <Money minor={(i.waivedWageMinor ?? 0) + (i.waivedPenaltyMinor ?? 0)} /></span>
+            : i.kind === "LEAVE" && i.leaveType !== "UNPAID" ? <span className="text-xs text-muted">لا يُخصم</span>
             : i.withinGrace ? <span className="text-xs text-muted">في حدود السماح، لا يُخصم</span>
             : total === null ? <span className="text-xs text-muted">{salaryKnown ? "غير معروف" : "الراتب غير مكتوب"}</span>
             : <span className="font-bold"><span className="text-muted">− </span><Money minor={total} /></span>}
         </div>
       </div>
 
-      {!i.withinGrace && i.kind !== "LEAVE" && (i.wageMinor !== null || i.penalty) && (
+      {!i.waivedAt && !i.withinGrace && i.kind !== "LEAVE" && (i.wageMinor !== null || i.penalty) && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
           {i.wageMinor !== null && i.wageMinor > 0 && <>أجر {byMinutes ? "الدقائق" : "اليوم"} <span className="nums"><Money minor={i.wageMinor} /></span></>}
           {i.penalty && (
@@ -98,7 +99,7 @@ function Line({ item: i, canEdit, salaryKnown }: { item: DeductionRow; canEdit: 
         </p>
       )}
 
-      {canEdit && (
+      {canEdit && !i.waivedAt && (
         editing ? (
           <form className="mt-2 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); void saveMinutes(); }}>
             <label className="text-xs font-bold text-ink-soft" htmlFor={`m-${i.id}`}>الدقائق الصحيحة</label>

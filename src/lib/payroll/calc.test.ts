@@ -104,6 +104,13 @@ describe("payslip — كم لازم أحوّل", () => {
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-09")).toEqual({ worked: 10, of: 30 });
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-10")).toBeNull();
   });
+  it("الإعفاءُ الكامل (120): التأخيرُ يبقى ولا يُحسم منه شيء", () => {
+    const waived = payslip({ ...base, attendance: [{ kind: "LATE", minutes: 60, waivedAt: new Date() }, { kind: "LATE", minutes: 30 }] });
+    const only30 = payslip({ ...base, attendance: [{ kind: "LATE", minutes: 30 }] });
+    expect(waived.lateMinutes).toBe(30);
+    expect(waived.lateMinor).toBe(only30.lateMinor);
+    expect(payslip({ ...base, attendance: [{ kind: "ABSENT", minutes: null, waivedAt: new Date() }] }).absenceMinor).toBe(0);
+  });
   it("آخرُ راتبٍ بدورة الصرف: الوليد خرج ٣ نوفمبر ← من ٢٨ أكتوبر إلى ٢ نوفمبر، ٧٠٠ من ٣٬٥٠٠", () => {
     const days = workedDays({ hiredOn: "2026-05-01", leftOn: "2026-11-03" }, "2026-11");
     expect(days).toEqual({ worked: 6, of: 30, range: { from: "2026-10-28", to: "2026-11-02" } });

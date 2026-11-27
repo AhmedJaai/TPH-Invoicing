@@ -117,5 +117,6 @@
   "116_declaration_days.sql": "77a7eb06bda92364824a26bf7b0327500df3300f12d4e91ff8806cfbfa408ed0",
   "117_forecast.sql": "101ccd7078832bc5e5bd66332b45f4600d12feaa02c5ff6ab643f8525e526456",
   "118_forecast_periods.sql": "eab8fc2f957d3e5e3fc697143c07ce7417484fe6151a0e3b93051d4767046176",
-  "119_payroll_overtime_days.sql": "af472e1ec831b2af7b38a6399cedaecff313af17e8078d74d691fba3f33a7a80"
+  "119_payroll_overtime_days.sql": "af472e1ec831b2af7b38a6399cedaecff313af17e8078d74d691fba3f33a7a80",
+  "120_payroll_attendance_waiver.sql": "b851a6653b0c21537c8753c3405e41e99aa74adfe309affdd987874293464a51"
 }

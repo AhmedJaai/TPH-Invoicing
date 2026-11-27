@@ -105,6 +105,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     return m.set(l.txId, g);
   }, new Map<string, { txId: string; day: string; viaOwner: boolean; payee: string | null; txAmountMinor: number; freeMinor: number; parts: typeof allLinks }>()).values()].sort((a, b) => a.day.localeCompare(b.day));
 
+  /* تأخيرٌ يُخصم في فترة الشهر، وما أُعفي منه جماعيّاً (120) */
+  const latesOpen = sheet.rows.reduce((n, r) => n + r.attendance.filter((a) => a.kind === "LATE" && !a.waivedAt && (a.minutes ?? 0) > r.employee.lateGraceMinutes).length, 0);
+  const latesWaived = sheet.rows.reduce((n, r) => n + r.attendance.filter((a) => a.kind === "LATE" && a.waivedAt).length, 0);
+
   const columns: Column<PayrollRow>[] = [
     {
       key: "name", header: "الموظف", primary: true,
@@ -163,6 +167,17 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       intro={`كم يستحق كل موظف عن ${formatMonth(month)} بعد الخصومات والسلف، وكم حوّلت له، وكم بقي. الراتب يُصرف يوم ${PAYDAY}، والخصومات عمّا وقع من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}
       actions={
         <>
+          {canEdit && latesOpen > 0 && (
+            <PostAction url="/api/payroll/entry" body={{ action: "lates-waive", month }} variant="secondary" done="أُعفي الجميع"
+              undo={{ body: { action: "lates-unwaive", month } }}>
+              اعفُ الجميع من تأخيرات الشهر ({latesOpen})
+            </PostAction>
+          )}
+          {canEdit && latesWaived > 0 && latesOpen === 0 && (
+            <PostAction url="/api/payroll/entry" body={{ action: "lates-unwaive", month }} variant="quiet" done="سُحب الإعفاء">
+              اسحب الإعفاء عن التأخيرات ({latesWaived})
+            </PostAction>
+          )}
           <DownloadButton href={`/api/payroll/export?month=${month}`} fallbackName={`payroll-${month}.csv`} variant="quiet" size="sm">تنزيل المسيّر</DownloadButton>
           <LinkButton href="/payroll/employees" variant="secondary" size="sm" icon={Users}>الموظفون</LinkButton>
         </>

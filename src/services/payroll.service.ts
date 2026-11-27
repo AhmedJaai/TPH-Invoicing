@@ -14,7 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  alertResolutions, appSettings, attendanceCheckins, employeeRates, employeeShiftPlans, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
+  alertResolutions, appSettings, attendanceCheckins, auditLogs, employeeRates, employeeShiftPlans, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
   type AttendanceKind, type CheckinVerdict, type LeaveType, type PayrollAdjustmentKind, type PayrollLinkPurpose,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -28,6 +28,7 @@ import {
 } from "@/lib/payroll/attendance";
 import { addDays, formatDay, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
+import { deductionItems } from "@/lib/payroll/deductions";
 import {
   damageCapMinor, isViolationCode, loanCapMinor, monthViolations, REPEAT_WINDOW_DAYS, type AssessedViolation,
 } from "@/lib/payroll/saudi-rules";
@@ -166,7 +167,8 @@ export interface PayrollRow {
   slip: Payslip;
   /** `workDay`: يومُ العمل الإضافيّ المُقرّ من التسجيل (119). */
   adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date; workDay: string | null; minutes: number | null }[];
-  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean; leaveType: LeaveType | null }[];
+  attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean; leaveType: LeaveType | null;
+    waivedAt: Date | null; waivedWageMinor: number | null; waivedPenaltyMinor: number | null }[];
   /** مخالفاتُ الشهر بجزائها من جدول اللائحة — من الحضور ومن المسجَّل بيده. */
   violations: (AssessedViolation & { source: "ATTENDANCE" | "MANUAL" })[];
   /** غيابٌ فوق عشرة أيّامٍ متّصلة — المادّة ٨٠، قرارٌ لا مبلغ. */
@@ -261,7 +263,8 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
           paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((sum, l) => sum + l.amountMinor, 0),
         }),
         adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt, workDay: a.workDay, minutes: a.minutes })),
-        attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived, leaveType: a.leaveType })),
+        attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived, leaveType: a.leaveType,
+          waivedAt: a.waivedAt, waivedWageMinor: a.waivedWageMinor, waivedPenaltyMinor: a.waivedPenaltyMinor })),
         violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
         article80: regs?.article80 ?? [],
         weeks: myWeeks.map((w) => ({ id: w.id, weekStart: w.weekStart, minutes: w.minutes, amountMinor: w.amountMinor, note: w.note })),
@@ -694,6 +697,98 @@ export async function dismissOvertime(input: { employeeId: string; day: string; 
     }
     await recordAudit({ actorId, action: "PAYROLL_OVERTIME_DISMISSED", entityType: "employee", entityId: input.employeeId, before: null, after: { day: input.day, dismissed: input.dismissed } }, t);
   });
+}
+
+/* ─────────────── الإعفاءُ الجماعيّ من التأخير (120) ─────────────── */
+
+/**
+ * يُعفي كلَّ الموظّفين من كلّ تأخيرٍ في فترة خصم الشهر (أحمد، ٢٧ نوفمبر ٢٠٢٦): البندُ يبقى ولا يُحسم
+ * منه أجرُ وقتٍ ولا جزاء، ويُحفظ ما كان سيُحسم لحظتَها (من المسيّر نفسه، `deductionItems`) ليُكتب في
+ * القسيمة. والجزاءُ المعفى لا يُعدّ في التكرار. ما في حدود السماح لم يكن خصماً فلا يُمسّ، وما أُعفي قبلُ لا يُعاد.
+ */
+export async function waiveMonthLates(month: string, actorId: string): Promise<{ rows: number; employees: number; wageMinor: number; penaltyMinor: number }> {
+  return db.transaction(async (t) => {
+    const sheet = await loadPayrollMonth(month, t);
+    const now = new Date();
+    let rows = 0, wageMinor = 0, penaltyMinor = 0;
+    const touched = new Set<string>();
+    for (const r of sheet.rows) {
+      if (r.employee.kind !== "MONTHLY") continue;
+      const items = deductionItems({ kind: r.employee.kind, rateMinor: r.rateMinor, shiftMinutes: r.shiftMinutes, graceMinutes: r.employee.lateGraceMinutes, attendance: r.attendance, violations: r.violations });
+      for (const i of items) {
+        if (i.kind !== "LATE" || i.withinGrace || i.waivedAt) continue;
+        const wage = i.wageMinor ?? 0;
+        const pen = i.penalty && !i.penalty.waived && i.penalty.amountMinor !== null ? i.penalty.amountMinor : 0;
+        await t.update(payrollAttendance).set({ waivedAt: now, waivedById: actorId, waivedWageMinor: wage, waivedPenaltyMinor: pen, waivedPrevPenalty: i.penaltyWaived, penaltyWaived: true })
+          .where(and(eq(payrollAttendance.id, i.id), isNull(payrollAttendance.voidedAt), isNull(payrollAttendance.waivedAt)));
+        rows++; wageMinor += wage; penaltyMinor += pen; touched.add(r.employee.id);
+      }
+    }
+    await recordAudit({ actorId, action: "PAYROLL_LATES_WAIVED", entityType: "payroll_month", entityId: month, before: null, after: { month, rows, employees: touched.size, wageMinor, penaltyMinor } }, t);
+    return { rows, employees: touched.size, wageMinor, penaltyMinor };
+  });
+}
+
+/** سحبُ الإعفاء الجماعيّ: يعود كلُّ تأخيرٍ أُعفي في فترة الشهر كما كان، والعفوُ عن جزائه كما كان قبله. */
+export async function unwaiveMonthLates(month: string, actorId: string): Promise<number> {
+  return db.transaction(async (t) => {
+    const period = deductionPeriod(month);
+    const done = await t.update(payrollAttendance)
+      .set({ waivedAt: null, waivedById: null, waivedWageMinor: null, waivedPenaltyMinor: null, penaltyWaived: sql`coalesce(${payrollAttendance}.waived_prev_penalty, false)`, waivedPrevPenalty: null })
+      .where(and(gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to), eq(payrollAttendance.kind, "LATE"), sql`${payrollAttendance}.waived_at is not null`))
+      .returning({ id: payrollAttendance.id });
+    await recordAudit({ actorId, action: "PAYROLL_LATES_UNWAIVED", entityType: "payroll_month", entityId: month, before: null, after: { month, rows: done.length } }, t);
+    return done.length;
+  });
+}
+
+/* ─────────────── ما أُلغي من الخصم — للقسيمة ─────────────── */
+
+export interface CancelledDeduction {
+  day: string | null;
+  /** «تأخر ٤٠ دقيقة» · «غياب» · «خصم بموافقته الخطية ١٠٠» · بندُ مخالفة. */
+  what: string;
+  kind: "ATTENDANCE" | "VIOLATION" | "ADJUSTMENT";
+  /** لبنود الحضور: نوعُها ودقائقُها — لسجلّ الحضور في القسيمة. */
+  attKind?: AttendanceKind;
+  minutes?: number | null;
+}
+
+/**
+ * خصومٌ ألغاها المالك في الشهر (أحمد، ٢٧ نوفمبر ٢٠٢٦: «أيّ خصمٍ ألغيته يُكتب في القسيمة أنّه كان
+ * ثمّ أُلغي، ليعرف الموظّف»): يومُ تأخيرٍ أو انصرافٍ أو غيابٍ أُلغي بـ«ألغِ الخصم» (سجلُّ التدقيق يميّزه
+ * عمّا استبدله النظامُ أو تعديلُ الدقائق) ولم يحلّ محلَّه بندٌ من نوعه، ومخالفةٌ سُحبت، وخصمٌ يدويٌّ سُحب.
+ */
+export async function loadCancelledDeductions(employeeId: string, month: string, graceMinutes: number, conn: Conn = db): Promise<CancelledDeduction[]> {
+  const period = deductionPeriod(month);
+  const [att, active, viol, adj] = await Promise.all([
+    conn.select({ id: payrollAttendance.id, day: payrollAttendance.day, kind: payrollAttendance.kind, minutes: payrollAttendance.minutes }).from(payrollAttendance)
+      .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to),
+        inArray(payrollAttendance.kind, ["LATE", "EARLY", "ABSENT"]), sql`${payrollAttendance}.voided_at is not null`,
+        sql`exists (select 1 from ${auditLogs} where ${auditLogs}.action = 'PAYROLL_ATTENDANCE_CLEARED' and ${auditLogs}.entity_id = ${payrollAttendance}.id)`)),
+    conn.select({ day: payrollAttendance.day, kind: payrollAttendance.kind }).from(payrollAttendance)
+      .where(and(eq(payrollAttendance.employeeId, employeeId), gte(payrollAttendance.day, period.from), lte(payrollAttendance.day, period.to), isNull(payrollAttendance.voidedAt))),
+    conn.select({ day: payrollViolations.day, code: payrollViolations.code, note: payrollViolations.note }).from(payrollViolations)
+      .where(and(eq(payrollViolations.employeeId, employeeId), gte(payrollViolations.day, period.from), lte(payrollViolations.day, period.to), sql`${payrollViolations}.voided_at is not null`)),
+    conn.select({ kind: payrollAdjustments.kind, amountMinor: payrollAdjustments.amountMinor, note: payrollAdjustments.note }).from(payrollAdjustments)
+      .where(and(eq(payrollAdjustments.employeeId, employeeId), eq(payrollAdjustments.month, month), inArray(payrollAdjustments.kind, ["DEDUCTION", "FINE", "LOAN_REPAYMENT"]), sql`${payrollAdjustments}.voided_at is not null`)),
+  ]);
+  /* بقي لليوم بندٌ من نوعه (عُدّلت دقائقه) أو غيابٌ أو إجازةٌ تنفيه: ليس إلغاءً */
+  const live = new Set(active.map((a) => `${a.day}:${a.kind}`));
+  const replaced = (day: string, kind: AttendanceKind) => live.has(`${day}:${kind}`) || live.has(`${day}:ABSENT`) || live.has(`${day}:LEAVE`);
+  const seen = new Set<string>();
+  const out: CancelledDeduction[] = [];
+  for (const a of [...att].sort((x, y) => x.day.localeCompare(y.day))) {
+    const key = `${a.day}:${a.kind}`;
+    if (seen.has(key) || replaced(a.day, a.kind)) continue;
+    /* تأخيرٌ في حدود السماح لم يكن خصماً */
+    if (a.kind === "LATE" && (a.minutes ?? 0) <= graceMinutes) continue;
+    seen.add(key);
+    out.push({ day: a.day, kind: "ATTENDANCE", attKind: a.kind, minutes: a.minutes, what: a.kind === "LATE" ? `تأخر ${countNoun(a.minutes ?? 0, MINUTE)}` : a.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(a.minutes ?? 0, MINUTE)}` : "غياب" });
+  }
+  for (const v of viol) out.push({ day: v.day, kind: "VIOLATION", what: `مخالفة البند ${v.code}${v.note ? ` (${v.note})` : ""}` });
+  for (const a of adj) out.push({ day: null, kind: "ADJUSTMENT", what: `${a.kind === "DEDUCTION" ? "خصم بموافقته الخطية" : a.kind === "FINE" ? "تعويض ضرر أو مخالفة بلدية" : "قسط سلفة"} ${formatRiyalsDisplay(a.amountMinor)}${a.note ? ` (${a.note})` : ""}` });
+  return out.sort((x, y) => (x.day ?? "9999").localeCompare(y.day ?? "9999"));
 }
 
 const MINUTE_KINDS: ReadonlySet<AttendanceKind> = new Set(["LATE", "EARLY"]);

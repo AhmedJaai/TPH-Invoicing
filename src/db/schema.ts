@@ -2679,6 +2679,12 @@ export const payrollAttendance = pgTable("payroll_attendance", {
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
   voidedAt: timestamp("voided_at", { withTimezone: true }),
+  /** إعفاءٌ كامل (120): البندُ قائمٌ ولا يُحسم منه شيء، وما كان سيُحسم محفوظٌ ليُقال. */
+  waivedAt: timestamp("waived_at", { withTimezone: true }),
+  waivedById: text("waived_by_id").references(() => users.id),
+  waivedWageMinor: integer("waived_wage_minor"),
+  waivedPenaltyMinor: integer("waived_penalty_minor"),
+  waivedPrevPenalty: boolean("waived_prev_penalty"),
 });
 
 export const payrollWeeks = pgTable("payroll_weeks", {

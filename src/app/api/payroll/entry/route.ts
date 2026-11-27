@@ -14,7 +14,7 @@ import { formatMonth } from "@/lib/riyadh-time";
 import { deductionMonthOf } from "@/lib/payroll/period";
 import { failWith, guard } from "@/services/guard";
 import {
-  addAdjustment, addViolation, approveOvertime, dismissOvertime, clearAttendance, clearLeave, clearWeek, LEAVE_TYPE_LABEL, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
+  addAdjustment, addViolation, approveOvertime, dismissOvertime, unwaiveMonthLates, waiveMonthLates, clearAttendance, clearLeave, clearWeek, LEAVE_TYPE_LABEL, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -36,6 +36,9 @@ const Body = z.discriminatedUnion("action", [
   /* العملُ الإضافيّ من التسجيل: يومٌ أو أيّام، أو «كلّها» (`days` فارغ) — المبلغُ يحسبه الخادم */
   z.object({ action: z.literal("overtime-approve"), employeeId: Id, month: Month, days: z.array(Day).min(1).max(40).nullable() }).strict(),
   z.object({ action: z.literal("overtime-dismiss"), employeeId: Id, day: Day, dismissed: z.boolean() }).strict(),
+  /* إعفاءٌ جماعيّ من تأخيرات فترة الشهر لكلّ الموظّفين، وسحبُه */
+  z.object({ action: z.literal("lates-waive"), month: Month }).strict(),
+  z.object({ action: z.literal("lates-unwaive"), month: Month }).strict(),
 ]);
 
 export async function POST(request: Request) {
@@ -55,6 +58,14 @@ export async function POST(request: Request) {
       case "overtime-approve": {
         const n = await approveOvertime({ employeeId: b.employeeId, month: b.month, days: b.days }, user.id);
         return NextResponse.json({ ok: true, message: n === 0 ? "أُقرّ من قبل" : `أُقرّ عمل إضافي ${countNoun(n, DAY)}، وزاد المستحق` });
+      }
+      case "lates-waive": {
+        const r = await waiveMonthLates(b.month, user.id);
+        return NextResponse.json({ ok: true, message: r.rows === 0 ? "لا تأخير يُخصم في هذا الشهر" : `أُعفي ${r.employees} موظفين من ${r.rows} تأخيراً — كان سيُخصم ${formatRiyalsDisplay(r.wageMinor + r.penaltyMinor)} قبل حد الجزاءات` });
+      }
+      case "lates-unwaive": {
+        const n = await unwaiveMonthLates(b.month, user.id);
+        return NextResponse.json({ ok: true, message: n === 0 ? "لا إعفاء يُسحب" : `سُحب الإعفاء عن ${n} تأخيراً، وعاد خصمها` });
       }
       case "overtime-dismiss": {
         await dismissOvertime({ employeeId: b.employeeId, day: b.day, dismissed: b.dismissed }, user.id);

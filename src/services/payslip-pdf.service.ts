@@ -7,14 +7,14 @@
  */
 import { DAY, MINUTE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { ADJUSTMENT_LABEL } from "@/lib/payroll/calc";
+import { ADJUSTMENT_LABEL, divRound } from "@/lib/payroll/calc";
 import { clock12, dayShiftRange, riyadhClock, shiftOn, WEEKDAY_LABEL } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { deductionPeriod } from "@/lib/payroll/period";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { payslipPdf, type SlipLine, type SlipPdfInput, type SlipTone } from "@/lib/payroll/payslip-pdf";
 import { addDays, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
-import { loadCheckins, loadOvertime, loadPayrollMonth, LEAVE_TYPE_LABEL, PayrollRefused, type PayrollRow } from "./payroll.service";
+import { loadCancelledDeductions, loadCheckins, loadOvertime, loadPayrollMonth, LEAVE_TYPE_LABEL, PayrollRefused, type PayrollRow } from "./payroll.service";
 
 const money = (minor: number | null) => (minor === null ? "غير معروف" : formatRiyalsDisplay(minor));
 const plus = (minor: number) => `+ ${formatRiyalsDisplay(minor)}`;
@@ -35,6 +35,7 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
   ]);
   const row = sheet.rows.find((r) => r.employee.id === employeeId);
   if (!row) throw new PayrollRefused(`لم يكن يعمل في ${formatMonth(month)}.`);
+  const cancelledList = await loadCancelledDeductions(employeeId, month, row.employee.lateGraceMinutes);
   const e = row.employee;
   const s = row.slip;
   const monthly = e.kind === "MONTHLY";
@@ -67,7 +68,7 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
   let itemized = 0;
   for (const i of items) {
     if (i.kind === "LEAVE" && i.leaveType !== "UNPAID") continue;
-    if (i.withinGrace) continue;
+    if (i.withinGrace || i.waivedAt) continue;
     const what = i.kind === "LATE" ? `تأخر ${countNoun(i.minutes ?? 0, MINUTE)}`
       : i.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(i.minutes ?? 0, MINUTE)}`
       : i.kind === "ABSENT" ? "غياب" : "إجازة بلا أجر";
@@ -118,6 +119,27 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
     throw new SlipMismatch(`سطور الخصم (${formatRiyalsDisplay(itemized)}) تخالف القسيمة (${formatRiyalsDisplay(s.deductionsMinor)}). لم يُعدّ الملف.`);
   }
 
+  /* ── ما أُعفي منه: كم كان سيُخصم (أجرُ الوقت + الجزاء، محفوظان لحظةَ الإعفاء) ولم يُخصم ── */
+  const waivedRows = row.attendance.filter((a) => a.waivedAt).sort((x, y) => x.day.localeCompare(y.day));
+  const waived: SlipLine[] = waivedRows.map((a) => {
+    const wage = a.waivedWageMinor ?? 0, pen = a.waivedPenaltyMinor ?? 0;
+    const what = a.kind === "LATE" ? `تأخر ${countNoun(a.minutes ?? 0, MINUTE)}` : a.kind === "EARLY" ? `انصرف قبل الموعد بـ${countNoun(a.minutes ?? 0, MINUTE)}` : "غياب";
+    return {
+      label: `${shortDay(a.day)} · ${what}`,
+      detail: `كان سيُخصم ${formatRiyalsDisplay(wage + pen)}${pen > 0 ? ` (أجر الوقت ${formatRiyalsDisplay(wage)} + جزاء ${formatRiyalsDisplay(pen)})` : ""}`,
+      value: "أُعفي", tone: "plus" as const,
+    };
+  });
+  /* مجموعُ ما كان سيُخصم بحدّ الجزاءات في الشهر (أجرُ خمسة أيّام) — لا يُقال أكثرُ ممّا كان يجوز */
+  const waivedWage = waivedRows.reduce((n, a) => n + (a.waivedWageMinor ?? 0), 0);
+  const waivedPen = waivedRows.reduce((n, a) => n + (a.waivedPenaltyMinor ?? 0), 0);
+  const penCap = row.rateMinor !== null && monthly ? divRound(row.rateMinor, 30) * 5 : waivedPen;
+  const waivedTotal = waivedWage + Math.min(waivedPen, Math.max(0, penCap - s.penaltiesMinor));
+
+  /* ── ما أُلغي من الخصم: يُكتب ليعرف الموظّف أنّه كان ثمّ أُلغي، ولا مالَ فيه ── */
+  const cancelled: SlipLine[] = cancelledList.map((c) => ({ label: c.day ? `${shortDay(c.day)} · ${c.what}` : c.what, value: "أُلغي", tone: "muted" as const }));
+  /* وجزاءٌ عُفي عنه وبقي أجرُ وقته: يُقال في سطر يومه بين الخصومات */
+
   /* ── السلف نقداً — تُنقص الصافي. والحوالاتُ وما بقي له لا تُذكر في القسيمة (أحمد، ٢٧ نوفمبر ٢٠٢٦) ── */
   const advances: SlipLine[] = row.adjustments.filter((x) => x.kind === "ADVANCE")
     .map((a) => ({ label: ADJUSTMENT_LABEL.ADVANCE, detail: a.note ?? undefined, value: minus(a.amountMinor), tone: "minus" as const }));
@@ -125,6 +147,8 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
   /* ── سجلُّ الحضور يوماً بيوم ── */
   const mine = checkins.filter((c) => c.employeeId === employeeId && c.review !== "REJECTED");
   const end = period.to < today ? period.to : today;
+  const cancelledByDay = new Map<string, typeof cancelledList>();
+  for (const c of cancelledList) if (c.day && c.attKind) cancelledByDay.set(c.day, [...(cancelledByDay.get(c.day) ?? []), c]);
   const otByDay = new Map((overtime?.days ?? []).filter((d) => d.approvedId).map((d) => [d.day, d]));
   const attRows: { cells: string[]; muted?: boolean }[] = [];
   const firstTracked = mine.length > 0 ? mine.map((c) => c.day).sort()[0] : null;
@@ -136,19 +160,23 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
     const recs = row.attendance.filter((a) => a.day === day);
     const notes: string[] = [];
     for (const a of recs) {
-      if (a.kind === "LATE") notes.push(`تأخر ${a.minutes ?? 0} د${(a.minutes ?? 0) <= e.lateGraceMinutes ? " (في السماح)" : ""}`);
-      else if (a.kind === "EARLY") notes.push(`انصرف مبكراً ${a.minutes ?? 0} د`);
+      if (a.kind === "LATE") notes.push(`تأخر ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : (a.minutes ?? 0) <= e.lateGraceMinutes ? " (في السماح)" : ""}`);
+      else if (a.kind === "EARLY") notes.push(`مبكراً ${a.minutes ?? 0} د${a.waivedAt ? " (أُعفي)" : ""}`);
       else if (a.kind === "ABSENT") notes.push("غياب");
       else if (a.kind === "LEAVE") notes.push(LEAVE_TYPE_LABEL[a.leaveType ?? "ANNUAL"]);
+    }
+    /* ما ألغاه المالك يُكتب في يومه — كان تأخيرُ صالح ١٩ نوفمبر يختفي من السجلّ */
+    for (const c of cancelledByDay.get(day) ?? []) {
+      notes.push(c.attKind === "LATE" ? `تأخر ${c.minutes ?? 0} د (أُلغي)` : c.attKind === "EARLY" ? `مبكراً ${c.minutes ?? 0} د (أُلغي)` : "غياب (أُلغي)");
     }
     const ot = otByDay.get(day);
     if (ot) notes.push(`إضافي ${ot.minutes} د`);
     const off = shift?.off === true;
     /* قبل أن يبدأ التسجيلَ برابطه لا يُقال «لم يسجّل» — تبقى الخانةُ فارغة */
     const tracked = firstTracked !== null && day >= firstTracked;
-    if (off && ins.length === 0 && outs.length === 0 && recs.length === 0) { attRows.push({ cells: [shortDay(day), "راحة", "", "", ""], muted: true }); continue; }
+    if (off && ins.length === 0 && outs.length === 0 && recs.length === 0 && !cancelledByDay.has(day)) { attRows.push({ cells: [shortDay(day), "راحة", "", "", ""], muted: true }); continue; }
     /* «لا تسجيل» منذ بدأ يسجّل وحده — قبل رابطه لم يكن ما يُسجَّل */
-    if (!off && ins.length === 0 && outs.length === 0 && recs.length === 0 && firstTracked !== null && day >= firstTracked) notes.push("لا تسجيل");
+    if (!off && ins.length === 0 && outs.length === 0 && recs.length === 0 && !cancelledByDay.has(day) && firstTracked !== null && day >= firstTracked) notes.push("لا تسجيل");
     attRows.push({
       cells: [
         shortDay(day),
@@ -180,10 +208,12 @@ export async function buildSlipPdfInput(employeeId: string, month: string, today
       { title: "المستحقات", subtitle: hasOvertime && overtime?.hourMinor ? `العمل الإضافي بأجر الساعة ونصفه (نظام العمل، م 107): الساعة ${formatRiyalsDisplay(overtime.hourMinor)}` : undefined,
         total: s.baseMinor === null ? undefined : formatRiyalsDisplay(s.baseMinor + s.additionsMinor), lines: earnings },
       { title: "الخصومات", total: s.deductionsMinor ? minus(s.deductionsMinor) : undefined, lines: deductions },
+      { title: "تأخيرات أُعفي منها", subtitle: waived.length > 0 ? `إعفاء من الإدارة: لم يُخصم منها شيء، وكانت ستُخصم ${formatRiyalsDisplay(waivedTotal)}` : undefined, lines: waived },
+      { title: "خصومات أُلغيت", subtitle: cancelled.length > 0 ? "كانت ستُخصم وألغتها الإدارة، فلم يُحسم منها شيء" : undefined, lines: cancelled },
       { title: "السلف", total: s.advancesMinor ? minus(s.advancesMinor) : undefined, lines: advances },
     ],
     net: ["صافي الراتب", money(s.dueMinor)],
-    attendance: attRows.length > 0 ? { columns: ["اليوم", "الدوام", "حضر", "انصرف", "ملاحظة"], widths: [24, 24, 13, 13, 26], rows: attRows } : null,
+    attendance: attRows.length > 0 ? { columns: ["اليوم", "الدوام", "حضر", "انصرف", "ملاحظة"], widths: [19, 21, 11, 11, 38], rows: attRows } : null,
     /* بلا شرحٍ في ذيلها (أحمد، ٢٧ نوفمبر ٢٠٢٦) — القسيمةُ أرقامُها وسجلُّ حضورها */
     notes: [],
     issuedAt: formatDay(today),
