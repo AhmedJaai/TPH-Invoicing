@@ -14,7 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  appSettings, attendanceCheckins, employeeRates, employeeShiftPlans, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
+  alertResolutions, appSettings, attendanceCheckins, employeeRates, employeeShiftPlans, employeeShifts, employees, obligations, payrollAdjustments, payrollAttendance, payrollLinks, payrollViolations, payrollWeeks,
   type AttendanceKind, type CheckinVerdict, type LeaveType, type PayrollAdjustmentKind, type PayrollLinkPurpose,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -26,12 +26,14 @@ import {
 import {
   DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, COUNTS_FROM_START, shiftOn, usualOn, type CafePlace, type ShiftPlan, type ShiftRule,
 } from "@/lib/payroll/attendance";
-import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, formatDay, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
 import {
   damageCapMinor, isViolationCode, loanCapMinor, monthViolations, REPEAT_WINDOW_DAYS, type AssessedViolation,
 } from "@/lib/payroll/saudi-rules";
 import { pgErrorCode } from "@/lib/pg-error";
+import { measureOvertime, overtimeHourMinor, overtimeMinor, type OvertimeDay } from "@/lib/payroll/overtime";
+import { countNoun, MINUTE } from "@/lib/arabic";
 import { assertMonthsOpen } from "./month-guard";
 import { unreadTeamMessages } from "./team.service";
 import { pendingRequestCount } from "./team-requests-count";
@@ -162,7 +164,8 @@ export interface PayrollRow {
   /** طولُ الدوام النافذ آخرَ فترة الخصم — منه أجرُ الدقيقة. لا دوامُ اليوم: تغييرٌ بعدها لا يُعيد حسابَها. */
   shiftMinutes: number;
   slip: Payslip;
-  adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date }[];
+  /** `workDay`: يومُ العمل الإضافيّ المُقرّ من التسجيل (119). */
+  adjustments: { id: string; kind: PayrollAdjustmentKind; amountMinor: number; note: string | null; createdAt: Date; workDay: string | null }[];
   attendance: { id: string; day: string; kind: AttendanceKind; minutes: number | null; source: "MANUAL" | "CHECKIN"; note: string | null; disrupted: boolean; penaltyWaived: boolean; leaveType: LeaveType | null }[];
   /** مخالفاتُ الشهر بجزائها من جدول اللائحة — من الحضور ومن المسجَّل بيده. */
   violations: (AssessedViolation & { source: "ATTENDANCE" | "MANUAL" })[];
@@ -257,7 +260,7 @@ export async function loadPayrollMonths(months: readonly string[], conn: Conn = 
           penalties: regs?.capped,
           paidMinor: myLinks.filter((l) => PAYS_SALARY.has(l.purpose)).reduce((sum, l) => sum + l.amountMinor, 0),
         }),
-        adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt })),
+        adjustments: myAdj.map((a) => ({ id: a.id, kind: a.kind, amountMinor: a.amountMinor, note: a.note, createdAt: a.createdAt, workDay: a.workDay })),
         attendance: myAtt.map((a) => ({ id: a.id, day: a.day, kind: a.kind, minutes: a.minutes, source: a.source, note: a.note, disrupted: a.disrupted, penaltyWaived: a.penaltyWaived, leaveType: a.leaveType })),
         violations: (regs?.items ?? []).map((v) => ({ ...v, source: manualIds.has(v.id) ? "MANUAL" as const : "ATTENDANCE" as const })),
         article80: regs?.article80 ?? [],
@@ -579,6 +582,117 @@ export async function voidAdjustment(id: string, actorId: string): Promise<boole
     }
     await recordAudit({ actorId, action: "PAYROLL_ADJUSTMENT_VOIDED", entityType: "payroll_adjustment", entityId: id, before: done[0], after: null }, t);
     return true;
+  });
+}
+
+/* ─────────────── العملُ الإضافيّ من تسجيل الحضور (119) ─────────────── */
+
+export interface OvertimeView extends OvertimeDay {
+  /** أجرُه بالمادّة ١٠٧ — `null` بلا راتبٍ مكتوب. */
+  amountMinor: number | null;
+  /** بندُ «عمل إضافي» الذي أُقرّ به — `null` لم يُقرّ. */
+  approvedId: string | null;
+  approvedMinor: number | null;
+  dismissed: boolean;
+}
+
+export interface OvertimeMonth {
+  days: OvertimeView[];
+  /** أجرُ الساعة الإضافيّة — `null` بلا راتب. */
+  hourMinor: number | null;
+  shiftMinutes: number;
+}
+
+const overtimeKey = (employeeId: string, day: string) => `overtime:${employeeId}:${day}`;
+
+/**
+ * أيّامُ العمل الإضافيّ في فترة خصم الشهر — تُقاس من التسجيل لحظةَ الطلب (`overtime.ts`) ولا تُخزَّن
+ * إلّا حين يُقرّها المالك. وأجرُ الدقيقة بدوام آخر الفترة كأجر التأخير.
+ */
+export async function loadOvertime(employeeId: string, month: string, conn: Conn = db): Promise<OvertimeMonth | null> {
+  const [emp] = await conn.select().from(employees).where(eq(employees.id, employeeId));
+  if (!emp || emp.kind !== "MONTHLY") return null;
+  const period = deductionPeriod(month);
+  const [{ base, rules }, checkins, rates, approved, dismissed] = await Promise.all([
+    shiftContext(conn, emp),
+    conn.select().from(attendanceCheckins).where(and(eq(attendanceCheckins.employeeId, employeeId), gte(attendanceCheckins.day, period.from), lte(attendanceCheckins.day, period.to))),
+    conn.select().from(employeeRates).where(eq(employeeRates.employeeId, employeeId)),
+    conn.select().from(payrollAdjustments).where(and(eq(payrollAdjustments.employeeId, employeeId), eq(payrollAdjustments.kind, "OVERTIME"), isNull(payrollAdjustments.voidedAt),
+      gte(payrollAdjustments.workDay, period.from), lte(payrollAdjustments.workDay, period.to))),
+    conn.select({ key: alertResolutions.key }).from(alertResolutions).where(sql`${alertResolutions}.key like ${`overtime:${employeeId}:%`}`),
+  ]);
+  const rate = rateFor(rates, month);
+  const shiftMinutes = usualOn(period.to, base, rules).shiftMinutes;
+  const measured = measureOvertime({
+    checkins: checkins.filter((c) => checkinCounts(c.day, emp.id)).map((c) => ({ kind: c.kind, at: c.at, day: c.day, rejected: c.review === "REJECTED" })),
+    shiftFor: (d) => shiftOn(d, base, rules),
+    fromDay: period.from, toDay: period.to,
+  });
+  const byDay = new Map(approved.map((a) => [a.workDay, a]));
+  const silenced = new Set(dismissed.map((d) => d.key));
+  return {
+    shiftMinutes,
+    hourMinor: rate === null ? null : overtimeHourMinor(rate, shiftMinutes),
+    days: measured.map((d) => ({
+      ...d,
+      amountMinor: rate === null ? null : overtimeMinor(rate, shiftMinutes, d.minutes),
+      approvedId: byDay.get(d.day)?.id ?? null,
+      approvedMinor: byDay.get(d.day)?.amountMinor ?? null,
+      dismissed: silenced.has(overtimeKey(employeeId, d.day)),
+    })),
+  };
+}
+
+/**
+ * يُقرّ أيّاماً من العمل الإضافيّ: كلُّ يومٍ بندُ «عمل إضافي» بيومه ودقائقه ومبلغه، يحسبه الخادم من
+ * التسجيل الآن لا ممّا عرضته الشاشة. «كلّها» (`days: null`) للمقترَح وحده — المشكوكُ يُقرّ بيومه فقط.
+ * وما أُقرّ لا يُكتب ثانيةً (الفهرسُ الفريد يحرس النقرتين المتزامنتين).
+ */
+export async function approveOvertime(input: { employeeId: string; month: string; days: readonly string[] | null }, actorId: string): Promise<number> {
+  return db.transaction(async (t) => {
+    await t.select({ id: employees.id }).from(employees).where(eq(employees.id, input.employeeId)).for("update");
+    const ot = await loadOvertime(input.employeeId, input.month, t);
+    if (!ot) throw new PayrollRefused("العمل الإضافي من التسجيل للموظفين الشهريين.");
+    if (ot.hourMinor === null) throw new PayrollRefused("اكتب راتبه لهذا الشهر أولاً: أجر العمل الإضافي يُحسب منه.");
+    const wanted = input.days === null ? null : new Set(input.days);
+    const targets = ot.days.filter((d) => d.approvedId === null && d.status !== "BELOW_MIN" && d.amountMinor !== null
+      && (wanted === null ? d.status === "SUGGESTED" && !d.dismissed : wanted.has(d.day)));
+    if (wanted !== null && targets.length < wanted.size) {
+      const missing = [...wanted].filter((d) => !targets.some((x) => x.day === d));
+      if (missing.every((d) => ot.days.some((x) => x.day === d && x.approvedId !== null))) return 0;
+      throw new PayrollRefused("تغيّر تسجيل هذا اليوم فلم يعد فيه عمل إضافي. حدّث الصفحة.");
+    }
+    if (targets.length === 0) return 0;
+    const rows = await t.insert(payrollAdjustments).values(targets.map((d) => ({
+      employeeId: input.employeeId,
+      month: deductionMonthOf(d.day),
+      kind: "OVERTIME" as const,
+      amountMinor: d.amountMinor!,
+      note: `${formatDay(d.day)}: ${countNoun(d.minutes, MINUTE)} ${d.restDay ? "في يوم راحته" : "بعد نهاية الدوام"}`,
+      workDay: d.day,
+      minutes: d.minutes,
+      createdById: actorId,
+    }))).onConflictDoNothing().returning({ id: payrollAdjustments.id, workDay: payrollAdjustments.workDay, amountMinor: payrollAdjustments.amountMinor });
+    if (rows.length > 0) {
+      await t.delete(alertResolutions).where(inArray(alertResolutions.key, rows.map((r) => overtimeKey(input.employeeId, r.workDay!))));
+      await recordAudit({ actorId, action: "PAYROLL_OVERTIME_APPROVED", entityType: "employee", entityId: input.employeeId, before: null,
+        after: { month: input.month, days: rows.map((r) => ({ day: r.workDay, amountMinor: r.amountMinor })) } }, t);
+    }
+    return rows.length;
+  });
+}
+
+/** «ليس عملاً إضافياً» ليومٍ مقترح — يبقى معروضاً بلونٍ خافت ولا يدخل «أقرّها كلّها»، ويُعاد بضغطة. */
+export async function dismissOvertime(input: { employeeId: string; day: string; dismissed: boolean }, actorId: string): Promise<void> {
+  await db.transaction(async (t) => {
+    const key = overtimeKey(input.employeeId, input.day);
+    if (input.dismissed) {
+      await t.insert(alertResolutions).values({ key, decision: "DISMISSED", userId: actorId })
+        .onConflictDoUpdate({ target: alertResolutions.key, set: { decision: "DISMISSED", userId: actorId, at: new Date() } });
+    } else {
+      await t.delete(alertResolutions).where(eq(alertResolutions.key, key));
+    }
+    await recordAudit({ actorId, action: "PAYROLL_OVERTIME_DISMISSED", entityType: "employee", entityId: input.employeeId, before: null, after: { day: input.day, dismissed: input.dismissed } }, t);
   });
 }
 

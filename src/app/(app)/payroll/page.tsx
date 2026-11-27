@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
+import { SlipPdfButton } from "@/components/payroll/slip-pdf-button";
 import { PostAction } from "@/components/post-action";
 import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton, type OwedByMonth } from "@/components/payroll/forms";
 import { Badge, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
@@ -112,10 +113,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           <span className="font-bold">{r.employee.name}</span>
           <span className="block text-[11px] text-muted">
             {r.employee.kind === "PART_TIME" ? "جزئي" : r.employee.jobTitle ?? "دوام كامل"}
-            {r.slip.days && r.slip.days.worked < r.slip.days.of && <> · {r.slip.days.worked} من {r.slip.days.of} يوماً</>}
+            {r.slip.days && r.slip.days.worked !== r.slip.days.of && <> · {r.slip.days.range ? "آخر راتب " : ""}{r.slip.days.worked} من {r.slip.days.of} يوماً</>}
           </span>
-          {(r.violations.some((v) => !v.waived) || r.loanMinor > 0 || r.article80.length > 0 || r.rateMinor === null) && (
+          {(r.violations.some((v) => !v.waived) || r.loanMinor > 0 || r.article80.length > 0 || r.rateMinor === null || r.employee.leftOn) && (
             <span className="mt-1 flex flex-wrap gap-1">
+              {/* يظهر في شهر خروجه بآخر راتبه، ويغيب بعده */}
+              {r.employee.leftOn && <Badge tone="muted">ترك العمل {formatDay(r.employee.leftOn)}</Badge>}
               {r.rateMinor === null && <Badge tone="warn">بلا راتب مكتوب</Badge>}
               {r.slip.warnings > 0 && <Badge tone="warn">{r.slip.warnings === 1 ? "إنذار" : `${r.slip.warnings} إنذارات`}</Badge>}
               {r.slip.penaltiesMinor > 0 && <Badge tone="danger">جزاءات {formatRiyalsDisplay(r.slip.penaltiesMinor)}</Badge>}
@@ -149,6 +152,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         : <Badge tone="ok">اكتمل</Badge>,
       sortBy: (r) => r.slip.remainingMinor,
     },
+    /* آخرَ الشهر: قسيمةُ كلٍّ منهم PDF تُرسل من هنا (`slip-pdf-button.tsx`) */
+    { key: "slip", header: "القسيمة", cell: (r) => <SlipPdfButton compact employeeId={r.employee.id} month={month} name={r.employee.name} monthLabel={formatMonth(month)} phone={r.employee.phone} /> },
   ];
 
   return (

@@ -189,6 +189,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   TEAM_REQUEST_APPROVED: "اعتماد طلب موظف",
   TEAM_REQUEST_REJECTED: "رفض طلب موظف",
   PAYROLL_SLIP_PUBLISHED: "نشر قسائم الراتب للموظفين",
+  PAYROLL_OVERTIME_APPROVED: "إقرار عمل إضافي من تسجيل الحضور",
+  PAYROLL_OVERTIME_DISMISSED: "يوم عمل إضافي: ليس عملاً إضافياً أو أُعيد",
   PAYROLL_WEEK_SET: "تسجيل أسبوع موظف جزئي",
   PAYROLL_WEEK_CLEARED: "مسح أسبوع موظف جزئي",
   PAYROLL_LINKED: "ربط حوالة بموظف",

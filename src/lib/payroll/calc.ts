@@ -104,21 +104,47 @@ function daysOfMonth(month: string): number {
 }
 
 /**
- * أيّامُ عمله في الشهر من أيّامه: مَن باشر في ١٥ أكتوبر عمل ١٧ يوماً من ٣١.
- * `null` لا يعمل فيه.
+ * آخرُ راتبٍ لمن ترك العمل بدورة الصرف لا بالتقويم (أحمد، ٢٧ نوفمبر ٢٠٢٦): راتبُ يوم ٢٧ يغطّي حتى
+ * ٢٧ منه، فآخرُ راتبٍ من ٢٨ الشهر السابق إلى اليوم الذي قبل خروجه، بأجر اليوم (الراتب ÷ ٣٠).
+ * الوليد خرج ٣ نوفمبر: من ٢٨ أكتوبر إلى ٢ نوفمبر = ٦ أيّام = ٧٠٠ من ٣٬٥٠٠ — ما حوّله أحمد. وكان
+ * يُحسب له ١–٣ نوفمبر (٣٥٠) فيُقال «حُوّل زيادة».
+ * ومَن ترك قبل نوفمبر أُدخل من جدول أحمد مدفوعاً كما دُفع، فيبقى على حسابه القديم.
  */
-export function workedDays(e: { hiredOn: string; leftOn: string | null }, month: string): { worked: number; of: number } | null {
+export const CYCLE_LEAVERS_FROM = "2026-11-01";
+const LAST_COVERED_DAY = 27;
+
+/**
+ * أيّامُ عمله في الشهر من أيّامه: مَن باشر في ١٥ أكتوبر عمل ١٧ يوماً من ٣١.
+ * ومَن ترك العمل منذ نوفمبر ٢٠٢٦ فآخرُ شهرٍ بأيّام دورته من ٣٠ (`CYCLE_LEAVERS_FROM`)، و`range` أوّلُها
+ * وآخرُها. `null` لا يعمل فيه.
+ */
+export function workedDays(e: { hiredOn: string; leftOn: string | null }, month: string): { worked: number; of: number; range?: { from: string; to: string } } | null {
   if (!activeIn(e, month)) return null;
   const of = daysOfMonth(month);
+  const leavingNow = e.leftOn !== null && e.leftOn.slice(0, 7) === month;
+  if (leavingNow && e.leftOn! >= CYCLE_LEAVERS_FROM) {
+    const [y, m] = month.split("-").map(Number);
+    const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+    const d = Number(e.leftOn!.slice(8, 10));
+    /* الدورةُ تبدأ ٢٨ السابق، أو ٢٨ هذا الشهر إن خرج بعد صرف راتبه — وإن باشر بعدها فمن مباشرته */
+    const cycleStart = d > LAST_COVERED_DAY ? `${month}-${LAST_COVERED_DAY + 1}` : `${prev}-${LAST_COVERED_DAY + 1}`;
+    /* باشر بعد بداية الدورة: شهرُ مباشرته دُفع حتى آخره بالتقويم، فلا يُعدّ ما فيه مرّتين */
+    const from = e.hiredOn <= cycleStart ? cycleStart : e.hiredOn.slice(0, 7) === month ? e.hiredOn : `${month}-01`;
+    const lastDay = d === 1 ? `${prev}-${String(daysOfMonth(prev)).padStart(2, "0")}` : `${month}-${String(d - 1).padStart(2, "0")}`;
+    const span = lastDay < from ? 0 : Math.round((Date.parse(`${lastDay}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+    /* خرج بعد ٢٧: راتبُ الشهر كاملاً (صُرف يومَه) وفوقه أيّامُ ما بعده */
+    const worked = d > LAST_COVERED_DAY && e.hiredOn.slice(0, 7) < month ? DAYS_PER_MONTH + span : span;
+    return { worked, of: DAYS_PER_MONTH, range: span > 0 ? { from, to: lastDay } : undefined };
+  }
   const from = e.hiredOn.slice(0, 7) === month ? Number(e.hiredOn.slice(8, 10)) : 1;
-  const to = e.leftOn && e.leftOn.slice(0, 7) === month ? Number(e.leftOn.slice(8, 10)) : of;
+  const to = leavingNow ? Number(e.leftOn!.slice(8, 10)) : of;
   return { worked: Math.max(0, to - from + 1), of };
 }
 
-/** راتبُ الشهر بأيّامه — كاملٌ إن عمل الشهرَ كلَّه. */
+/** راتبُ الشهر بأيّامه — كاملٌ إن عمل الشهرَ كلَّه، وفوقه أيّامٌ بعد يوم الصرف لمن خرج بعده. */
 export function proratedSalary(salaryMinor: number | null, days: { worked: number; of: number } | null): number | null {
   if (salaryMinor === null || days === null) return salaryMinor === null ? null : 0;
-  return days.worked >= days.of ? salaryMinor : divRound(salaryMinor * days.worked, days.of);
+  return days.worked === days.of ? salaryMinor : divRound(salaryMinor * days.worked, days.of);
 }
 
 export interface LatePolicy {
@@ -261,7 +287,7 @@ export interface PayslipInput {
   /** للشهريّ: راتبُ الشهر النافذ (`null` لم يُكتب) — للجزئيّ يُهمَل. */
   salaryMinor: number | null;
   /** أيّامُ عمله من أيّام الشهر — مباشرةٌ أو خروجٌ في منتصفه. `null` يعمل الشهرَ كلَّه. */
-  days: { worked: number; of: number } | null;
+  days: { worked: number; of: number; range?: { from: string; to: string } } | null;
   /** للجزئيّ: أجورُ أسابيع الشهر. */
   weeksMinor: readonly number[];
   policy: LatePolicy;
@@ -280,7 +306,7 @@ export interface Payslip {
   fullSalaryMinor: number | null;
   /** الراتبُ بأيّامه، أو مجموعُ الأسابيع للجزئيّ. `null` لم يُعرف. */
   baseMinor: number | null;
-  days: { worked: number; of: number } | null;
+  days: { worked: number; of: number; range?: { from: string; to: string } } | null;
   additionsMinor: number;
   /** خصمٌ بموافقته ومخالفةٌ بخطئه وقسطُ سلفة كما كُتبت. */
   manualDeductionsMinor: number;

@@ -14,7 +14,7 @@ import { formatMonth } from "@/lib/riyadh-time";
 import { deductionMonthOf } from "@/lib/payroll/period";
 import { failWith, guard } from "@/services/guard";
 import {
-  addAdjustment, addViolation, clearAttendance, clearLeave, clearWeek, LEAVE_TYPE_LABEL, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
+  addAdjustment, addViolation, approveOvertime, dismissOvertime, clearAttendance, clearLeave, clearWeek, LEAVE_TYPE_LABEL, PayrollRefused, restoreAttendance, setAttendance, setLeave, setPenaltyWaived, setWeek, voidAdjustment, voidViolation,
 } from "@/services/payroll.service";
 
 export const runtime = "nodejs";
@@ -33,6 +33,9 @@ const Body = z.discriminatedUnion("action", [
   /* إجازةٌ من يومٍ إلى يوم — أيّامُ العمل فيها، وأيّامُ الراحة تُترك */
   z.object({ action: z.literal("leave"), employeeId: Id, fromDay: Day, toDay: Day, note: Note, leaveType: z.enum(["ANNUAL", "SICK", "UNPAID"]).optional() }).strict(),
   z.object({ action: z.literal("leave-clear"), employeeId: Id, fromDay: Day, toDay: Day }).strict(),
+  /* العملُ الإضافيّ من التسجيل: يومٌ أو أيّام، أو «كلّها» (`days` فارغ) — المبلغُ يحسبه الخادم */
+  z.object({ action: z.literal("overtime-approve"), employeeId: Id, month: Month, days: z.array(Day).min(1).max(40).nullable() }).strict(),
+  z.object({ action: z.literal("overtime-dismiss"), employeeId: Id, day: Day, dismissed: z.boolean() }).strict(),
 ]);
 
 export async function POST(request: Request) {
@@ -48,6 +51,14 @@ export async function POST(request: Request) {
         if (!amount.ok) return NextResponse.json({ error: amount.error }, { status: 400 });
         await addAdjustment({ employeeId: b.employeeId, month: b.month, kind: b.kind, amountMinor: amount.minor, note: b.note }, user.id);
         return NextResponse.json({ ok: true, message: "أُضيف، وتغيّر المستحق" });
+      }
+      case "overtime-approve": {
+        const n = await approveOvertime({ employeeId: b.employeeId, month: b.month, days: b.days }, user.id);
+        return NextResponse.json({ ok: true, message: n === 0 ? "أُقرّ من قبل" : `أُقرّ عمل إضافي ${countNoun(n, DAY)}، وزاد المستحق` });
+      }
+      case "overtime-dismiss": {
+        await dismissOvertime({ employeeId: b.employeeId, day: b.day, dismissed: b.dismissed }, user.id);
+        return NextResponse.json({ ok: true, message: b.dismissed ? "لن يُقترح هذا اليوم" : "عاد مقترحاً" });
       }
       case "adjust-void": {
         const done = await voidAdjustment(b.id, user.id);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  endOfService, loanBalance, workedDays,
+  endOfService, loanBalance, proratedSalary, workedDays,
   absenceDeductionMinor, beneficiaryIdOf, beneficiaryNameOf, divRound, hoursPayMinor, parseHours,
   payrollTotals, payslip, rateFor, suggestedPayMonth, unitValues, weekMonth, weekStartOf, weeksOfMonth,
   type PayslipInput,
@@ -103,6 +103,23 @@ describe("payslip — كم لازم أحوّل", () => {
     expect(s.lateMinor).toBe(1_250);
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-09")).toEqual({ worked: 10, of: 30 });
     expect(workedDays({ hiredOn: "2026-05-14", leftOn: "2026-09-10" }, "2026-10")).toBeNull();
+  });
+  it("آخرُ راتبٍ بدورة الصرف: الوليد خرج ٣ نوفمبر ← من ٢٨ أكتوبر إلى ٢ نوفمبر، ٧٠٠ من ٣٬٥٠٠", () => {
+    const days = workedDays({ hiredOn: "2026-05-01", leftOn: "2026-11-03" }, "2026-11");
+    expect(days).toEqual({ worked: 6, of: 30, range: { from: "2026-10-28", to: "2026-11-02" } });
+    expect(proratedSalary(350_000, days)).toBe(70_000);
+    /* خرج بعد صرف راتب الشهر: راتبُه كاملاً وأيّامُ ما بعد ٢٧ */
+    expect(workedDays({ hiredOn: "2026-05-01", leftOn: "2026-11-30" }, "2026-11")).toEqual({ worked: 32, of: 30, range: { from: "2026-11-28", to: "2026-11-29" } });
+    expect(proratedSalary(300_000, { worked: 32, of: 30 })).toBe(320_000);
+    /* خرج يوم ٢٨: لا يومَ بعد الصرف */
+    expect(workedDays({ hiredOn: "2026-05-01", leftOn: "2026-12-28" }, "2026-12")).toEqual({ worked: 30, of: 30, range: undefined });
+    /* خرج أوّلَ الشهر: من ٢٨ السابق إلى آخره */
+    expect(workedDays({ hiredOn: "2026-05-01", leftOn: "2026-12-01" }, "2026-12")).toMatchObject({ worked: 3, range: { from: "2026-11-28", to: "2026-11-30" } });
+    /* باشر ٣٠ نوفمبر (دُفع له في نوفمبر يومُه) وخرج ٥ ديسمبر: ١–٤ ديسمبر وحدها */
+    expect(workedDays({ hiredOn: "2026-11-30", leftOn: "2026-12-05" }, "2026-12")).toMatchObject({ worked: 4, range: { from: "2026-12-01", to: "2026-12-04" } });
+    expect(workedDays({ hiredOn: "2026-12-02", leftOn: "2026-12-05" }, "2026-12")).toMatchObject({ worked: 3, range: { from: "2026-12-02", to: "2026-12-04" } });
+    /* من خرج قبل نوفمبر على حسابه القديم */
+    expect(workedDays({ hiredOn: "2026-05-01", leftOn: "2026-08-28" }, "2026-08")).toEqual({ worked: 28, of: 31 });
   });
   it("مكافأة نهاية الخدمة", () => {
     expect(endOfService(300_000, 365).fullMinor).toBe(150_000);

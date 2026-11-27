@@ -1,9 +1,9 @@
 import { RecordHistory } from "@/components/record-history";
 import { TEAM_APP_NAME } from "@/lib/team-app";
-import { DAY, MINUTE, MONTH, countNoun } from "@/lib/arabic";
+import { DAY, MINUTE, MONTH, TIME, countNoun } from "@/lib/arabic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, CalendarClock, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, Timer, CalendarOff, Clock, FileBadge, HandCoins, History, Link2, Pencil, Printer, ReceiptText, Scale, TriangleAlert, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -18,7 +18,7 @@ import { Badge, Callout, Card, EmptyState, LinkButton, NoAccess, Section } from 
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { absenceLineLabel, ADJUSTMENT_LABEL, ANNUAL_LEAVE_DAYS, ANNUAL_LEAVE_DAYS_AFTER_FIVE, endOfService, formatLeaveDays, formatMinutes, hoursLabel, leaveBalance, PURPOSE_LABEL, rateFor, suggestedPayMonth } from "@/lib/payroll/calc";
-import { daysOffLabel, planOn, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
+import { clock12, daysOffLabel, planOn, riyadhClock, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
@@ -26,12 +26,13 @@ import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, month
 import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { OBLIGATION_KIND_LABEL, isObligationKind } from "@/lib/obligations";
 import {
-  loadCheckins, loadEmployee, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadLeave, LEAVE_TYPE_LABEL, loadOpenTransfers, loadPayrollMonth, transfersSince,
+  loadCheckins, loadEmployee, loadOvertime, loadEmployeeDocuments, loadEmployeeHistory, loadEmployeeLinks, loadLeave, LEAVE_TYPE_LABEL, loadOpenTransfers, loadPayrollMonth, transfersSince,
 } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const riyadhClockLabel = (at: Date) => clock12(riyadhClock(at));
 
 function Line({ label, minor, sign, strong, note }: { label: string; minor: number | null; sign?: "+" | "−"; strong?: boolean; note?: string }) {
   return (
@@ -61,7 +62,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const workMonths = monthsBetween(employee.hiredOn.slice(0, 7), endMonth).reverse();
 
   const leaveFrom = deductionPeriod(deductionMonthOf(today)).from;
-  const [sheet, links, docs, open, checkins, history, leave, allLeave] = await Promise.all([
+  const [sheet, links, docs, open, checkins, history, leave, allLeave, overtime] = await Promise.all([
     loadPayrollMonth(month),
     loadEmployeeLinks(id),
     loadEmployeeDocuments(id),
@@ -72,6 +73,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     loadLeave(id, leaveFrom),
     /* كلُّ إجازةٍ منذ المباشرة — للرصيد السنويّ */
     loadLeave(id, employee.hiredOn),
+    /* العملُ الإضافيّ يُقاس من التسجيل لحظةَ الفتح، ويُكتب حين تُقرّه */
+    loadOvertime(id, month),
   ]);
   /* سجلُّ الدوام من تاريخ: الأحدثُ أوّلاً، والنافذُ اليوم معلَّم */
   const currentPlan = planOn(today, employee.plans);
@@ -110,6 +113,13 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const balanceMinor = closedMonths.reduce((sum, h) => sum + (h.slip.dueMinor ?? 0) - h.slip.paidMinor, 0);
   const gaps = closedMonths.filter((h) => h.slip.dueMinor !== null && h.slip.dueMinor !== h.slip.paidMinor)
     .map((h) => ({ month: h.month, diff: (h.slip.dueMinor ?? 0) - h.slip.paidMinor }));
+  /* تأخيرٌ في حدود السماح لا يُخصم بقرارك (٢٧ نوفمبر ٢٠٢٦)، ويُقال نمطاً إن تكرّر */
+  const graceLates = deductions.filter((d) => d.withinGrace);
+  const graceMinutes = graceLates.reduce((sum, d) => sum + (d.minutes ?? 0), 0);
+  const otDays = (overtime?.days ?? []).filter((d) => d.status !== "BELOW_MIN" || d.approvedId !== null);
+  const otPending = otDays.filter((d) => d.approvedId === null && d.status === "SUGGESTED" && !d.dismissed);
+  const otPendingMinor = otPending.reduce((sum, d) => sum + (d.amountMinor ?? 0), 0);
+  const otBelow = (overtime?.days ?? []).filter((d) => d.status === "BELOW_MIN" && d.approvedId === null);
   const pendingMinor = open.filter((o) => o.suggestion?.employeeId === id).reduce((sum, o) => sum + o.freeMinor, 0);
 
   return (
@@ -126,8 +136,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
     >
       <MonthTabs base={`/payroll/employee/${id}`} months={workMonths.slice(0, 12)} active={month} />
       <nav aria-label="أقسام الصفحة" className="sticky top-(--app-header) z-10 -mx-1 mt-3 flex gap-1 overflow-x-auto bg-surface/90 px-1 py-2 backdrop-blur">
-        {[["#month", "الشهر"], ["#deductions", "التأخير"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "TPH Team"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
-          .filter(([href]) => (employee.kind === "MONTHLY" || href !== "#violations") && (href !== "#deductions" || deductions.length > 0))
+        {[["#month", "الشهر"], ["#deductions", "التأخير"], ["#overtime", "الإضافي"], ["#violations", "المخالفات"], ["#transfers", "الحوالات"], ["#salary", "الراتب"], ["#checkin", "TPH Team"], ["#docs", "الوثائق"], ["#history", "السجل"], ["#edit", "البيانات"]]
+          .filter(([href]) => (employee.kind === "MONTHLY" || href !== "#violations") && (href !== "#deductions" || deductions.length > 0) && (href !== "#overtime" || otDays.length > 0))
           .map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-hover">{label}</a>)}
       </nav>
       {closedMonths.length > 0 && (
@@ -159,8 +169,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               <Line
                 label={employee.kind === "PART_TIME" ? `أجر الأسابيع (${row.weeks.length})` : "الراتب"}
                 minor={slip!.baseMinor}
-                note={employee.kind === "MONTHLY" && slip!.days && slip!.days.worked < slip!.days.of
-                  ? `${countNoun(slip!.days.worked, DAY)} من ${slip!.days.of} من راتب ${rate !== null ? formatRiyalsDisplay(rate) : "غير معروف"}`
+                note={employee.kind === "MONTHLY" && slip!.days && slip!.days.worked !== slip!.days.of
+                  ? `${slip!.days.range ? `آخر راتب من ${formatDay(slip!.days.range.from)} إلى ${formatDay(slip!.days.range.to)}: ` : ""}${countNoun(slip!.days.worked, DAY)} من ${slip!.days.of} من راتب ${rate !== null ? formatRiyalsDisplay(rate) : "غير معروف"}`
                   : employee.kind === "PART_TIME" && rate !== null ? `أجر الساعة ${formatRiyalsDisplay(rate)}` : undefined}
               />
               {row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a) => (
@@ -222,10 +232,62 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       {row && deductions.length > 0 && (
         <Section id="deductions" title="التأخير والغياب وخصمه" icon={Clock} count={deductions.length}
           hint={`كل يوم بما يُحسم عنه: أجر الوقت الذي لم يُعمل، وفوقه جزاء اللائحة. عدّل الدقائق، أو اعفُ عن الجزاء ويبقى أجر الوقت، أو ألغِ خصم اليوم كله. من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}>
+          {graceLates.length >= 4 && (
+            <Callout tone="info" icon={Clock} className="mb-3" title={`تأخّر ${countNoun(graceLates.length, TIME)} في حدود السماح (${countNoun(graceMinutes, MINUTE)})`}>
+              لا يُخصم شيء منها لأن كل مرة دون سماحه ({countNoun(employee.lateGraceMinutes, MINUTE)})، لكنه يتكرر. إن أردت أن تُحسب فقلّل السماح من «جدول الدوام»، أو نبّهه.
+            </Callout>
+          )}
           <DeductionList items={deductions} canEdit={canEdit} salaryKnown={rate !== null} />
           {slip && slip.penaltiesDroppedMinor > 0 && (
             <p className="mt-2 text-[11px] font-bold text-warn">زادت جزاءات الشهر على أجر خمسة أيام، فلا يُحسم منها {formatRiyalsDisplay(slip.penaltiesDroppedMinor)} ريال — القسيمة تحسب الحد.</p>
           )}
+        </Section>
+      )}
+
+      {row && overtime && otDays.length > 0 && (
+        <Section id="overtime" title="عمل إضافي من تسجيل الحضور" icon={Timer} count={otDays.length}
+          hint={`ما بعد نهاية دوامه إلى انصرافه، ويوم الراحة كله. لا يُحسب حتى تقرّه، والأجر بالمادة 107 من نظام العمل: أجر الساعة ونصفه${overtime.hourMinor !== null ? ` (الساعة ${formatRiyalsDisplay(overtime.hourMinor)} ريال)` : ""}. التأخير لا يُقاصّ به. من ${formatDay(deductionPeriod(month).from)} إلى ${formatDay(deductionPeriod(month).to)}.`}
+          action={canEdit && otPending.length > 1 ? (
+            <PostAction url="/api/payroll/entry" body={{ action: "overtime-approve", employeeId: id, month, days: null }} variant="primary" done="أُقرّ">
+              أقرّها كلها ({formatRiyalsDisplay(otPendingMinor)})
+            </PostAction>
+          ) : undefined}>
+          {overtime.hourMinor === null && <Callout tone="warn" className="mb-3" title="لم يُكتب راتبه لهذا الشهر">أجر العمل الإضافي يُحسب من الراتب. اكتبه من «الراتب» أدناه.</Callout>}
+          <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
+            {otDays.map((d) => (
+              <li key={d.day} className={`flex flex-wrap items-center gap-3 px-4 py-2.5 ${d.dismissed && !d.approvedId ? "opacity-60" : ""}`}>
+                <span className="min-w-0 flex-1 basis-56 text-sm">
+                  {formatDay(d.day)} · <bdi className="nums">{countNoun(d.minutes, MINUTE)}</bdi> {d.restDay ? "في يوم راحته" : "بعد نهاية الدوام"}
+                  <span className="block text-[11px] text-muted">
+                    {d.firstIn ? <>حضر <bdi className="nums">{riyadhClockLabel(d.firstIn)}</bdi> · </> : "بلا حضور مسجّل · "}
+                    انصرف <bdi className="nums">{riyadhClockLabel(d.lastOut)}</bdi>
+                    {d.shiftEnd && <> · نهاية دوامه <bdi className="nums">{riyadhClockLabel(d.shiftEnd)}</bdi></>}
+                  </span>
+                </span>
+                {d.approvedId ? <><Badge tone="ok">أُقرّ</Badge><Money minor={d.approvedMinor ?? 0} /></>
+                  : d.status === "SUSPECT" ? <Badge tone="warn">تسجيل ناقص؟</Badge>
+                  : d.dismissed ? <Badge tone="muted">ليس إضافياً</Badge>
+                  : <MaybeMoney minor={d.amountMinor} />}
+                {canEdit && !d.approvedId && (
+                  <span className="flex gap-1">
+                    {!d.dismissed && d.amountMinor !== null && (
+                      <PostAction url="/api/payroll/entry" body={{ action: "overtime-approve", employeeId: id, month, days: [d.day] }} variant={d.status === "SUSPECT" ? "quiet" : "secondary"} done="أُقرّ">
+                        {d.status === "SUSPECT" ? "أقرّه رغم ذلك" : "أقرّه"}
+                      </PostAction>
+                    )}
+                    <PostAction url="/api/payroll/entry" body={{ action: "overtime-dismiss", employeeId: id, day: d.day, dismissed: !d.dismissed }} variant="quiet" done={d.dismissed ? "أُعيد" : "تُرك"}>
+                      {d.dismissed ? "أعده" : "ليس إضافياً"}
+                    </PostAction>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] text-muted">
+            ما أُقرّ يظهر في «بنود الشهر» وفي القسيمة بيومه، ويُسحب من هناك.
+            {otBelow.length > 0 && ` و${countNoun(otBelow.length, DAY)} بقي فيها أقل من ربع ساعة بعد الدوام لا تُقترح.`}
+            {otDays.some((d) => d.status === "SUSPECT") && " «تسجيل ناقص؟»: أطول من ست ساعات بعد الدوام أو بلا حضور — غالباً نسي الضغط."}
+          </p>
         </Section>
       )}
 

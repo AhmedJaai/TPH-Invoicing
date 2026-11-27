@@ -2649,6 +2649,9 @@ export const payrollAdjustments = pgTable("payroll_adjustments", {
   kind: text("kind").$type<PayrollAdjustmentKind>().notNull(),
   amountMinor: integer("amount_minor").notNull(),
   note: text("note"),
+  /** للعمل الإضافيّ المُقرّ من تسجيل الحضور (119): يومُه ودقائقُه — لا يُحسب اليومُ مرّتين. */
+  workDay: text("work_day"),
+  minutes: integer("minutes"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
   voidedAt: timestamp("voided_at", { withTimezone: true }),

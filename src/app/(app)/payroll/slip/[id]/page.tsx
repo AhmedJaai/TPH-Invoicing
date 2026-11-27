@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { PrintButton } from "@/components/print-button";
+import { SlipPdfButton } from "@/components/payroll/slip-pdf-button";
 import { BrandMark } from "@/components/icons";
 import { LinkButton, NoAccess } from "@/components/ui";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -32,7 +33,7 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
   if (!row) notFound();
   const s = row.slip;
   const lines: [string, string, boolean?][] = [
-    [row.employee.kind === "PART_TIME" ? "أجر الأسابيع" : s.days && s.days.worked < s.days.of ? `الراتب (${s.days.worked} من ${s.days.of} يوماً)` : "الراتب الشهري", money(s.baseMinor)],
+    [row.employee.kind === "PART_TIME" ? "أجر الأسابيع" : s.days && s.days.worked !== s.days.of ? `${s.days.range ? `آخر راتب من ${formatDay(s.days.range.from)} إلى ${formatDay(s.days.range.to)}` : "الراتب"} (${s.days.worked} من ${s.days.of} يوماً)` : "الراتب الشهري", money(s.baseMinor)],
     ...row.adjustments.filter((a) => a.kind === "BONUS" || a.kind === "OVERTIME" || a.kind === "ALLOWANCE").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `+ ${money(a.amountMinor)}`]),
     ...row.adjustments.filter((a) => a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT").map((a): [string, string] => [`${ADJUSTMENT_LABEL[a.kind]}${a.note ? ` (${a.note})` : ""}`, `− ${money(a.amountMinor)}`]),
     ...(s.lateMinutes + s.earlyMinutes > 0 ? [[`أجر دقائق التأخير والانصراف (${countNoun(s.lateMinutes + s.earlyMinutes, MINUTE)})`, `− ${money(s.lateMinor)}`] as [string, string]] : []),
@@ -50,7 +51,7 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
     [s.remainingMinor !== null && s.remainingMinor < 0 ? "حُوّل زيادة" : "الباقي", money(s.remainingMinor === null ? null : Math.abs(s.remainingMinor)), true],
   ];
   return (
-    <PageShell user={user} title="قسيمة الراتب" actions={<><LinkButton href={`/payroll/employee/${id}?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>الموظف</LinkButton><PrintButton /></>}>
+    <PageShell user={user} title="قسيمة الراتب" actions={<><LinkButton href={`/payroll/employee/${id}?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>الموظف</LinkButton><SlipPdfButton employeeId={id} month={month} name={row.employee.name} monthLabel={formatMonth(month)} phone={row.employee.phone} /><PrintButton label="اطبع" variant="quiet" /></>}>
       <article className="mx-auto max-w-xl rounded-2xl border border-line bg-raised p-6 shadow-raised print:border-0 print:shadow-none">
         <header className="flex items-center justify-between gap-4 border-b border-line pb-4">
           <div>

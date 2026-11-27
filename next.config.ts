@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
 
   /*
+    قسيمةُ الراتب PDF تقرأ خطَّها وشعارَها من القرص، وعلى Vercel لا يُنسخ ملفٌّ لم يُطلب.
+    المفتاحُ نمطُ picomatch على مسار الدالّة: «[id]» يُهرَّب وإلّا صار صنفَ حروفٍ لا يطابق
+    (`payslip-pdf.guard.test.ts`).
+  */
+  outputFileTracingIncludes: {
+    "/payroll/slip/\\[id\\]/pdf": ["./src/fonts/thmanyahsans-Regular.woff2", "./src/fonts/thmanyahsans-Bold.woff2", "./public/icons/icon-192.png"],
+  },
+
+  /*
     ترويساتُ الأمان — لم يكن منها شيء.
 
     صفحاتٌ تحمل الحسابات والرواتب والكشوف: لا تُؤطَّر في موقعٍ آخر
