@@ -86,7 +86,7 @@ export default async function CommitmentsPage() {
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <p className="text-sm font-bold">
-                        {formatWeekday(d.day)} <bdi>{formatDay(d.day)}</bdi>
+                        {formatWeekday(d.day).replace(/\s*\d+$/, "")} <bdi>{formatDay(d.day)}</bdi>
                         {d.today && <span className="ms-2"><Badge tone="accent">اليوم</Badge></span>}
                         {d.past && <span className="ms-2"><Badge>انقضى</Badge></span>}
                       </p>

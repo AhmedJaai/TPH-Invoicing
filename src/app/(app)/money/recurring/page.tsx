@@ -1,18 +1,20 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, CircleCheck, Copy, Landmark, Plus, Repeat, TrendingUp, Upload } from "lucide-react";
+import { CalendarCheck, CircleCheck, Copy, Landmark, Plus, Repeat, Search, TrendingUp, Upload, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { PostAction } from "@/components/post-action";
 import { SignalControls } from "@/components/signal-controls";
-import { Badge, DataTable, EmptyState, KeyFigure, LinkButton, NoAccess, Section } from "@/components/ui";
-import { MONTH, countNoun } from "@/lib/arabic";
-import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { formatRiyals } from "@/lib/money";
+import { Badge, DataTable, EmptyState, LinkButton, NoAccess, Section, type Tone } from "@/components/ui";
+import { ITEM, MONTH, countNoun } from "@/lib/arabic";
+import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
+import { formatRiyals, formatRiyalsDisplay } from "@/lib/money";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { SERIES_MIN_MONTHS, nextDueOn, suggestionKey } from "@/lib/recurring-detect";
-import { loadRecurringWatch, type SeriesView } from "@/services/recurring-watch.service";
+import { loadMonthWatch, loadRecurringWatch, type SeriesView } from "@/services/recurring-watch.service";
+import { seesSalaries } from "@/lib/payroll/visibility";
+import type { MonthRow, MonthStatus, MonthWatch } from "@/lib/recurring-month";
 import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +54,10 @@ export default async function RecurringPage() {
     );
   }
 
-  const notes = w.series.flatMap((s) => s.openNotes.map((n) => ({ series: s, ...n })));
-  const unregistered = w.series.filter((s) => !s.registered && !s.suggestionSilenced);
+  const m = await loadMonthWatch(w, { hideSalaries: !seesSalaries(user.role) });
+  /* غيابُ هذا الشهر صفٌّ في «هذا الشهر» بفعله — فلا يُكرَّر تنبيهاً تحته */
+  const notes = w.series.flatMap((s) => s.openNotes.filter((n) => !(n.note.kind === "MISSING" && n.note.month === m.month)).map((n) => ({ series: s, ...n })));
+  const missingKey = new Map(w.series.flatMap((s) => s.openNotes.filter((n) => n.note.kind === "MISSING" && n.note.month === m.month).map((n) => [s.key, n.key] as const)));
 
   return (
     <PageShell
@@ -73,28 +77,7 @@ export default async function RecurringPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-            <KeyFigure
-              icon={Repeat}
-              label="خصومات شهرية في الكشف"
-              value={<span className="nums nums-count">{w.series.length}</span>}
-              sub="جهات يُخصم لها مبلغ متقارب كل شهر، تجدها في الجدول أدناه."
-            />
-            <KeyFigure
-              icon={CalendarClock}
-              label="مجموعها في السنة"
-              value={<Money minor={w.annualMinor} />}
-              sub="المبلغ المعتاد لكل جهة × 12. هذا تقدير، لا مبلغ فعلي."
-            />
-            <KeyFigure
-              icon={Plus}
-              tone={unregistered.length > 0 ? "warn" : "ok"}
-              label="لم تُسجَّل مصروفاً متكرراً"
-              value={<span className="nums nums-count">{unregistered.length}</span>}
-              sub={unregistered.length > 0 ? "لن تظهر في «النقد القادم» حتى تسجّلها. أضفها من الجدول." : "كل ما في الكشف مسجّل، أو تجاهلت اقتراحه."}
-              href={unregistered.length > 0 ? "#series" : "/cash"}
-            />
-          </div>
+          <MonthPanel m={m} canEdit={canEdit} canSilence={canSilence} missingKey={missingKey} />
 
           {/* ── ما خرج عن عادته ── */}
           {notes.length > 0 && (
@@ -140,7 +123,7 @@ export default async function RecurringPage() {
             title="ما يتكرر كل شهر"
             icon={Repeat}
             count={w.series.length}
-            hint="«المعتاد» وسيط الخصومات السابقة، و«اليوم» وسيط أيامها. وحين تسجّله مصروفاً متكرراً يظهر في «النقد القادم» في ذلك اليوم، ويمكنك تعديل مبلغه ودورته من الإعدادات."
+            hint={`«المعتاد» وسيط الخصومات السابقة، و«اليوم» وسيط أيامها، ومجموعها في السنة نحو ${formatRiyalsDisplay(w.annualMinor)} ريال (تقدير: المعتاد × 12). وحين تسجّله مصروفاً متكرراً يظهر في «النقد القادم» في ذلك اليوم.`}
           >
             <DataTable<SeriesView>
               rows={w.series}
@@ -213,5 +196,92 @@ export default async function RecurringPage() {
         </>
       )}
     </PageShell>
+  );
+}
+
+const STATUS: Record<MonthStatus, { label: string; tone: Tone }> = {
+  LATE: { label: "لم يُخصم", tone: "danger" },
+  NOT_SEEN: { label: "الكشف لم يصل لموعده", tone: "warn" },
+  UPCOMING: { label: "قادم", tone: "muted" },
+  ARRIVED: { label: "وصل", tone: "ok" },
+};
+
+/**
+ * «هذا الشهر» — ما كان متوقَّعاً وما وصل، والغائبُ أوّلاً وبجانبه فعلُه.
+ * الحكمُ بآخر يومٍ في الكشف: ما موعدُه بعده لا يُقال إنّه تأخّر.
+ */
+function MonthPanel({ m, canEdit, canSilence, missingKey }: {
+  m: MonthWatch; canEdit: boolean; canSilence: boolean; missingKey: ReadonlyMap<string, string>;
+}) {
+  const lateMinor = m.late.reduce((s, r) => s + r.expectedMinor, 0);
+  const arrivedCount = m.rows.filter((r) => r.status === "ARRIVED").length;
+  if (m.rows.length === 0) {
+    return (
+      <EmptyState
+        compact
+        icon={CalendarCheck}
+        title={`لا يُتوقع خصم متكرر في ${formatMonth(m.month)}.`}
+        hint="لا مصروف متكرر مسجّل يقع في هذا الشهر، ولا خصم شهري في الكشف. سجّل الإيجار والاشتراكات ليظهر هنا ما وصل منها وما غاب."
+        action={canEdit ? <LinkButton href="/settings#recurring" variant="primary" icon={Plus}>أضف مصروفاً متكرراً</LinkButton> : undefined}
+      />
+    );
+  }
+  return (
+    <section aria-labelledby="month-title" className="overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
+      <header className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b border-line-soft p-4 sm:p-5">
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-xs font-bold text-muted">{formatMonth(m.month)}: ما كان متوقعاً، وما وصل</p>
+          <h2 id="month-title" className={`mt-1 text-xl font-bold leading-snug sm:text-2xl ${m.late.length > 0 ? "text-danger" : ""}`}>
+            {m.late.length > 0
+              ? <T s="{0} لم يُخصم في موعده" a={[countNoun(m.late.length, ITEM)]} />
+              : arrivedCount === m.rows.length ? "وصل كل المتوقع" : <T s="وصل {0} من {1}، والباقي لم يحن" a={[<span key="0" className="nums nums-count">{arrivedCount}</span>, <span key="1" className="nums nums-count">{m.rows.length}</span>]} />}
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            {m.lastBankDay ? <T s="الحكم بكشف البنك حتى {0}، وما موعده بعده لا يُعدّ متأخراً." a={[<bdi key="0">{formatDay(m.lastBankDay)}</bdi>]} /> : "لا كشف بنك بعد."}
+          </p>
+        </div>
+        <dl className="grid grid-cols-3 gap-4 text-xs sm:gap-6">
+          <div><dt className="text-muted">المتوقع</dt><dd className="mt-0.5 text-[15px] font-bold"><Money minor={m.expectedMinor} /></dd></div>
+          <div><dt className="text-muted">وصل</dt><dd className="mt-0.5 text-[15px] font-bold text-ok"><Money minor={m.arrivedMinor} /></dd></div>
+          <div><dt className="text-muted">غاب</dt><dd className={`mt-0.5 text-[15px] font-bold ${lateMinor > 0 ? "text-danger" : ""}`}><Money minor={lateMinor} /></dd></div>
+        </dl>
+      </header>
+      <ul className="divide-y divide-line-soft">
+        {m.rows.map((r) => <MonthLine key={r.key} r={r} canEdit={canEdit} canSilence={canSilence} silenceKey={r.seriesKey ? missingKey.get(r.seriesKey) : undefined} />)}
+      </ul>
+    </section>
+  );
+}
+
+function MonthLine({ r, canEdit, canSilence, silenceKey }: { r: MonthRow; canEdit: boolean; canSilence: boolean; silenceKey?: string }) {
+  const st = STATUS[r.status];
+  const diff = r.arrived ? r.arrived.amountMinor - r.expectedMinor : 0;
+  const search = `/bank?show=all&q=${encodeURIComponent(r.label.slice(0, 30))}#transactions`;
+  return (
+    <li className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5 ${r.status === "LATE" ? "bg-danger-bg/50" : ""}`}>
+      <div className="min-w-0 flex-1 basis-60">
+        <p className="flex flex-wrap items-center gap-2 text-[13px] font-bold">
+          <span className="min-w-0 break-words" dir="auto">{r.label}</span>
+          <Badge tone={st.tone} dot>{st.label}</Badge>
+          {!r.registeredId && <a href="#series" className="inline-flex min-h-11 items-center sm:min-h-0"><Badge tone="info">من الكشف، غير مسجّل</Badge></a>}
+        </p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+          {r.category && isTxCategory(r.category) ? `${CATEGORY_LABEL[r.category]} · ` : ""}
+          {r.dueDay ? <T s="موعده {0}" a={[<bdi key="0">{formatDay(r.dueDay)}</bdi>]} /> : "يومه غير محدد"}
+          {r.arrived && <> · <T s="وصل {0} {1}" a={[r.arrived.day ? <bdi key="0">{formatDay(r.arrived.day)}</bdi> : "", r.arrived.via === "EXPENSE" ? "(مصروف مسجّل)" : "(من الكشف)"]} /></>}
+          {diff !== 0 && <span className={diff > 0 ? "font-bold text-warn" : ""}> · <T s="{0} بـ{1}" a={[diff > 0 ? "أعلى من المعتاد" : "أقل من المعتاد", <Money key="1" minor={Math.abs(diff)} />]} /></span>}
+        </p>
+      </div>
+      <span className="shrink-0 text-[13px] font-bold"><Money minor={r.arrived?.amountMinor ?? r.expectedMinor} /></span>
+      {r.status !== "ARRIVED" && r.status !== "UPCOMING" && (
+        <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
+          {r.status === "NOT_SEEN"
+            ? <LinkButton href="/bank#import" size="sm" variant="secondary" icon={Upload}>استورد الكشف الأحدث</LinkButton>
+            : <LinkButton href={search} size="sm" variant="secondary" icon={Search}>ابحث في البنك</LinkButton>}
+          {canEdit && r.status === "LATE" && <LinkButton href="/money/expenses?add=1" size="sm" variant="quiet" icon={Wallet}>دفعته نقداً؟ سجّله</LinkButton>}
+          {canSilence && silenceKey && <SignalControls signalKey={silenceKey} dismissLabel="أُلغي" snoozeDays={30} />}
+        </div>
+      )}
+    </li>
   );
 }

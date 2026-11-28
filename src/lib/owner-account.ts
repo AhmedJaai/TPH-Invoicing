@@ -59,10 +59,23 @@ export interface OwnerYear {
   netMinor: number;
 }
 
+/** شهرٌ بشهر — والرصيدُ في آخره (الجاري من أوّل السجلّ)، ليُرى متى اتّسع الفرق. */
+export interface OwnerMonth {
+  month: string;
+  paidForCafeMinor: number;
+  putInMinor: number;
+  tookOutMinor: number;
+  netMinor: number;
+  endBalanceMinor: number;
+  count: number;
+}
+
 export interface OwnerAccount {
   /** الأحدثُ أوّلاً، وكلٌّ برصيده بعده. */
   lines: OwnerLine[];
   years: OwnerYear[];
+  /** الأحدثُ أوّلاً. */
+  months: OwnerMonth[];
   paidForCafeMinor: number;
   putInMinor: number;
   tookOutMinor: number;
@@ -72,6 +85,7 @@ export interface OwnerAccount {
 export function buildOwnerAccount(entries: readonly OwnerEntry[]): OwnerAccount {
   const ordered = [...entries].sort((a, b) => a.day.localeCompare(b.day) || a.id.localeCompare(b.id));
   const years = new Map<string, OwnerYear>();
+  const months = new Map<string, OwnerMonth>();
   const lines: OwnerLine[] = [];
   let balance = 0;
   let paid = 0;
@@ -88,11 +102,21 @@ export function buildOwnerAccount(entries: readonly OwnerEntry[]): OwnerAccount 
     if (e.kind === "TOOK_OUT") { y.tookOutMinor += e.amountMinor; took += e.amountMinor; }
     y.netMinor += signedMinor(e);
     years.set(year, y);
+    const month = e.day.slice(0, 7);
+    const m = months.get(month) ?? { month, paidForCafeMinor: 0, putInMinor: 0, tookOutMinor: 0, netMinor: 0, endBalanceMinor: 0, count: 0 };
+    if (e.kind === "PAID_FOR_CAFE") m.paidForCafeMinor += e.amountMinor;
+    if (e.kind === "PUT_IN") m.putInMinor += e.amountMinor;
+    if (e.kind === "TOOK_OUT") m.tookOutMinor += e.amountMinor;
+    m.netMinor += signedMinor(e);
+    m.endBalanceMinor = balance;
+    m.count++;
+    months.set(month, m);
   }
 
   return {
     lines: lines.reverse(),
     years: [...years.values()].sort((a, b) => b.year.localeCompare(a.year)),
+    months: [...months.values()].sort((a, b) => b.month.localeCompare(a.month)),
     paidForCafeMinor: paid,
     putInMinor: put,
     tookOutMinor: took,

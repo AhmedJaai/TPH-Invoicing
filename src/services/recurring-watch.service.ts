@@ -2,9 +2,9 @@
  * الخصوماتُ المتكرّرة من القاعدة — صادرُ البنك بيومه في الرياض، والمتكرّرُ
  * المسجَّل، وقراراتُ صاحبها. والكشفُ في `lib/recurring-detect.ts` الخالصة.
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { recurringExpenses } from "@/db/schema";
+import { expenses, recurringExpenses } from "@/db/schema";
 import { isTxCategory } from "@/lib/bank/rules";
 import { asCadence } from "@/lib/cadence";
 import { monthlyShare } from "@/lib/expenses";
@@ -13,7 +13,10 @@ import {
   type DebitTx, type RecurringSeries, type RegisteredRecurring, type SeriesNote,
 } from "@/lib/recurring-detect";
 import { silencedKeys } from "@/lib/signal-decisions";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
+import { buildMonthWatch, type MonthWatch } from "@/lib/recurring-month";
+import { isSalaryRow } from "@/lib/payroll/visibility";
+import { loadRecurringInputs } from "./cash-outlook.service";
 
 /** كم شهراً من الكشف يُقرأ — سنةٌ تكفي لتُرى السلسلة وعادتُها. */
 const WINDOW_MONTHS = 13;
@@ -117,4 +120,27 @@ export async function loadRecurringAnomalies(): Promise<RecurringAnomaly[]> {
     }
   }
   return out.sort((a, b) => b.amountMinor - a.amountMinor);
+}
+
+/**
+ * «هذا الشهر: المتوقَّع وما وصل» — المتكرّرُ المسجَّل ومصروفاتُه المربوطة هذا الشهر، مع سلاسل الكشف
+ * المحمَّلة سلفاً (`loadRecurringWatch`). البناءُ في `lib/recurring-month.ts`.
+ */
+export async function loadMonthWatch(w: RecurringWatch, opts: { hideSalaries: boolean }): Promise<MonthWatch> {
+  const month = currentMonthRiyadh();
+  const [registered, paid] = await Promise.all([
+    loadRecurringInputs(),
+    db.select({ id: expenses.recurringExpenseId, day: expenses.occurredOn, amountMinor: expenses.amountMinor })
+      .from(expenses)
+      .where(and(eq(expenses.periodMonth, month), isNotNull(expenses.recurringExpenseId))),
+  ]);
+  const shown = opts.hideSalaries ? registered.filter((r) => !isSalaryRow({ category: r.category ?? "" })) : registered;
+  return buildMonthWatch({
+    month,
+    today: todayInRiyadh(),
+    lastBankDay: w.lastBankDay,
+    registered: shown,
+    paid: paid.flatMap((p) => (p.id ? [{ recurringExpenseId: p.id, day: p.day, amountMinor: p.amountMinor }] : [])),
+    series: opts.hideSalaries ? w.series.filter((s) => !isSalaryRow(s)) : w.series,
+  });
 }
