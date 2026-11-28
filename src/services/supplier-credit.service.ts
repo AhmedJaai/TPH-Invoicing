@@ -96,6 +96,10 @@ async function loadOpenInvoices(
              ), 0))::bigint as remaining
         from invoices i
        where i.supplier_id = ${supplierId}
+         -- الشهرُ المقفل لا يُخصَّص عليه: «الأقدمُ أوّلاً» كان يختار فاتورتَه فيرمي التخصيصُ
+         -- MonthClosedError ويُسقط الفعلَ كلَّه (أرشفةَ فاتورةٍ جديدة، «سُدّدت من حسابي»).
+         -- فتُتخطّى كما يتخطّاها reclaimForwardCredit، ويبقى ما عليها لمن يفتح الشهر.
+         and not exists (select 1 from month_closes mc where mc.month = i.period_month and mc.status = 'CLOSED')
          ${archivedOnly ? sql`and not exists (
            select 1 from documents d where d.id = i.document_id and d.status <> 'ARCHIVED'
          )` : sql``}

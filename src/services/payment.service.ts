@@ -12,6 +12,8 @@ import { currentMonthRiyadh, paymentMonthOf, todayInRiyadh } from "@/lib/riyadh-
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
 import { assertMonthsOpen } from "./month-guard";
+import { resyncBankExpenses } from "./expense.service";
+import { isExpenseCategory } from "@/lib/expenses";
 import { planAllocations, type AllocationRequest } from "@/lib/allocation";
 import {
   derivePaymentStatus, planReversal, type PaymentStatus,
@@ -307,6 +309,14 @@ export async function claimBankTransaction(
     ))
     .returning({ id: bankTransactions.id });
   if (rows.length === 0) throw new AlreadyMatchedError();
+  /*
+    حركةٌ صارت سداداً لمورّد لا يبقى عليها مصروف. كان المصروفُ المشتقّ من بابها
+    السابق (رسمٌ بنكيّ، «ليست سداداً» رُدّت) يبقى حتّى يُعاد الاشتقاق في الإقفال —
+    فيُحسب المبلغُ مرّتين: مشترياتٍ بالسداد ومصروفاً بالحركة.
+  */
+  if (set.category && !isExpenseCategory(set.category)) {
+    await resyncBankExpenses(tx, null, { transactionIds: [bankTransactionId] });
+  }
 }
 
 /**

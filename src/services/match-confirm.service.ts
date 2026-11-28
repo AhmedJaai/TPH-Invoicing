@@ -312,7 +312,11 @@ async function settleAccounts(
           from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`,
       })
       .from(invoices)
-      .where(eq(invoices.supplierId, supplierId)))
+      .where(and(
+        eq(invoices.supplierId, supplierId),
+        /* فاتورةُ الشهر المقفل لا تُخصَّص — كانت تُختار أوّلاً فيسقط السدادُ كلُّه بـ`MonthClosedError` */
+        sql`not exists (select 1 from month_closes mc where mc.month = ${invoices}.period_month and mc.status = 'CLOSED')`,
+      )))
       .map((i) => ({
         invoiceId: i.id,
         invoiceDate: i.invoiceDate,
@@ -356,10 +360,15 @@ async function settleAccounts(
           كان يُخطَّط على المبلغ كلِّه فيكتب «خصّص ٩٤٥ لفاتورتين» والقاعدةُ لم تكتب شيئاً (`allocate` يقصّ
           إلى الصفر)، وتُعدّ الفاتورتان مسدّدتين فتتخطّاهما الحوالةُ التالية — فينكسر «الأقدم أوّلاً».
         */
-        const [taken] = (await t.execute<{ s: string | null }>(sql`
-          select sum(amount_minor)::bigint::text as s from payment_allocations where payment_id = ${paymentId}
+        /*
+          والرسمُ كذلك: `allocate` لا يوزّع إلّا صافي الدفعة، فخطّةٌ على المبلغ كلِّه كانت تعدّ
+          الرسمَ مسدَّداً على فاتورةٍ لم يُكتب عليها — والقابلُ من القاعدة لا من الحوالة.
+        */
+        const [taken] = (await t.execute<{ s: string | null; fee: string | number }>(sql`
+          select (select sum(amount_minor)::bigint::text from payment_allocations where payment_id = ${paymentId}) as s,
+                 (select fee_minor from payments where id = ${paymentId}) as fee
         `)).rows;
-        const already = Number(taken?.s ?? 0);
+        const already = Number(taken?.s ?? 0) + Number(taken?.fee ?? 0);
         if (already > 0) {
           plan = settleSupplierAccount(
             Math.max(0, tx.amountMinor - already),

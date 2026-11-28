@@ -155,11 +155,29 @@ async function main() {
        )
     `)
   ).rows;
+  /*
+    ومالٌ يُحسب مرّتين لا يمنعه قيد: مصروفٌ بنكيٌّ على حركةٍ صارت سداداً لمورّد أو خرج
+    بابُها من المصروف (كان يبقى حتّى يُعاد الاشتقاق — نوفمبر ٢٠٢٦)، وتخصيصٌ على دفعةٍ مردودة.
+  */
+  const [twice] = (
+    await db.execute<{ expenses: number; reversed: number }>(sql`
+      select
+        (select count(*)::int from expenses e join bank_transactions t on t.id = e.bank_transaction_id
+          where e.source = 'BANK'
+            and (t.matched_payment_id is not null or t.direction = 'CREDIT'
+                 or t.category::text in ('SUPPLIER','INTERNAL','PERSONAL','UNKNOWN','OTHER_SALES'))) as expenses,
+        (select count(*)::int from payment_allocations a join payments p on p.id = a.payment_id
+          where p.status in ('REVERSED','VOID')) as reversed
+    `)
+  ).rows;
+  const doubled = Number(twice?.expenses ?? 0) + Number(twice?.reversed ?? 0);
   add(
     "financial_invariants",
-    Number(constraints?.n ?? 0) >= 5 ? "PASS" : "FAIL",
-    `القيود الماليّة المفروضة في القاعدة: ${Number(constraints?.n ?? 0)} من 5`,
-    "npm run db:migrate ثمّ npm run db:verify",
+    Number(constraints?.n ?? 0) >= 5 && doubled === 0 ? "PASS" : "FAIL",
+    `القيود الماليّة المفروضة في القاعدة: ${Number(constraints?.n ?? 0)} من 5`
+      + (doubled === 0 ? " · ولا مالَ محسوبٌ مرّتين"
+        : ` · مصروفٌ على حركةٍ ليست مصروفاً: ${Number(twice?.expenses ?? 0)} · تخصيصٌ على دفعةٍ مردودة: ${Number(twice?.reversed ?? 0)}`),
+    doubled > 0 ? "صفحة المصروفات: «أعد الاشتقاق» للشهر المفتوح، وراجع الدفعة المردودة" : "npm run db:migrate ثمّ npm run db:verify",
   );
 
   /* ── ٤ · تسوية البنك: المعادلة والفجوة ── */

@@ -24,6 +24,7 @@ import { isOwnersPayment } from "./payment-echo.service";
 import { MonthClosedError } from "./validation.service";
 import { recordAudit } from "@/lib/audit";
 import { refreshPaymentStatus, reversePayment } from "./payment.service";
+import { resyncBankExpenses } from "./expense.service";
 import { Conflict, NotFound, Refused } from "@/lib/domain-error";
 import { FailWithError } from "@/lib/domain-error";
 import type { Conn } from "./types";
@@ -90,6 +91,8 @@ export async function undoMatch(userId: string, body: MatchUndoBody, conn: Conn 
         }).where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchOutcome, "NOT_A_PAYMENT")))
           .returning({ id: bankTransactions.id });
         if (rows.length === 0) return false;
+        /* البابُ عاد — فمصروفُ «رسمٍ بنكيّ» المشتقُّ من الإعلان لا يبقى بعد ردّه */
+        await resyncBankExpenses(t, userId, { transactionIds: [tx.id], insertMissing: true });
         await t.insert(decisionHistory).values({
           bankTransactionId: tx.id,
           event: "MATCH_REVERSED",
