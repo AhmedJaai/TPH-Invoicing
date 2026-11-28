@@ -127,6 +127,22 @@ export default async function HomePage() {
     if (canPay && run && run.readyTotalMinor > 0) summary.push(`ودفعة ${formatMonth(runMonth)} جاهزة للتحويل (${countNoun(run.ready.length, SUPPLIER)}).`);
   }
 
+  /* الإحاطةُ نصّاً لمن يريد إطلاعَ شريكه أو محاسبه — من الأرقام نفسها أدناه */
+  const brief = start.knowsNothing ? null : (
+    <ShareBrief
+      text={buildBrief({
+        dateLabel: longDate(),
+        knowsNothing: start.knowsNothing,
+        owedMinor: totals.owedMinor,
+        owedSuppliers: totals.owedSuppliers,
+        weekMinor: week ? week.totalMinor : null,
+        balanceMinor: cash ? cash.balanceMinor : undefined,
+        pending: attention.length,
+        yesterdaySales,
+      })}
+    />
+  );
+
   return (
     <PageShell
       user={user}
@@ -136,23 +152,8 @@ export default async function HomePage() {
       display
       intro={summary.join(" ")}
       actions={
-        <>
-          {/* الإحاطةُ نصّاً لمن يريد إطلاعَ شريكه أو محاسبه — من الأرقام نفسها أدناه */}
-          {!start.knowsNothing && (
-            <ShareBrief
-              text={buildBrief({
-                dateLabel: longDate(),
-                knowsNothing: start.knowsNothing,
-                owedMinor: totals.owedMinor,
-                owedSuppliers: totals.owedSuppliers,
-                weekMinor: week ? week.totalMinor : null,
-                balanceMinor: cash ? cash.balanceMinor : undefined,
-                pending: attention.length,
-                yesterdaySales,
-              })}
-            />
-          )}
-        </>
+        /* على الجوّال تنزل الإحاطةُ تحت القرارات — كانت صفّاً كاملاً يدفع الجوابَ تحت الطيّ */
+        brief ? <span className="hidden sm:contents">{brief}</span> : undefined
       }
     >
       {start.incomplete && (
@@ -238,6 +239,8 @@ export default async function HomePage() {
           </div>
         )}
       </Section>
+
+      {brief && <div className="mt-4 flex justify-center sm:hidden">{brief}</div>}
 
       {!start.knowsNothing && (
         <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">

@@ -70,7 +70,7 @@ function SalesTile({ pulse }: { pulse: PulseView | null }) {
   const y = pulse.lastDay;
   return (
     <Link href="/finance/sales" className={tile}>
-      <TileHead icon={Activity} label="مبيعات اليوم حتى الآن" />
+      <TileHead icon={Activity} label="مبيعات اليوم" />
       <span className="mt-2 text-[1.45rem] font-bold leading-none tracking-tight sm:text-[2rem]">
         <Money minor={pulse.paidMinor} />
       </span>
