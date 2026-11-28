@@ -7,7 +7,7 @@
  * تخصيصاتُها فتعود الفواتيرُ مفتوحة، وتبقى الدفعةُ وأثرُها في السجلّ.
  *
  * وحارسُه أضيقُ من حارس الإلغاء العامّ: الدفعةُ نفسُها التي كُتبت الآن
- * (خلال `UNDO_WINDOW_MINUTES`)، بلا حركة بنك ولا مستند، وقائمةٌ لم تُردّ،
+ * (خلال `UNDO_WINDOW_MINUTES`) بإقرار المستخدم نفسِه في التدقيق، بلا حركة بنك ولا مستند، وقائمةٌ لم تُردّ،
  * في شهرٍ مفتوح. فلا يصير الزرُّ باباً لإلغاء مالٍ تاريخيّ.
  */
 import { inArray, sql } from "drizzle-orm";
@@ -43,6 +43,13 @@ export async function undoMarkedPaid(
       documentId: payments.documentId,
       recent: sql<boolean>`${payments}.created_at > now() - make_interval(mins => ${UNDO_WINDOW_MINUTES})`,
       hasBankTx: sql<boolean>`exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id)`,
+      /* كتبها إقرارُ هذا المستخدم نفسِه في النافذة — وإلّا فالزرُّ يلغي دفعةً نقديّةً أو يدويّةً لغيره */
+      markedByUser: sql<boolean>`exists (
+        select 1 from audit_logs a
+         where a.action = 'INVOICES_MARKED_PAID' and a.actor_id = ${userId}
+           and a.at > now() - make_interval(mins => ${UNDO_WINDOW_MINUTES})
+           and coalesce(a.after->'الدفعات', '[]'::jsonb) ? ${payments}.id
+      )`,
     })
     .from(payments)
     .where(inArray(payments.id, [...paymentIds]))
@@ -57,6 +64,9 @@ export async function undoMarkedPaid(
     }
     if (!p.recent) {
       throw new UndoError("انتهى وقت التراجع من الإشعار. ألغِ الدفعة من صفحة الفاتورة.", 409);
+    }
+    if (!p.markedByUser) {
+      throw new UndoError("هذه الدفعة لم تُسجَّل من إقرارك الآن، فلا تُلغى من هذا الإشعار. ألغِها من صفحة الفاتورة.", 409);
     }
     if (p.hasBankTx || p.documentId) {
       throw new UndoError("لهذه الدفعة حركة بنكية أو إيصال، فلا يمكن إلغاؤها من هنا.", 409);
