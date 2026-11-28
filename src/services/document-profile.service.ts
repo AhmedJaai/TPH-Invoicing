@@ -52,7 +52,8 @@ export interface DocumentProfile {
   model: string | null;
   confidence: Record<string, number> | null;
   supplier: { id: string; nameAr: string; slug: string } | null;
-  invoice: { id: string; number: string; totalMinor: number } | null;
+  /** المقيَّدُ كما حسبه الخادم — يُقارَن بما قرأه النموذج حقلاً حقلاً. */
+  invoice: { id: string; number: string; date: string | null; subtotalMinor: number | null; vatMinor: number | null; totalMinor: number } | null;
   statementId: string | null;
   /** ما قرأه النموذج — كما حُفظ، لا يُعدَّل. */
   reading: {
@@ -271,7 +272,11 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
       ? { id: row.supplierId, nameAr: row.supplierName, slug: row.supplierSlug }
       : null,
     invoice: row.invoiceId && row.totalMinor !== null
-      ? { id: row.invoiceId, number: row.invoiceNumber ?? "", totalMinor: row.totalMinor }
+      ? {
+          id: row.invoiceId, number: row.invoiceNumber ?? "", totalMinor: row.totalMinor,
+          date: row.invoiceDate ? isoDay(row.invoiceDate) : null,
+          subtotalMinor: row.subtotalMinor, vatMinor: row.vatMinor,
+        }
       : null,
     statementId: row.statementId,
     reading: x
