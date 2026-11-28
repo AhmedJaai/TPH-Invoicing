@@ -15,6 +15,7 @@ import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import type { TxCategory } from "@/lib/bank/rules";
 import type { LedgerSearch } from "@/lib/bank/ledger-search";
+import { hasLedgerFilters, type LedgerFilters } from "@/lib/bank/ledger-filters";
 import { LEDGER_RECENT, ledgerPages, ledgerWindow } from "@/lib/bank/ledger-window";
 import { findDoublePaid, partitionDoublePaid, type DoublePaidTx } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
@@ -255,6 +256,26 @@ function viewWhere(view: TxView): SQL | undefined {
   }
 }
 
+/**
+ * المرشِّحُ إلى شرط — والحالُ كما ترسمه خانةُ «الحالة» حرفاً (`StateCell`):
+ * «تنتظر قرارك» من `pendingDecision()` نفسها، و«مطابَقة» ما له سدادٌ أو قرار.
+ */
+function filterWhere(f: LedgerFilters): SQL | undefined {
+  /* يومُ الحركة بتوقيت الرياض كما يقرؤه `loadCashPosition` — لا بمنطقة الجلسة */
+  const day = sql`(${bankTransactions.valueDate} at time zone 'Asia/Riyadh')::date`;
+  return and(
+    f.fromDay ? sql`${day} >= ${f.fromDay}::date` : undefined,
+    f.toDay ? sql`${day} <= ${f.toDay}::date` : undefined,
+    f.minMinor !== null ? sql`${bankTransactions.amountMinor} >= ${f.minMinor}` : undefined,
+    f.maxMinor !== null ? sql`${bankTransactions.amountMinor} <= ${f.maxMinor}` : undefined,
+    f.category ? sql`${bankTransactions.category} = ${f.category}` : undefined,
+    f.state === "pending" ? sql`(${pendingDecision()})` : undefined,
+    f.state === "matched"
+      ? sql`(${bankTransactions.matchedPaymentId} is not null or ${bankTransactions.matchDisposition} is not null or ${bankTransactions.matchOutcome} = 'NOT_A_PAYMENT')`
+      : undefined,
+  );
+}
+
 export interface LedgerRow {
   id: string;
   valueDate: Date;
@@ -281,6 +302,11 @@ export interface Ledger {
   pages: number;
   /** كم صفّاً يُرسَم بلا شهر — لجملة «المعروض هو أحدث …». */
   recentLimit: number;
+  /**
+   * مع البحث أو المرشِّح: مجموعُ ما طابق كلِّه (لا المرسومِ وحده) خارجاً وداخلاً
+   * بالهللات — جوابُ «كم حوّلتُ لفلان في هذه الفترة؟». وبلاهما `null`.
+   */
+  sums: { outMinor: number; inMinor: number } | null;
 }
 
 export async function loadLedger(
@@ -288,9 +314,12 @@ export async function loadLedger(
   /** لمن لا يرى الرواتب: حوالاتُ «راتب أو أجر» لا تُرسم ولا تُبحث ولا تُعدّ في الألسنة */
   hideSalaries = false,
   page = 1,
+  filters: LedgerFilters | null = null,
 ): Promise<Ledger> {
   const noSalary = hideSalaries ? sql`${bankTransactions.category} <> 'SALARY'` : undefined;
-  const window = ledgerWindow(month, search !== null, page);
+  const filtered = filters !== null && hasLedgerFilters(filters);
+  const narrowing = search !== null || filtered;
+  const window = ledgerWindow(month, narrowing, page);
   const inMonth = month ? sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${month}` : undefined;
   /*
     البحثُ في الخادم لا في الصفوف المرسومة: نصُّ البنك واسمُ المستفيد، أو المبلغ إن
@@ -302,7 +331,7 @@ export async function loadLedger(
           ? sql` or ${bankTransactions.amountMinor} between ${search.amount.fromMinor} and ${search.amount.toMinor}`
           : sql``})`
     : undefined;
-  const where = and(viewWhere(view), inMonth, matches, noSalary);
+  const where = and(viewWhere(view), inMonth, matches, noSalary, filters && filtered ? filterWhere(filters) : undefined);
 
   const [rows, countRows, monthRows, matchedRows, hiddenRows] = await Promise.all([
     db.select({
@@ -346,9 +375,13 @@ export async function loadLedger(
       select distinct to_char(value_date, 'YYYY-MM') as m from bank_transactions order by 1 desc
     `),
 
-    /* عددُ ما طابق البحثَ كلّه — كي يُقال «أوّلُ ٣٠٠ من N» ولا تُقصّ القائمة بصمت */
-    search
-      ? db.select({ n: sql<number>`count(*)::int` }).from(bankTransactions).where(where)
+    /* عددُ ما طابق البحثَ كلّه ومجموعُه — كي يُقال «أوّلُ ٣٠٠ من N» ولا تُقصّ القائمة بصمت */
+    narrowing
+      ? db.select({
+          n: sql<number>`count(*)::int`,
+          outMinor: sql<string>`coalesce(sum(${bankTransactions.amountMinor}) filter (where ${bankTransactions.direction} = 'DEBIT'), 0)::bigint`,
+          inMinor: sql<string>`coalesce(sum(${bankTransactions.amountMinor}) filter (where ${bankTransactions.direction} = 'CREDIT'), 0)::bigint`,
+        }).from(bankTransactions).where(where)
       : Promise.resolve(null),
 
     hideSalaries
@@ -392,8 +425,11 @@ export async function loadLedger(
     months: monthRows.rows.map((r) => r.m),
     hiddenSalary: hiddenRows ? Number(hiddenRows[0]?.n ?? 0) : 0,
     page: window.page,
-    pages: ledgerPages(counts[view], month, search !== null),
+    pages: ledgerPages(counts[view], month, narrowing),
     recentLimit: LEDGER_RECENT,
+    sums: matchedRows
+      ? { outMinor: Number(matchedRows[0]?.outMinor ?? 0), inMinor: Number(matchedRows[0]?.inMinor ?? 0) }
+      : null,
   };
 }
 

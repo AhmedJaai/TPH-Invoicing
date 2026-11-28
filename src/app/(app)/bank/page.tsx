@@ -1,13 +1,15 @@
 import { Fragment } from "react";
 import { parseLedgerSearch } from "@/lib/bank/ledger-search";
 import { parseLedgerPage } from "@/lib/bank/ledger-window";
+import { hasLedgerFilters, ledgerFilterParams, parseLedgerFilters } from "@/lib/bank/ledger-filters";
+import { LedgerFilterBar, LedgerResultSummary } from "@/components/bank-ledger-filters";
 import { BankHeldRows } from "@/components/bank-held-rows";
 import { loadOpenHeldRows } from "@/services/bank-held.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
-  ListFilter, Search, Upload,
+  ListFilter, Upload,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -60,7 +62,10 @@ const VIEW_LABEL: Record<TxView, string> = {
 export default async function BankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tx?: string; show?: string; month?: string; q?: string; page?: string }>;
+  searchParams: Promise<{
+    tx?: string; show?: string; month?: string; q?: string; page?: string;
+    from?: string; to?: string; min?: string; max?: string; cat?: string; state?: string;
+  }>;
 }) {
   const params = await searchParams;
   const user = await currentUser();
@@ -78,6 +83,8 @@ export default async function BankPage({
     : "out";
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : null;
   const search = parseLedgerSearch(params.q);
+  const filters = parseLedgerFilters(params);
+  const filtered = hasLedgerFilters(filters);
 
   /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
   if (params.tx) redirect(txHref(params.tx));
@@ -85,7 +92,7 @@ export default async function BankPage({
   const [coverage, queue, ledger, doublePaid, handLinks, held, attention] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
-    loadLedger(view, month, search, !seesSalaries(user.role), parseLedgerPage(params.page)),
+    loadLedger(view, month, search, !seesSalaries(user.role), parseLedgerPage(params.page), filters),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
     loadOpenHeldRows(),
@@ -97,7 +104,8 @@ export default async function BankPage({
     كانت الشارةُ تقول ١ والصفحةُ «لا توجد حركات تنتظر» فلا يُعرف ما الواحد.
     وما وجهتُه الطابورُ هنا (`#queue`) يُعرض في الطابور نفسه تحت.
   */
-  const areaWork = attention.filter((i) => countedArea(i.href) === "/bank" && !i.href.startsWith("/bank#queue"));
+  /* و«الكشف يقف عند…» يقوله شريطُ التغطية فوقه بفعله — لا يُكرَّر بطاقةً ثانية في الطابور */
+  const areaWork = attention.filter((i) => countedArea(i.href) === "/bank" && !i.href.startsWith("/bank#queue") && i.id !== "bank-stale");
 
   const canApprove = can(user.role, "payment:approve");
   const canEdit = can(user.role, "bank:edit");
@@ -106,15 +114,20 @@ export default async function BankPage({
   const stale = staleDays !== null && staleDays > BANK_STALE_DAYS;
   const queuedTx = queue.groups.reduce((n, g) => n + g.items.length, 0);
 
-  /* اللسانُ والشهرُ والبحثُ يعيدون الصفحةَ إلى أوّلها — `page` وحده يحملها */
-  const href = (next: { show?: TxView; month?: string | null; q?: null; page?: number }) => {
+  /*
+    اللسانُ والشهرُ والبحثُ يعيدون الصفحةَ إلى أوّلها — `page` وحده يحملها.
+    والبحثُ والمرشِّحُ يبقيان مع تبديل اللسان والشهر، ويُزالان برقاقاتهما.
+  */
+  const filterParams = ledgerFilterParams(filters);
+  const href = (next: { show?: TxView; month?: string | null; q?: null; page?: number; drop?: readonly string[] }) => {
     const q = new URLSearchParams();
     const s = next.show ?? view;
     const m = next.month === undefined ? month : next.month;
+    const drop = new Set(next.drop ?? []);
     if (s !== "out") q.set("show", s);
     if (m) q.set("month", m);
-    /* البحثُ يبقى مع تبديل اللسان والشهر — ويُمسَح بزرّه */
-    if (search && next.q !== null) q.set("q", search.text);
+    if (search && next.q !== null && !drop.has("q")) q.set("q", search.text);
+    for (const [k, v] of Object.entries(filterParams)) if (!drop.has(k)) q.set(k, v);
     if (next.page && next.page > 1) q.set("page", String(next.page));
     const qs = q.toString();
     return `/bank${qs ? `?${qs}` : ""}#transactions`;
@@ -235,33 +248,32 @@ export default async function BankPage({
               )}
             </div>
 
-            {/* بحثٌ في الحركات كلِّها عند الخادم — لا في الصفوف المرسومة وحدها */}
-            <form action="/bank#transactions" className="mb-3 flex flex-wrap items-center gap-2" role="search">
-              <label className="relative flex min-w-0 flex-1 basis-64 items-center sm:max-w-md">
-                <Search className="pointer-events-none absolute start-3 h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                <input
-                  name="q"
-                  type="search"
-                  defaultValue={search?.text ?? ""}
-                  placeholder="مبلغ أو اسم أو نص من الكشف"
-                  aria-label="ابحث في كل الحركات بالمبلغ أو الاسم أو نص البنك"
-                  dir="auto"
-                  className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
-                />
-              </label>
-              {view !== "out" && <input type="hidden" name="show" value={view} />}
-              {month && <input type="hidden" name="month" value={month} />}
-              <button type="submit" className={buttonClass("secondary", "sm")}>ابحث</button>
-              {search && <LinkButton href={href({ q: null })} size="sm" variant="quiet">امسح البحث</LinkButton>}
-            </form>
+            {/* بحثٌ ومرشِّحٌ في الحركات كلِّها عند الخادم — لا في الصفوف المرسومة وحدها */}
+            <LedgerFilterBar
+              q={search?.text ?? ""}
+              filters={filters}
+              hidden={{ ...(view !== "out" ? { show: view } : {}), ...(month ? { month } : {}) }}
+              clearHref={href({ q: null, drop: Object.keys(filterParams) })}
+              chipHref={(drop) => href({ drop })}
+            />
 
-            {search ? (
-              <p className="mb-3 text-xs text-ink-soft" role="status">
-                <T s="{0} «{1}»{2} في «{3}»{4}{5}{6}" a={[ledger.total === 0 ? "لا توجد حركات مطابقة" : <Fragment key="0"><T s="{0} نتيجة مطابقة" a={[<span key="0" className="nums">{ledger.total}</span>]} /></Fragment>, <bdi key="1">{search.text}</bdi>, search.amount ? " (مبلغ أو نص)" : "", VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : " في كل الأشهر", ledger.total > ledger.rows.length && <Fragment key="5"><T s=". المعروض هو أحدث {0}، فضيّق البحث أو اختر شهراً" a={[<span key="0" className="nums">{ledger.rows.length}</span>]} /></Fragment>, view !== "all" && <Fragment key="6"> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></Fragment>]} /></p>
+            {(search || filtered) && ledger.sums ? (
+              ledger.total === 0 ? null : (
+                <LedgerResultSummary
+                  total={ledger.total}
+                  shown={ledger.rows.length}
+                  sums={ledger.sums}
+                  scope={<>
+                    <T s="في «{0}»{1}" a={[VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : filters.fromDay || filters.toDay ? "" : " في كل الأشهر"]} />
+                    {search?.amount && " · يُقرأ ما كتبته مبلغاً أو نصاً"}
+                    {view !== "all" && <Fragment> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></Fragment>}
+                  </>}
+                />
+              )
             ) : !month && ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-                <span><T s="المعروض هو أحدث {0} من {1}. ابحث في كل الحركات من الأعلى، أو اختر شهراً لترى حركاته." a={[countNoun(ledger.recentLimit, TRANSACTION), <span key="1" className="nums">{ledger.total}</span>]} /></span>
+                <span><T s="المعروض هو أحدث {0} من {1}. ابحث أو ضيّق بالتاريخ من الأعلى، أو اختر شهراً لترى حركاته." a={[countNoun(ledger.recentLimit, TRANSACTION), <span key="1" className="nums">{ledger.total}</span>]} /></span>
               </p>
             )}
 
@@ -282,9 +294,9 @@ export default async function BankPage({
                 <EmptyState
                   compact
                   icon={ListFilter}
-                  title={search ? `لا توجد حركات تطابق «${search.text}».` : `لا توجد حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
-                  hint="جرّب نوعاً أو شهراً آخر."
-                  action={<LinkButton href={href({ show: "all", month: null })} size="sm">اعرض الكل</LinkButton>}
+                  title={search ? `لا توجد حركات تطابق «${search.text}».` : filtered ? "لا توجد حركات بهذه الشروط." : `لا توجد حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
+                  hint={search || filtered ? `بحثتَ في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}. وسّع البحث إلى كل الأنواع والأشهر، أو أزل شرطاً من الرقاقات أعلاه.` : "جرّب نوعاً أو شهراً آخر."}
+                  action={<LinkButton href={href({ show: "all", month: null })} size="sm">{search || filtered ? "ابحث في كل الأنواع والأشهر" : "اعرض الكل"}</LinkButton>}
                 />
               }
               columns={[
