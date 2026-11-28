@@ -168,6 +168,8 @@ export interface ProductPriceHistory {
   state: PriceState;
   /** سعرُ كلّ فاتورة بترتيبها — بلا الشاذّ ولا المزدوج. */
   points: number[];
+  /** النقاطُ نفسُها بيومها وفاتورتها، الأقدمُ أوّلاً — للرسم وجدوله. */
+  history: { day: string; unitMinor: number; invoiceId: string; invoiceNumber: string | null }[];
 }
 
 const rank = (s: PriceState): number => {
@@ -205,6 +207,9 @@ export function priceHistory(lines: readonly WatchedLine[], todayDay: string): P
     changePct: i.trail.length >= 2 && i.state.kind !== "MIXED" ? sinceFirstPct(i.firstMinor, i.expectedMinor) : null,
     state: i.state,
     points: i.trail,
+    history: i.readings
+      .filter((r) => r.unitMinor !== null && !r.stray)
+      .map((r) => ({ day: r.day, unitMinor: r.unitMinor!, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber })),
   }));
   /* ما تغيّر فعلاً أوّلاً وبالأكبر، ثمّ ما يحتاج مراجعة بنده، ثمّ الأكثر شراءً */
   return out.sort(
