@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, Bot, CheckCheck, CircleAlert, CircleCheck, CloudOff, FileText, Info, RefreshCw, TriangleAlert } from "lucide-react";
+import { Bell, Bot, CheckCheck, CircleAlert, CircleCheck, CloudOff, FileText, Info, ListChecks, RefreshCw, TriangleAlert } from "lucide-react";
 import { request, postJson } from "@/lib/http-client";
 import { timeAgo } from "@/lib/arabic";
+import { splitNotices } from "@/lib/notice-groups";
 import type { NoticeFeed, Notice } from "@/services/notifications.service";
 import { Sheet } from "./ui-client";
 import { T } from "@/components/i18n/t";
@@ -32,6 +33,7 @@ const ICON = {
   OVERDUE: TriangleAlert,
   DRIVE: CloudOff,
   ACTIVITY: CircleCheck,
+  TASK: ListChecks,
 } as const;
 
 const TONE = { ok: "text-ok bg-ok-bg", warn: "text-warn bg-warn-bg", danger: "text-danger bg-danger-bg", info: "text-info bg-info-bg" } as const;
@@ -177,21 +179,48 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
 
         {feed && tab === "new" && (
           feed.notices.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
-              لا شيء جديد يستحق الإشعار خلال الأسبوعين الماضيين.
-            </p>
+            <div className="rounded-xl border border-dashed border-line px-4 py-10 text-center">
+              <CircleCheck className="mx-auto h-6 w-6 text-ok" strokeWidth={2} aria-hidden />
+              <p className="mt-2 text-sm font-bold">لا شيء يستحق الإشعار</p>
+              <p className="mt-1 text-xs text-muted">لا مهمّة حلّت، ولا مستند ينتظرك، ولا فعل لغيرك في الأسبوعين الماضيين.</p>
+            </div>
           ) : (
-            <ul className="space-y-1">
-              {feed.notices.map((n) => (
-                <NoticeRow key={n.id} n={n} unread={!feed.seenAt || n.at > feed.seenAt} />
-              ))}
-            </ul>
+            <NoticeGroups feed={feed} />
           )
         )}
 
         {feed && tab === "digest" && <DigestPanel feed={feed} />}
       </Sheet>
     </>
+  );
+}
+
+/**
+ * «يحتاج فعلاً» أوّلاً (ما نبرتُه تحذيرٌ أو خطر: مهمّةٌ حلّت، مستندٌ ينتظر، مزامنةٌ وقفت) ثمّ «ما جرى»
+ * (أفعالُ غيرك ووصولُ المستندات). والجديدُ منذ آخر قراءة معلَّمٌ في كلٍّ — لا خليطٌ بالأحدث وحده.
+ */
+function NoticeGroups({ feed }: { feed: NoticeFeed }) {
+  const { act, happened } = splitNotices(feed.notices);
+  const isUnread = (n: Notice) => !feed.seenAt || n.at > feed.seenAt;
+  return (
+    <div className="space-y-5">
+      <p className="text-xs text-muted">
+        {feed.unread > 0 ? <><strong className="text-ink">{feed.unread > 9 ? "أكثر من 9" : feed.unread} جديد</strong> منذ آخر قراءة</> : "لا جديد منذ آخر قراءة"}
+        {feed.seenAt && <> · قرأتها {timeAgo(feed.seenAt)}</>}
+      </p>
+      {act.length > 0 && (
+        <section aria-labelledby="notices-act">
+          <h3 id="notices-act" className="mb-1 px-2.5 text-[11px] font-bold text-ink-soft">يحتاج فعلاً منك</h3>
+          <ul className="space-y-1">{act.map((n) => <NoticeRow key={n.id} n={n} unread={isUnread(n)} />)}</ul>
+        </section>
+      )}
+      {happened.length > 0 && (
+        <section aria-labelledby="notices-happened">
+          <h3 id="notices-happened" className="mb-1 px-2.5 text-[11px] font-bold text-ink-soft">ما جرى</h3>
+          <ul className="space-y-1">{happened.map((n) => <NoticeRow key={n.id} n={n} unread={isUnread(n)} />)}</ul>
+        </section>
+      )}
+    </div>
   );
 }
 

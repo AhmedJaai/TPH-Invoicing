@@ -18,6 +18,8 @@ import { can, type Role } from "@/lib/permissions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { activityTarget, isOwnActivity } from "@/lib/notice-activity";
 import { loadOverdueBalances } from "./supplier-balance.service";
+import { loadDueTasks } from "./task.service";
+import { describeDue } from "@/lib/tasks";
 import { loadDriveHeartbeat } from "./drive-status.service";
 
 export type NoticeTone = "ok" | "warn" | "danger" | "info";
@@ -31,7 +33,7 @@ export interface Notice {
   body?: string;
   href: string;
   tone: NoticeTone;
-  kind: "DOCUMENTS" | "REVIEW" | "STALLED" | "OVERDUE" | "DRIVE" | "ACTIVITY";
+  kind: "DOCUMENTS" | "REVIEW" | "STALLED" | "OVERDUE" | "DRIVE" | "ACTIVITY" | "TASK";
   /** فعلٌ في السجلّ قام به النظام لا إنسان — يُرسَم بأيقونته. */
   bySystem?: boolean;
 }
@@ -92,7 +94,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
     .limit(1);
   const seenAt = seenRow?.seenAt ?? null;
 
-  const [arrivals, pending, activity, digestRow, overdue, drive] = await Promise.all([
+  const today = todayInRiyadh();
+  const [arrivals, pending, activity, digestRow, overdue, drive, dueTasks] = await Promise.all([
     db.execute<{ day: string; arrived: number; archived: number; last_at: string }>(sql`
       select to_char(created_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
              count(*)::int as arrived,
@@ -133,9 +136,26 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
     money ? loadOverdueBalances() : Promise.resolve([]),
     /* المزامنةُ المتوقّفة تُقال لمن يملك إصلاحها — مرّةً بحالها لا في كلّ فحص */
     can(user.role, "document:upload") ? loadDriveHeartbeat(user.id).catch(() => null) : Promise.resolve(null),
+    /* المهامُّ التي حلّت — الجرسُ حيث ينظر الفريق، فلا تبقى في صفحتها وحدها */
+    can(user.role, "task:view") ? loadDueTasks(today) : Promise.resolve([]),
   ]);
 
   const notices: Notice[] = [];
+
+  /* وقتُها الثامنةُ صباحاً بتوقيت الرياض من يومها (05:00Z) — تُعدّ جديدةً مرّةً ثمّ تبقى حتى تُغلق */
+  for (const t of dueTasks.slice(0, 5)) {
+    const day = t.level === "REMINDER" ? t.remindOn ?? today : t.dueOn ?? today;
+    notices.push({
+      id: `task:${t.id}:${day}`,
+      at: `${day}T05:00:00.000Z`,
+      kind: "TASK",
+      tone: t.level === "OVERDUE" ? "danger" : "warn",
+      title: t.level === "OVERDUE" ? `مهمّة متأخّرة: ${t.title}` : t.level === "TODAY" ? `اليوم: ${t.title}` : `تذكير: ${t.title}`,
+      body: !t.dueOn ? "أنجزها أو حدّد لها موعداً من المهام."
+        : `${t.level === "OVERDUE" ? describeDue(t.dueOn, today) : `موعدها ${describeDue(t.dueOn, today)}`}. أنجزها أو غيّر موعدها من المهام.`,
+      href: "/tasks",
+    });
+  }
 
   for (const d of arrivals.rows) {
     notices.push({
