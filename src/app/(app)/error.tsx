@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CloudOff, RotateCw, WifiOff } from "lucide-react";
 import { buttonClass } from "@/components/ui-tokens";
 import { T } from "@/components/i18n/t";
+import { useShellUser } from "@/components/shell-context";
+import { homeHref } from "@/lib/nav";
 
 /**
  * حدُّ الخطأ — بالعربية، داخل القشرة.
@@ -34,6 +36,11 @@ export default function ErrorPage({
   useEffect(() => {
     console.error(error);
   }, [error]);
+
+  /* البدايةُ بدايةُ الدور — مديرُ المشتريات لا يملك «اليوم» فكان الزرُّ يحوّله */
+  const user = useShellUser();
+  const home = user ? homeHref(user.role) : "/";
+  const homeLabel = home === "/" ? "ارجع إلى اليوم" : "ارجع إلى البداية";
 
   /* أمقطوعٌ الجهازُ أم الخادمُ لم يردّ؟ — الجوابان يختلفان، فتختلف الجملة */
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
@@ -83,8 +90,8 @@ export default function ErrorPage({
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button type="button" onClick={() => retry()} className={buttonClass("primary")}>
             <T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
-          <Link href="/" className={buttonClass("secondary")}>
-            حتى اليوم
+          <Link href={home} className={buttonClass("secondary")}>
+            {homeLabel}
           </Link>
         </div>
       </div>

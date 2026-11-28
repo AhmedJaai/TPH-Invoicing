@@ -60,6 +60,17 @@ export function Sidebar({
   const pathname = useShellPath();
   const groups = groupedAreas(role);
   const area = activeArea(pathname);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  /* موضعُك يُرى دائماً: إن وقع المدخلُ المفتوح تحت حافّة الشريط مُرِّر إليه */
+  useEffect(() => {
+    const box = scrollRef.current;
+    const on = box?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!box || !on) return;
+    const b = box.getBoundingClientRect();
+    const r = on.getBoundingClientRect();
+    if (r.top < b.top || r.bottom > b.bottom) on.scrollIntoView({ block: "nearest" });
+  }, [pathname]);
 
   return (
     <nav className="flex h-full flex-col" aria-label="التنقل الرئيسي">
@@ -86,9 +97,14 @@ export function Sidebar({
         <CaptureButton role={role} variant="frame" />
       </div>
 
-      <div className="frame-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      {/*
+        المداخلُ والإعداداتُ تمرّ معاً، والمستخدمُ وحده مثبَّتٌ أسفل. كانت الإعداداتُ
+        مثبَّتةً تحت التمرير فتأكل ١٨٠ بكسلاً، و«الموظفون» يختفي تحتها على شاشة
+        حاسوبٍ بارتفاع ٨٦٠ — والصفحةُ المفتوحة لا يُرى موضعُها في الشريط.
+      */}
+      <div ref={scrollRef} className="frame-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {groups.map((g) => (
-          <div key={g.group} className="mb-4">
+          <div key={g.group} className="mb-3">
             {g.label && (
               <p className="px-2.5 pb-1.5 text-[11px] font-bold tracking-wide text-frame-muted">{g.label}</p>
             )}
@@ -100,7 +116,7 @@ export function Sidebar({
                     <Link
                       href={entryHref(role, a)}
                       aria-current={current ? "page" : undefined}
-                      className={`group relative flex h-10 items-center gap-3 rounded-lg px-2.5 text-[14px] transition-colors ${
+                      className={`group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[14px] transition-colors ${
                         current
                           ? "bg-frame-raised font-bold text-frame-ink"
                           : "text-frame-muted hover:bg-frame-raised/60 hover:text-frame-ink"
@@ -127,10 +143,7 @@ export function Sidebar({
             </ul>
           </div>
         ))}
-      </div>
-
-      <div className="border-t border-frame-line px-3 pb-3 pt-2">
-        <ul className="space-y-0.5">
+        <ul className="space-y-0.5 border-t border-frame-line pt-2">
           {visibleAccountLinks(role).map((l) => {
             const on = pathname === l.href;
             return (
@@ -150,8 +163,9 @@ export function Sidebar({
             );
           })}
         </ul>
-        {footer && <div className="mt-2 border-t border-frame-line pt-3">{footer}</div>}
       </div>
+
+      {footer && <div className="border-t border-frame-line px-3 pb-3 pt-3">{footer}</div>}
     </nav>
   );
 }

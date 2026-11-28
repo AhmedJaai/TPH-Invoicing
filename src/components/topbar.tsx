@@ -31,6 +31,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
   /* الإعداداتُ وسجلُّ التدقيق خارج المساحات — وموضعُهما يُقال كذلك */
   const account = area ? undefined : [...ACCOUNT_LINKS].sort((a, b) => b.href.length - a.href.length)
     .find((l) => pathname === l.href || pathname.startsWith(`${l.href}/`));
+  const scrolledTitle = useScrolledTitle(pathname);
 
   return (
     <header className="topbar no-print sticky top-0 z-20 border-b border-line bg-surface/90 pt-(--safe-top) backdrop-blur-md">
@@ -39,7 +40,16 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
         <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="البداية">
           <BrandMark className="h-7 w-auto text-accent" />
         </Link>
-        <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? account?.label ?? "ذا بوبليك هاوس"}</p>
+        {/* حين يغيب عنوانُ الصفحة تحت الشريط يحلّ اسمُها محلَّ اسم المساحة — فيُعرف الموضعُ في منتصف الصفحة */}
+        <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden" aria-live="off">
+          {scrolledTitle ? (
+            <span key="page" className="block truncate animate-fade">
+              {scrolledTitle}
+            </span>
+          ) : (
+            area?.label ?? account?.label ?? "ذا بوبليك هاوس"
+          )}
+        </p>
 
         {/* الحاسوب: فتاتُ الموضع */}
         <nav aria-label="موقعك في النظام" className="hidden min-w-0 items-center gap-1.5 text-[13px] lg:flex lg:w-64 xl:w-72">
@@ -112,6 +122,37 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
       </div>
     </header>
   );
+}
+
+/**
+ * عنوانُ الصفحة حين يُمرَّر فوق الشريط العلويّ — `null` ما دام يُرى.
+ *
+ * على الجوّال يقول الشريطُ اسمَ المساحة («الموظفون») والعنوانُ تحته («مسيّر الرواتب»)؛
+ * فإذا نزلتَ في الصفحة غاب العنوانُ وبقي اسمُ المساحة وحده، وصفحاتُ المساحة كثيرة.
+ */
+function useScrolledTitle(pathname: string): string | null {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    let frame = 0;
+    function check() {
+      frame = 0;
+      const h1 = document.querySelector<HTMLElement>("#main h1");
+      const bar = document.querySelector<HTMLElement>("header.topbar");
+      if (!h1 || !bar) return setTitle(null);
+      const hidden = h1.getBoundingClientRect().bottom < bar.getBoundingClientRect().bottom;
+      setTitle(hidden ? h1.textContent?.trim() || null : null);
+    }
+    function onScroll() {
+      if (!frame) frame = requestAnimationFrame(check);
+    }
+    check();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [pathname]);
+  return title;
 }
 
 /**
