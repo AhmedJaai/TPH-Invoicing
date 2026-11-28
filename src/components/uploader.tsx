@@ -1730,12 +1730,37 @@ function ReviewCard({
   const isStatement = r.documentKind === "STATEMENT";
   /* أقرّ صاحبُ العمل بمانعٍ يُتجاوز (رقم المشتري) — وما زال وحدَه ما يمنع */
   const acked = !r.canArchive && Boolean(r.canArchiveWithAck) && item.edited.ackBlockers === "1";
-  const [showPaper, setShowPaper] = useState(false);
+  /* على الجوّال الورقةُ فوق الحقول ومفتوحةٌ للصورة: المقارنةُ تبدأ من الورقة، لا من زرٍّ في آخر البطاقة */
+  const [showPaper, setShowPaper] = useState(item.mimeType.startsWith("image/"));
   const fid = (k: string) => `${item.id}-${k}`;
+  const archivable = (r.canArchive || acked) && !item.archiving && !item.reviewing;
+  /* ما يمنع بعينه في الذيل الملتصق — كان يقول «مذكور في ملاحظات الفحص» وهي تحت شاشتين */
+  const firstBlocker = blocking[0]?.message ?? null;
+  /* الحقولُ الضعيفة أزرارٌ تنقل التركيزَ إليها: «راجع» بلا طريقٍ إلى ما يُراجَع تمريرٌ وبحث */
+  const weakTargets = [
+    ...(needsSupplier || low.has(LOW.supplier) ? [{ label: "المورّد", id: fid("supplier") }] : []),
+    ...(low.has(LOW.number) && !isStatement ? [{ label: "رقم الفاتورة", id: fid("number") }] : []),
+    ...(low.has(LOW.date) ? [{ label: "التاريخ", id: fid("date") }] : []),
+    ...(low.has(LOW.amounts) && canSeeAmounts ? [{ label: "المبالغ", id: fid("total") }] : []),
+  ];
+  const focusField = (id: string) => {
+    const el = document.getElementById(id) ?? document.querySelector<HTMLElement>(`[id^="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+  };
 
   return (
     /* `overflow-clip` لا `hidden`: `hidden` يجعل البطاقةَ وعاءَ تمريرٍ فلا يلتصق ذيلُها بأسفل الشاشة */
-    <article className="overflow-clip rounded-2xl border border-accent-line bg-raised shadow-lifted animate-rise">
+    /* ⌘↵ / Ctrl+↵ من أيّ حقلٍ في البطاقة يؤكّدها — الزرُّ نفسُه بحراسته، فلا يؤرشف ما يمنعه مانع */
+    <article
+      className="overflow-clip rounded-2xl border border-accent-line bg-raised shadow-lifted animate-rise"
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        if (archivable) onArchive();
+      }}
+    >
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line-soft px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2">
           {/* نوعُ الورقة يصحّحه من يرفعها: سندُ التسليم (أمرُ التوريد) يُحفظ ولا يُقيَّد فاتورة */}
@@ -1767,6 +1792,29 @@ function ReviewCard({
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="space-y-5 p-4 sm:p-5">
+          {/*
+            الورقةُ على الجوّال فوق الحقول — المراجعةُ مقارنةٌ تبدأ بالورقة. كانت خلف زرٍّ في
+            آخر البطاقة، فيُصحَّح الرقمُ من الذاكرة. ارتفاعُها محدود كي تبقى الحقولُ قريبة.
+          */}
+          <div className="lg:hidden">
+            {showPaper ? (
+              <div className="rounded-xl border border-line bg-sunken p-2">
+                {item.mimeType.startsWith("image/") ? (
+                  <div className="max-h-[55vh] overflow-auto">
+                    <Paper url={item.previewUrl} mime={item.mimeType} name={item.fileName} />
+                  </div>
+                ) : (
+                  <a href={item.previewUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+                    <T s="{0}افتح الملف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
+                )}
+              </div>
+            ) : null}
+            <button type="button" onClick={() => setShowPaper((v) => !v)} className={`${buttonClass("quiet", "sm")} mt-1`} aria-expanded={showPaper}>
+              <FileText className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              {showPaper ? "أخفِ الورقة" : "اعرض الورقة للمقارنة"}
+            </button>
+          </div>
+
           {/* فاتورةٌ قُيِّدت من كشف المورّد ولم يصل ملفُّها — وهذا ملفُّها: يُربط بقيدها ولا يُكرّره */}
           {r.completesStatementInvoice && (
             <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-bg px-3.5 py-2.5 text-xs leading-relaxed text-info">
@@ -1785,7 +1833,22 @@ function ReviewCard({
             <p className="flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-bg px-3.5 py-2.5 text-xs font-bold text-warn">
               <TriangleAlert className="mt-px h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
               <span>
-                <T s="{0} {1} إلى مراجعتك قبل الأرشفة، وعليها علامة «راجعه».{2}" a={[countNoun(decisions, FIELD), decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج", otherWeak.length > 0 && <span key="2" className="block font-normal text-ink-soft"><T s="وقُرئ بثقة ضعيفة: {0}." a={[otherWeak.join(" · ")]} /></span>]} /></span>
+                <T s="{0} {1} إلى مراجعتك قبل الأرشفة، وعليها علامة «راجعه».{2}" a={[countNoun(decisions, FIELD), decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج", otherWeak.length > 0 && <span key="2" className="block font-normal text-ink-soft"><T s="وقُرئ بثقة ضعيفة: {0}." a={[otherWeak.join(" · ")]} /></span>]} />
+                {weakTargets.length > 0 && (
+                  <span className="mt-2 flex flex-wrap gap-1.5">
+                    {weakTargets.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => focusField(w.id)}
+                        className="inline-flex min-h-11 items-center rounded-full border border-warn/40 bg-raised px-3 text-[11px] font-bold text-warn hover:bg-hover sm:min-h-8"
+                      >
+                        {w.label} ←
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </span>
             </p>
           )}
 
@@ -1809,7 +1872,7 @@ function ReviewCard({
               {!isStatement && <Field id={fid("number")} label="رقم الفاتورة" value={item.edited.invoiceNumber} weak={low.has(LOW.number)} onChange={(v) => onEdit("invoiceNumber", v)} />}
               <Field id={fid("date")} label={isStatement ? "آخر يوم في الكشف" : "التاريخ"} type="date" value={item.edited.invoiceDate} weak={low.has(LOW.date)} onChange={(v) => onEdit("invoiceDate", v)} />
               <div className="col-span-2 min-w-0 sm:col-span-1">
-                <p className="text-xs font-bold text-ink-soft">الشهر المحاسبي</p>
+                <p className="flex items-center justify-between gap-2 text-xs font-bold text-ink-soft">الشهر المحاسبي <span className="text-[10px] font-normal text-muted">يحسبه النظام</span></p>
                 <p className="nums mt-1.5 flex min-h-11 items-center rounded-lg bg-sunken px-3 text-sm sm:min-h-10">
                   {r.periodMonth ?? <span className="font-sans text-muted">يُحدَّد من التاريخ</span>}
                 </p>
@@ -1839,7 +1902,7 @@ function ReviewCard({
                 */}
                 <Field id={fid("discount")} label="الخصم (إن وُجد)" inputMode="decimal" value={item.edited.discount ?? ""} weak={false} onChange={(v) => onEdit("discount", v)} />
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-ink-soft">{r.preVatDiscount ? "بعد الخصم، قبل الضريبة" : "قبل الضريبة"}</p>
+                  <p className="flex items-center justify-between gap-2 text-xs font-bold text-ink-soft">{r.preVatDiscount ? "بعد الخصم، قبل الضريبة" : "قبل الضريبة"} <span className="text-[10px] font-normal text-muted">يحسبه النظام</span></p>
                   <p className="mt-1.5 flex min-h-11 items-center rounded-lg bg-sunken px-3 text-sm sm:min-h-10">
                     {r.subtotalMinor !== undefined ? <Money minor={r.subtotalMinor} /> : <span className="text-muted">غير معروف</span>}
                   </p>
@@ -1941,23 +2004,6 @@ function ReviewCard({
             </details>
           )}
 
-          {/* الورقةُ على الجوّال خلف زرّ — الشاشةُ الضيّقة لا تحمل الاثنين */}
-          <div className="lg:hidden">
-            <button type="button" onClick={() => setShowPaper((v) => !v)} className={buttonClass("quiet", "sm")} aria-expanded={showPaper}>
-              <FileText className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              {showPaper ? "أخفِ الورقة" : "قارن بالورقة"}
-            </button>
-            {showPaper && (
-              <div className="mt-2 rounded-xl border border-line bg-sunken p-2">
-                {item.mimeType.startsWith("image/") ? (
-                  <Paper url={item.previewUrl} mime={item.mimeType} name={item.fileName} />
-                ) : (
-                  <a href={item.previewUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-                    <T s="{0}افتح الملف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         <aside className="hidden border-s border-line-soft bg-sunken/60 p-3 lg:block" aria-label="الورقة">
@@ -1972,7 +2018,7 @@ function ReviewCard({
         على الجوّال الذيلُ يلتصق فوق شريط التنقّل ما دامت البطاقةُ على الشاشة: من قرأ
         «قُرئ كلُّ شيءٍ بثقة» يؤكّد من حيث هو، ومعه الإجماليّ — كان يمرّر شاشتين إلى الزرّ.
       */}
-      <footer className="sticky bottom-(--above-tabbar) z-10 border-t border-line-soft bg-raised px-4 py-3 sm:px-5 lg:static lg:bg-sunken/40 lg:py-3.5">
+      <footer className="sticky bottom-(--above-tabbar) z-10 border-t border-line-soft bg-raised px-4 py-3 shadow-raised sm:px-5 lg:py-3.5">
         {item.archiving && (
           <div className="mb-3">
             <Elapsed startedAt={item.startedAt} slowAfter={30} text="يرفع إلى الدرايف ويسجّل…" slowText="يرفع الآن، والخادم بطيء، فامنحه لحظة" />
@@ -2018,18 +2064,21 @@ function ReviewCard({
                   ? "لا يُحفظ شيء قبل تأكيدك، ثم يُرفع الملف الأصلي إلى مجلده ويُسجَّل."
                   : r.canArchiveWithAck
                     ? "يمنعها اختلاف رقم المشتري. صحّحه إن كانت القراءة خاطئة، أو أقرّ بأن الفاتورة لك."
-                    : "لا تتم الأرشفة قبل معالجة ما يمنعها، وهو مذكور في «ملاحظات الفحص»."}
+                    : firstBlocker
+                      ? <><b className="text-danger">يمنعها: </b>{firstBlocker}{blocking.length > 1 ? <T s=" (و{0} غيره في «ملاحظات الفحص»)" a={[<span key="0" className="nums">{blocking.length - 1}</span>]} /> : null}</>
+                      : "لا تتم الأرشفة قبل معالجة ما يمنعها، وهو مذكور في «ملاحظات الفحص»."}
           </p>
           <button
             type="button"
             onClick={onArchive}
-            disabled={!(r.canArchive || acked) || item.archiving || item.reviewing}
+            disabled={!archivable}
+            aria-keyshortcuts="Control+Enter Meta+Enter"
             className={`${buttonClass("primary", "md")} w-full sm:w-auto`}
           >
             {item.archiving ? "يؤرشف…" : item.archiveError ? (
               <><T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>
             ) : (
-              <><T s="{0}أكّد وأرشف" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />]} /></>
+              <><T s="{0}أكّد وأرشف" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />]} /><kbd aria-hidden className="hidden rounded border border-current/30 px-1 text-[10px] font-bold leading-4 opacity-70 lg:inline">⌘↵</kbd></>
             )}
           </button>
         </div>
