@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import {
-  CalendarClock, Copy, ListChecks, PieChart, Receipt, Repeat, Settings, Store, TriangleAlert,
+  CalendarClock, Copy, ListChecks, PieChart, Receipt, Repeat, Settings, Store, TriangleAlert, X,
 } from "lucide-react";
 import { db } from "@/db";
 import { expenses, suppliers } from "@/db/schema";
@@ -50,7 +50,7 @@ export const dynamic = "force-dynamic";
 export default async function ExpensesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; add?: string }>;
+  searchParams: Promise<{ month?: string; add?: string; cat?: string; src?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/money/expenses");
@@ -175,6 +175,29 @@ export default async function ExpensesPage({
 
   const incomplete = pending.count > 0;
 
+  /*
+    ── التصفية في الرابط ──
+    رسومُ الشبكة والبنك مئاتُ قيودٍ بهللاتٍ (٢٧٥ قيداً منها ٢٥٠ رسماً): تُطوى في سطرٍ بمجموعها
+    فتظهر القيودُ التي يُحكم عليها، وتُفتح بضغطة. والبابُ من «التصنيفات» يصفّي القيود.
+  */
+  const isFee = (c: string) => FEE_CATEGORIES.has(c);
+  const cat = p.cat === "fees" ? "fees" : p.cat && byCategory.has(p.cat) ? p.cat : null;
+  const src = p.src && Object.hasOwn(SOURCE_LABEL, p.src) ? (p.src as Expense["source"]) : null;
+  const fees = actual.filter((e) => isFee(e.category));
+  const feeMinor = fees.reduce((x, e) => x + e.amountMinor, 0);
+  const inCat = actual.filter((e) => (cat === null ? !isFee(e.category) : cat === "fees" ? isFee(e.category) : e.category === cat));
+  const listed = src ? inCat.filter((e) => e.source === src) : inCat;
+  const salaryMinor = allActual.filter(isSalaryRow).reduce((x, e) => x + e.amountMinor, 0);
+  const q = (next: { cat?: string | null; src?: string | null }) => {
+    const u = new URLSearchParams({ month });
+    const c = next.cat === undefined ? cat : next.cat;
+    const r = next.src === undefined ? src : next.src;
+    if (c) u.set("cat", c);
+    if (r) u.set("src", r);
+    return `/money/expenses?${u.toString()}#entries`;
+  };
+  const sources = (Object.keys(SOURCE_LABEL) as Expense["source"][]).filter((k) => inCat.some((e) => e.source === k));
+
   return (
     <PageShell
       user={user}
@@ -193,27 +216,40 @@ export default async function ExpensesPage({
       )}
 
       {/* ── رقمُ الشهر — والمقارنةُ حين يوجد ما يُقارَن به ── */}
-      {recurring.length === 0 ? (
+      {expectedTotal === 0 ? (
         /*
           بلا متوقَّعٍ مسجَّل تُعرَض بطاقةُ الفعليّ وحدها — «المتوقَّع ٠٫٠٠»
           تقول إنّ المقهى لا يتوقّع أن يصرف شيئاً، وذلك غير «لم يُسجَّل بعد».
         */
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-stretch">
           <Hero
-            label={`الفعلي في ${formatMonth(month)}`}
+            label={`مصروفات ${formatMonth(month)}`}
             minor={actualTotal}
             tone={incomplete ? "warn" : undefined}
-            note={incomplete ? `${countNoun(actual.length, ITEM)}، وينقصه ما لم يُسجَّل من الكشف` : countNoun(actual.length, ITEM)}
+            note={incomplete ? `${countNoun(allActual.length, ITEM)}، وينقصه ما لم يُسجَّل من الكشف` : countNoun(allActual.length, ITEM)}
           />
-          <Notice
-            tone="accent"
-            icon={Repeat}
-            title="لا توجد مقارنة بالمتوقع بعد"
-            action={<LinkButton href="/settings" variant="secondary" size="sm" icon={Settings}>سجّلها في الإعدادات</LinkButton>}
-            className="h-full sm:items-center"
-          >
-            سجّل الإيجار والرواتب والاشتراكات كمصروفات متكررة، ليقارن النظام بها المصروف الفعلي كل شهر، ويُظهر هنا ما كان متوقعاً ولم يُصرف.
-          </Notice>
+          {recurring.length === 0 ? (
+            <Notice
+              tone="accent"
+              icon={Repeat}
+              title="لا توجد مقارنة بالمتوقع بعد"
+              action={<LinkButton href="/settings#recurring" variant="secondary" size="sm" icon={Settings}>سجّلها في الإعدادات</LinkButton>}
+              className="h-full sm:items-center"
+            >
+              سجّل الإيجار والرواتب والاشتراكات كمصروفات متكررة، ليقارن النظام بها المصروف الفعلي كل شهر، ويُظهر هنا ما كان متوقعاً ولم يُصرف.
+            </Notice>
+          ) : (
+            /* «المتوقع ٠٫٠٠ · صرفت أكثر بـ٢٬١٠٠» كان يقول إنّ الإيجارَ زيادة — وهو ما سُجّل متكرّراً يستحقّ في شهرٍ آخر */
+            <Notice
+              tone="accent"
+              icon={Repeat}
+              title={`لا مصروف متكرر يستحق في ${formatMonth(month)}`}
+              action={<LinkButton href="/money/recurring" variant="secondary" size="sm">المتوقع هذا الشهر</LinkButton>}
+              className="h-full sm:items-center"
+            >
+              {`المسجّل (${countNoun(recurring.length, ITEM)}) يستحق في أشهر أخرى، فلا يُقارن به هذا الشهر.`}
+            </Notice>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -236,6 +272,14 @@ export default async function ExpensesPage({
           />
         </div>
       )}
+
+      {/* ── الرقمُ يُسمّى بما يشمله ── */}
+      <p className="mt-3 text-xs leading-relaxed text-muted">
+        <T s="يشمل ما سُجّل من كشف البنك ونقداً ومن الفواتير{0}{1}. ولا يشمل سداد المورّدين (محسوب في المشتريات) ولا تحويلاتك الشخصية." a={[
+          feeMinor > 0 && <span key="0"><T s="، ومنه رسوم الشبكة والبنك {0}" a={[<Money key="0" minor={feeMinor} />]} /></span>,
+          salaryMinor > 0 && <span key="1"><T s="، والرواتب {0}" a={[<Money key="0" minor={salaryMinor} />]} /></span>,
+        ]} />
+      </p>
 
       {/* ── ما يُنقص صدقَ الرقم — ولكلٍّ فعلُه بجانبه ── */}
       {(incomplete || duplicates.length > 0 || suspects.length > 0 || unmet.length > 0) && (
@@ -329,15 +373,22 @@ export default async function ExpensesPage({
         </div>
       )}
 
-      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+      <div className={`mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 ${expectedTotal > 0 && variance.length > 0 ? "xl:grid-cols-2" : "xl:max-w-2xl"}`}>
         {/* ── أين ذهب مصروفُ الشهر ── */}
-        <Section title="التصنيفات" icon={PieChart} className="mt-0!" hint={`مصروفات ${formatMonth(month)} حسب التصنيف، من القيود أدناه.`}>
+        <Section title="التصنيفات" icon={PieChart} className="mt-0!" hint={`مصروفات ${formatMonth(month)} حسب التصنيف. اضغط التصنيف لترى قيوده.`}>
           {categories.length === 0 ? (
             <EmptyState compact title="لا توجد قيود في هذا الشهر." hint="سجّل المصروفات من كشف البنك، أو أضف ما دفعته نقداً." />
           ) : (
             <div className="rounded-2xl border border-line bg-raised p-3 shadow-raised">
               <BarList
-                items={categories.map(([key, c]) => ({ key, label: c.label, minor: c.minor, sub: countNoun(c.n, ITEM) }))}
+                items={categories.map(([key, c]) => ({
+                  key,
+                  label: key === cat ? <b className="text-accent">{c.label}</b> : c.label,
+                  minor: c.minor,
+                  sub: countNoun(c.n, ITEM),
+                  /* الرواتبُ لغير المالك مجموعةٌ لا تُفتح قيودها */
+                  href: hideSalaries && isSalaryRow({ category: key }) ? undefined : q({ cat: key === cat ? null : key, src: null }),
+                }))}
               />
             </div>
           )}
@@ -346,9 +397,10 @@ export default async function ExpensesPage({
             جدولُ «المتوقَّع مقابل الفعلي» بلا متوقَّعٍ عمودان من أربعةٍ يقولان
             «لم يُتوقَّع» — فلا يُعرَض إلّا حين يوجد ما يُقارَن به.
           */}
+        </Section>
+
           {expectedTotal > 0 && variance.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-2 text-[13px] font-bold">المتوقع مقابل الفعلي</h3>
+            <Section title="المتوقع مقابل الفعلي" icon={Repeat} className="mt-0!" hint="في الأبواب التي سُجّل لها مصروف متكرر يستحق هذا الشهر.">
               <DataTable
                 rows={variance}
                 keyOf={(v) => v.category}
@@ -362,18 +414,41 @@ export default async function ExpensesPage({
                   },
                 ]}
               />
-            </div>
+            </Section>
           )}
-        </Section>
+      </div>
 
         {/* ── القيود ── */}
-        <Section title="القيود" icon={ListChecks} className="mt-0!" count={actual.length || undefined}>
+        <Section
+          id="entries"
+          title={cat === null ? "القيود" : cat === "fees" ? "رسوم الشبكة والبنك" : `قيود ${byCategory.get(cat)?.label ?? cat}`}
+          icon={ListChecks}
+          count={listed.length || undefined}
+          action={cat !== null ? <LinkButton href={q({ cat: null, src: null })} size="sm" variant="quiet" icon={X}>كل القيود</LinkButton> : undefined}
+        >
+          <div className="mb-3 flex flex-col gap-2">
+            {sources.length > 1 && (
+              <LinkTabs
+                label="مصدر القيد"
+                items={[
+                  { href: q({ src: null }), label: "كل المصادر", count: inCat.length, active: src === null },
+                  ...sources.map((k) => ({ href: q({ src: k }), label: SOURCE_LABEL[k], count: inCat.filter((e) => e.source === k).length, active: src === k })),
+                ]}
+              />
+            )}
+            {cat === null && fees.length > 0 && (
+              <Link href={q({ cat: "fees", src: null })} className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-dashed border-line bg-raised/60 px-4 py-2 text-xs transition-colors hover:bg-hover">
+                <span className="text-ink-soft"><T s="{0} من رسوم الشبكة والبنك مطويّة هنا" a={[countNoun(fees.length, ITEM)]} /></span>
+                <span className="font-bold"><Money minor={feeMinor} /> <span className="ms-2 text-accent">اعرضها</span></span>
+              </Link>
+            )}
+          </div>
           {hiddenSalaryRows > 0 && (
             <p className="mb-3 text-xs text-muted" role="note">
               <T s="{0} من باب الرواتب محجوبة هنا: الرواتب للمالك وحده، ومجموعها في الأبواب أعلاه." a={[countNoun(hiddenSalaryRows, ITEM)]} /></p>
           )}
           <DataTable
-            rows={actual}
+            rows={listed}
             keyOf={(e) => e.id}
             searchOf={(e) => `${CATEGORY_LABEL[e.category] ?? ""} ${e.label} ${formatDay(e.occurredOn)} ${SOURCE_LABEL[e.source]}`}
             searchLabel="ابحث في قيود الشهر"
@@ -413,10 +488,12 @@ export default async function ExpensesPage({
             ]}
           />
         </Section>
-      </div>
     </PageShell>
   );
 }
+
+/** رسومٌ بالهللات تتكرّر مع كلّ عمليّة شبكة — تُطوى في سطرٍ بمجموعها. */
+const FEE_CATEGORIES: ReadonlySet<string> = new Set(["POS_FEE", "POS_VAT", "BANK_FEE", "BANK_VAT"]);
 
 const SOURCE_LABEL: Record<Expense["source"], string> = {
   BANK: "من كشف البنك",

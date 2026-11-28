@@ -10,6 +10,7 @@ import { toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
 import { txHref } from "@/lib/inspector";
 import { T } from "@/components/i18n/t";
+import { ITEM, countNoun } from "@/lib/arabic";
 
 /**
  * تصحيحُ التصنيف في موضع التنبيه.
@@ -38,35 +39,78 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
   const [done, setDone] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
 
+  /** حركةٌ واحدة إلى «سداد مورّد» — بالمسار نفسه الذي يكتب ذاكرةَ الجهة. */
+  async function classify(s: Suspect): Promise<boolean> {
+    if (!s.bankTransactionId || !s.supplierId) return false;
+    /*
+      ومعرّفُ المورّد يُرسَل لا اسمُه وحده — النظام يعرفه (به طابق البند)،
+      فطلبُه من صاحب العمل سؤالٌ عمّا يُطرَح جوابُه.
+    */
+    const r = await postJson<{ message?: string }>("/api/counterparty", {
+      transactionId: s.bankTransactionId,
+      kind: "SUPPLIER",
+      supplierId: s.supplierId,
+      displayName: s.supplier,
+    });
+    if (!r.ok) {
+      setError({ id: s.id, message: r.error });
+      return false;
+    }
+    setDone((d) => new Map(d).set(s.id, r.data.message ?? "صُنّفت الحركة سداداً لمورّد"));
+    return true;
+  }
+
   async function fix(s: Suspect) {
-    if (!s.bankTransactionId || !s.supplierId) return;
     setBusy(s.id);
     setError(null);
     try {
-      /*
-        ومعرّفُ المورّد يُرسَل لا اسمُه وحده — النظام يعرفه (به طابق البند)،
-        فطلبُه من صاحب العمل سؤالٌ عمّا يُطرَح جوابُه.
-      */
-      const r = await postJson<{ message?: string }>("/api/counterparty", {
-        transactionId: s.bankTransactionId,
-        kind: "SUPPLIER",
-        supplierId: s.supplierId,
-        displayName: s.supplier,
-      });
-      if (!r.ok) {
-        setError({ id: s.id, message: r.error });
-        return;
+      if (await classify(s)) {
+        toast({ tone: "ok", title: "صُنّفت الحركة سداداً لمورّد", body: "وسيُطبَّق التصنيف على الحركات المشابهة في الكشوف القادمة." });
+        router.refresh();
       }
-      const message = r.data.message ?? "صُنّفت الحركة سداداً لمورّد";
-      setDone((d) => new Map(d).set(s.id, message));
-      toast({ tone: "ok", title: message, body: "وسيُطبَّق التصنيف على الحركات المشابهة في الكشوف القادمة." });
-      router.refresh();
     } finally {
       setBusy(null);
     }
   }
 
+  /*
+    دفعةً لمورّدٍ واحد — القاعدةُ واحدة (الجهةُ نفسُها سدادٌ لهذا المورّد)، فتُطبَّق على بنوده
+    واحداً بعد واحد بالمسار نفسه، ويقف عند أوّل خطأ ويقوله. ولا تُجمع مورّدين في ضغطة.
+  */
+  async function fixAll(supplierId: string) {
+    const group = suspects.filter((s) => s.supplierId === supplierId && s.bankTransactionId && !done.has(s.id));
+    setBusy(`all:${supplierId}`);
+    setError(null);
+    let ok = 0;
+    try {
+      for (const s of group) {
+        if (!(await classify(s))) break;
+        ok++;
+      }
+      if (ok > 0) {
+        toast({ tone: ok === group.length ? "ok" : "warn", title: `صُنّف ${countNoun(ok, ITEM)} من ${countNoun(group.length, ITEM)} سداداً لـ«${group[0]?.supplier ?? ""}»`, body: "وسيُطبَّق التصنيف على الحركات المشابهة في الكشوف القادمة." });
+        router.refresh();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const groups = [...new Set(suspects.flatMap((s) => (s.supplierId && s.bankTransactionId && !done.has(s.id) ? [s.supplierId] : [])))]
+    .map((id) => ({ id, items: suspects.filter((s) => s.supplierId === id && s.bankTransactionId && !done.has(s.id)) }))
+    .filter((g) => g.items.length > 1);
+
   return (
+    <>
+    {groups.length > 0 && (
+      <div className="mb-2 flex flex-wrap gap-2">
+        {groups.map((g) => (
+          <button key={g.id} type="button" aria-busy={busy === `all:${g.id}`} disabled={busy !== null} onClick={() => fixAll(g.id)} className={buttonClass("primary", "sm")}>
+            {`صنّف ${countNoun(g.items.length, ITEM)} سداداً لـ«${g.items[0].supplier}» — `}<Money minor={g.items.reduce((x, s) => x + s.amountMinor, 0)} />
+          </button>
+        ))}
+      </div>
+    )}
     <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
       {suspects.map((s) => {
         const finished = done.get(s.id);
@@ -90,7 +134,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                 <button
                   aria-busy={busy === s.id}
                   type="button"
-                  disabled={busy === s.id || !s.bankTransactionId || !s.supplierId}
+                  disabled={busy !== null || !s.bankTransactionId || !s.supplierId}
                   onClick={() => fix(s)}
                   className={buttonClass("primary", "sm")}
                 >
@@ -111,5 +155,6 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
         );
       })}
     </ul>
+    </>
   );
 }
