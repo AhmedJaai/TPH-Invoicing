@@ -155,12 +155,21 @@ export default async function ItemsAndPricesPage({
   const falls = priceMoves.filter((i) => i.priceChange!.direction === "down");
   const maxRise = Math.max(0, ...rises.map((i) => pctOf(i) ?? 0));
 
-  const dueSoon = items
+  /*
+    دورةُ الشراء: ما حان موعدُه (من ٨٥٪ من دورته إلى ثلاثة أضعافها)، وما تجاوزها كثيراً
+    — ثلاثةُ أضعاف وفوق ٤٥ يوماً — توقّفتَ عن شرائه على الأرجح: بدّلتَ مورّده أو أُوقف
+    الصنف. كان يتصدّر القائمة «فات موعده» منذ ١٨٧ يوماً فيدفن ما يُشترى فعلاً هذا الأسبوع.
+  */
+  const cycles = items
     .filter((i) => i.averageDaysBetweenOrders !== null && daysSince(i.lastOrderedAt) !== null)
-    .filter((i) => daysSince(i.lastOrderedAt)! >= i.averageDaysBetweenOrders! * 0.85)
     .map((item) => ({ item, cycle: item.averageDaysBetweenOrders!, since: daysSince(item.lastOrderedAt)! }))
+    .filter((x) => x.since >= x.cycle * 0.85);
+  const stopped = (x: { cycle: number; since: number }) => x.since > x.cycle * 3 && x.since > 45;
+  const dueSoon = cycles
+    .filter((x) => !stopped(x))
     .sort((a, b) => b.since / b.cycle - a.since / a.cycle)
     .slice(0, 12);
+  const stoppedBuying = cycles.filter(stopped).sort((a, b) => a.since - b.since);
 
   const unmapped = mapping ? mapping[2].total - mapping[2].mapped : 0;
 
@@ -356,17 +365,42 @@ export default async function ItemsAndPricesPage({
               <EmptyState compact icon={CalendarClock} title="لا يوجد صنف حان موعد شرائه." hint="تُحسب دورة الشراء للأصناف التي اشتريتها في يومين مختلفين على الأقل." />
             ) : (
               <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
-                {dueSoon.map((x) => (
-                  <li key={x.item.key} className="flex items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 block break-words text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
-                      <span className="block text-[11px] leading-relaxed text-muted">
-                        <T s="{0} · عادةً كل {1} · آخر شراء قبل {2}" a={[x.item.supplierName, countNoun(x.cycle, DAY), countNoun(x.since, DAY)]} /></span>
-                    </span>
-                    <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "فات موعده" : "حان موعده"}</Badge>
-                  </li>
-                ))}
+                {dueSoon.map((x) => {
+                  const slug = x.item.supplierId ? slugOf.get(x.item.supplierId) : undefined;
+                  const body = (
+                    <>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block break-words text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
+                        <span className="block text-[11px] leading-relaxed text-muted">
+                          <T s="{0} · عادةً كل {1} · آخر شراء قبل {2}" a={[x.item.supplierName, countNoun(x.cycle, DAY), countNoun(x.since, DAY)]} /></span>
+                      </span>
+                      <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "فات موعده" : "حان موعده"}</Badge>
+                    </>
+                  );
+                  const cls = "flex min-h-14 items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised";
+                  return (
+                    <li key={x.item.key}>
+                      {/* يفتح أسعارَ الصنف عند مورّده — من تطلب، وبكم آخرَ مرّة */}
+                      {slug ? <Link href={`/suppliers/${slug}?tab=prices#detail`} className={`${cls} transition-colors hover:border-accent-line`}>{body}</Link> : <div className={cls}>{body}</div>}
+                    </li>
+                  );
+                })}
               </ul>
+            )}
+            {stoppedBuying.length > 0 && (
+              <details className="group mt-3 rounded-xl border border-line-soft bg-sunken/40 px-4 py-2 text-[12px]">
+                <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-bold text-ink-soft">
+                  <T s="{0} توقّفت عن شرائها على ما يبدو (لم تُشترَ منذ ثلاثة أضعاف دورتها)" a={[countNoun(stoppedBuying.length, PRODUCT)]} />
+                </summary>
+                <ul className="mt-1 space-y-1 pb-2 text-muted">
+                  {stoppedBuying.map((x) => (
+                    <li key={x.item.key}>
+                      <bdi dir="auto" className="text-ink-soft">{x.item.displayName}</bdi>
+                      <T s=" · {0} · آخر شراء قبل {1}" a={[x.item.supplierName, countNoun(x.since, DAY)]} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </Section>
         </>
