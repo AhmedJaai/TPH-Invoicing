@@ -55,7 +55,14 @@ export interface PlannerSupplier {
 
 type RowState = "running" | "ok" | "failed";
 
-export function PayRunPlanner({ month, suppliers, only = null }: { month: string; suppliers: PlannerSupplier[]; only?: string | null }) {
+/** آخرُ رصيدٍ معروف وحدُّه الأدنى — من `loadCashPosition` و`loadCashFloor` كما يقرؤهما «النقد القادم». */
+export interface PlannerCash {
+  balanceMinor: number | null;
+  asOf: string | null;
+  floorMinor: number | null;
+}
+
+export function PayRunPlanner({ month, suppliers, only = null, cash = null }: { month: string; suppliers: PlannerSupplier[]; only?: string | null; cash?: PlannerCash | null }) {
   const router = useRouter();
   /* ما اختاره من قبل لهذا الشهر يعود بعد التحميل — ويُقال في سطرٍ ظاهر */
   const raw = useSyncExternalStore(subscribeSelection, () => rawSelection(month), () => "");
@@ -329,6 +336,7 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
               <T s="{0}سجّل المحدد مسدّداً" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />]} /></button>
           </div>
         </div>
+        {cash && <CashCheck cash={cash} payingMinor={totalMinor} />}
         {markBlocked && <p className="mt-2 text-[11px] text-ink-soft">{markBlocked}</p>}
         {customised && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-soft">
@@ -577,6 +585,44 @@ export function PayRunPlanner({ month, suppliers, only = null }: { month: string
 }
 
 /** رسالةُ واتساب جاهزة لمورّدٍ محجوزةٍ فواتيره — رابطٌ يفتح واتساب ولا يُرسل شيئاً وحده. */
+/**
+ * «هل يكفي الرصيد؟» بجانب المجموع — السؤالُ الثاني لكلّ دفعة. عرضٌ لا كتابة:
+ * آخرُ رصيدٍ معروف ناقصَ ما اخترته، ويُقال إن نزل تحت الحدّ الأدنى أو تحت الصفر.
+ * والمجهولُ «غير معروف» مع بابه — لا «يكفي» عن غير علم.
+ */
+function CashCheck({ cash, payingMinor }: { cash: PlannerCash; payingMinor: number }) {
+  if (cash.balanceMinor === null) {
+    return (
+      <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-soft">
+        <Wallet className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        <span>الرصيد غير معروف، فلا يُعرف هل يكفي لهذه الدفعة.</span>
+        <Link href="/bank#import" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">استورد كشفاً فيه الرصيد</Link>
+      </p>
+    );
+  }
+  const after = cash.balanceMinor - payingMinor;
+  const tone = after < 0 ? "danger" : cash.floorMinor !== null && after < cash.floorMinor ? "warn" : "ok";
+  const cls = tone === "danger" ? "border-danger/25 bg-danger-bg text-danger" : tone === "warn" ? "border-warn/30 bg-warn-bg text-warn" : "border-ok/25 bg-ok-bg text-ok";
+  const Icon = tone === "ok" ? CircleCheck : CircleAlert;
+  return (
+    <div role="status" className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-3 py-2 text-xs ${cls}`}>
+      <span className="flex items-center gap-1.5 font-bold">
+        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+        {tone === "danger" ? "الرصيد لا يكفي هذه الدفعة" : tone === "warn" ? "تكفي، لكن الرصيد ينزل تحت حدّك الأدنى" : "الرصيد يكفي هذه الدفعة"}
+      </span>
+      <span className="text-ink-soft">
+        <T s="آخر رصيد معروف {0}{1} · يبقى بعدها {2}" a={[
+          <Money key="0" minor={cash.balanceMinor} />,
+          cash.asOf ? ` (${formatDay(cash.asOf)})` : "",
+          <span key="2" className={`font-bold ${after < 0 ? "text-danger" : "text-ink"}`} dir="ltr">{after < 0 ? "−" : ""}<Money minor={Math.abs(after)} /></span>,
+        ]} />
+        {cash.floorMinor !== null && <T s=" · حدّك الأدنى {0}" a={[<Money key="0" minor={cash.floorMinor} />]} />}
+      </span>
+      <Link href="/cash" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:ms-auto sm:min-h-0">ما يخرج غير هذه الدفعة</Link>
+    </div>
+  );
+}
+
 export function WhatsAppLink({ href }: { href: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>

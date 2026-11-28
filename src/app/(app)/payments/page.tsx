@@ -17,6 +17,8 @@ import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { loadPayeeAccounts } from "@/services/payee-account.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
+import { loadCashPosition } from "@/services/briefing.service";
+import { loadCashFloor } from "@/services/app-settings.service";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { db } from "@/db";
 import { suppliers as suppliersTable } from "@/db/schema";
@@ -55,7 +57,8 @@ export default async function PaymentsPage({
   const defaultMonth = previousMonth(current);
   const chosen = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : null;
 
-  const balances = await loadSupplierBalances();
+  /* «هل يكفي الرصيد؟» من المصدرين اللذين يقرأ منهما «النقد القادم» — لا حسابٌ ثانٍ */
+  const [balances, cashPos, floorMinor] = await Promise.all([loadSupplierBalances(), loadCashPosition(), loadCashFloor()]);
   const creditBy = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
   /*
     بلا اختيار: الشهرُ الماضي — فإن لم يبقَ فيه شيءٌ (سُدّد كلُّه) فالجاري حتى اليوم.
@@ -205,7 +208,7 @@ export default async function PaymentsPage({
         <>
           {run.ready.length > 0 && (
             <div className="mt-10">
-              <PayRunPlanner month={month} suppliers={planner} only={only} />
+              <PayRunPlanner month={month} suppliers={planner} only={only} cash={{ balanceMinor: cashPos.balanceMinor, asOf: cashPos.asOf, floorMinor }} />
             </div>
           )}
 
