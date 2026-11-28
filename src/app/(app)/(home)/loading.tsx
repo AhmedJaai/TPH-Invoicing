@@ -8,5 +8,14 @@ import { greeting, longDate } from "@/services/briefing.service";
  * تحتاج قاعدة، والاسمُ من القشرة.
  */
 export default function Loading() {
-  return <PageSkeleton title={<SkeletonGreeting greeting={greeting()} />} eyebrow={longDate()} display stats={4} />;
+  return (
+    <PageSkeleton
+      title={<SkeletonGreeting greeting={greeting()} />}
+      eyebrow={longDate()}
+      display
+      intro={2}
+      actions={2}
+      layout={[{ kind: "hero", side: 2 }, { kind: "stats", count: 4 }, { kind: "list", rows: 3 }]}
+    />
+  );
 }

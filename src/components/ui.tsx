@@ -333,7 +333,7 @@ export function isNumeric(value: React.ReactNode): boolean {
  * بمقاس الوعاء لا الشاشة (`@container` في `PageShell` ولوح الفحص).
  */
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className={STAT_GRID}>{children}</div>;
+  return <div className={STAT_GRID_CLASS}>{children}</div>;
 }
 
 /**
@@ -341,7 +341,7 @@ export function StatGrid({ children }: { children: React.ReactNode }) {
  * الأخيرة الوحيدة في صفّها تأخذه كلَّه لا نصفَه (كانت الثالثةُ تقبع وحدها على اليمين).
  * `col-span-full` لا `col-span-2`: في شبكةٍ من عمودٍ واحد يُنشئ الثاني عموداً خفيّاً.
  */
-const STAT_GRID =
+export const STAT_GRID_CLASS =
   "grid grid-cols-2 gap-3 @max-[22rem]:grid-cols-1 @max-3xl:[&>:last-child:nth-child(odd)]:col-span-full @3xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]";
 
 /**

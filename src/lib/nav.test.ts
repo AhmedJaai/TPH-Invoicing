@@ -319,6 +319,41 @@ describe("الهيكل يحمل اسم صفحته", () => {
   }
 });
 
+describe("الهيكل بعرض صفحته", () => {
+  /*
+    `PageSkeleton` عرضُه الافتراضيّ «wide» و`PageShell` «page» — هيكلُ «إقفال الشهر»
+    و«ما قرّرته» و«قائمة الطلب» كان أعرضَ من صفحته بـ٢٨٨ بكسلاً، فينكمش المحتوى
+    لحظةَ وصوله. والمقارنةُ بآخر `PageShell` في الملفّ — الرسمُ الكامل؛ وما قبله
+    «خارج صلاحيتك» أو «لا بيانات بعد».
+  */
+  const widthsOf = (file: string, tag: "PageShell" | "PageSkeleton", fallback: string): string[] => {
+    const src = readFileSync(file, "utf8");
+    return [...src.matchAll(new RegExp(`<${tag}\\b([\\s\\S]*?)>`, "g"))].map(
+      (m) => m[1].match(/\bwidth="([a-z]+)"/)?.[1] ?? fallback,
+    );
+  };
+  const loadings: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const f = join(dir, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (e.name === "loading.tsx") loadings.push(f);
+    }
+  };
+  walk("src/app");
+
+  for (const l of loadings) {
+    const page = l.replace(/loading\.tsx$/, "page.tsx");
+    if (!existsSync(page)) continue;
+    const shells = widthsOf(page, "PageShell", "page");
+    const skeleton = widthsOf(l, "PageSkeleton", "wide");
+    if (shells.length === 0 || skeleton.length !== 1) continue;
+    it(`${l} بعرض صفحته`, () => {
+      expect(skeleton[0]).toBe(shells[shells.length - 1]);
+    });
+  }
+});
+
 /*
   لا رابطَ ظاهرٌ لدورٍ يفتح عليه «خارج صلاحيتك» — وجده الزاحفُ بدور مدير
   المشتريات: العلامةُ إلى «اليوم» (يُحوِّل)، وألسنةُ المورّدين إلى صفحاتٍ مالُها
