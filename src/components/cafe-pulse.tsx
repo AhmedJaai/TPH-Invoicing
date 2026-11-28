@@ -2,7 +2,6 @@ import Link from "next/link";
 import { hourLabel } from "@/lib/finance/sales-heatmap";
 import { Activity, ArrowLeft } from "lucide-react";
 import { Money } from "./money";
-import { Delta } from "./ui";
 import { T } from "@/components/i18n/t";
 import { timeAgo, countNoun, ORDER } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -32,47 +31,33 @@ export function CafePulse({ pulse, month }: { pulse: PulseView; month?: PulseMon
   /* اسمُ يوم الأسبوع وحده («الثلاثاء») — الرقمُ بعده في `formatWeekday` يومُ هذا الأسبوع لا الماضي */
   const lastWeekDay = formatWeekday(pulse.businessDay).split(" ")[0];
   const peak = Math.max(pulse.peakMinor, 1);
-  const y = pulse.yesterday;
+  /*
+    الرقمُ الكبير وفرقُه وأمسُ صارت في بطاقة «مبيعات اليوم» أعلى الرئيسيّة (`TodayAnswers`)؛
+    وهنا تفصيلُها: ساعةً بساعة، ونظيرُها بمبلغه، والطلبات، والأكثرُ طلباً، وربحُ الشهر.
+  */
   return (
     <section aria-labelledby="pulse-title" className="relative overflow-hidden rounded-2xl border border-line bg-raised p-5 shadow-raised sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
-          <h2 id="pulse-title" className="flex items-center gap-2 text-xs font-bold text-muted">
+          <h2 id="pulse-title" className="flex items-center gap-2 text-sm font-bold">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
               <Activity className="h-4 w-4" strokeWidth={2} aria-hidden />
             </span>
-            مبيعات اليوم حتى الآن
+            اليوم ساعة بساعة
           </h2>
-          <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[2.25rem] font-bold leading-none tracking-tight sm:text-[2.6rem]"><Money minor={pulse.paidMinor} /></span>
-            <span className="text-xs text-muted">ر.س شاملة الضريبة</span>
-          </p>
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-            {/* قبل أوّل طلبٍ في اليوم «−١٠٠٪» ضجيج — يُقال ما كان في نظيره حتى الآن وحده */}
-            {pulse.vsLastWeekBp !== null && pulse.orders > 0 && <Delta pct={pulse.vsLastWeekBp / 100} favourable={pulse.vsLastWeekBp >= 0} />}
+          <p className="mt-3 text-xs text-ink-soft">
             {pulse.lastWeekToNowMinor !== null
-              ? <T s="{0} الماضي حتى الساعة نفسها: {1}" a={[lastWeekDay, <bdi key="1" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.lastWeekToNowMinor)}</bdi>]} />
+              ? <T s="{0} · و{1} الماضي حتى الساعة نفسها {2}" a={[<span key="0" className="font-bold text-ink"><bdi className="nums" dir="ltr">{formatRiyalsDisplay(pulse.paidMinor)}</bdi> اليوم</span>, lastWeekDay, <bdi key="2" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.lastWeekToNowMinor)}</bdi>]} />
               : "لا بيانات ليوم الأسبوع نفسه قبل أسبوع للمقارنة"}
           </p>
           <p className="mt-1 text-xs text-muted">
             {pulse.orders > 0
-              ? <T s="{0} · متوسط الطلب {1}" a={[countNoun(pulse.orders, ORDER), <bdi key="1" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.avgOrderMinor ?? 0)}</bdi>]} />
+              ? <T s="{0} · متوسط الطلب {1} · شاملة الضريبة" a={[countNoun(pulse.orders, ORDER), <bdi key="1" className="nums" dir="ltr">{formatRiyalsDisplay(pulse.avgOrderMinor ?? 0)}</bdi>]} />
               : "لم يُسجَّل طلب بعد في يوم العمل هذا"}
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-        {y && (
-          <div className="rounded-xl bg-sunken/60 px-4 py-3 text-xs">
-            <p className="font-bold text-muted">أمس</p>
-            <p className="mt-1 text-lg font-bold"><Money minor={y.paidMinor} /></p>
-            <p className="mt-1 flex items-center gap-1.5 text-ink-soft">
-              {y.vsUsualBp !== null
-                ? <><Delta pct={y.vsUsualBp / 100} favourable={y.vsUsualBp >= 0} /> عن المعتاد ليومه</>
-                : countNoun(y.orders, ORDER)}
-            </p>
-          </div>
-        )}
         {/* «كم ربحتُ هذا الشهر؟» بجانب «كيف يمشي اليوم؟» — من `loadPnl` نفسِه وباسمه */}
         {month && (
           <Link href="/finance" className="rounded-xl bg-sunken/60 px-4 py-3 text-xs transition-colors hover:bg-accent-soft/60">

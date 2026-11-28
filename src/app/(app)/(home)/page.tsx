@@ -5,15 +5,15 @@ import { buildBrief } from "@/lib/morning-brief";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
-  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
+  ArrowLeft, CalendarCheck, CircleCheck, Inbox, ShoppingBasket, Sparkles, Store, Wallet,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, EmptyState, Kbd, KeyFigure, LinkButton, Meter, Section, StatGrid, Stepper, buttonClass } from "@/components/ui";
+import { Badge, EmptyState, Kbd, KeyFigure, Meter, Section, StatGrid, Stepper, buttonClass } from "@/components/ui";
 import { SectionBoundary } from "@/components/ui-client";
 import { TaskList } from "@/components/task-list";
 import { Changes } from "@/components/changes";
@@ -23,7 +23,7 @@ import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
 import { CHECK, DAY, ITEM, OTHER_ITEM, SUPPLIER, WARNING, countNoun, countNounGen, doesNotBlock } from "@/lib/arabic";
 import { previousMonth } from "@/lib/filing";
-import { addDays, currentMonthRiyadh, formatDay, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, currentMonthRiyadh, formatMonth, formatWeekday, todayInRiyadh } from "@/lib/riyadh-time";
 import { sinceYesterday } from "@/lib/since-yesterday";
 import { loadDayFigures } from "@/services/daily-figures.service";
 import { SinceYesterdayLine } from "@/components/since-yesterday";
@@ -35,25 +35,25 @@ import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 import { T } from "@/components/i18n/t";
 import { CafePulse } from "@/components/cafe-pulse";
+import { TodayAnswers } from "./today-answers";
 import { loadPnl } from "@/services/profit.service";
 import { loadOutstanding } from "@/services/outstanding.service";
 import { loadPulseOnce } from "@/services/pulse.service";
 
 export const dynamic = "force-dynamic";
 
-/** كم مهمّةً تُعرَض قبل «افتح الطابور». */
-const SHOWN = 5;
+/** كم قراراً يُعرَض قبل «افتح الطابور» — ثلاثةٌ تتّسع لها الشاشةُ الأولى على الجوّال تحت جوابَي الصباح. */
+const SHOWN = 3;
 
 /**
  * اليوم — إحاطةُ الصباح.
  *
  * شاشةٌ واحدة هادئة تجيب «ماذا أحتاج أن أعرف أو أفعل اليوم؟»:
  *
- *   ١. جملةٌ تقول الحال، وفعلٌ واحدٌ بارز: أهمُّ ما ينتظر.
- *   ٢. أربعةُ أرقامٍ لها جواب: كم عليك · كم يخرج هذا الأسبوع · كم في البنك
- *      وهل يكفي · كم اشتريت — وكلٌّ يفتح موضعه. والمجهولُ «غير معروف» لا صفر.
- *   ٣. ما ينتظر قرارك — العددُ نفسُه في القشرة والطابور.
- *   ٤. بجانبه: تقدّمُ إقفال الشهر، وما تغيّر منذ الأسبوع الماضي.
+ *   ١. جملةٌ تقول ما ينتظر وما هو جاهز.
+ *   ٢. جوابا الصباح (`TodayAnswers`): مبيعاتُ اليوم بفرقها، والبنكُ وما يخرج هذا الأسبوع وهل يكفي.
+ *   ٣. أهمُّ ثلاثة قرارات بأفعالها — والعددُ نفسُه في القشرة والطابور.
+ *   ٤. ثمّ التفصيل: اليومُ ساعةً بساعة، والإقفال، وما الجديد، والمستحقّ والأسبوع والمشتريات.
  *
  * والأقسامُ البطيئة تصل بعد الصفحة في `Suspense` — فلا ينتظرها ما فوقها: الإقفال،
  * و«ما الجديد» ورقمُ المشتريات (`gatherChangeFacts` — يمشي على الفواتير والكشوف شهرين،
@@ -107,13 +107,12 @@ export default async function HomePage() {
   /* رصيدٌ مضى عليه أكثرُ من ثلاثة أيّام لا يُقال «يكفي» بلا تاريخه — ما خرج بعده لا يعرفه */
   const cashDay = cash?.asOf ? String(cash.asOf).slice(0, 10) : null;
   const cashStale = cashDay !== null && cashDay < addDays(todayInRiyadh(), -3);
-  const cashSince = cash ? sinceYesterday(cash.balanceMinor, snap ? snap.cashMinor : undefined, yesterday) : null;
   /* اللقطةُ تعدّ ما يراه المالك — ولغيره عددٌ آخر، فلا يُقارَن بها */
   const attentionSince = user.role === "OWNER" ? sinceYesterday(attention.length, snap ? snap.attentionCount : undefined, yesterday) : null;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
+  /* «ابدأ بالأهم» زرّاً في الرأس صار مكرَّراً: أهمُّ ثلاثة بأفعالها تحت جوابَي الصباح مباشرةً */
   const { top } = prioritize(attention, SHOWN);
-  const first = top[0];
 
   const name = user.name && user.name !== "وضع التجربة" ? user.name.split(" ")[0] : null;
   const title = name ? `${greeting()}، ${name}` : greeting();
@@ -123,14 +122,26 @@ export default async function HomePage() {
   if (start.knowsNothing) {
     summary.push("لم يقرأ النظام أي بيانات حتى الآن. خطوتان فقط، ويعرف لمن تدين وأين ذهبت أموالك.");
   } else {
-    if (yesterdaySales) {
-      const vs = yesterdaySales.vsBp;
-      const base = yesterdaySales.against === "USUAL" ? "معتاد يومه" : "يومه قبل أسبوع";
-      summary.push(`بعتَ أمس ${formatRiyalsDisplay(yesterdaySales.paidMinor)} ريال${vs === null ? "" : Math.abs(vs) < 300 ? `، قريباً من ${base}` : `، ${vs > 0 ? "أعلى" : "أقل"} من ${base} بـ${Math.abs(Math.round(vs / 100))}٪`}.`);
-    }
+    /* مبيعاتُ أمس في بطاقة «مبيعات اليوم» تحت الرأس — والجملةُ هنا ما ينتظر وما هو جاهز */
     summary.push(attention.length === 0 ? "لا شيء يحتاج قرارك اليوم." : `${countNoun(attention.length, ITEM)} بانتظار قرارك.`);
     if (canPay && run && run.readyTotalMinor > 0) summary.push(`ودفعة ${formatMonth(runMonth)} جاهزة للتحويل (${countNoun(run.ready.length, SUPPLIER)}).`);
   }
+
+  /* الإحاطةُ نصّاً لمن يريد إطلاعَ شريكه أو محاسبه — من الأرقام نفسها أدناه */
+  const brief = start.knowsNothing ? null : (
+    <ShareBrief
+      text={buildBrief({
+        dateLabel: longDate(),
+        knowsNothing: start.knowsNothing,
+        owedMinor: totals.owedMinor,
+        owedSuppliers: totals.owedSuppliers,
+        weekMinor: week ? week.totalMinor : null,
+        balanceMinor: cash ? cash.balanceMinor : undefined,
+        pending: attention.length,
+        yesterdaySales,
+      })}
+    />
+  );
 
   return (
     <PageShell
@@ -141,28 +152,8 @@ export default async function HomePage() {
       display
       intro={summary.join(" ")}
       actions={
-        <>
-          {/* الإحاطةُ نصّاً لمن يريد إطلاعَ شريكه أو محاسبه — من الأرقام نفسها أدناه */}
-          {!start.knowsNothing && (
-            <ShareBrief
-              text={buildBrief({
-                dateLabel: longDate(),
-                knowsNothing: start.knowsNothing,
-                owedMinor: totals.owedMinor,
-                owedSuppliers: totals.owedSuppliers,
-                weekMinor: week ? week.totalMinor : null,
-                balanceMinor: cash ? cash.balanceMinor : undefined,
-                pending: attention.length,
-                yesterdaySales,
-              })}
-            />
-          )}
-          {first && (
-            <LinkButton href={first.href} variant="primary" size="lg" icon={ArrowLeft}>
-              {`ابدأ بالأهم: ${first.actionLabel ?? "افتح"}`}
-            </LinkButton>
-          )}
-        </>
+        /* على الجوّال تنزل الإحاطةُ تحت القرارات — كانت صفّاً كاملاً يدفع الجوابَ تحت الطيّ */
+        brief ? <span className="hidden sm:contents">{brief}</span> : undefined
       }
     >
       {start.incomplete && (
@@ -193,151 +184,84 @@ export default async function HomePage() {
       )}
 
       {/*
-        على الجوّال «ما يحتاج قرارك» قبل الأرقام: كان يقع بعد ثلاث شاشات (الجديد ثمّ أربعة أرقام)،
-        وسؤالُ الصباح «ماذا أفعل اليوم؟» جوابُه القائمة. وعلى الشاشة الواسعة الترتيبُ كما كان.
+        الشاشةُ الأولى على الجوّال تجيب سؤالَ الصباح كلَّه: كيف يمشي البيع، وهل يكفي البنكُ لما يخرج
+        هذا الأسبوع، ثمّ أهمُّ ثلاثة قرارات بفعلها. كان رصيدُ البنك بعد ثلاث شاشات، والقراراتُ بعد
+        رسمِ الساعات؛ والتفصيلُ (الساعات، الإقفال، الجديد، المستحقّ) بعدها كما هو.
       */}
-      {/* نبضُ اليوم أوّلاً: كيف يمشي البيع الآن مقارنةً بالساعة نفسها قبل أسبوع — يصل بعد الصفحة ولا يؤخّرها */}
-      {!start.knowsNothing && can(user.role, "amounts:view") && (
-        <SectionBoundary what="مبيعات اليوم">
-          <Suspense fallback={<PulseSkeleton />}>
-            <PulseCard />
-          </Suspense>
-        </SectionBoundary>
-      )}
-
-      <div className="mt-8 flex flex-col">
       {!start.knowsNothing && (
-        <div className="order-2 mt-10 lg:order-1 lg:mt-0">
-        <StatGrid>
-          <KeyFigure
-            icon={Store}
-            label="المستحق للمورّدين"
-            href="/suppliers"
-            value={<Money minor={totals.owedMinor} />}
-            tone={totals.owedMinor > 0 ? "warn" : undefined}
-            sub={
-              totals.owedMinor === 0
-                ? "لا يوجد على المقهى أي مبلغ مستحق الآن."
-                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNounGen(oldestDays, DAY)}` : ""}`
-            }
-          >
-            {/* دون ريالٍ تقريبٌ لا رصيد يُقال في الصفحة الأولى — يبقى في قائمة المورّدين بهللاته */}
-            {totals.creditLeftMinor >= TOTAL_ROUNDING_TOLERANCE_MINOR && (
-              <p className="text-xs text-ink-soft"><T s="ولك عندهم رصيد {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></p>
-            )}
-            {!start.knowsNothing && <SinceYesterdayLine s={owedSince} kind="money" />}
-            {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
-            <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
-          </KeyFigure>
-          {week && (
-            <KeyFigure
-              icon={Wallet}
-              label="مدفوعات هذا الأسبوع"
-              href="/cash"
-              tone={cash?.balanceMinor != null && cash.balanceMinor < week.totalMinor ? "danger" : undefined}
-              value={
-                week.lines.length === 0
-                  ? <span className="text-[1.35rem] text-muted">لا مدفوعات مستحقة</span>
-                  : <Money minor={week.totalMinor} />
-              }
-              sub={weekSummary(week, runMonth)}
-            >
-              {canPay && run && run.ready.length > 0 && (
-                <Link href="/payments" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                  <T s="جهّز الدفعة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
-              )}
-              {can(user.role, "payroll:view") && week.lines.some((l) => l.kind === "PAYROLL") && (
-                <Link href="/payroll" className="ms-4 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                  <T s="افتح المسيّر {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
-              )}
-            </KeyFigure>
-          )}
-          {cash && (
-            <KeyFigure
-              icon={Landmark}
-              label="رصيد البنك"
-              href="/cash"
-              value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
-              sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : cash.asOf ? `آخر رصيد معروف · ${formatDay(cash.asOf)}` : "آخر رصيد معروف"}
-            >
-              {cashSince && <SinceYesterdayLine s={cashSince} kind="money" quietWithoutSnapshot />}
-              {cash.balanceMinor !== null && week && week.totalMinor > 0 && (
-                cash.balanceMinor >= week.totalMinor ? (
-                  <p className="text-xs text-ink-soft">
-                    {cashStale && cashDay
-                      ? <T s="على رصيد {0}: يكفي لمدفوعات هذا الأسبوع، ويتبقى {1}. وما خرج بعده لا يعرفه النظام." a={[formatDay(cashDay), <Money key="1" minor={cash.balanceMinor - week.totalMinor} />]} />
-                      : <T s="يكفي لمدفوعات هذا الأسبوع، ويتبقى {0}" a={[<Money key="0" minor={cash.balanceMinor - week.totalMinor} />]} />}
-                  </p>
-                ) : (
-                  <p className="text-xs font-bold text-danger"><T s="لا يكفي لمدفوعات هذا الأسبوع، وينقصه {0}" a={[<Money key="0" minor={week.totalMinor - cash.balanceMinor} />]} /></p>
-                )
-              )}
-            </KeyFigure>
-          )}
-          <SectionBoundary what="مشتريات الشهر">
-            <Suspense fallback={<FigureSkeleton />}>
-              <PurchasesFigure factsP={factsP} />
-            </Suspense>
-          </SectionBoundary>
-        </StatGrid>
-        </div>
+        <TodayAnswers
+          pulse={pulseForBrief}
+          cash={cash ? { balanceMinor: cash.balanceMinor, asOfDay: cashDay, stale: cashStale } : null}
+          week={week}
+        />
       )}
 
-      <div className="order-1 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 lg:order-2 lg:mt-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
-        {/* ── ما ينتظر قرارك ── */}
-        <Section
-          title="ما يحتاج قرارك"
-          icon={Inbox}
-          count={attention.length > 0 ? attention.length : undefined}
-          className="mt-0!"
-          action={
-            attention.length > 0 ? (
-              <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                <T s="اعرض القائمة كاملة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
-            ) : undefined
-          }
-        >
-          {attentionSince && !start.knowsNothing && <div className="-mt-1 mb-2"><SinceYesterdayLine s={attentionSince} kind="count" quietWithoutSnapshot /></div>}
-          {attention.length > 0 ? (
-            <>
-              <TaskList items={top} />
-              {attention.length > SHOWN && (
-                <Link
-                  href="/attention"
-                  className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
-                >
-                  <T s="و{0} في القائمة{1}" a={[countNoun(attention.length - SHOWN, OTHER_ITEM), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
-              )}
-              <p className="mt-3 hidden text-[11px] text-muted lg:block">
-                <T s="تنقّل بين البنود بالمفتاحين {0} و{1}، وافتح البند بمفتاح {2}." a={[<Kbd key="0">J</Kbd>, <Kbd key="1">K</Kbd>, <Kbd key="2">Enter</Kbd>]} /></p>
-            </>
-          ) : start.knowsNothing ? (
-            <EmptyState
-              compact
-              title="هنا يظهر ما يحتاج قرارك"
-              hint="بعد أن يقرأ النظام مستنداتك وكشف البنك، ستظهر هنا الأمور التي تحتاج قرارك."
-            />
-          ) : (
-            <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-6">
-              <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
-              <div>
-                <p className="text-sm font-bold text-ok">لا شيء يحتاج قرارك.</p>
-                <p className="mt-0.5 text-xs text-ink-soft">لا مبالغ دُفعت مرتين، ولا دفعات بلا مستند، ولا مستندات تنتظر المراجعة.</p>
-              </div>
+      {/* ── ما ينتظر قرارك: أهمُّ ثلاثة بفعلها، والباقي في الطابور ── */}
+      <Section
+        title="أهم ما ينتظر قرارك"
+        icon={Inbox}
+        count={attention.length > 0 ? attention.length : undefined}
+        className={start.knowsNothing ? "mt-0!" : "mt-6! sm:mt-8!"}
+        action={
+          attention.length > 0 ? (
+            <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+              <T s="القائمة كاملة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+          ) : undefined
+        }
+      >
+        {attentionSince && !start.knowsNothing && <div className="-mt-1 mb-2"><SinceYesterdayLine s={attentionSince} kind="count" quietWithoutSnapshot /></div>}
+        {attention.length > 0 ? (
+          <>
+            <TaskList items={top} />
+            {attention.length > SHOWN && (
+              <Link
+                href="/attention"
+                className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
+              >
+                <T s="و{0} في القائمة{1}" a={[countNoun(attention.length - SHOWN, OTHER_ITEM), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+            )}
+            <p className="mt-3 hidden text-[11px] text-muted lg:block">
+              <T s="تنقّل بين البنود بالمفتاحين {0} و{1}، وافتح البند بمفتاح {2}." a={[<Kbd key="0">J</Kbd>, <Kbd key="1">K</Kbd>, <Kbd key="2">Enter</Kbd>]} /></p>
+          </>
+        ) : start.knowsNothing ? (
+          <EmptyState
+            compact
+            title="هنا يظهر ما يحتاج قرارك"
+            hint="بعد أن يقرأ النظام مستنداتك وكشف البنك، ستظهر هنا الأمور التي تحتاج قرارك."
+          />
+        ) : (
+          <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-6">
+            <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+            <div>
+              <p className="text-sm font-bold text-ok">لا شيء يحتاج قرارك.</p>
+              <p className="mt-0.5 text-xs text-ink-soft">لا مبالغ دُفعت مرتين، ولا دفعات بلا مستند، ولا مستندات تنتظر المراجعة.</p>
             </div>
-          )}
-        </Section>
+          </div>
+        )}
+      </Section>
 
-        <div className="space-y-10">
-          {can(user.role, "month:close") && !start.knowsNothing && (
-            <SectionBoundary what={`تقدّم إقفال ${formatMonth(runMonth)}`}>
-              <Suspense fallback={<CloseCardSkeleton />}>
-                <CloseCard month={runMonth} />
+      {brief && <div className="mt-4 flex justify-center sm:hidden">{brief}</div>}
+
+      {!start.knowsNothing && (
+        <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+          {/* اليومُ ساعةً بساعة وربحُ الشهر — يصل بعد الصفحة ولا يؤخّرها */}
+          <div className="min-w-0">
+            <SectionBoundary what="مبيعات اليوم">
+              <Suspense fallback={<PulseSkeleton />}>
+                <PulseCard />
               </Suspense>
             </SectionBoundary>
-          )}
+          </div>
 
-          {!start.knowsNothing && (
+          <div className="space-y-10">
+            {can(user.role, "month:close") && (
+              <SectionBoundary what={`تقدّم إقفال ${formatMonth(runMonth)}`}>
+                <Suspense fallback={<CloseCardSkeleton />}>
+                  <CloseCard month={runMonth} />
+                </Suspense>
+              </SectionBoundary>
+            )}
+
             <Section title="ما الجديد" icon={Sparkles} hint="منذ الأسبوع الماضي." className="mt-0!">
               <SectionBoundary what="ما الجديد">
                 <Suspense fallback={<ChangesSkeleton />}>
@@ -345,11 +269,65 @@ export default async function HomePage() {
                 </Suspense>
               </SectionBoundary>
             </Section>
-          )}
+          </div>
         </div>
-      </div>
-      </div>
+      )}
 
+      {/* المستحقُّ وتفصيلُ الأسبوع والمشتريات — ورصيدُ البنك صار في «البنك وهذا الأسبوع» أعلاه */}
+      {!start.knowsNothing && (
+        <div className="mt-10">
+          <StatGrid>
+            <KeyFigure
+              icon={Store}
+              label="المستحق للمورّدين"
+              href="/suppliers"
+              value={<Money minor={totals.owedMinor} />}
+              tone={totals.owedMinor > 0 ? "warn" : undefined}
+              sub={
+                totals.owedMinor === 0
+                  ? "لا يوجد على المقهى أي مبلغ مستحق الآن."
+                  : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNounGen(oldestDays, DAY)}` : ""}`
+              }
+            >
+              {/* دون ريالٍ تقريبٌ لا رصيد يُقال في الصفحة الأولى — يبقى في قائمة المورّدين بهللاته */}
+              {totals.creditLeftMinor >= TOTAL_ROUNDING_TOLERANCE_MINOR && (
+                <p className="text-xs text-ink-soft"><T s="ولك عندهم رصيد {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></p>
+              )}
+              <SinceYesterdayLine s={owedSince} kind="money" />
+              {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
+              <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
+            </KeyFigure>
+            {week && (
+              <KeyFigure
+                icon={Wallet}
+                label="مدفوعات هذا الأسبوع"
+                href="/cash"
+                tone={cash?.balanceMinor != null && cash.balanceMinor < week.totalMinor ? "danger" : undefined}
+                value={
+                  week.lines.length === 0
+                    ? <span className="text-[1.35rem] text-muted">لا مدفوعات مستحقة</span>
+                    : <Money minor={week.totalMinor} />
+                }
+                sub={weekSummary(week, runMonth)}
+              >
+                {canPay && run && run.ready.length > 0 && (
+                  <Link href="/payments" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+                    <T s="جهّز الدفعة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+                )}
+                {can(user.role, "payroll:view") && week.lines.some((l) => l.kind === "PAYROLL") && (
+                  <Link href="/payroll" className="ms-4 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+                    <T s="افتح المسيّر {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+                )}
+              </KeyFigure>
+            )}
+            <SectionBoundary what="مشتريات الشهر">
+              <Suspense fallback={<FigureSkeleton />}>
+                <PurchasesFigure factsP={factsP} />
+              </Suspense>
+            </SectionBoundary>
+          </StatGrid>
+        </div>
+      )}
       {/* «الجديد في النظام» آخرَ الصفحة — خبرٌ عن التطبيق لا عملٌ ينتظر، فلا يسبق القائمة */}
       {!start.knowsNothing && (
         <div className="mt-10">

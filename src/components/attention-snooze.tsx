@@ -12,7 +12,15 @@ import { T } from "@/components/i18n/t";
  * «أجِّله إلى…» — قرارٌ صغير بجانب البند: متى يعود، ولماذا (اختياريّ).
  * الأيّامُ الجاهزة يحسبها الخادم بتوقيت الرياض وتُمرَّر؛ والخادمُ يفحص اليومَ ثانيةً.
  */
-export function SnoozeControl({ itemId, options }: { itemId: string; options: readonly { label: string; day: string }[] }) {
+export function SnoozeControl({ itemId, options, after = "/attention" }: {
+  itemId: string;
+  options: readonly { label: string; day: string }[];
+  /**
+   * إلى أين بعد التأجيل — رابطُ البند نفسه بتاليه (`itemHref(id, lens, next)`): البندُ خرج فيُفتح
+   * تاليه ويُقال «تمّ البتّ» (`landing`). كان يعود إلى رأس القائمة فيضيع موضعُ الفرز.
+   */
+  after?: string;
+}) {
   const router = useRouter();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -40,7 +48,7 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
         },
       },
     });
-    router.push("/attention");
+    router.push(after);
     router.refresh();
   }
 
