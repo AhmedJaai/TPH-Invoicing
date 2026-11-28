@@ -6,6 +6,7 @@
  * والخادمُ يحسب مجموعَ ما طابق. دالّةٌ خالصة: ما لا يُفهم يسقط ولا يُخمَّن.
  */
 import { parseRiyals } from "../money";
+import { isoDay } from "../riyadh-time";
 import { CATEGORY_LABEL, isTxCategory, type TxCategory } from "./rules";
 
 /** حالُ الحركة في السجلّ: تنتظر قرارك · طُوبقت بسدادٍ أو قرار · الباقي. */
@@ -44,7 +45,7 @@ function day(raw: string | undefined): string | null {
   if (!raw || !DAY.test(raw)) return null;
   /* «2026-02-31» يُرفض — لا يصير مارسَ بصمت */
   const d = new Date(`${raw}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === raw ? raw : null;
+  return !Number.isNaN(d.getTime()) && isoDay(d) === raw ? raw : null;
 }
 
 function amount(raw: string | undefined): number | null {
