@@ -21,6 +21,7 @@ import { absenceLineLabel, ADJUSTMENT_LABEL, ANNUAL_LEAVE_DAYS, ANNUAL_LEAVE_DAY
 import { clock12, daysOffLabel, planOn, riyadhClock, planSummary, shiftEndOf, shiftRange, WEEKDAY_LABEL, workedMinutes } from "@/lib/payroll/attendance";
 import { deductionItems } from "@/lib/payroll/deductions";
 import { DeductionList } from "@/components/payroll/deduction-list";
+import { EmployeeMonthAnswer, MonthHistoryRow } from "@/components/payroll/employee-month";
 import { ORDINAL, penaltyLabel } from "@/lib/payroll/saudi-rules";
 import { addDays, daysBetween, currentMonthRiyadh, formatDay, formatMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { deductionMonthOf, deductionPeriod, PAYDAY } from "@/lib/payroll/period";
@@ -128,7 +129,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       actions={
         <>
           <LinkButton href={`/payroll?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>المسيّر</LinkButton>
-          <LinkButton href={`/payroll/slip/${id}?month=${month}`} variant="secondary" size="sm" icon={Printer}>قسيمة الراتب</LinkButton>
+          {/* القسيمةُ في الجواب أدناه حين يكون للشهر حساب */}
+          {!row && <LinkButton href={`/payroll/slip/${id}?month=${month}`} variant="secondary" size="sm" icon={Printer}>قسيمة الراتب</LinkButton>}
         </>
       }
     >
@@ -138,6 +140,13 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           .filter(([href]) => (employee.kind === "MONTHLY" || href !== "#violations") && (href !== "#deductions" || deductions.length > 0) && (href !== "#overtime" || otDays.length > 0))
           .map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-hover">{label}</a>)}
       </nav>
+      {/* الجوابُ أوّلاً: حالُه هذا الشهر، والباقي له، وما نقص راتبَه بكلمات، والخطوةُ التالية */}
+      {row && (
+        <EmployeeMonthAnswer row={row} employeeId={id} month={month} today={today} kind={employee.kind} canEdit={canEdit}
+          pendingTransfers={mine.filter((o) => o.suggestion?.employeeId === id).length}
+          pendingMinor={mine.filter((o) => o.suggestion?.employeeId === id).reduce((sum, o) => sum + o.freeMinor, 0)}
+          overtimePending={otPending.length} />
+      )}
       {closedMonths.length > 0 && (
         <Callout tone={balanceMinor > 0 ? "warn" : balanceMinor < 0 ? "info" : "ok"} icon={Wallet} className="mt-3"
           title={balanceMinor > 0 ? `باقٍ له ${formatRiyalsDisplay(balanceMinor)} ريال من الأشهر الماضية` : balanceMinor < 0 ? `حُوّل له ${formatRiyalsDisplay(-balanceMinor)} ريال فوق مستحقه في الأشهر الماضية` : "حسابه مع المقهى متساوٍ حتى آخر شهر انتهى"}>
@@ -162,7 +171,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       ) : (
         <div id="month" className="mt-5 grid scroll-mt-28 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <Card>
-            <h2 className="flex items-center gap-2 text-sm font-bold"><ReceiptText className="h-4 w-4 text-muted" aria-hidden />{formatMonth(month)}</h2>
+            <h2 className="flex items-center gap-2 text-sm font-bold"><ReceiptText className="h-4 w-4 text-muted" aria-hidden />حساب {formatMonth(month)} بنداً بنداً</h2>
             <div className="mt-2 divide-y divide-line/60">
               <Line
                 label={employee.kind === "PART_TIME" ? `أجر الأسابيع (${row.weeks.length})` : "الراتب"}
@@ -199,10 +208,10 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
           {canEdit && (
             <div className="space-y-5">
-              <Card>
+              <div id="adjust" className="scroll-mt-28"><Card>
                 <h2 className="mb-3 text-sm font-bold">سلفة، مكافأة، بدل، تعويض ضرر…</h2>
                 <AdjustmentForm employeeId={id} month={month} loanMinor={row.loanMinor} />
-              </Card>
+              </Card></div>
               {employee.kind === "MONTHLY" ? (
                 <Card>
                   <h2 className="mb-3 text-sm font-bold">تأخير، انصراف مبكر، غياب، إجازة</h2>
@@ -507,18 +516,9 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       </Section>
 
       {history.length > 0 && (
-        <Section id="history" title="الأشهر" icon={History}>
+        <Section id="history" title="الأشهر وقسائمها" icon={History} count={history.length} hint="كل شهر بحاله: ما استحقه وما وصله. افتح الشهر لتفصيله، أو قسيمته لطباعتها وإرسالها.">
           <ul className="divide-y divide-line rounded-xl border border-line bg-raised shadow-raised">
-            {history.map((h) => (
-              <li key={h.month}>
-                <Link href={`/payroll/employee/${id}?month=${h.month}`} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm hover:bg-hover">
-                  <span className="min-w-0 flex-1 font-bold">{formatMonth(h.month)}</span>
-                  <span className="text-xs text-muted">المستحق <MaybeMoney minor={h.slip.dueMinor} /></span>
-                  <span className="text-xs text-muted">حُوّل <Money minor={h.slip.paidMinor} /></span>
-                  {h.slip.remainingMinor === null ? <Badge tone="muted">غير معروف</Badge> : h.slip.remainingMinor > 0 ? <Badge tone="warn">باقٍ {formatRiyalsDisplay(h.slip.remainingMinor)}</Badge> : h.slip.remainingMinor < 0 ? <Badge tone="danger">زيادة {formatRiyalsDisplay(-h.slip.remainingMinor)}</Badge> : <Badge tone="ok">اكتمل</Badge>}
-                </Link>
-              </li>
-            ))}
+            {history.map((h) => <MonthHistoryRow key={h.month} employeeId={id} month={h.month} slip={h.slip} active={h.month === month} />)}
           </ul>
         </Section>
       )}
