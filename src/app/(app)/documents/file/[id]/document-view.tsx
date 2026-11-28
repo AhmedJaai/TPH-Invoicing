@@ -81,7 +81,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       ? db.select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug, folder: suppliers.driveFolderName })
           .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr))
       : Promise.resolve([]),
-    loadWaitingQueue(id),
+    loadWaitingQueue(id, p.history[0]?.at ?? null),
   ]);
   /* التالي بعد الحسم: التالي في الطابور، وإلّا صندوقُ الوارد — لا بقاءَ على ما حُسم */
   const nextHref = queue.nextId ? documentHref(queue.nextId) : "/documents";
@@ -89,8 +89,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
     شريطُ الطابور لما ينتظر، ولما حُسم للتوّ (آخرُ إجراءٍ قبل دقائق) — كي يمضي من
     اعتمد إلى التالي. أمّا مؤرشفٌ قديم فلا يُقال عنه «خرج من الطابور».
   */
-  const justDecided = p.history[0] ? Date.now() - new Date(p.history[0].at).getTime() < 15 * 60_000 : false;
-  const showQueue = waiting || (justDecided && queue.total > 0);
+  const showQueue = waiting || (queue.justDecided && queue.total > 0);
 
   const rb = readback({
     reading: p.reading,

@@ -21,14 +21,16 @@ export interface WaitingQueuePlace {
  * كان الحسمُ في الملفّ ينتهي بتحديث الصفحة نفسها: «اعتُمد» ثمّ لا شيء، ومن
  * يراجع عشرةً يعود إلى القائمة عشر مرّات. فالملفُّ يعرف تاليه ويذهب إليه.
  */
-export async function loadWaitingQueue(documentId: string): Promise<WaitingQueuePlace> {
+export async function loadWaitingQueue(documentId: string, lastActionAt: Date | null = null): Promise<WaitingQueuePlace & { justDecided: boolean }> {
   const rows = await db
     .select({ id: documents.id })
     .from(documents)
     .where(inArray(documents.status, [...WAITING_STATUSES]))
     .orderBy(desc(documents.periodMonth), desc(documents.uploadedAt))
     .limit(1000);
-  return placeIn(rows.map((r) => r.id), documentId);
+  /* حُسم قبل دقائق (آخرُ إجراءٍ عليه): يُعرض شريطُ الطابور ليمضي من حسمه إلى التالي */
+  const justDecided = lastActionAt !== null && Date.now() - new Date(lastActionAt).getTime() < 15 * 60_000;
+  return { ...placeIn(rows.map((r) => r.id), documentId), justDecided };
 }
 
 /** خالصة — تُختبَر بلا قاعدة. */
