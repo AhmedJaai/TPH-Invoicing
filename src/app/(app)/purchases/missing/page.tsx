@@ -8,7 +8,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Badge, Callout, DataTable, EmptyState, KeyFigure, NoAccess, Section } from "@/components/ui";
 import { T } from "@/components/i18n/t";
-import { DAY, PAYMENT, PRODUCT, SUPPLIER, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, PAYMENT, PRODUCT, SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { readableQuantity } from "@/lib/finance/quantity";
 import {
@@ -16,6 +16,12 @@ import {
   type MissingInvoice, type StatementCover, type SupplierFacts,
 } from "@/lib/missing-invoices";
 import { loadMissingInvoices, loadStockLeads } from "@/services/missing-invoices.service";
+import { inArray } from "drizzle-orm";
+import { db } from "@/db";
+import { suppliers } from "@/db/schema";
+import { whatsappHref } from "@/lib/supplier-edit";
+import { buildMissingInvoicesRequest } from "@/lib/supplier-requests";
+import { WhatsAppLink } from "@/components/pay-run-planner";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +61,24 @@ export default async function MissingInvoicesPage() {
   const leads: LeadRow[] = board.withLeads.flatMap((r) => r.invoices.map((i) => ({ ...i, supplier: r.supplier })));
   const payments = board.withLeads.flatMap((r) => r.payments.map((p) => ({ ...p, supplier: r.supplier })));
   const watched = board.withLeads.length + board.blind.length + board.clearCount + board.oneOffCount;
+
+  /*
+    القرينةُ لا تُحسَم هنا — تُطلَب من صاحبها. مورّداً مورّداً: كم فاتورةً وبكم، ورسالةٌ
+    جاهزة تذكر كلَّ فاتورةٍ بيومها ورقمها ومبلغها (كانت ٢٢ سطراً يُفتح كلٌّ وحده).
+  */
+  const askIds = board.withLeads.filter((r) => r.invoices.length > 0).map((r) => r.supplier.id);
+  const phones = askIds.length === 0 ? new Map<string, string | null>() : new Map(
+    (await db.select({ id: suppliers.id, phone: suppliers.phoneE164 }).from(suppliers).where(inArray(suppliers.id, askIds))).map((r) => [r.id, r.phone]),
+  );
+  const asks = board.withLeads
+    .filter((r) => r.invoices.length > 0)
+    .map((r) => ({
+      supplier: r.supplier,
+      count: r.invoices.length,
+      totalMinor: r.invoices.reduce((s, i) => s + i.amountMinor, 0),
+      href: whatsappHref(phones.get(r.supplier.id) ?? null, buildMissingInvoicesRequest(r.supplier.name, r.invoices)),
+    }))
+    .sort((a, b) => b.totalMinor - a.totalMinor);
 
   /* قاعدةٌ لا تعرف مورّداً نشِطاً لا تقول «لا فاتورة غائبة» — لم يُفحَص شيء */
   if (watched === 0) {
@@ -117,7 +141,7 @@ export default async function MissingInvoicesPage() {
         title="قرائن على فواتير غائبة"
         icon={FileQuestion}
         count={leads.length}
-        hint="كل سطر شراءٌ ذكره مصدر من خارج أرشيفك ولا فاتورة له عندك. وما ذكره مصدران بالمبلغ نفسه في أسبوع واحد سطر واحد لا سطران. اضغط السطر لتحسمه في صفحته."
+        hint="كل سطر شراءٌ ذكره مصدر من خارج أرشيفك ولا فاتورة له عندك. اطلبها من المورّد برسالة جاهزة تذكرها كلها، أو اضغط السطر لتحسمه في صفحته إن كانت عندك برقم آخر."
         className="mt-8"
       >
         {leads.length === 0 ? (
@@ -128,6 +152,20 @@ export default async function MissingInvoicesPage() {
             hint="كل ما ذكرته كشوف المورّدين وما أُدخل في فودكس له فاتورة عندك. هذا لا يشمل المورّدين الذين لا مصدر يؤكّد تعاملهم أدناه."
           />
         ) : (
+          <>
+          <ul className="mb-4 grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {asks.map((a) => (
+              <li key={a.supplier.id} className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
+                <span className="min-w-0">
+                  <Link href={`/suppliers/${a.supplier.slug}`} className="block truncate text-[13px] font-bold hover:text-accent">{a.supplier.name}</Link>
+                  <span className="block text-[11px] text-muted">
+                    <T s="{0} بمجموع {1}" a={[countNoun(a.count, INVOICE), <Money key="1" minor={a.totalMinor} />]} />
+                  </span>
+                </span>
+                <WhatsAppLink href={a.href} />
+              </li>
+            ))}
+          </ul>
           <DataTable
             rows={leads}
             keyOf={(l) => `${l.supplier.id}:${l.key}`}
@@ -158,6 +196,7 @@ export default async function MissingInvoicesPage() {
               { key: "amount", header: "المبلغ", numeric: true, cell: (l) => <Money minor={l.amountMinor} /> },
             ]}
           />
+          </>
         )}
         {unattributedFoodics.count > 0 && (
           <Callout tone="info" className="mt-4" action={<Link href="/purchases/foodics#only-foodics" className="font-semibold text-accent underline-offset-4 hover:underline">افتح فودكس والفواتير</Link>}>

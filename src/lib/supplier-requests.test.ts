@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, splitSupplierCredit, type UnbackedPayment, buildPriceRiseMessage, describeRequested, invoiceRequestKey, statementRequestMonth, yearlyQuantity } from "./supplier-requests";
+  buildInvoiceRequest, buildMissingInvoicesRequest, buildStatementRequest, groupUnbackedBySupplier, splitSupplierCredit, type UnbackedPayment, buildPriceRiseMessage, describeRequested, invoiceRequestKey, statementRequestMonth, yearlyQuantity } from "./supplier-requests";
 
 const pay = (o: Partial<UnbackedPayment> & { paymentId: string }): UnbackedPayment => ({
   supplierId: "g", supplierName: "غاناش", supplierSlug: "Ganache",
@@ -115,5 +115,18 @@ describe("statementRequestMonth — أيُّ كشفٍ يُطلب اليوم", ()
     expect(statementRequestMonth("2026-11-08")).toBe("2026-10");
     expect(statementRequestMonth("2027-01-03")).toBe("2026-11");
     expect(statementRequestMonth("2027-01-20")).toBe("2026-12");
+  });
+});
+
+describe("رسالة الفواتير الغائبة", () => {
+  it("كل فاتورة بيومها ورقمها ومبلغها، الأقدم أولاً", () => {
+    const text = buildMissingInvoicesRequest("مورّد تجريبي", [
+      { day: "2026-11-20", ref: "SI-2", amountMinor: 37_950 },
+      { day: "2026-11-16", ref: null, amountMinor: 25_300 },
+    ]);
+    expect(text).toContain("نسخ الفواتير التالية");
+    expect(text.indexOf("2026-11-16")).toBeLessThan(text.indexOf("2026-11-20"));
+    expect(text).toContain("• 2026-11-20 — رقم SI-2: 379.50 ريال");
+    expect(text).toContain("• 2026-11-16: 253.00 ريال");
   });
 });
