@@ -294,6 +294,28 @@ export function nextKind(last: { kind: "IN" | "OUT"; at: Date } | null, now: Dat
   return last && last.kind === "IN" && now.getTime() - last.at.getTime() < OUT_PAIRS_WITHIN_MS ? "OUT" : "IN";
 }
 
+/** ضغطتان متتاليتان على الزرّ نفسه في هذه المدّة تسجيلٌ واحد — ويكفي لإعادة المحاولة على شبكةٍ بطيئة. */
+export const DOUBLE_TAP_MS = 2 * 60 * 1000;
+
+/**
+ * أهذا التسجيلُ تكرارٌ لما قبله؟ — يُعاد السابقُ ولا يُكتب جديد:
+ *   `DOUBLE_TAP`: الزرُّ نفسه في دقيقتين (ضغطتان، أو إعادةُ طلبٍ وصل وضاع ردُّه).
+ *   `ALREADY_IN`: حضورٌ بعد حضورٍ في اليوم نفسه بلا انصرافٍ بينهما — التأخيرُ من أوّل حضورٍ
+ *   على كلّ حال، فالثاني لا يضيف شيئاً ويوهم الموظّفَ أنّه «سجّل الآن».
+ * والانصرافُ بعد انصرافٍ يُكتب: آخرُ انصرافٍ هو المحسوب (بقي يعمل ثمّ ضغط ثانية).
+ * والمرفوضُ بحكم المدير لا يُعدّ سابقاً.
+ */
+export function repeatOf(
+  last: { kind: "IN" | "OUT"; at: Date; day: string; rejected?: boolean } | null,
+  kind: "IN" | "OUT",
+  now: Date,
+): "DOUBLE_TAP" | "ALREADY_IN" | null {
+  if (!last || last.rejected || last.kind !== kind) return null;
+  if (now.getTime() - last.at.getTime() < DOUBLE_TAP_MS) return "DOUBLE_TAP";
+  if (kind === "IN" && last.day === riyadhDay(now)) return "ALREADY_IN";
+  return null;
+}
+
 /**
  * دقائقُ العمل من أزواج حضورٍ وانصراف — للجزئيّ. حضورٌ بلا انصرافٍ لا يُحسب (يُقال عددُه).
  * المرفوضُ لا يدخل.

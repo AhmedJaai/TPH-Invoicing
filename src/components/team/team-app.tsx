@@ -108,7 +108,6 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
       <main className="flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4">
         {tab === "attend" && (
           <>
-            <InstallHint />
             {announcements.map((a) => (
               <aside key={a.id} className="mb-4 flex items-start gap-3 rounded-2xl border border-accent-line bg-raised p-3.5">
                 <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
@@ -116,6 +115,8 @@ export function TeamApp({ token, name, initialTab, attend, captures, messages, b
               </aside>
             ))}
             <AttendPanel token={token} {...attend} />
+            {/* التثبيتُ تحت الزرّ لا فوقه — من يقف عند الباب يرى زرَّه أوّلاً */}
+            <div className="mt-4"><InstallHint /></div>
           </>
         )}
         {tab === "board" && <BoardPanel token={token} cards={board} todayWeekday={todayWeekday} pendingIds={pendingBoardIds} />}

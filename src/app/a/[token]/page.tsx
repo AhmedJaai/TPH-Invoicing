@@ -62,7 +62,8 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   const todayShift = shiftOn(today, employee, employee.shiftRules);
   const counted = employee.kind === "MONTHLY" && employee.shiftStart !== null;
   const [recent, captures, messages, period, { tab }, board, requests, everyone, stock, slip] = await Promise.all([
-    recentCheckins(employee.id, 6),
+    /* أسبوعٌ كامل بحضوره وانصرافه — ثلاثون تكفي حتى من سجّل مرّاتٍ في اليوم */
+    recentCheckins(employee.id, 30),
     recentForEmployee(employee.id),
     myMessages(employee.id),
     counted ? myPeriod(employee, today) : Promise.resolve(null),
@@ -85,6 +86,8 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
         today,
         shiftRange: dayShiftRange(todayShift),
         shiftStart: todayShift.off ? null : todayShift.start,
+        graceMinutes: employee.lateGraceMinutes,
+        daysOff: employee.daysOff,
         dayOff: employee.kind === "MONTHLY" && todayShift.off,
         daysOffLabel: daysOffLabel(employee.daysOff),
         period,

@@ -24,7 +24,7 @@ import {
   suggestedPayMonth, weekMonth, weekStartOf, workedDays, type Payslip, type ReclassTarget,
 } from "@/lib/payroll/calc";
 import {
-  DEFAULT_RADIUS_M, dayForOut, earlyMinutesAt, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, COUNTS_FROM_START, shiftOn, usualOn, type CafePlace, type ShiftPlan, type ShiftRule,
+  DEFAULT_RADIUS_M, dayForOut, repeatOf, earlyMinutesAt, judgeCheckin, lateMinutesAt, MAX_SHIFT_MINUTES, riyadhDay, checkinCounts, CHECKIN_COUNTS_FROM, COUNTS_FROM_START, shiftOn, usualOn, type CafePlace, type ShiftPlan, type ShiftRule,
 } from "@/lib/payroll/attendance";
 import { addDays, formatDay, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { silencedKeys } from "@/lib/signal-decisions";
@@ -1511,9 +1511,6 @@ export async function loadUnreviewedCheckins(conn: Conn = db): Promise<CheckinVi
   return rows.map(toCheckinView);
 }
 
-/** ضغطتان متتاليتان على الزرّ نفسه في هذه المدّة تسجيلٌ واحد. */
-const DOUBLE_TAP_MS = 2 * 60 * 1000;
-
 /**
  * تسجيلُ حضورٍ أو انصراف من رابط الموظّف. يُحفظ دائماً ويُحكم عليه، ثمّ يُحسب منه التأخيرُ
  * (أوّلُ حضورٍ في اليوم) أو الانصرافُ المبكّر (آخرُ انصراف) — ما لم يكتب صاحبُ المقهى اليومَ بيده.
@@ -1524,7 +1521,11 @@ export async function recordCheckin(input: {
   position: { latMicro: number; lngMicro: number; accuracyM: number | null } | null;
   ip: string | null;
   userAgent: string | null;
-}): Promise<{ id: string; at: Date; day: string; verdict: CheckinVerdict; lateMinutes: number; earlyMinutes: number; duplicate: boolean }> {
+}): Promise<{
+  id: string; at: Date; day: string; verdict: CheckinVerdict; distanceM: number | null; lateMinutes: number; earlyMinutes: number;
+  /** تكرارٌ لم يُكتب — أُعيد السابق (`repeatOf`). */
+  duplicate: boolean; repeat: "DOUBLE_TAP" | "ALREADY_IN" | null;
+}> {
   const settings = await loadAttendanceSettings();
   const now = new Date();
   return db.transaction(async (t) => {
@@ -1532,8 +1533,10 @@ export async function recordCheckin(input: {
     const [emp] = await t.select().from(employees).where(eq(employees.id, input.employee.id)).for("update");
     if (!emp) throw new PayrollRefused("الرابط لم يعد يعمل.");
     const [last] = await t.select().from(attendanceCheckins).where(eq(attendanceCheckins.employeeId, emp.id)).orderBy(desc(attendanceCheckins.at)).limit(1);
-    if (last && last.kind === input.kind && now.getTime() - last.at.getTime() < DOUBLE_TAP_MS) {
-      return { id: last.id, at: last.at, day: last.day, verdict: last.verdict, lateMinutes: 0, earlyMinutes: 0, duplicate: true };
+    /* ضغطتان، أو إعادةُ طلبٍ ضاع ردُّه، أو حضورٌ ثانٍ في يومه — يُعاد السابق ولا يُكتب */
+    const repeat = last ? repeatOf({ kind: last.kind, at: last.at, day: last.day, rejected: last.review === "REJECTED" }, input.kind, now) : null;
+    if (last && repeat) {
+      return { id: last.id, at: last.at, day: last.day, verdict: last.verdict, distanceM: last.distanceM, lateMinutes: 0, earlyMinutes: 0, duplicate: true, repeat };
     }
     let day = riyadhDay(now);
     const { base, rules } = await shiftContext(t, emp);
@@ -1579,7 +1582,7 @@ export async function recordCheckin(input: {
         }
       }
     }
-    return { id: row.id, at: now, day, verdict, lateMinutes, earlyMinutes, duplicate: false };
+    return { id: row.id, at: now, day, verdict, distanceM, lateMinutes, earlyMinutes, duplicate: false, repeat: null };
   });
 }
 

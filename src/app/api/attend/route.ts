@@ -1,7 +1,8 @@
 /**
  * تسجيلُ الحضور والانصراف من رابط الموظّف — بلا جلسة، والرمزُ إذنُه.
  *
- *   POST { token, kind: IN|OUT, lat?, lng?, accuracy? } → { verdict, at, lateMinutes, earlyMinutes }
+ *   POST { token, kind: IN|OUT, lat?, lng?, accuracy? } → { verdict, at, distanceM, lateMinutes, earlyMinutes, duplicate, repeat }
+ *   والتكرارُ (`repeatOf`) لا يُكتب: يُعاد السابقُ بسببه — فإعادةُ المحاولة آمنة.
  *
  * لا يملك الرابطُ إلّا أن يضيف تسجيلاً لصاحبه: لا يرى راتباً ولا غيره. والموقعُ اختياريّ — يُحفظ
  * التسجيلُ بلا موقعٍ ويُعرض على صاحب المقهى ليحكم فيه.
@@ -36,7 +37,9 @@ export async function POST(request: Request) {
       ? { latMicro: toMicro(b.lat), lngMicro: toMicro(b.lng), accuracyM: b.accuracy !== undefined ? Math.round(b.accuracy) : null }
       : null;
     const r = await recordCheckin({ employee, kind: b.kind, position, ip: clientIp(request.headers), userAgent: request.headers.get("user-agent") });
-    return NextResponse.json({ ok: true, verdict: r.verdict, at: r.at.toISOString(), lateMinutes: r.lateMinutes, earlyMinutes: r.earlyMinutes, duplicate: r.duplicate });
+    return NextResponse.json({
+      ok: true, verdict: r.verdict, at: r.at.toISOString(), distanceM: r.distanceM, lateMinutes: r.lateMinutes, earlyMinutes: r.earlyMinutes, duplicate: r.duplicate, repeat: r.repeat,
+    });
   } catch (e) {
     if (e instanceof PayrollRefused) return NextResponse.json({ error: e.message }, { status: 409 });
     return failWith(e, "attend");

@@ -1,8 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
   clock12, clockMinutes, dayForOut, daysOffLabel, distanceMeters, earlyMinutesAt, isWorkday, judgeCheckin, lateMinutesAt, riyadhClock, riyadhDay,
-  shiftEndOf, shiftLength, shiftRange, toMicro, workedMinutes,
+  DOUBLE_TAP_MS, repeatOf, shiftEndOf, shiftLength, shiftRange, toMicro, workedMinutes,
 } from "./attendance";
+
+describe("التكرار لا يُكتب مرّتين", () => {
+  /* ٤:٠٢ عصراً بتوقيت الرياض = ١٣:٠٢ بتوقيت غرينتش */
+  const at = new Date("2026-11-28T13:02:00Z");
+  const later = (ms: number) => new Date(at.getTime() + ms);
+  const lastIn = { kind: "IN" as const, at, day: "2026-11-28" };
+  it("ضغطتان على الزرّ نفسه في دقيقتين تسجيلٌ واحد", () => {
+    expect(repeatOf(lastIn, "IN", later(1_000))).toBe("DOUBLE_TAP");
+    expect(repeatOf({ ...lastIn, kind: "OUT" }, "OUT", later(DOUBLE_TAP_MS - 1))).toBe("DOUBLE_TAP");
+  });
+  it("حضورٌ ثانٍ في اليوم نفسه بلا انصراف: «حضورك مسجّل»", () => {
+    expect(repeatOf(lastIn, "IN", later(3 * 3600_000))).toBe("ALREADY_IN");
+  });
+  it("حضورٌ في يومٍ جديد يُكتب", () => {
+    expect(repeatOf(lastIn, "IN", later(20 * 3600_000))).toBeNull();
+  });
+  it("انصرافٌ بعد انصرافٍ بعد دقيقتين يُكتب — آخرُه هو المحسوب", () => {
+    expect(repeatOf({ ...lastIn, kind: "OUT" }, "OUT", later(DOUBLE_TAP_MS + 1))).toBeNull();
+  });
+  it("الزرُّ الآخر أو السابقُ المرفوض لا يُعدّ تكراراً", () => {
+    expect(repeatOf(lastIn, "OUT", later(1_000))).toBeNull();
+    expect(repeatOf({ ...lastIn, rejected: true }, "IN", later(1_000))).toBeNull();
+    expect(repeatOf(null, "IN", at)).toBeNull();
+  });
+});
 
 const cafe = { latMicro: toMicro(21.6136), lngMicro: toMicro(39.1567), radiusM: 120 };
 
