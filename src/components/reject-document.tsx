@@ -14,7 +14,7 @@ import { toast } from "./ui-client";
  * من قراءتها المحفوظة من جديد — فما صُحّح بيدٍ لا يعود كما كان. فيُقال
  * أين يجده ومن أين يُعاد، ولا يُوعَد بتراجعٍ ليس تراجعاً.
  */
-export function RejectDocument({ documentId, cancel = false, redirectTo }: {
+export function RejectDocument({ documentId, cancel = false, redirectTo, keyAction = false }: {
   documentId: string;
   /** مستندٌ معتمَد يُلغى — فاتورةٌ ألغاها المورّد. ويُكتَب السبب. */
   cancel?: boolean;
@@ -23,6 +23,8 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
    * فالتحديثُ في موضعه يفتح «لم نجد هذه الصفحة» — طريقٌ مسدود بعد فعلٍ نجح.
    */
   redirectTo?: string;
+  /** في صفٍّ من طابور: `X` يفتح سؤالَ السبب (`keyboard.tsx`). */
+  keyAction?: boolean;
 }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
@@ -32,9 +34,16 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
 
   if (!asking) {
     return (
-      <button type="button" className={buttonClass(cancel ? "danger" : "quiet", "sm")} onClick={() => setAsking(true)}>
+      <button
+        type="button"
+        data-key-action={keyAction ? "reject" : undefined}
+        aria-keyshortcuts={keyAction ? "X" : undefined}
+        className={buttonClass(cancel ? "danger" : "quiet", "sm")}
+        onClick={() => setAsking(true)}
+      >
         <Ban className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
         {cancel ? "ألغِ الفاتورة" : "ارفض المستند"}
+        {keyAction && <kbd aria-hidden className="hidden rounded border border-current/30 px-1 text-[10px] font-bold leading-4 opacity-70 lg:inline">X</kbd>}
       </button>
     );
   }

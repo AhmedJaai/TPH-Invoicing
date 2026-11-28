@@ -12,7 +12,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
-import { Badge, Callout, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline, type TimelineItem } from "@/components/ui";
+import { Badge, Callout, EmptyState, LinkButton, Monogram, NoAccess, Section, Timeline, type TimelineItem } from "@/components/ui";
 import { DocumentRecord } from "@/components/document-record";
 import { DocumentReread } from "@/components/document-reread";
 import { DocumentPaper } from "@/components/document-paper";
@@ -25,7 +25,10 @@ import { loadDocumentProfile } from "@/services/document-profile.service";
 import { DOCUMENT_KIND_LABEL, DOCUMENT_STATUS_BADGE, documentHref } from "@/lib/document-labels";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
 import { ExtractionEvidencePanel } from "@/components/extraction-evidence";
-import { FIELD_LABEL, LOW_CONFIDENCE, invoiceHref } from "@/lib/invoice-profile";
+import { invoiceHref } from "@/lib/invoice-profile";
+import { readback, readbackSummary, type ReadbackRow } from "@/lib/document-readback";
+import { loadWaitingQueue } from "@/services/document-queue.service";
+import { DocumentQueueNav } from "@/components/document-queue-nav";
 import { actionLabel } from "@/lib/audit-labels";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { T } from "@/components/i18n/t";
@@ -73,10 +76,29 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
   const byDesign = !isInvoiceKind && p.kind !== "STATEMENT";
   const waiting = p.status === "PENDING" || p.status === "EXTRACTED" || p.status === "NEEDS_REVIEW";
 
-  const supplierOptions = recordable && canEdit && showAmounts
-    ? await db.select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug, folder: suppliers.driveFolderName })
-        .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr))
-    : [];
+  const [supplierOptions, queue] = await Promise.all([
+    recordable && canEdit && showAmounts
+      ? db.select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug, folder: suppliers.driveFolderName })
+          .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr))
+      : Promise.resolve([]),
+    loadWaitingQueue(id, p.history[0]?.at ?? null),
+  ]);
+  /* التالي بعد الحسم: التالي في الطابور، وإلّا صندوقُ الوارد — لا بقاءَ على ما حُسم */
+  const nextHref = queue.nextId ? documentHref(queue.nextId) : "/documents";
+  /*
+    شريطُ الطابور لما ينتظر، ولما حُسم للتوّ (آخرُ إجراءٍ قبل دقائق) — كي يمضي من
+    اعتمد إلى التالي. أمّا مؤرشفٌ قديم فلا يُقال عنه «خرج من الطابور».
+  */
+  const showQueue = waiting || (queue.justDecided && queue.total > 0);
+
+  const rb = readback({
+    reading: p.reading,
+    recorded: { kind: p.kind, supplierName: p.supplier?.nameAr ?? null, invoice: p.invoice },
+    confidence: p.confidence,
+    kindLabel: (k) => DOCUMENT_KIND_LABEL[k] ?? k,
+    showAmounts,
+  });
+  const rbSum = readbackSummary(rb);
 
   /* ── الجوابُ في سطر: ما حالُه وما يمنعه ── */
   /* الرقمُ نفسه بأيّ صيغة نسخةٌ يقيناً؛ واليومُ والمبلغ نفسهما شبهٌ يُقارَن ولا يُحسَم */
@@ -149,7 +171,6 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
     },
   ];
 
-  const confidence = p.confidence ? Object.entries(p.confidence).sort(([, a], [, b]) => a - b) : [];
   const supplierText = [p.reading?.supplierName, p.fileName].filter(Boolean).join(" ");
 
   return (
@@ -176,6 +197,10 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         </>
       }
     >
+      {showQueue && canEdit && (
+        <DocumentQueueNav position={queue.position} total={queue.total} prevId={queue.prevId} nextId={queue.nextId} />
+      )}
+
       {/* ── الحال ── */}
       <section aria-label="الحالة" className="rounded-2xl border border-line bg-raised p-5 shadow-raised">
         <p className={`flex items-center gap-2 text-base font-bold ${headline.tone === "ok" ? "text-ok" : headline.tone === "danger" ? "text-danger" : headline.tone === "warn" ? "text-warn" : "text-ink-soft"}`}>
@@ -255,7 +280,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         {/* الأفعال على المستند نفسه */}
         {canEdit && (
           <div className="mt-4 flex flex-wrap items-start gap-2 border-t border-line-soft pt-4">
-            {waiting && showAmounts && (p.invoice || p.statementId) && <ConfirmDocument documentId={p.id} variant="primary" />}
+            {waiting && showAmounts && (p.invoice || p.statementId) && <ConfirmDocument documentId={p.id} variant="primary" nextHref={showQueue ? nextHref : null} />}
             {corrected && showAmounts && (
               <ReplaceInvoice documentId={p.id} number={corrected.number} before={formatRiyalsDisplay(corrected.totalMinor!)} after={formatRiyalsDisplay(corrected.readTotalMinor!)} />
             )}
@@ -270,7 +295,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
                 <RestoreDocument documentId={p.id} />
               )
             ) : (
-              !p.invoice && <RejectDocument documentId={p.id} />
+              !p.invoice && <RejectDocument documentId={p.id} redirectTo={waiting ? nextHref : undefined} />
             )}
             {/* وما أُرشف بلا قيدٍ يُقرأ من جديد كذلك — زاكوباك 3068 لم يكن له طريقٌ إلى القراءة */}
             {p.driveFileId && (p.invoice || waiting || recordable) && <DocumentReread documentId={p.id} canEdit={canEdit} />}
@@ -278,64 +303,69 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         )}
       </section>
 
-      {/* ── الورقة نفسها — تُقارَن بما قرأه النموذج في مكانها، لا في لسانٍ آخر ── */}
-      {p.driveFileId && (
-        <Section id="paper" icon={FileText} title="الورقة" className="mt-8 scroll-mt-24">
-          <DocumentPaper documentId={p.id} driveFileId={p.driveFileId} fileName={p.fileName} defaultOpen />
-        </Section>
-      )}
+      {/*
+        ── الورقةُ بجانب ما قُرئ منها ──
+        المراجعةُ مقارنة: الورقةُ في عمودٍ ثابت، وما قرأه النموذج وما سُجّل — ونموذجُ
+        الإكمال إن لزم — في الآخر. كانت الورقةُ فوق والنموذجُ تحتها بشاشتين، فيُقارَن
+        الرقمُ بالذاكرة. وعلى الضيّق تبقى الورقةُ أوّلاً والحقولُ تحتها.
+      */}
+      <div className={`mt-8 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-8 ${p.driveFileId ? "@4xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" : ""}`}>
+        {p.driveFileId && (
+          <Section id="paper" icon={FileText} title="الورقة" className="scroll-mt-24">
+            <div className="@4xl:sticky @4xl:top-24">
+              <DocumentPaper documentId={p.id} driveFileId={p.driveFileId} fileName={p.fileName} defaultOpen />
+            </div>
+          </Section>
+        )}
 
-      {/* ── أكمِل الناقص وقيّدها ── */}
-      {recordable && !sureTwin && canEdit && showAmounts && (
-        <Section id="fix" icon={Wrench} title={byDesign ? "هل هو فاتورة فعلاً؟ سجّلها" : p.missing.length > 0 ? "أكمل البيانات الناقصة وسجّلها" : "راجعها وسجّلها"} className="mt-8 scroll-mt-24">
-          {byDesign && (
-            <Callout tone="info" className="mb-3" title={`صنّفه النموذج «${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind}»`}>
-              هذا النوع لا يُسجَّل فاتورة ولا يدخل في المبالغ المستحقة، وهذا صحيح إن كان عرض سعر فعلاً. أما إن كان فاتورة أخطأ النموذج في تصنيفها فأكمل بياناتها هنا لتُسجَّل فاتورة، وإن كان خطأً كله فارفضه من الأعلى.
-            </Callout>
+        <div className="min-w-0 space-y-8">
+          {/* ── أكمِل الناقص وقيّدها ── */}
+          {recordable && !sureTwin && canEdit && showAmounts && (
+            <Section id="fix" icon={Wrench} title={byDesign ? "هل هو فاتورة فعلاً؟ سجّلها" : p.missing.length > 0 ? "أكمل البيانات الناقصة وسجّلها" : "راجعها وسجّلها"} className="scroll-mt-24">
+              {byDesign && (
+                <Callout tone="info" className="mb-3" title={`صنّفه النموذج «${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind}»`}>
+                  هذا النوع لا يُسجَّل فاتورة ولا يدخل في المبالغ المستحقة، وهذا صحيح إن كان عرض سعر فعلاً. أما إن كان فاتورة أخطأ النموذج في تصنيفها فأكمل بياناتها هنا لتُسجَّل فاتورة، وإن كان خطأً كله فارفضه من الأعلى.
+                </Callout>
+              )}
+              <div className="rounded-2xl border border-accent-line bg-raised p-4 shadow-raised sm:p-5">
+                <DocumentRecord
+                  documentId={p.id}
+                  initial={{ ...p.proposal, supplierId: p.proposal.supplierId }}
+                  suppliers={supplierOptions}
+                  missing={p.missing}
+                  fromName={p.proposal.fromName}
+                  canCreateSupplier={can(user.role, "supplier:edit")}
+                  supplierText={supplierText}
+                />
+              </div>
+            </Section>
           )}
-          <div className="rounded-2xl border border-accent-line bg-raised p-4 shadow-raised sm:p-5">
-            <DocumentRecord
-              documentId={p.id}
-              initial={{ ...p.proposal, supplierId: p.proposal.supplierId }}
-              suppliers={supplierOptions}
-              missing={p.missing}
-              fromName={p.proposal.fromName}
-              canCreateSupplier={can(user.role, "supplier:edit")}
-              supplierText={supplierText}
-            />
-          </div>
-        </Section>
-      )}
+
+          {/* ── ما قُرئ وما سُجّل، حقلاً حقلاً ── */}
+          <Section
+            id="read"
+            icon={ScanText}
+            title="ما قرأه النموذج وما سُجّل"
+            className="scroll-mt-24"
+            hint={p.textSource === "TEXT"
+              ? "مأخوذ حرفياً من النص المكتوب في الملف، لا تخميناً."
+              : p.textSource === "VISION"
+                ? "مقروء بالنظر من صورة الملف، وهو تقدير يحتاج إلى ما يؤكده."
+                : p.reading ? "مصدر القراءة غير مسجّل." : "لم يُقرأ بالذكاء الاصطناعي، بل عُرف من اسم الملف أو نُقل من قراءة سابقة."}
+          >
+            {p.reading ? (
+              <ReadbackTable rows={rb} summary={rbSum} model={p.model} hasInvoice={Boolean(p.invoice)} />
+            ) : (
+              <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد قراءة محفوظة لهذا المستند.</p>
+            )}
+          </Section>
+        </div>
+      </div>
 
       {/* ── كيف قرّر النظام ── */}
       <Section id="why" icon={Brain} title="كيف قرّر النظام" className="mt-8 scroll-mt-24"
         hint="ما قرأه النموذج اقتراح فقط، والقرار مبني على شروط ثابتة في النظام لا على رأي النموذج.">
         <div className="space-y-4">
-          <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
-            <p className="flex items-center gap-2 text-xs font-bold">
-              <ScanText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-              {p.textSource === "TEXT"
-                ? "مأخوذ حرفياً من النص المكتوب في الملف، لا تخميناً"
-                : p.textSource === "VISION"
-                  ? "مقروء بالنظر من صورة الملف، وهو تقدير يحتاج إلى ما يؤكده"
-                  : p.reading ? "مصدر القراءة غير مسجّل" : "لم يُقرأ بالذكاء الاصطناعي، بل عُرف من اسم الملف أو نُقل من قراءة سابقة"}
-              {p.model && <span className="ms-auto font-normal text-muted" dir="ltr">{p.model}</span>}
-            </p>
-            {p.reading && (
-              <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] @xl:grid-cols-3">
-                <Read label="النوع" value={p.reading.kind ? DOCUMENT_KIND_LABEL[p.reading.kind] ?? p.reading.kind : null} />
-                <Read label="المورّد" value={p.reading.supplierName} />
-                <Read label="الرقم الضريبي للبائع" value={p.reading.sellerVat} ltr />
-                <Read label="رقم الفاتورة" value={p.reading.invoiceNumber} ltr />
-                <Read label="التاريخ" value={p.reading.invoiceDate} ltr />
-                {/* مَن لا يرى المبالغ لا يُقال له «لم يُقرأ» — قُرئ وحُجب عنه */}
-                {showAmounts && <Read label="الإجمالي" value={p.reading.total} ltr />}
-                {showAmounts && <Read label="الضريبة" value={p.reading.vat} ltr />}
-                <Read label="البنود" value={p.reading.lineCount > 0 ? `${p.reading.lineCount}` : null} ltr />
-              </dl>
-            )}
-          </div>
-
           {isInvoiceKind && (
             <div className="rounded-xl border border-line bg-raised shadow-raised">
               <p className="flex items-center gap-2 border-b border-line-soft px-4 py-3 text-xs font-bold">
@@ -366,25 +396,6 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
             </p>
           )}
 
-          {confidence.length > 0 && (
-            <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
-              <p className="mb-2.5 text-[11px] font-bold text-muted">ثقة النموذج في كل حقل</p>
-              <ul className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-2.5 @xl:grid-cols-2">
-                {confidence.map(([k, v]) => {
-                  const low = v < LOW_CONFIDENCE;
-                  return (
-                    <li key={k}>
-                      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                        <span>{FIELD_LABEL[k] ?? k}</span>
-                        <span className={`text-[11px] font-bold ${low ? "text-warn" : "text-ok"}`}>{low ? "منخفضة" : "جيدة"}</span>
-                      </div>
-                      <Meter value={Math.round(v * 100)} max={100} tone={low ? "warn" : "ok"} label={`ثقة ${FIELD_LABEL[k] ?? k}`} />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
         </div>
       </Section>
 
@@ -400,13 +411,107 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
   );
 }
 
-function Read({ label, value, ltr = false }: { label: string; value: string | null; ltr?: boolean }) {
+const MATCH_TEXT: Record<ReadbackRow["match"], string> = {
+  same: "كما قُرئ",
+  changed: "سُجّل غيرُه",
+  unrecorded: "—",
+  unread: "لم يُقرأ وسُجّل",
+};
+
+const plainText = (f: ReadbackRow["field"]) => f === "supplier" || f === "kind";
+
+/** «حقل واحد» · «حقلين» · «٣ حقول» — بعددٍ لاتينيّ كسائر الأعداد. */
+function fieldsText(n: number) {
+  return n === 1 ? "حقل واحد" : n === 2 ? "حقلين" : <T s="{0} حقول" a={[<span key="0" className="nums">{n}</span>]} />;
+}
+
+/**
+ * جدولُ المقارنة: لكلّ حقلٍ ما قرأه النموذج، وثقتُه بنفسه، وما سجّله الخادم.
+ * الثقةُ رقمُ النموذج كما قاله — كلمةٌ ورمزٌ لا لونٌ وحده، والمجهولةُ «لم يقلها».
+ * وعلى الجوّال يصير كلُّ صفٍّ بطاقةً صغيرة (الحقلُ فوق، والقيمُ تحته).
+ */
+function ReadbackTable({ rows, summary, model, hasInvoice }: {
+  rows: ReadbackRow[];
+  summary: { low: number; changed: number; unknownTrust: boolean };
+  model: string | null;
+  hasInvoice: boolean;
+}) {
   return (
-    <div className="min-w-0">
-      <dt className="text-muted">{label}</dt>
-      <dd className="mt-0.5 break-words font-bold">
-        {value ? <bdi dir={ltr ? "ltr" : undefined} className={ltr ? "nums" : ""}>{value}</bdi> : <span className="font-normal text-muted">لم يُقرأ</span>}
-      </dd>
+    <div className="relative overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-soft px-4 py-2.5 text-xs">
+        {summary.low > 0 ? (
+          <span className="inline-flex items-center gap-1.5 font-bold text-warn">
+            <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            <T s="ثقة النموذج ضعيفة في {0}، فقارنها بالورقة" a={[<Fragment key="0">{fieldsText(summary.low)}</Fragment>]} />
+          </span>
+        ) : summary.unknownTrust ? (
+          <span className="font-bold text-ink-soft">لم يقل النموذج مدى ثقته في هذه القراءة</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 font-bold text-ok">
+            <CircleCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            قرأ النموذج كل الحقول بثقة جيدة
+          </span>
+        )}
+        {hasInvoice && summary.changed > 0 && (
+          <span className="inline-flex items-center gap-1.5 font-bold text-info">
+            <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            <T s="سُجّل غير المقروء في {0}" a={[<Fragment key="0">{fieldsText(summary.changed)}</Fragment>]} />
+          </span>
+        )}
+        {model && <span className="ms-auto text-[11px] text-muted" dir="ltr">{model}</span>}
+      </p>
+      <table className="w-full text-xs">
+        <thead className="hidden sm:table-header-group">
+          <tr className="border-b border-line-soft text-[11px] text-muted">
+            <th scope="col" className="px-4 py-2 text-start font-bold">الحقل</th>
+            <th scope="col" className="px-2 py-2 text-start font-bold">قرأه النموذج</th>
+            <th scope="col" className="px-2 py-2 text-start font-bold">ثقته</th>
+            <th scope="col" className="px-4 py-2 text-start font-bold">المسجَّل</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line-soft">
+          {rows.map((r) => (
+            <tr key={r.field} className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-4 py-2.5 sm:table-row sm:p-0 ${r.trust === "low" ? "bg-warn-bg" : ""}`}>
+              <th scope="row" className="col-span-2 text-start text-[11px] font-normal text-muted sm:px-4 sm:py-2.5 sm:text-xs">{r.label}</th>
+              <td className="min-w-0 break-words font-bold sm:px-2 sm:py-2.5">
+                {r.read
+                  ? <bdi dir={plainText(r.field) ? undefined : "ltr"} className={plainText(r.field) ? "" : "nums"}>{r.read}</bdi>
+                  : <span className="font-normal text-muted">لم يُقرأ</span>}
+              </td>
+              <td className="sm:px-2 sm:py-2.5">
+                {r.trust === "unknown" ? (
+                  <span className="text-[11px] text-muted">لم يقلها</span>
+                ) : (
+                  <span className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold ${r.trust === "low" ? "text-warn" : "text-ok"}`}>
+                    {r.trust === "low"
+                      ? <TriangleAlert className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
+                      : <CircleCheck className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />}
+                    {r.trust === "low" ? "ضعيفة" : "جيدة"}
+                    <span className="nums nums-count font-normal text-ink-soft">{Math.round((r.confidence ?? 0) * 100)}%</span>
+                  </span>
+                )}
+              </td>
+              <td className="col-span-2 min-w-0 break-words sm:px-4 sm:py-2.5">
+                {r.recorded === null ? (
+                  <span className="text-[11px] text-muted">{hasInvoice || r.field === "lines" || r.field === "sellerVat" ? "—" : "لم يُسجَّل بعد"}</span>
+                ) : (
+                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-[11px] text-muted sm:hidden">المسجَّل:</span>
+                    <bdi dir={plainText(r.field) ? undefined : "ltr"} className={`font-bold ${plainText(r.field) ? "" : "nums"}`}>{r.recorded}</bdi>
+                    <span className={`inline-flex items-center gap-0.5 text-[11px] ${r.match === "changed" ? "font-bold text-info" : "text-muted"}`}>
+                      {r.match === "changed" && <PenLine className="h-3 w-3" strokeWidth={2} aria-hidden />}
+                      {MATCH_TEXT[r.match]}
+                    </span>
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="border-t border-line-soft px-4 py-2 text-[11px] leading-relaxed text-muted">
+        الثقة رقم يقوله النموذج عن نفسه، لا حكم النظام. والمسجَّل يحسبه الخادم ويتحقق منه عند الحفظ، فما سُجّل غير ما قُرئ صحّحه إنسان أو أعاد الخادم حسابه.
+      </p>
     </div>
   );
 }

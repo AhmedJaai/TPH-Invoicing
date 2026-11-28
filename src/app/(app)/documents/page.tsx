@@ -3,7 +3,7 @@ import { Suspense, Fragment } from "react";
 import { SavedViews } from "@/components/saved-views";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, asc, count, desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import {
   Archive, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, FileSearch, FolderSync, Search, Upload,
 } from "lucide-react";
@@ -104,12 +104,26 @@ export default async function DocumentsPage({
     تحت الترشيحات الأخرى. كان يُحسَب بالحالة المختارة فيقول «الكل (٠)»
     تحت «يحتاج مراجعة» والمؤرشف ١٦٥.
   */
-  const base: SQL[] = [];
-  if (p.month) base.push(eq(documents.periodMonth, p.month));
-  if (p.supplier) base.push(eq(documents.supplierId, p.supplier));
-  if (p.kind) base.push(sql`${documents.kind}::text = ${p.kind}`);
-  // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
-  if (q) base.push(ilike(documents.fileName, `%${escapeLike(q)}%`));
+  /*
+    كلُّ ترشيحٍ باسمه — فعددُ كلّ خيارٍ في قائمته يُحسب تحت الترشيحات الأخرى
+    واللسانِ المفتوح، لا تحتها هي. كانت قائمةُ المورّدين كلَّ مورّدٍ نشط بلا عدد،
+    فيُختار مورّدٌ فيقول «لا شيء» — ثلاثون محاولةً لمعرفة من له مستندٌ ينتظر.
+  */
+  const NO_SUPPLIER = "none";
+  const cond: Record<"month" | "supplier" | "kind" | "q", SQL | undefined> = {
+    month: p.month ? eq(documents.periodMonth, p.month) : undefined,
+    supplier: p.supplier === NO_SUPPLIER ? isNull(documents.supplierId) : p.supplier ? eq(documents.supplierId, p.supplier) : undefined,
+    kind: p.kind ? sql`${documents.kind}::text = ${p.kind}` : undefined,
+    // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
+    q: q ? ilike(documents.fileName, `%${escapeLike(q)}%`) : undefined,
+  };
+  const FACETS = ["month", "supplier", "kind", "q"] as const;
+  const isSql = (c: SQL | undefined): c is SQL => c !== undefined;
+  const base: SQL[] = Object.values(cond).filter(isSql);
+  const facetWhere = (except: keyof typeof cond) => and(
+    ...FACETS.filter((k) => k !== except).map((k) => cond[k]).filter(isSql),
+    ...(statusFilter ? [statusFilter] : []),
+  );
   const where = and(...base, ...(statusFilter ? [statusFilter] : []));
   const whereBase = base.length ? and(...base) : undefined;
 
@@ -155,15 +169,19 @@ export default async function DocumentsPage({
       .offset((page - 1) * PAGE_SIZE),
 
     db
-      .select({ month: documents.periodMonth })
+      .select({ month: documents.periodMonth, n: sql<number>`count(*)::int` })
       .from(documents)
+      .where(facetWhere("month"))
       .groupBy(documents.periodMonth)
       .orderBy(desc(documents.periodMonth)),
 
+    /* مَن له مستندٌ هنا وحده، بعدده — والمجهولُ خيارٌ باسمه (أكثرُ ما ينتظر بلا مورّد) */
     db
-      .select({ id: suppliers.id, nameAr: suppliers.nameAr })
-      .from(suppliers)
-      .where(eq(suppliers.isActive, true))
+      .select({ id: documents.supplierId, nameAr: suppliers.nameAr, n: sql<number>`count(*)::int` })
+      .from(documents)
+      .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
+      .where(facetWhere("supplier"))
+      .groupBy(documents.supplierId, suppliers.nameAr)
       .orderBy(asc(suppliers.nameAr)),
 
     db
@@ -175,6 +193,7 @@ export default async function DocumentsPage({
     db
       .select({ kind: documents.kind, n: sql<number>`count(*)::int` })
       .from(documents)
+      .where(facetWhere("kind"))
       .groupBy(documents.kind)
       .orderBy(desc(sql`count(*)`)),
 
@@ -277,6 +296,18 @@ export default async function DocumentsPage({
     return `/documents?${next.toString()}`;
   };
 
+  /* الخيارُ المختار يبقى في قائمته ولو صار عددُه صفراً تحت اللسان الآخر — وإلّا ضاع اسمُ ما اخترته */
+  const monthOptions = monthRows.flatMap((m) => (m.month ? [{ month: m.month, n: Number(m.n) }] : []));
+  if (p.month && !monthOptions.some((m) => m.month === p.month)) monthOptions.unshift({ month: p.month, n: 0 });
+  const supplierOptions = supplierRows
+    .map((s) => ({ value: s.id ?? NO_SUPPLIER, label: s.id ? s.nameAr ?? "مورّد" : "مورّد غير معروف", n: Number(s.n) }))
+    /* المجهولُ أوّلاً: هو ما ينتظر أكثرَ من غيره */
+    .sort((a, b) => (a.value === NO_SUPPLIER ? -1 : b.value === NO_SUPPLIER ? 1 : 0));
+  if (p.supplier && !supplierOptions.some((s) => s.value === p.supplier)) {
+    const [chosen] = p.supplier === NO_SUPPLIER ? [] : await db.select({ nameAr: suppliers.nameAr }).from(suppliers).where(eq(suppliers.id, p.supplier)).limit(1);
+    supplierOptions.unshift({ value: p.supplier, label: p.supplier === NO_SUPPLIER ? "مورّد غير معروف" : chosen?.nameAr ?? "مورّد", n: 0 });
+  }
+
   const pages = Math.ceil(total / PAGE_SIZE);
   const filtered = Boolean(p.month || p.supplier || p.kind || q);
 
@@ -352,10 +383,10 @@ export default async function DocumentsPage({
                 value={p.month ?? ""}
                 options={[
                   { value: "", label: "كلّ الأشهر", href: link({ month: undefined }) },
-                  ...monthRows.filter((m) => m.month).map((m) => ({
-                    value: m.month as string,
-                    label: formatMonth(m.month as string),
-                    href: link({ month: m.month as string }),
+                  ...monthOptions.map((m) => ({
+                    value: m.month,
+                    label: `${formatMonth(m.month)} (${m.n})`,
+                    href: link({ month: m.month }),
                   })),
                 ]}
               />
@@ -376,7 +407,7 @@ export default async function DocumentsPage({
                 value={p.supplier ?? ""}
                 options={[
                   { value: "", label: "كلّ المورّدين", href: link({ supplier: undefined }) },
-                  ...supplierRows.map((s) => ({ value: s.id, label: s.nameAr, href: link({ supplier: s.id }) })),
+                  ...supplierOptions.map((s) => ({ value: s.value, label: `${s.label} (${s.n})`, href: link({ supplier: s.value }) })),
                 ]}
               />
               {filtered && (
@@ -392,7 +423,7 @@ export default async function DocumentsPage({
                 suggestedName={[
                   p.month ? formatMonth(p.month) : null,
                   p.kind ? KIND_LABEL[p.kind] ?? p.kind : null,
-                  p.supplier ? supplierRows.find((r) => r.id === p.supplier)?.nameAr ?? null : null,
+                  p.supplier ? supplierOptions.find((r) => r.value === p.supplier)?.label ?? null : null,
                   q ? `«${q}»` : null,
                 ].filter(Boolean).join(" · ") || "طريقة العرض"}
               />
@@ -552,7 +583,7 @@ export default async function DocumentsPage({
                             <span className="block text-[11px] text-danger">لا يصلح لخصم الضريبة</span>
                           )}
                           {r.status === "REJECTED" && (
-                            <span className="block text-[11px] leading-relaxed text-muted">
+                            <span className="block text-[11px] leading-relaxed text-muted [overflow-wrap:anywhere]">
                               {j
                                 ? <><T s="رُفض في {0}{1}: {2}" a={[formatDay(j.at), j.by ? <Fragment key="1"> <T s=" بواسطة {0}" a={[<bdi key="0">{j.by}</bdi>]} /></Fragment> : null, j.reason ?? "بلا سبب مكتوب"]} /></>
                                 : "مرفوض، ولا يوجد سبب مسجّل."}

@@ -18,9 +18,15 @@ import { ACT } from "@/lib/ui-terms";
 export function ConfirmDocument({
   documentId,
   variant = "secondary",
+  nextHref,
+  keyAction = false,
 }: {
   documentId: string;
   variant?: ButtonVariant;
+  /** بعد النجاح: إلى التالي في الطابور بدل البقاء على ما حُسم. */
+  nextHref?: string | null;
+  /** في صفٍّ من طابور: `A` يضغطه، ثمّ تنتقل العلامةُ إلى ما يليه (`keyboard.tsx`). */
+  keyAction?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -32,6 +38,9 @@ export function ConfirmDocument({
         aria-busy={busy}
         type="button"
         disabled={busy}
+        data-key-action={keyAction ? "approve" : undefined}
+        data-key-then={keyAction ? "next" : undefined}
+        aria-keyshortcuts={keyAction ? "A" : undefined}
         className={buttonClass(variant, "sm")}
         onClick={async () => {
           setBusy(true);
@@ -42,13 +51,17 @@ export function ConfirmDocument({
           toast({
             tone: "ok",
             title: "اعتُمد المستند",
-            body: "دخلت فاتورته في المستحقات، وخُصم منها ما دفعته للمورّد مقدّماً.",
+            body: nextHref
+              ? "دخلت فاتورته في المستحقات، وخُصم منها ما دفعته للمورّد مقدّماً. وفُتح لك التالي."
+              : "دخلت فاتورته في المستحقات، وخُصم منها ما دفعته للمورّد مقدّماً.",
           });
-          router.refresh();
+          if (nextHref) router.replace(nextHref, { scroll: false });
+          else router.refresh();
         }}
       >
         <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
         {ACT.approveDocument}
+        {keyAction && <kbd aria-hidden className="hidden rounded border border-current/30 px-1 text-[10px] font-bold leading-4 opacity-70 lg:inline">A</kbd>}
       </button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>
