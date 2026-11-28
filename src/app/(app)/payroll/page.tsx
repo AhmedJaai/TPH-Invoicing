@@ -2,42 +2,28 @@ import Link from "next/link";
 import { DownloadButton } from "@/components/download-button";
 import { deductionPeriod, PAYDAY } from "@/lib/payroll/period";
 import { redirect } from "next/navigation";
-import { ArrowLeftRight, Info, Link2, ReceiptText, UserPlus, Users } from "lucide-react";
+import { ArrowLeftRight, CircleCheck, Info, Link2, ReceiptText, UserPlus, Users } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { MaybeMoney, MonthTabs } from "@/components/finance-bits";
-import { SlipPdfButton } from "@/components/payroll/slip-pdf-button";
+import { MonthTabs } from "@/components/finance-bits";
+import { PayPeople, STATUS_UI, statusCounts } from "@/components/payroll/pay-people";
+import { daysToPayday, PAY_STATUS_ORDER } from "@/lib/payroll/pay-status";
 import { PostAction } from "@/components/post-action";
 import { LinkSuggestedButton, LinkTransferForm, NotPayrollButton, type OwedByMonth } from "@/components/payroll/forms";
-import { Badge, Callout, DataTable, EmptyState, LinkButton, Meter, NoAccess, Section, Stat, StatGrid, type Column } from "@/components/ui";
+import { Badge, Callout, EmptyState, LinkButton, Meter, NoAccess, Section } from "@/components/ui";
 import { monthsBetween } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { countNoun, countNounGen, DAY, DISCIPLINARY, EMPLOYEE, MINUTE, TRANSFER } from "@/lib/arabic";
-import { ADJUSTMENT_LABEL, payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
+import { countNoun, countNounGen, DAY, EMPLOYEE, TRANSFER } from "@/lib/arabic";
+import { payrollTotals, PURPOSE_LABEL, suggestedPayMonth } from "@/lib/payroll/calc";
 import { currentMonthRiyadh, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
-import { loadBankPayees, loadEmployees, loadPayrollMonth, loadPayrollMonths, loadOpenTransfers, transfersSince, type PayrollRow, type TransferView } from "@/services/payroll.service";
+import { loadBankPayees, loadEmployees, loadPayrollMonth, loadPayrollMonths, loadOpenTransfers, transfersSince, type TransferView } from "@/services/payroll.service";
 
 export const dynamic = "force-dynamic";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-/** ما ينقص الراتب، بكلماتٍ — لعمود الخصومات. */
-function deductionText(r: PayrollRow): string {
-  const s = r.slip;
-  const parts: string[] = [];
-  for (const a of r.adjustments) {
-    if (a.kind === "DEDUCTION" || a.kind === "FINE" || a.kind === "LOAN_REPAYMENT") parts.push(`${ADJUSTMENT_LABEL[a.kind]} ${formatRiyalsDisplay(a.amountMinor)}`);
-  }
-  if (s.lateMinutes + s.earlyMinutes > 0) parts.push(`تأخير ${countNoun(s.lateMinutes + s.earlyMinutes, MINUTE)}`);
-  if (s.absentDays > 0) parts.push(`غياب ${countNoun(s.absentDays, DAY)}`);
-  if (s.unpaidLeaveDays > 0) parts.push(`إجازة بلا أجر ${countNoun(s.unpaidLeaveDays, DAY)}`);
-  if (s.penaltiesMinor > 0) parts.push(`جزاءات اللائحة ${formatRiyalsDisplay(s.penaltiesMinor)}`);
-  if (s.warnings > 0) parts.push(countNoun(s.warnings, DISCIPLINARY));
-  return parts.join(" · ");
-}
 
 /**
  * مسيّرُ الرواتب — لكلّ موظّفٍ في الشهر: راتبُه بأيّامه، وما زاد وما نقص، وما حُوِّل له، وكم بقي.
@@ -109,56 +95,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const latesOpen = sheet.rows.reduce((n, r) => n + r.attendance.filter((a) => a.kind === "LATE" && !a.waivedAt && (a.minutes ?? 0) > r.employee.lateGraceMinutes).length, 0);
   const latesWaived = sheet.rows.reduce((n, r) => n + r.attendance.filter((a) => a.kind === "LATE" && a.waivedAt).length, 0);
 
-  const columns: Column<PayrollRow>[] = [
-    {
-      key: "name", header: "الموظف", primary: true,
-      cell: (r) => (
-        <span className="min-w-0">
-          <span className="font-bold">{r.employee.name}</span>
-          <span className="block text-[11px] text-muted">
-            {r.employee.kind === "PART_TIME" ? "جزئي" : r.employee.jobTitle ?? "دوام كامل"}
-            {r.slip.days && r.slip.days.worked !== r.slip.days.of && <> · {r.slip.days.range ? "آخر راتب " : ""}{r.slip.days.worked} من {r.slip.days.of} يوماً</>}
-          </span>
-          {(r.violations.some((v) => !v.waived) || r.loanMinor > 0 || r.article80.length > 0 || r.rateMinor === null || r.employee.leftOn) && (
-            <span className="mt-1 flex flex-wrap gap-1">
-              {/* يظهر في شهر خروجه بآخر راتبه، ويغيب بعده */}
-              {r.employee.leftOn && <Badge tone="muted">ترك العمل {formatDay(r.employee.leftOn)}</Badge>}
-              {r.rateMinor === null && <Badge tone="warn">بلا راتب مكتوب</Badge>}
-              {r.slip.warnings > 0 && <Badge tone="warn">{r.slip.warnings === 1 ? "إنذار" : `${r.slip.warnings} إنذارات`}</Badge>}
-              {r.slip.penaltiesMinor > 0 && <Badge tone="danger">جزاءات {formatRiyalsDisplay(r.slip.penaltiesMinor)}</Badge>}
-              {r.article80.length > 0 && <Badge tone="danger">غياب يجيز الفصل</Badge>}
-              {r.loanMinor > 0 && <Badge tone="muted">سلف {formatRiyalsDisplay(r.loanMinor)}</Badge>}
-            </span>
-          )}
-        </span>
-      ),
-      sortBy: (r) => r.employee.name,
-    },
-    {
-      key: "base", header: "الراتب", numeric: true,
-      cell: (r) => <MaybeMoney minor={r.slip.baseMinor} why={r.employee.kind === "MONTHLY" ? "لم يُكتب راتبه" : undefined} />,
-      sortBy: (r) => r.slip.baseMinor,
-    },
-    { key: "add", header: "إضافات", numeric: true, secondary: true, cell: (r) => (r.slip.additionsMinor > 0 ? <Money minor={r.slip.additionsMinor} /> : <span className="text-muted">لا شيء</span>) },
-    {
-      key: "ded", header: "خصومات", numeric: true,
-      cell: (r) => r.slip.deductionsMinor === null ? <MaybeMoney minor={null} />
-        : r.slip.deductionsMinor > 0 ? <span title={deductionText(r)}><Money minor={-r.slip.deductionsMinor} signed /></span> : <span className="text-muted">لا شيء</span>,
-    },
-    { key: "adv", header: "سلف نقداً", numeric: true, secondary: true, cell: (r) => (r.slip.advancesMinor > 0 ? <Money minor={-r.slip.advancesMinor} signed /> : <span className="text-muted">لا شيء</span>) },
-    { key: "due", header: "المستحق", numeric: true, cell: (r) => <MaybeMoney minor={r.slip.dueMinor} />, sortBy: (r) => r.slip.dueMinor },
-    { key: "paid", header: "حُوّل", numeric: true, cell: (r) => (r.slip.paidMinor > 0 ? <Money minor={r.slip.paidMinor} /> : <span className="text-muted">لم يُحوَّل</span>), sortBy: (r) => r.slip.paidMinor },
-    {
-      key: "left", header: "الباقي للتحويل", numeric: true,
-      cell: (r) => r.slip.remainingMinor === null ? <MaybeMoney minor={null} />
-        : r.slip.remainingMinor > 0 ? <strong><Money minor={r.slip.remainingMinor} tone="warn" /></strong>
-        : r.slip.remainingMinor < 0 ? <span className="text-[11px] font-bold text-danger">حُوّل زيادة <Money minor={-r.slip.remainingMinor} /></span>
-        : <Badge tone="ok">اكتمل</Badge>,
-      sortBy: (r) => r.slip.remainingMinor,
-    },
-    /* آخرَ الشهر: قسيمةُ كلٍّ منهم PDF تُرسل من هنا (`slip-pdf-button.tsx`) */
-    { key: "slip", header: "القسيمة", cell: (r) => <SlipPdfButton compact employeeId={r.employee.id} month={month} name={r.employee.name} monthLabel={formatMonth(month)} phone={r.employee.phone} /> },
-  ];
+  const counts = statusCounts(sheet.rows);
+  const owedCount = counts.NONE + counts.PARTIAL;
+  const toPayday = daysToPayday(month, todayInRiyadh(), PAYDAY);
+  const paydayText = toPayday === null ? null : toPayday === 0 ? "يُصرف الراتب اليوم" : toPayday === 1 ? "يُصرف الراتب غداً" : `يُصرف الراتب بعد ${countNoun(toPayday, DAY)}`;
 
   return (
     <PageShell
@@ -198,32 +138,77 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         </div>
       ) : (
         <>
-          <div className="mt-5">
-            <StatGrid>
-              <Stat label={month === current ? "المستحق عن الشهر كاملاً" : "المستحق للشهر"} minor={totals.dueMinor} sub={totals.unknown > 0 ? `ومعه ${countNoun(totals.unknown, EMPLOYEE)} بلا راتب مكتوب، فالمجموع ناقص` : countNoun(sheet.rows.length, EMPLOYEE)} tone={totals.unknown > 0 ? "warn" : undefined} />
-              {/* «٠٫٠٠ حُوّل» فوق حوالاتٍ لم توزَّع يُقرأ «لم أحوّل شيئاً» — فيُقال ما ينتظر التوزيع بجانب الرقم ويُفتح */}
-              <Stat
-                label="حُوّل من الرواتب"
-                minor={totals.paidMinor}
-                sub={salaryOpen.length > 0
-                  ? <><a href="#transfers" className="font-bold text-warn hover:underline">{countNoun(salaryOpen.length, TRANSFER)} في الكشف لم توزَّع بعد</a>، فما يُعدّ هنا ما وُزّع منها</>
-                  : "ما وُزّع من الحوالات راتباً أو سلفة، وما دُفع خارج الكشف"}
-              />
-              <Stat label="الباقي للتحويل" minor={totals.remainingMinor} tone={totals.remainingMinor > 0 ? "warn" : "ok"} sub={totals.overpaidMinor > 0 ? `وحُوّل زيادةً ${formatRiyalsDisplay(totals.overpaidMinor)} لبعضهم` : "هذا ما يلزمك تحويله الآن"} />
-            </StatGrid>
-            {totals.dueMinor > 0 && (
-              <div className="mt-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="font-bold">{settled === sheet.rows.length ? "اكتمل الشهر: وصل كل موظف مستحقه" : `اكتمل ${settled} من ${countNounGen(sheet.rows.length, EMPLOYEE)}`}</span>
-                  <span className="nums text-muted">{Math.min(100, Math.floor((Math.min(totals.paidMinor, totals.dueMinor) * 100) / totals.dueMinor))}٪ مما يستحقونه</span>
-                </div>
-                <Meter value={Math.min(totals.paidMinor, totals.dueMinor)} max={totals.dueMinor} tone={settled === sheet.rows.length ? "ok" : "accent"} label="ما حُوّل مما يستحقه الموظفون" />
+          {/* ── الجواب: كم بقي ولمن، ومتى يُصرف ── */}
+          <section aria-label={`حال رواتب ${formatMonth(month)}`} className={`mt-5 overflow-hidden rounded-2xl border shadow-raised ${owedCount === 0 && counts.UNKNOWN === 0 ? "border-ok/25 bg-ok-bg" : "border-line bg-raised"}`}>
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-4 p-5 sm:p-6">
+              <div className="min-w-0 flex-1 basis-72">
+                <p className="text-xs font-bold text-muted">
+                  رواتب {formatMonth(month)}{paydayText && <> · <span className="text-ink-soft">{paydayText} ({formatDay(`${month}-${PAYDAY}`)})</span></>}
+                </p>
+                {totals.remainingMinor > 0 ? (
+                  <>
+                    <p className="mt-1.5 text-[clamp(1.5rem,6vw,2.25rem)] font-bold leading-tight tracking-tight">
+                      باقٍ عليك <Money minor={totals.remainingMinor} tone="warn" currency />
+                    </p>
+                    <p className="mt-1 text-sm text-ink-soft">لـ{countNoun(owedCount, EMPLOYEE)}{counts.UNKNOWN > 0 && <>، و<a href="#pay-unknown" className="font-bold text-danger underline-offset-2 hover:underline">{countNoun(counts.UNKNOWN, EMPLOYEE)} مستحقهم غير معروف</a> فالمبلغ ناقص</>}.</p>
+                  </>
+                ) : counts.UNKNOWN > 0 ? (
+                  <p className="mt-1.5 text-2xl font-bold leading-tight text-danger">
+                    <a href="#pay-unknown" className="hover:underline">{countNoun(counts.UNKNOWN, EMPLOYEE)} مستحقهم غير معروف</a>
+                  </p>
+                ) : (
+                  <p className="mt-1.5 flex items-center gap-2 text-2xl font-bold leading-tight text-ok">
+                    <CircleCheck className="h-7 w-7" strokeWidth={2} aria-hidden /> وصل كل موظف مستحقه
+                  </p>
+                )}
+                {/* الحالُ بعددها — كلُّ واحدةٍ تنزل إلى مجموعتها */}
+                <ul className="mt-4 flex flex-wrap gap-2">
+                  {PAY_STATUS_ORDER.filter((st) => counts[st] > 0).map((st) => (
+                    <li key={st}>
+                      <a href={`#pay-${st.toLowerCase()}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-raised px-3 text-xs font-bold text-ink-soft transition-colors hover:border-accent-line hover:text-ink sm:min-h-9">
+                        {(() => { const I = STATUS_UI[st].icon; return <I className={`h-3.5 w-3.5 ${st === "DONE" ? "text-ok" : st === "UNKNOWN" || st === "OVER" ? "text-danger" : "text-warn"}`} strokeWidth={2} aria-hidden />; })()}
+                        {STATUS_UI[st].title}
+                        <span className="nums nums-count text-muted">{counts[st]}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
+              <dl className="grid w-full grid-cols-3 gap-3 text-xs sm:w-auto sm:min-w-80">
+                <div>
+                  <dt className="text-muted">المستحق</dt>
+                  <dd className="mt-1 text-[15px] font-bold"><Money minor={totals.dueMinor} /></dd>
+                </div>
+                <div>
+                  <dt className="text-muted">حُوّل</dt>
+                  <dd className="mt-1 text-[15px] font-bold"><Money minor={totals.paidMinor} /></dd>
+                </div>
+                <div>
+                  <dt className="text-muted">الباقي</dt>
+                  <dd className="mt-1 text-[15px] font-bold"><Money minor={totals.remainingMinor} tone={totals.remainingMinor > 0 ? "warn" : "ok"} /></dd>
+                </div>
+                {totals.dueMinor > 0 && (
+                  <div className="col-span-3">
+                    <Meter value={Math.min(totals.paidMinor, totals.dueMinor)} max={totals.dueMinor} tone={settled === sheet.rows.length ? "ok" : "accent"} label="ما حُوّل مما يستحقه الموظفون" />
+                    <p className="mt-1.5 text-[11px] text-muted">
+                      اكتمل <span className="nums nums-count">{settled}</span> من {countNounGen(sheet.rows.length, EMPLOYEE)}
+                      {totals.overpaidMinor > 0 && <> · حُوّل زيادةً <Money minor={totals.overpaidMinor} /></>}
+                    </p>
+                  </div>
+                )}
+              </dl>
+            </div>
+            {/* «٠٫٠٠ حُوّل» فوق حوالاتٍ لم توزَّع يُقرأ «لم أحوّل شيئاً» — فيُقال ما ينتظر التوزيع بجانب الرقم ويُفتح */}
+            {salaryOpen.length > 0 && (
+              <a href="#transfers" className="flex min-h-11 items-center gap-2 border-t border-warn/25 bg-warn-bg px-5 py-2.5 text-xs font-bold text-warn hover:underline sm:px-6">
+                <ArrowLeftRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                {countNoun(salaryOpen.length, TRANSFER)} رواتب في الكشف لم توزَّع بعد، فما «حُوّل» هنا ما وُزّع منها فقط. وزّعها الآن
+              </a>
             )}
-          </div>
+          </section>
 
-          <Section title="الموظفون هذا الشهر" icon={ReceiptText} count={sheet.rows.length} hint="افتح أي موظف لتضيف خصماً أو سلفة أو مخالفة أو تأخيراً، أو لترى قسيمة راتبه.">
-            <DataTable columns={columns} rows={sheet.rows} keyOf={(r) => r.employee.id} hrefOf={(r) => `/payroll/employee/${r.employee.id}?month=${month}`} />
+          <Section title="الموظفون هذا الشهر" icon={ReceiptText} count={sheet.rows.length} hint="افتح أي موظف لترى قسيمته، أو لتضيف خصماً أو سلفة أو مخالفة أو تأخيراً." className="mt-8">
+            <PayPeople rows={sheet.rows} month={month} monthLabel={formatMonth(month)} />
           </Section>
         </>
       )}
