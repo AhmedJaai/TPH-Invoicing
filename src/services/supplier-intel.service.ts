@@ -27,6 +27,8 @@ import {
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
 import { auditActorName } from "@/lib/audit-actor";
+import { addMonths } from "@/lib/filing";
+import type { SpendRow } from "@/lib/supplier-overview";
 
 const RIYADH_DAY = (col: SQL) => sql`(${col} at time zone 'Asia/Riyadh')::date::text`;
 
@@ -123,7 +125,9 @@ export interface SupplierIntel {
   /** تغيّرُ أسعاره في مجملها بنقاط الأساس (`supplierPriceDriftBp`) — `null` إن لم يُقَس */
   priceDriftBp: number | null;
   events: TimelineEvent[];
-  lastPayment: { date: string; amountMinor: number } | null;
+  lastPayment: { date: string; amountMinor: number; href?: string } | null;
+  /** آخرُ فاتورةٍ بتاريخها — `null`: لا فاتورة منه بعد */
+  lastInvoice: { id: string; number: string; date: string; totalMinor: number } | null;
 }
 
 /**
@@ -139,7 +143,7 @@ export async function loadSupplierIntel(
   openCountInput: number | Promise<number>,
   eventLimit = 16,
 ): Promise<SupplierIntel> {
-  const [openCount, counts, settlements, lines, events, lastPay] = await Promise.all([
+  const [openCount, counts, settlements, lines, events, lastPay, lastInv] = await Promise.all([
     openCountInput,
     db.execute<{ invoice_count: number }>(sql`
       select count(*)::int as invoice_count from invoices where supplier_id = ${supplierId}
@@ -201,11 +205,18 @@ export async function loadSupplierIntel(
                 (select f.id from ai_findings f where f.supplier_id = ${supplierId}))
         order by al.at desc limit ${eventLimit})
     `),
-    db.execute<{ d: string; amount: string | number }>(sql`
-      select ${RIYADH_DAY(sql`p.paid_at`)} as d, (p.amount_minor - p.fee_minor)::bigint as amount
+    db.execute<{ d: string; amount: string | number; tx: string | null }>(sql`
+      select ${RIYADH_DAY(sql`p.paid_at`)} as d, (p.amount_minor - p.fee_minor)::bigint as amount,
+             (select bt.id from bank_transactions bt where bt.matched_payment_id = p.id limit 1) as tx
         from payments p
        where p.supplier_id = ${supplierId} and p.status not in ('REVERSED','VOID')
        order by p.paid_at desc limit 1
+    `),
+    db.execute<{ id: string; num: string; d: string; total: string | number }>(sql`
+      select i.id, i.invoice_number as num, ${RIYADH_DAY(sql`i.invoice_date`)} as d, i.total_minor::bigint as total
+        from invoices i
+       where i.supplier_id = ${supplierId}
+       order by i.invoice_date desc, i.created_at desc limit 1
     `),
   ]);
 
@@ -241,17 +252,56 @@ export async function loadSupplierIntel(
         cancelled: r.cancelled ?? undefined,
       };
     })
-    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
-    .slice(0, eventLimit);
+    /* حدٌّ لكلّ نوعٍ لا للمجموع — قطعُ المجموع كان يترك للدفعات واحدةً تحت ثلاثين قراراً، فيكذب مرشِّحُ «دفعات» */
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
   const lp = lastPay.rows[0];
+  const li = lastInv.rows[0];
   return {
     reliability,
     prices,
     priceDriftBp,
     events: merged,
-    lastPayment: lp ? { date: lp.d, amountMinor: Number(lp.amount) } : null,
+    lastPayment: lp ? { date: lp.d, amountMinor: Number(lp.amount), href: lp.tx ? txHref(lp.tx) : undefined } : null,
+    lastInvoice: li ? { id: li.id, number: li.num, date: li.d, totalMinor: Number(li.total) } : null,
   };
+}
+
+/**
+ * فواتيرُه ودفعاتُه شهراً بشهر في آخر `months` شهراً.
+ *
+ * الفاتورةُ بشهرها المحاسبيّ (`period_month`) وإجماليّها شاملاً الضريبة — كما تجمعها
+ * المشتريات (`spendByMonth`). والدفعةُ بشهر يومها بتوقيت الرياض، بما وصل المورّد
+ * (المبلغ ناقص رسم التحويل)، بلا المردودة والملغاة. والرصفُ في `spendMonths`.
+ */
+export async function loadSupplierMonthly(supplierId: string, currentMonth: string, months = 12): Promise<SpendRow[]> {
+  const from = addMonths(currentMonth, -(months - 1));
+  const rows = await db.execute<{ m: string; billed: string | number; n_inv: number; paid: string | number; n_pay: number }>(sql`
+    with inv as (
+      select period_month as m, sum(total_minor)::bigint as billed, count(*)::int as n_inv
+        from invoices
+       where supplier_id = ${supplierId} and period_month >= ${from}
+       group by 1
+    ), pay as (
+      select to_char(paid_at at time zone 'Asia/Riyadh', 'YYYY-MM') as m,
+             sum(amount_minor - fee_minor)::bigint as paid, count(*)::int as n_pay
+        from payments
+       where supplier_id = ${supplierId} and status not in ('REVERSED','VOID')
+         and to_char(paid_at at time zone 'Asia/Riyadh', 'YYYY-MM') >= ${from}
+       group by 1
+    )
+    select coalesce(inv.m, pay.m) as m,
+           coalesce(inv.billed, 0) as billed, coalesce(inv.n_inv, 0) as n_inv,
+           coalesce(pay.paid, 0) as paid, coalesce(pay.n_pay, 0) as n_pay
+      from inv full join pay on pay.m = inv.m
+  `);
+  return rows.rows.map((r) => ({
+    month: r.m,
+    billedMinor: Number(r.billed),
+    invoiceCount: Number(r.n_inv),
+    paidMinor: Number(r.paid),
+    paymentCount: Number(r.n_pay),
+  }));
 }
 
 /* ───────────────────────── كشفُ الحساب المطبوع ───────────────────────── */

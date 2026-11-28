@@ -629,6 +629,8 @@ export type TimelineItem = {
   tone?: Tone;
   icon?: LucideIcon;
   href?: string;
+  /** نوعُ الحدث — يُصفّى به (`TimelineFilter`) */
+  kind?: string;
 };
 
 /** خطٌّ زمنيّ: ما حدث، ومتى، ومَن — بترتيبه. */
@@ -638,8 +640,8 @@ export function Timeline({ items }: { items: readonly TimelineItem[] }) {
       {items.map((i, idx) => {
         const Icon = i.icon;
         return (
-          <li key={i.id} className="relative flex gap-3 pb-5 last:pb-0">
-            {idx < items.length - 1 && <span aria-hidden className="absolute start-[13px] top-7 bottom-0 w-px bg-line" />}
+          <li key={i.id} data-kind={i.kind} className="relative flex gap-3 pb-5 last:pb-0">
+            {idx < items.length - 1 && <span aria-hidden data-connector className="absolute start-[13px] top-7 bottom-0 w-px bg-line" />}
             <span className={`relative z-10 mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line bg-raised ${i.tone ? TONE_TEXT[i.tone] : "text-muted"}`}>
               {Icon ? <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <span className={`h-2 w-2 rounded-full ${i.tone ? TONE_DOT[i.tone] : "bg-muted"}`} />}
             </span>

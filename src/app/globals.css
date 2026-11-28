@@ -1233,3 +1233,12 @@ details[open]::details-content {
 html[dir="ltr"] :is(.lucide-arrow-left, .lucide-arrow-right, .lucide-chevron-left, .lucide-chevron-right, .lucide-chevrons-left, .lucide-chevrons-right) {
   transform: scaleX(-1);
 }
+
+/* مرشِّحُ الخطّ الزمنيّ (`TimelineFilter`): ما ليس من النوع المختار يُخفى، والوصلُ بين النقاط يسقط حين تتباعد */
+[data-timeline-show="INVOICE"] li[data-kind]:not([data-kind="INVOICE"]),
+[data-timeline-show="PAYMENT"] li[data-kind]:not([data-kind="PAYMENT"]),
+[data-timeline-show="STATEMENT"] li[data-kind]:not([data-kind="STATEMENT"]),
+[data-timeline-show="AUDIT"] li[data-kind]:not([data-kind="AUDIT"]) {
+  display: none;
+}
+[data-timeline-show]:not([data-timeline-show="ALL"]) [data-connector] { display: none; }

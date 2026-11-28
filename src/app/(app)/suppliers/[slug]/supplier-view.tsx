@@ -20,7 +20,7 @@ import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
 import { LiveMoney } from "@/components/live-money";
 import {
-  Badge, Callout, Card, DataTable, Delta, EmptyState, KeyValue, LinkButton, LinkTabs, Meter, Monogram, Section, Sparkline, TONE_TEXT,
+  Badge, Card, DataTable, Delta, EmptyState, KeyValue, LinkButton, LinkTabs, Meter, Monogram, Section, Sparkline, TONE_TEXT,
   Timeline, type TimelineItem, type Tone,
 } from "@/components/ui";
 import { AgeingBar } from "@/components/supplier-intel";
@@ -31,11 +31,14 @@ import {
   type Grade,
 } from "@/lib/supplier-health";
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
-import { countNoun, countNounGen, DAY, INVOICE, LINE, MONTH, PRODUCT, TIME } from "@/lib/arabic";
+import { countNoun, countNounGen, DAY, INVOICE, LINE, MONTH, PAYMENT, PRODUCT, TIME } from "@/lib/arabic";
 import { loadOpenInvoiceAges, loadSupplierBalances } from "@/services/supplier-balance.service";
 import { SupplierItemMerge, SupplierItemUnmerge } from "@/components/supplier-item-merge";
 import { similarItems } from "@/lib/items";
-import { loadSupplierIntel, type TimelineEvent } from "@/services/supplier-intel.service";
+import { loadSupplierIntel, loadSupplierMonthly, type TimelineEvent } from "@/services/supplier-intel.service";
+import { latestPriceChange, spendMonths, type PriceChangeLine, supplierExceptions, TIMELINE_FILTERS, timelineCounts, type SpendMonth, type TimelineKind } from "@/lib/supplier-overview";
+import { TimelineFilter } from "@/components/timeline-filter";
+import { PriceHistoryChart } from "@/components/price-history-chart";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
@@ -51,12 +54,12 @@ import { CreditNoteForm } from "@/components/credit-note-form";
 import { StatementCreditAction } from "@/components/statement-credit-action";
 import { SupplierHandDuplicates } from "@/components/hand-duplicate";
 import { loadDuplicateHandPayments } from "@/services/hand-duplicate.service";
-import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, formatDay, formatMonth, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
 import { buttonClass } from "@/components/ui-tokens";
 import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { ACTION_LABEL } from "@/lib/audit-labels";
-import { MIN_SETTLED_SAMPLE, ageOwed, ageTone } from "@/lib/supplier-intel";
+import { MIN_SETTLED_SAMPLE, ageOwed, ageTone, type ProductPriceHistory } from "@/lib/supplier-intel";
 import { txHref } from "@/lib/inspector";
 import { latestStatementDiscrepancies } from "@/services/statement-reconcile.service";
 import { loadSettlementComparisons } from "@/services/statement-payments.service";
@@ -149,7 +152,7 @@ export async function SupplierView({
 
   const [
     statsRes, balRows, ages, findingsRaw, intel, atStatementRes, invoicesAtStatementRes, why,
-    recent, statementRes, paymentRes, settlementRows,
+    recent, statementRes, paymentRes, settlementRows, monthlyRows,
   ] = await Promise.all([
     db.execute<Record<string, number | string | null>>(sql`
       select
@@ -191,7 +194,7 @@ export async function SupplierView({
     loadOpenInvoiceAges(s.id),
     showAmounts ? listOpenFindings(s.id) : Promise.resolve([]),
     /* «المسدَّد» ما عدا المفتوحَ الذي يعدّه مصدرُ الأرصدة — لا عتبةٌ ثانية */
-    loadSupplierIntel(s.id, balP.then((rows) => rows[0]?.openCount ?? 0)),
+    loadSupplierIntel(s.id, balP.then((rows) => rows[0]?.openCount ?? 0), 15),
     db.execute<{ billed: string; paid: string; allocated_after: string }>(sql`
       select
         (select coalesce(sum(total_minor), 0)::bigint from invoices
@@ -269,6 +272,8 @@ export async function SupplierView({
       : Promise.resolve(null),
     /* دائنُ آخر كشفه مقابلَ ما دفعناه — سطراً بسطر */
     showAmounts ? loadSettlementComparisons([s.id]) : Promise.resolve([]),
+    /* فواتيرُه ودفعاتُه بالشهر — مالٌ كلُّه، فلمن يرى المبالغ وحده */
+    showAmounts ? loadSupplierMonthly(s.id, currentMonthRiyadh()) : Promise.resolve([]),
   ]);
   /* دائنُ كشفه مقابلَ ما دفعناه (`lib/statement-payments.ts`) — لآخر كشفٍ وحده، كأسباب الفرق */
   const settlement = settlementRows[0]?.comparison ?? null;
@@ -304,8 +309,6 @@ export async function SupplierView({
     لا يُقال «متأخّر» عن مورّدٍ أمهلنا، ولا «في أجله» عن غير علم.
   */
   const pastDue = pastDueOf(ages.get(s.id) ?? [], s.paymentTermsDays, todayInRiyadh());
-  /* سقفٌ كتبه صاحبُ المقهى لما عليه لهذا المورّد — وتجاوزُه يُقال في رأس ملفّه */
-  const overAlert = s.balanceAlertMinor !== null && balance > s.balanceAlertMinor;
 
   const canAnalyze = can(user.role, "supplier:edit");
   /* الدمجُ والحذف للمالك وحده — والمورّدون الباقون هدفاً، بلا المدموجين */
@@ -410,6 +413,29 @@ export async function SupplierView({
   };
 
   const timeline = toTimeline(intel.events, showAmounts);
+  const counts = timelineCounts(timeline.map((t) => t.kind as TimelineKind));
+
+  /* ما يحتاج فعلاً عنده — الأرقامُ من مصادرها، والجمعُ في `supplier-overview.ts` */
+  const exceptions = showAmounts
+    ? supplierExceptions({
+        supplierId: s.id,
+        slug: s.slug,
+        owedMinor: balance,
+        pastDue,
+        oldestOwedDays: ageing.oldestOwedDays,
+        statementStatus: account.status,
+        statementDifferenceMinor: account.differenceMinor,
+        risingItems: rising,
+        alertMinor: s.balanceAlertMinor,
+        issuesStatements: s.issuesStatements,
+        statementCount: statementRows.length,
+        invoiceCount: n("invoice_count"),
+        canPay: canApprove,
+      })
+    : [];
+  const months = spendMonths(monthlyRows, currentMonthRiyadh());
+  /* من لا يصدر فواتير ولا فاتورةَ منه تُقاس مشترياتُه بدفعاته — ومن سُجّلت له فواتير تُقاس بها */
+  const spendByPaid = !s.issuesInvoices && months.every((m) => m.invoiceCount === 0);
 
   return (
     <DetailFrame
@@ -450,18 +476,6 @@ export async function SupplierView({
                 </span>
                 {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيد لك عنده" : offsetting ? "متوازن على الورق" : "الحساب متوازن"}
               </p>
-              {ageing.oldestOwedDays !== null && (
-                /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
-                can(user.role, "payment:approve") ? (
-                  <Link href={`/payments?supplier=${encodeURIComponent(s.id)}`} className="rounded-full hover:opacity-80">
-                    <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
-                      <T s="أقدم مبلغ مستحق منذ {0}، جهّز سداده" a={[countNoun(ageing.oldestOwedDays, DAY)]} /></Badge>
-                  </Link>
-                ) : (
-                  <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
-                    <T s="أقدم مبلغ مستحق منذ {0}" a={[countNoun(ageing.oldestOwedDays, DAY)]} /></Badge>
-                )
-              )}
             </div>
             <p className={`mt-4 text-[2.25rem] font-bold leading-none tracking-tight sm:text-[2.6rem] ${balance > 0 ? "text-warn" : ""}`}>
               <LiveMoney minor={balance > 0 ? balance : creditLeft} currency />
@@ -479,6 +493,55 @@ export async function SupplierView({
                       ? "لا فاتورة منه ولا دفعة له حتى الآن، فلا حساب يُعرض."
                       : "لا توجد فاتورة مفتوحة ولا رصيد لك عنده."}
             </p>
+            {/* ── الجواب في سطر: المتأخّر، وآخر دفعة، وآخر فاتورة ── */}
+            <dl className="mt-4 grid grid-cols-3 gap-1.5 @md:gap-2">
+              <Fact3
+                label="متأخّر عن أجله"
+                value={
+                  balance <= 0 ? <span className="text-sm font-medium text-muted">لا شيء</span>
+                  : pastDue === null ? <span className="text-sm font-medium text-muted">غير معروف</span>
+                  : pastDue.count === 0 ? <span className="text-sm font-medium text-ok">لا شيء</span>
+                  : <Money minor={pastDue.totalMinor} tone="warn" />
+                }
+                sub={
+                  balance <= 0 ? "لا شيء مستحق له"
+                  : pastDue === null
+                    ? (canAnalyze
+                        ? <Link href={`/suppliers/${s.slug}?tab=profile#detail`} scroll={false} className="font-bold text-accent hover:underline">لا أجل مسجّل له، سجّله</Link>
+                        : "لا أجل مسجّل له")
+                  : pastDue.count === 0 ? "كل فواتيره في أجلها"
+                  : `${countNoun(pastDue.count, INVOICE)}، أقدمها بـ${countNoun(pastDue.oldestDays, DAY)}`
+                }
+                foot={ageing.oldestOwedDays !== null ? `أقدم مستحق منذ ${countNoun(ageing.oldestOwedDays, DAY)}` : undefined}
+              />
+              <Fact3
+                label="آخر دفعة له"
+                value={intel.lastPayment ? <Money minor={intel.lastPayment.amountMinor} /> : <span className="text-sm font-medium text-muted">لا دفعة بعد</span>}
+                sub={intel.lastPayment ? formatDay(intel.lastPayment.date) : undefined}
+                href={intel.lastPayment?.href ?? (intel.lastPayment ? `/suppliers/${s.slug}?tab=payments#detail` : undefined)}
+              />
+              <Fact3
+                label="آخر فاتورة منه"
+                value={intel.lastInvoice ? <Money minor={intel.lastInvoice.totalMinor} /> : <span className="text-sm font-medium text-muted">لا فاتورة بعد</span>}
+                sub={intel.lastInvoice ? <>{formatDay(intel.lastInvoice.date)}<bdi className="block truncate font-mono" title={intel.lastInvoice.number}>{intel.lastInvoice.number}</bdi></> : undefined}
+                href={intel.lastInvoice ? invoiceHref(intel.lastInvoice.id) : undefined}
+              />
+            </dl>
+
+            {/* ── ما يحتاج فعلاً عنده، وبجانب كلٍّ بابُه ── */}
+            {exceptions.length > 0 && (
+              <ul className="mt-3 space-y-1.5" aria-label="ما يحتاج انتباهك عنده">
+                {exceptions.map((e) => (
+                  <li key={e.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2 text-xs ${e.tone === "info" ? "bg-info-bg" : e.tone === "danger" ? "bg-danger-bg" : "bg-warn-bg"}`}>
+                    <span className={`min-w-0 flex-1 basis-48 font-bold ${TONE_TEXT[e.tone]}`}>
+                      {e.title}
+                      {e.amountMinor !== null && <> · <Money minor={e.amountMinor} /></>}
+                    </span>
+                    {e.action && <LinkButton href={e.action.href} size="sm">{e.action.label}</LinkButton>}
+                  </li>
+                ))}
+              </ul>
+            )}
             <SupplierHandDuplicates list={handDups} canAct={can(user.role, "invoice:remove")} />
             {/* ما يتقابل لا يُقال «متّزناً» وتُترك — بابُه بجانبه */}
             {unapplied > 0 && (bal?.openMinor ?? 0) > 0 && can(user.role, "payment:approve") && (
@@ -671,7 +734,7 @@ export async function SupplierView({
                   <div className="mt-1.5">
                     <Meter value={rel.settledCount} max={rel.invoiceCount} tone={rel.settledCount === rel.invoiceCount ? "ok" : "accent"} label="الفواتير المسدّدة" />
                   </div>
-                  <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                  <dl className="mt-4 text-xs">
                     <div className="min-w-0">
                       <dt className="text-[11px] text-muted">من الفاتورة إلى سدادها</dt>
                       <dd className="mt-1 text-sm font-bold">
@@ -687,26 +750,24 @@ export async function SupplierView({
                           : `الوسيط من ${countNounGen(rel.sampleCount, INVOICE)} · المتوسط ${countNoun(rel.averageDays, DAY)}${rel.prepaidCount > 0 ? ` · ${rel.prepaidCount} سبقها رصيد لك عنده` : ""}`}
                       </dd>
                     </div>
-                    <div className="min-w-0">
-                      <dt className="text-[11px] text-muted">آخر دفعة له</dt>
-                      <dd className="mt-1 text-sm font-bold">
-                        {intel.lastPayment ? <Money minor={intel.lastPayment.amountMinor} /> : <span className="font-medium text-muted">لا توجد دفعة بعد</span>}
-                      </dd>
-                      {intel.lastPayment && <dd className="mt-0.5 text-[11px] text-muted">{formatDay(intel.lastPayment.date)}</dd>}
-                    </div>
                   </dl>
                 </>
-              )}
-              {rising > 0 && (
-                <Link
-                  href={`/suppliers/${s.slug}?tab=prices#detail`}
-                  className="mt-4 flex min-h-11 items-center gap-2 rounded-lg bg-warn-bg px-3 text-xs font-bold text-warn transition-colors hover:brightness-95 sm:min-h-9"
-                >
-                  <T s="{0}{1} ارتفع سعره في آخر شراء. راجع أسعاره" a={[<Tags key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, countNoun(rising, PRODUCT)]} /></Link>
               )}
             </Card>
           </div>
         </div>
+      )}
+
+      {showAmounts && (
+        <Section
+          title={spendByPaid ? "ما دفعته له بالشهر" : "فواتيره ودفعاته بالشهر"}
+          icon={CalendarClock}
+          hint={!spendByPaid
+            ? "الفواتير بشهرها المحاسبي وإجماليها شامل الضريبة، والدفعات بشهر يومها بعد رسم التحويل. الشهر الجاري حتى اليوم."
+            : "لا يصدر فواتير، فما تدفعه له هو مشترياتك منه، بشهر يوم الدفع بعد رسم التحويل. الشهر الجاري حتى اليوم."}
+        >
+          <SpendByMonth months={months} byPaid={spendByPaid} />
+        </Section>
       )}
 
       {showAmounts && (findings.length > 0 || canAnalyze) && (
@@ -863,7 +924,6 @@ export async function SupplierView({
               <DataTable
                 rows={intel.prices}
                 keyOf={(p) => p.normalized}
-                hrefOf={(p) => (showAmounts && p.lastInvoiceId ? invoiceHref(p.lastInvoiceId, "lines") : undefined)}
                 searchOf={(p) => p.displayName}
                 searchLabel="ابحث عن صنف"
                 empty={
@@ -879,11 +939,21 @@ export async function SupplierView({
                     key: "item",
                     header: "الصنف",
                     primary: true,
-                    cell: (p) => (
+                    wrap: true,
+                    cell: (p) => {
+                      const change = latestPriceChange(p.state);
+                      return (
                       <span className="block min-w-0">
-                        <span className="block truncate font-bold" dir="auto">{p.displayName}</span>
+                        {/* الاسمُ يلتفّ ولا يُقصّ — «حليب نادك قليل الدسم 1 لتر» كان يُقرأ «حليب نادك قل…» */}
+                        <span className="block font-bold [overflow-wrap:anywhere]" dir="auto">{p.displayName}</span>
                         <span className="block text-[11px] font-normal text-muted">
                           <T s="اشتريته {0} · آخر مرة {1}" a={[countNoun(p.purchases, TIME), formatDay(p.lastDate)]} /></span>
+                        {showAmounts && change && <span className="mt-1 block"><PriceChangeChip change={change} /></span>}
+                        {showAmounts && p.history.length > 1 && (
+                          <a href={`#price-${encodeURIComponent(p.normalized)}`} className="relative mt-0.5 block text-[11px] font-bold text-accent hover:underline">
+                            <T s="تاريخ سعره ({0})" a={[countNoun(p.history.length, INVOICE)]} />
+                          </a>
+                        )}
                         {canAnalyze && (mergedAliases.get(p.normalized) ?? []).map((a) => (
                           <SupplierItemUnmerge key={a.alias} supplierId={s.id} alias={a.alias} name={a.name} into={p.displayName} />
                         ))}
@@ -896,7 +966,8 @@ export async function SupplierView({
                           />
                         )}
                       </span>
-                    ),
+                      );
+                    },
                   },
                   ...(showAmounts
                     ? [
@@ -928,6 +999,7 @@ export async function SupplierView({
                     : []),
                 ]}
               />
+              {showAmounts && <PriceHistories prices={intel.prices} />}
             </>
           )}
 
@@ -1008,19 +1080,6 @@ export async function SupplierView({
                   contractOnFile: s.contractOnFile,
                 }}
               />
-
-              {showAmounts && overAlert && s.balanceAlertMinor !== null && (
-                <Callout tone="warn" title="المستحق له تجاوز الحد الذي وضعته">
-                  <T s="المستحق له {0} والحد {1}. يمكنك رفع الحد أو حذفه من «عدّل بياناته» أدناه." a={[<Money key="0" minor={balance} />, <Money key="1" minor={s.balanceAlertMinor} />]} /></Callout>
-              )}
-              {showAmounts && pastDue && pastDue.count > 0 && (
-                /*
-                  للعلم لا للتنبيه (أحمد، ٢٤ أكتوبر ٢٠٢٦): المورّدون يُسدَّدون آخرَ كلّ شهر في دفعة الشهر،
-                  فأجلُ المورّد لا يصنع «متأخّراً» في «يحتاج قرارك» ولا في مجموع الدفعة — هنا وحده.
-                */
-                <Callout tone="info" title={`للعلم: ${countNoun(pastDue.count, INVOICE)} تجاوزت أجل هذا المورّد`}>
-                  <T s="المتبقي عليها {0}، وأقدمها تجاوز الأجل المسجّل ({2}) بـ{1}. أنت تسدّد المورّدين آخر كل شهر، فهذا للعلم فقط ولا يدخل في دفعة آخر الشهر ولا في «يحتاج قرارك»." a={[<Money key="0" minor={pastDue.totalMinor} />, countNoun(pastDue.oldestDays, DAY), s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)]} /></Callout>
-              )}
 
               <Card>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -1116,13 +1175,16 @@ export async function SupplierView({
 
         <aside aria-labelledby="events-title" className="min-w-0">
           <h2 id="events-title" className="mb-4 flex items-center gap-2 text-[15px] font-bold sm:text-base">
-            <T s="{0}آخر النشاط" a={[<History key="0" className="h-[18px] w-[18px] text-muted" strokeWidth={1.75} aria-hidden />]} /></h2>
+            <T s="{0}ما جرى معه" a={[<History key="0" className="h-[18px] w-[18px] text-muted" strokeWidth={1.75} aria-hidden />]} /></h2>
           {timeline.length === 0 ? (
             <EmptyState compact icon={CalendarClock} title="لا توجد أحداث بعد." hint="هنا تظهر الفواتير المرفوعة والدفعات المسجّلة بترتيب حدوثها." />
           ) : (
-            <div className="rounded-xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-              <Timeline items={timeline} />
-            </div>
+            <TimelineFilter filters={TIMELINE_FILTERS.map((f) => ({ ...f, count: counts[f.id] }))}>
+              <div className="rounded-xl border border-line bg-raised p-4 shadow-raised sm:p-5">
+                <Timeline items={timeline} />
+              </div>
+              <p className="mt-2 text-[11px] text-muted">يُعرض آخر 15 من كل نوع، والكل في ألسنة «فواتيره» و«دفعاته» و«كشوفه».</p>
+            </TimelineFilter>
           )}
         </aside>
       </div>
@@ -1152,6 +1214,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
       out.push({
         id: e.id,
         key,
+        kind: "AUDIT",
         title: ACTION_LABEL[e.title as keyof typeof ACTION_LABEL] ?? e.title,
         meta: formatDay(day),
         body: e.meta ? `بواسطة ${e.meta}` : undefined,
@@ -1162,6 +1225,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
     if (e.kind === "INVOICE") {
       out.push({
         id: e.id,
+        kind: "INVOICE",
         title: <><T s="فاتورة {0}" a={[<bdi key="0" className="font-mono">{e.title}</bdi>]} /></>,
         meta: formatDay(day),
         body: showAmounts && e.amountMinor !== null ? <Money minor={e.amountMinor} /> : undefined,
@@ -1175,6 +1239,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
       if (!showAmounts) continue;
       out.push({
         id: e.id,
+        kind: "PAYMENT",
         title: <><T s="دفعة · {0}" a={[METHOD_LABEL[e.title] ?? e.title]} /></>,
         meta: formatDay(day),
         body: (
@@ -1192,6 +1257,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
     const [from, to] = e.title.split("|");
     out.push({
       id: e.id,
+      kind: "STATEMENT",
       title: "وصل كشف حساب",
       meta: formatDay(day),
       body: (
@@ -1229,6 +1295,156 @@ function Trace({ label, minor, href }: { label: string; minor: number; href?: st
         {href ? <Link href={href} className="after:absolute after:inset-0">{label}</Link> : label}
       </dt>
       <dd className="shrink-0 font-bold"><Money minor={minor} /></dd>
+    </div>
+  );
+}
+
+/**
+ * سعرُ الوحدة عبر الزمن لكلّ صنفٍ اشتُري في فاتورتين فأكثر — رسمٌ وجدولُه تحته.
+ * ما تغيّر سعرُه تغيّراً مؤكَّداً يُفتح وحده، والباقي مطويّ بآخر سعره.
+ */
+function PriceHistories({ prices }: { prices: readonly ProductPriceHistory[] }) {
+  const items = prices.filter((p) => p.history.length > 1);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-6">
+      <h3 className="mb-1 text-sm font-bold">سعر الوحدة في كل فاتورة</h3>
+      <p className="mb-3 text-xs text-muted">لكل صنف اشتريته منه أكثر من مرة. اضغط نقطة في الرسم لترى سعرها وفاتورتها، والقائمة تحت الرسم فيها الأسعار كلها.</p>
+      <ul className="space-y-2">
+        {items.map((p) => {
+          const change = latestPriceChange(p.state);
+          return (
+            <li key={p.normalized} id={`price-${encodeURIComponent(p.normalized)}`} className="scroll-mt-24">
+              <details open={change !== null} className="rounded-xl border border-line bg-raised shadow-raised">
+                <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0 flex-1 basis-48 text-[13px] font-bold [overflow-wrap:anywhere]" dir="auto">{p.displayName}</span>
+                  {change && <PriceChangeChip change={change} />}
+                  {p.lastMinor !== null && <span className="shrink-0 text-[13px] font-bold"><Money minor={p.lastMinor} /></span>}
+                </summary>
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-line-soft px-4 py-3 @3xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <PriceHistoryChart
+                    points={p.history}
+                    since={change && p.state.kind === "MOVED" ? p.state.sinceDay : null}
+                    label={`سعر وحدة ${p.displayName} في كل فاتورة`}
+                  />
+                  <ol className="max-h-64 divide-y divide-line-soft overflow-y-auto rounded-lg border border-line-soft text-[12px]">
+                    {[...p.history].reverse().map((h, i) => (
+                      <li key={`${h.invoiceId}-${i}`}>
+                        <Link href={invoiceHref(h.invoiceId, "lines")} className="flex min-h-11 items-center justify-between gap-3 px-2.5 hover:bg-hover sm:min-h-9">
+                          <span className="min-w-0 text-ink-soft">{formatDay(h.day)}{h.invoiceNumber && <> · <bdi className="font-mono text-[11px]">{h.invoiceNumber}</bdi></>}</span>
+                          <span className="shrink-0 font-bold"><Money minor={h.unitMinor} /></span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** «ارتفع 8٪ منذ أغسطس» — لونُ الحال معه سهمٌ وكلمة، لا لونٌ وحده. */
+function PriceChangeChip({ change }: { change: PriceChangeLine }) {
+  return (
+    <span className={`inline-block shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${change.direction === "UP" ? "bg-warn-bg text-warn" : "bg-ok-bg text-ok"}`}>
+      {change.direction === "UP" ? "▲" : "▼"} {change.text}
+    </span>
+  );
+}
+
+/** حقيقةٌ من الجواب في رأس الملفّ — وبابُ سجلّها إن كان لها سجلّ. */
+function Fact3({ label, value, sub, foot, href }: {
+  label: string; value: React.ReactNode; sub?: React.ReactNode; foot?: string; href?: string;
+}) {
+  const body = (
+    <>
+      <dt className="text-[11px] text-muted">{label}</dt>
+      <dd className="mt-1 text-[13px] font-bold leading-tight @md:text-[15px]">{value}</dd>
+      {sub && <dd className="mt-0.5 text-[11px] leading-snug text-muted">{sub}</dd>}
+      {foot && <dd className="mt-0.5 text-[11px] leading-snug text-muted">{foot}</dd>}
+    </>
+  );
+  const cls = "relative min-w-0 rounded-lg border border-line-soft bg-sunken/50 px-2 py-2 @md:px-3 @md:py-2.5";
+  /* الخانةُ كلُّها تُضغط ويبقى `<dt>`/`<dd>` زوجاً: الرابطُ غطاءٌ فوقها لا غلافٌ لها */
+  return (
+    <div className={`${cls} ${href ? "transition-colors hover:border-accent-line hover:bg-hover" : ""}`}>
+      {href && <Link href={href} className="absolute inset-0 rounded-lg" aria-label={label} />}
+      {body}
+    </div>
+  );
+}
+
+/**
+ * فواتيرُه ودفعاتُه شهراً بشهر — شريطٌ واحدٌ بلونٍ واحد لما يقيس الشهر (فواتيره،
+ * أو دفعاته لمن لا يصدر فواتير)، والرقمُ مكتوبٌ بجانبه، والدفعاتُ نصّاً تحته.
+ * وشهرٌ بلا قيدٍ يُقال بالكلمة «لا فاتورة مسجّلة» — لا «0.00» يُقرأ «لم أشترِ شيئاً».
+ */
+function SpendByMonth({ months, byPaid }: { months: readonly SpendMonth[]; byPaid: boolean }) {
+  if (months.length === 0) {
+    return (
+      <EmptyState
+        compact
+        icon={CalendarClock}
+        title="لا فاتورة منه ولا دفعة له في آخر 12 شهراً."
+        hint="حين تُسجَّل فاتورة منه أو دفعة له يظهر هنا ما اشتريته منه كل شهر."
+      />
+    );
+  }
+  const measure = (m: SpendMonth) => (byPaid ? m.paidMinor : m.billedMinor);
+  const max = Math.max(1, ...months.map(measure));
+  const total = months.reduce((t, m) => t + measure(m), 0);
+  const totalCount = months.reduce((t, m) => t + (byPaid ? m.paymentCount : m.invoiceCount), 0);
+  return (
+    <div className="rounded-xl border border-line bg-raised p-3 shadow-raised sm:p-4">
+      <p className="mb-3 text-xs text-ink-soft">
+        <T
+          s="في آخر {0}: {1} في {2}."
+          a={[countNoun(months.length, MONTH), <span key="1" className="font-bold text-ink"><Money minor={total} currency /></span>, byPaid ? countNoun(totalCount, PAYMENT) : countNoun(totalCount, INVOICE)]}
+        />
+      </p>
+      <ol className="space-y-0.5">
+        {months.map((m) => {
+          const v = measure(m);
+          const count = byPaid ? m.paymentCount : m.invoiceCount;
+          return (
+            <li key={m.month} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg px-1.5 py-1.5 @xl:grid-cols-[7.5rem_minmax(0,1fr)_minmax(0,12rem)]">
+              <span className="text-[12px] font-bold">
+                {formatMonth(m.month)}
+                {m.partial && <span className="block text-[10px] font-normal text-muted">حتى اليوم</span>}
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-2">
+                  {count > 0 ? (
+                    <>
+                      <span
+                        aria-hidden
+                        className="block h-2 rounded-full bg-accent"
+                        style={{ width: `${Math.max(2, (v / max) * 100) * 0.7}%` }}
+                      />
+                      <span className="shrink-0 text-[12px] font-bold"><Money minor={v} /></span>
+                    </>
+                  ) : (
+                    <span className="text-[11px] text-muted">{byPaid ? "لا دفعة مسجّلة" : "لا فاتورة مسجّلة"}</span>
+                  )}
+                </span>
+                {/* على الجوّال: العددُ والدفعاتُ تحت الشريط */}
+                <span className="mt-0.5 block text-[10px] text-muted @xl:hidden">
+                  {count > 0 && (byPaid ? countNoun(count, PAYMENT) : countNoun(count, INVOICE))}
+                  {!byPaid && m.paymentCount > 0 && <>{count > 0 && " · "}<T s="دفعت {0}" a={[<Money key="0" minor={m.paidMinor} />]} /></>}
+                </span>
+              </span>
+              <span className="hidden text-[11px] text-muted @xl:block">
+                {count > 0 && (byPaid ? countNoun(count, PAYMENT) : countNoun(count, INVOICE))}
+                {!byPaid && m.paymentCount > 0 && <>{count > 0 && " · "}<T s="دفعت {0}" a={[<Money key="0" minor={m.paidMinor} />]} /></>}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
