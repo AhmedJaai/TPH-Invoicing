@@ -68,6 +68,14 @@ export const ITEM: NounForms = {
   zero: "لا بنود",
 };
 
+export const TASK: NounForms = {
+  one: "مهمّة واحدة",
+  two: "مهمّتان",
+  few: "مهامّ",
+  many: "مهمّة",
+  zero: "لا مهامّ",
+};
+
 export const PAGE: NounForms = {
   one: "صفحة واحدة",
   two: "صفحتان",

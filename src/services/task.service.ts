@@ -4,9 +4,9 @@
  * تُغلَق ولا تُحذف، والإغلاقُ يُنقَض: التراجعُ يعيد المهمّة ويمسح تاليتَها المكرَّرة إن لم
  * يمسّها أحد. والمكرَّرةُ تلد تاليتَها في المعاملة نفسِها فلا تضيع ولا تتكرّر بنقرتين.
  */
-import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { tasks } from "@/db/schema";
+import { tasks, users } from "@/db/schema";
 import type { Conn } from "./types";
 import { recordAudit } from "@/lib/audit";
 import { pgErrorCode } from "@/lib/pg-error";
@@ -30,10 +30,21 @@ function toTask(r: Row): Task {
   };
 }
 
+/** مَن كتبها — لا إسنادَ في المهامّ، فـ«مهامّي» ما كتبتُه أنا. `null`: لا يُعرف (قديمةٌ أو حسابٌ حُذف). */
+export interface TaskAuthor { createdById: string | null; createdBy: string | null }
+
 export interface TasksView {
-  open: (Task & { level: TaskLevel })[];
-  /** آخرُ ما أُغلق — لمن أنجز خطأً. */
-  closed: (Task & { outcome: "DONE" | "DROPPED"; closedOn: string })[];
+  open: (Task & TaskAuthor & { level: TaskLevel })[];
+  /** آخرُ ما أُغلق — لمن أنجز خطأً، وبمن أغلقها. */
+  closed: (Task & TaskAuthor & { outcome: "DONE" | "DROPPED"; closedOn: string; closedById: string | null; closedBy: string | null })[];
+}
+
+/** أسماءُ الفريق بمعرّفاتهم — استعلامٌ واحد لكلّ القائمة. والاسمُ الغائب يُكتفى فيه بأوّل البريد. */
+async function namesOf(ids: readonly (string | null)[]): Promise<Map<string, string>> {
+  const wanted = [...new Set(ids.filter((x): x is string => x !== null))];
+  if (wanted.length === 0) return new Map();
+  const rows = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, wanted));
+  return new Map(rows.map((r) => [r.id, r.name?.trim() || r.email.split("@")[0]]));
 }
 
 export async function loadTasks(today = todayInRiyadh()): Promise<TasksView> {
@@ -41,12 +52,17 @@ export async function loadTasks(today = todayInRiyadh()): Promise<TasksView> {
     db.select().from(tasks).where(isNull(tasks.closedAt)).orderBy(asc(tasks.dueOn)),
     db.select().from(tasks).where(isNotNull(tasks.closedAt)).orderBy(desc(tasks.closedAt)).limit(15),
   ]);
+  const names = await namesOf([...open, ...closed].flatMap((r) => [r.createdById, r.closedById]));
+  const author = (r: Row): TaskAuthor => ({ createdById: r.createdById, createdBy: r.createdById ? names.get(r.createdById) ?? null : null });
   return {
-    open: sortTasks(open.map(toTask), today).map((t) => ({ ...t, level: taskLevel(t, today) })),
+    open: sortTasks(open.map((r) => ({ ...toTask(r), ...author(r) })), today).map((t) => ({ ...t, level: taskLevel(t, today) })),
     closed: closed.map((r) => ({
       ...toTask(r),
+      ...author(r),
       outcome: r.outcome === "DROPPED" ? "DROPPED" : "DONE",
       closedOn: r.closedAt ? todayInRiyadh(r.closedAt) : "",
+      closedById: r.closedById,
+      closedBy: r.closedById ? names.get(r.closedById) ?? null : null,
     })),
   };
 }
