@@ -114,7 +114,6 @@ export function MonthClose({
   const grouped = STEPS.map((s) => ({ ...s, items: s.ids.map((id) => byId.get(id)).filter((i): i is CheckItem => !!i) }))
     .filter((s) => s.items.length > 0);
   const known = new Set(STEPS.flatMap((s) => s.ids));
-  const firstBlocker = grouped.flatMap((g) => g.items).find((i) => i.state === "BLOCK");
   const other = report?.items.filter((i) => !known.has(i.id)) ?? [];
   if (other.length > 0) grouped.push({ id: "other", title: "أخرى", icon: CircleAlert, ids: [], items: other });
 
@@ -181,13 +180,45 @@ export function MonthClose({
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                   <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <Fragment key="2"> <T s=" · {0} {1}" a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></Fragment>, report.warnings.length > 0 && <Fragment key="3"> <T s=" · {0} {1} الإقفال" a={[countNoun(report.warnings.length, WARNING), doesNotBlock(report.warnings.length)]} /></Fragment>]} /></p>
               </div>
-              {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
-              {!isClosed && firstBlocker && (
-                <a href={`#check-${firstBlocker.id}`} className={buttonClass("primary", "md")}>
-                  <T s="إلى المانع {0}" a={[<ArrowLeft key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
+              {/* الجاهزُ يُقفَل من هنا — لا يُبحث عن الزرّ أسفل القائمة */}
+              {!isClosed && report.canClose && (
+                <a href="#close-action" className={buttonClass("primary", "md")}>
+                  <T s="أقفل {0} {1}" a={[formatMonth(month), <ArrowLeft key="1" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
               )}
             </div>
-            <div className="flex gap-1 px-5 pb-5 sm:px-6" aria-hidden>
+            {/*
+              ما يمنع الإقفال وما ستقرّ به، بأسمائه وبجانب كلٍّ موضعُ إصلاحه — كان الجوابُ عدداً
+              («مانعان») وزرّاً إلى أوّلهما، والباقي يُبحث عنه في أربع خطوات.
+            */}
+            {!isClosed && (report.blockers.length > 0 || report.warnings.length > 0) && (
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-line-soft px-5 py-4 sm:px-6 md:grid-cols-2">
+                {([["BLOCK", report.blockers, "يمنع الإقفال، أصلحه أولاً"], ["WARN", report.warnings, "لا يمنع، لكنك ستقرّ به عند الإقفال"]] as const)
+                  .filter(([, list]) => list.length > 0)
+                  .map(([state, list, title]) => (
+                    <div key={state} className="min-w-0">
+                      <p className={`flex items-center gap-1.5 text-xs font-bold ${STATE_UI[state].text}`}>
+                        {(() => { const I = STATE_UI[state].icon; return <I className="h-4 w-4" strokeWidth={2} aria-hidden />; })()}
+                        {title}
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {list.map((i) => (
+                          <li key={i.id} className="flex items-center gap-2 rounded-lg bg-raised/70 py-1 ps-3 pe-1 ring-1 ring-line-soft">
+                            <a href={`#check-${i.id}`} className="min-w-0 flex-1 py-1.5 text-[13px] font-bold leading-snug hover:underline">
+                              {i.label}
+                              <span className="block truncate text-[11px] font-normal text-muted">{i.detail}</span>
+                            </a>
+                            {i.href && (
+                              <Link href={i.href} className={buttonClass(state === "BLOCK" ? "primary" : "secondary", "sm")}>
+                                <T s="أصلح {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </div>
+            )}
+            <div className={`flex gap-1 px-5 pb-5 sm:px-6 `} aria-hidden>
               {report.items.map((i) => (
                 <span key={i.id} className={`h-1.5 flex-1 rounded-full ${i.state === "PASS" ? "bg-ok" : i.state === "WARN" ? "bg-warn" : "bg-danger"}`} />
               ))}
@@ -296,7 +327,7 @@ export function MonthClose({
 
           {/* ── الإقفال ── */}
           {!isClosed ? (
-            <section className="rounded-xl border border-line bg-raised p-5 shadow-raised">
+            <section id="close-action" className="scroll-mt-28 rounded-xl border border-line bg-raised p-5 shadow-raised">
               <h3 className="flex items-center gap-2 text-[15px] font-bold">
                 <T s="{0}{1} الإقفال" a={[<Lock key="0" className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />, <span key="1" className="nums text-muted">{grouped.length + 1}.</span>]} /></h3>
               {report.canClose ? (
@@ -363,6 +394,22 @@ export function MonthClose({
                 />
               </div>
             </section>
+          )}
+
+          {/* على الجوّال: الحالُ وفعلُها تحت الإبهام وهو يمرّ بالخطوات — لا يُصعَد إلى الرأس ولا يُنزل إلى الآخر */}
+          {!isClosed && (
+            <div className="sticky bottom-(--above-tabbar) z-10 md:hidden">
+              <div className="flex items-center gap-3 rounded-2xl border border-line bg-overlay/95 px-4 py-2.5 shadow-overlay backdrop-blur">
+                <p className="min-w-0 flex-1 text-xs font-bold">
+                  {report.canClose
+                    ? <span className="text-ok">جاهز للإقفال</span>
+                    : <span className="text-danger"><T s="{0} {1}" a={[countNoun(report.blockers.length, BLOCKER), mustBeResolved(report.blockers.length)]} /></span>}
+                </p>
+                {report.canClose
+                  ? <a href="#close-action" className={buttonClass("primary", "sm")}><T s="أقفل {0}" a={[formatMonth(month)]} /></a>
+                  : report.blockers[0]?.href && <Link href={report.blockers[0].href} className={buttonClass("primary", "sm")}>أصلح الأول</Link>}
+              </div>
+            </div>
           )}
 
           {/* ── حزمة المحاسب ── */}
