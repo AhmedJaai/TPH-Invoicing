@@ -26,7 +26,7 @@ const july: PnlInput = {
   opex: [
     { category: "RENT", label: "إيجار", amountMinor: 800_000, source: "SPREAD" },
     { category: "SALARY", label: "رواتب", amountMinor: 1_500_000, source: "BANK" },
-    { category: "UTILITIES", label: "كهرباء", amountMinor: 40_000, source: "BANK" },
+    { category: "UTILITY", label: "كهرباء", amountMinor: 40_000, source: "BANK" },
   ],
 };
 
@@ -37,11 +37,11 @@ describe("لماذا تغيّر الربح", () => {
     const b = profitBridge(cur, prev)!;
     expect(b.changeMinor).toBe(cur.profitMinor! - prev.profitMinor!);
     expect(b.drivers.reduce((s, d) => s + d.impactMinor, 0)).toBe(b.changeMinor);
-    expect(b.drivers.map((d) => d.id)).toEqual(["revenue", "op-SALARY", "cogs", "op-POS_FEE", "op-UTILITIES"]);
+    expect(b.drivers.map((d) => d.id)).toEqual(["revenue", "op-SALARY", "cogs", "op-POS_FEE", "op-UTILITY"]);
     expect(b.drivers[0].impactMinor).toBe(-1_000_000);
     expect(b.drivers.find((d) => d.id === "cogs")!.impactMinor).toBe(200_000);
     /* بابٌ لم يكن في أحد الشهرين: مبلغُه هناك «غير معروف» لا صفر */
-    expect(b.drivers.find((d) => d.id === "op-UTILITIES")!.previousMinor).toBeNull();
+    expect(b.drivers.find((d) => d.id === "op-UTILITY")!.previousMinor).toBeNull();
     expect(b.drivers.find((d) => d.id === "op-POS_FEE")!.currentMinor).toBeNull();
     expect(b.caveats).toEqual([]);
   });

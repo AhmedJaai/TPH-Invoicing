@@ -53,7 +53,7 @@ export function ProfitBridgeCard({ bridge, month, previous, profitLabel, hrefOf 
           const body = (
             <>
               <span className="min-w-0">
-                <span className="block truncate text-[13px] font-bold">{d.label}</span>
+                <span className="block break-words text-[13px] font-bold leading-snug">{d.label}</span>
                 <span className="block text-[11px] text-muted">
                   {d.previousMinor === null ? <span>لا شيء مسجّل</span> : <Money minor={d.previousMinor} />}
                   <span aria-hidden className="mx-1">←</span>
@@ -73,7 +73,7 @@ export function ProfitBridgeCard({ bridge, month, previous, profitLabel, hrefOf 
               </span>
             </>
           );
-          const cls = "grid min-h-12 grid-cols-[minmax(0,1fr)_4.5rem_6.5rem] items-center gap-3 px-4 py-2 sm:grid-cols-[minmax(0,1fr)_8rem_7.5rem] sm:px-5";
+          const cls = "grid min-h-12 grid-cols-[minmax(0,1fr)_3.5rem_6.5rem] items-center gap-3 px-4 py-2 sm:grid-cols-[minmax(0,1fr)_5rem_7rem] sm:px-5";
           return (
             <li key={d.id}>
               {href ? (
