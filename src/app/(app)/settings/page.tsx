@@ -131,35 +131,84 @@ export default async function SettingsPage() {
   const managedUsers = can(user.role, "users:manage") && !isAuthBypassed() ? await listUsersForAdmin() : null;
   const captureLinks = can(user.role, "users:manage") ? await listLinks() : null;
   const locale = asLocale((await cookies()).get(LOCALE_COOKIE)?.value);
-  const toc = [
-    { id: "account", label: "الحساب", icon: UserRound },
-    { id: "language", label: "اللغة", icon: Languages },
-    ...(showMoney ? [{ id: "push", label: "إشعار الصباح", icon: BellRing }] : []),
-    ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
-    ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكررة", icon: Repeat }] : []),
-    ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
-    { id: "health", label: "صحة البيانات", icon: Activity },
-    { id: "system", label: "النظام", icon: Cpu },
+  /*
+    الأقسامُ مجموعةٌ بالعمل لا بترتيب بنائها: «أنت وهذا الجهاز» · «الفريق» · «ما يتكرّر» ·
+    «البنك» · «صحّة النظام». كان الفهرسُ ثمانيةَ بنودٍ مسطّحة يغيب عنه نصفُ الصفحة
+    (روابطُ الفريق والوثائقُ والنسخةُ الاحتياطيّة والأعطال).
+  */
+  const groups = [
+    { id: "me", title: "أنت وهذا الجهاز", hint: "اسمك ودورك، ولغة الواجهة، وإشعار الصباح على هذا الجهاز.", items: [
+      { id: "account", label: "الحساب", icon: UserRound },
+      { id: "language", label: "اللغة", icon: Languages },
+      ...(showMoney ? [{ id: "push", label: "إشعار الصباح", icon: BellRing }] : []),
+    ] },
+    ...(managedUsers || captureLinks ? [{ id: "team", title: "الفريق والدخول", hint: "من يدخل النظام وبأي دور، وروابط التصوير التي يرسل بها الفريق فواتيره.", items: [
+      ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
+      ...(captureLinks ? [{ id: "team-links", label: "روابط التصوير", icon: Camera }] : []),
+    ] }] : []),
+    ...(showMoney || can(user.role, "reports:view") ? [{ id: "recurring-group", title: "ما يتكرر وما ينتهي", hint: "المصروفات التي تتكرر بلا فاتورة، والوثائق والتراخيص التي لها تاريخ انتهاء.", items: [
+      ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكررة", icon: Repeat }] : []),
+      ...(can(user.role, "reports:view") ? [{ id: "obligations", label: "الوثائق والتراخيص", icon: CalendarClock }] : []),
+    ] }] : []),
+    ...(showRules ? [{ id: "bank-group", title: "تصنيف البنك", hint: "ما اخترته مرة لحركة في الكشف فصار يُطبَّق وحده بعدها.", items: [
+      { id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal },
+    ] }] : []),
+    { id: "system-group", title: "صحة النظام", hint: "هل البيانات مكتملة، وهل النسخة الاحتياطية حديثة، وهل تعطّل شيء.", items: [
+      { id: "health", label: "صحة البيانات", icon: Activity },
+      { id: "system", label: "النظام", icon: Cpu },
+      ...(backup !== null ? [{ id: "backup", label: "النسخة الاحتياطية", icon: HardDrive }] : []),
+      ...(serverErrorRows !== null ? [{ id: "errors", label: "أعطال النظام", icon: ShieldAlert }] : []),
+    ] },
   ];
+  const groupOf = (id: string) => groups.find((g) => g.id === id);
+  const healthWorst = health.metrics.some((m) => m.state === "MISSING") ? "danger" : health.metrics.some((m) => m.state === "PARTIAL") ? "warn" : "ok";
+  const goodMetrics = health.metrics.filter((m) => m.state === "GOOD");
+  const otherMetrics = health.metrics.filter((m) => m.state !== "GOOD");
 
   return (
     <PageShell user={user} width="wide" title="الإعدادات" intro={`إعدادات تضبطها مرة واحدة: ${[showMoney ? "المصروفات المتكررة" : null, showRules ? "قواعد التصنيف" : null, "حالة الربط"].filter(Boolean).join("، و")}.`}>
       {/* `minmax(0,1fr)` على الجوّال أيضاً — عمودٌ ضمنيّ بعرض محتواه يمدّه صفُّ الفهرس فتفيض الصفحة كلُّها عرضاً */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav aria-label="أقسام الإعدادات" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-          <ul className="scroll-x flex gap-1 overflow-x-auto lg:flex-col">
-            {toc.map((t) => (
-              <li key={t.id} className="shrink-0">
-                <a href={`#${t.id}`} className="flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-[13px] text-ink-soft transition-colors hover:bg-hover hover:text-ink lg:min-h-9">
-                  <t.icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} aria-hidden />
-                  {t.label}
-                </a>
+          <ul className="scroll-x flex gap-1 overflow-x-auto lg:flex-col lg:gap-0">
+            {groups.map((g) => (
+              <li key={g.id} className="flex shrink-0 gap-1 lg:block lg:pb-3">
+                <p className="hidden px-3 pb-1 pt-2 text-[11px] font-bold text-muted lg:block">{g.title}</p>
+                <ul className="flex gap-1 lg:flex-col">
+                  {g.items.map((t) => (
+                    <li key={t.id} className="shrink-0">
+                      <a href={`#${t.id}`} className="flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-[13px] text-ink-soft transition-colors hover:bg-hover hover:text-ink lg:min-h-9">
+                        <t.icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} aria-hidden />
+                        {t.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
         </nav>
 
         <div className="min-w-0 max-w-4xl">
+          {/* ── الجوابُ أوّلاً: هل كلُّ شيءٍ سليم؟ — وكلُّ بطاقةٍ تنزل إلى قسمها ── */}
+          <section aria-label="حال النظام الآن" className="mb-10 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+            <StatusTile href="#health" label="اكتمال البيانات" tone={healthWorst}
+              value={<><span className="nums">{Math.round(health.confidence * 100)}</span>٪</>}
+              sub={otherMetrics.length === 0 ? "كل مصادر البيانات مكتملة" : `ينقص: ${otherMetrics.map((m) => m.label).join("، ")}`} />
+            {backup !== null && (
+              <StatusTile href="#backup" label="النسخة الاحتياطية"
+                tone={backup.state === "OK" ? "ok" : backup.state === "CORE_STALE" ? "danger" : "warn"}
+                value={backup.state === "OK" ? "حديثة" : backup.state === "UNKNOWN" ? "غير معروف" : backup.state === "CORE_STALE" ? "متأخرة" : "نسخة الدرايف متأخرة"}
+                sub={backup.state === "UNKNOWN" ? "لم تُبلغ عن نفسها بعد" : <T s="آخر تشغيل {0}" a={[formatMoment(new Date(backup.hb.at))]} />} />
+            )}
+            {serverErrorRows !== null && (
+              <StatusTile href="#errors" label="أعطال آخر سبعة أيام" tone={serverErrorRows.length === 0 ? "ok" : "warn"}
+                value={serverErrorRows.length === 0 ? "لا عطل" : <span className="nums">{serverErrorRows.length}</span>}
+                sub={serverErrorRows.length === 0 ? "لم يتعطل شيء" : "أعطال مختلفة، لكل منها مرجع ترسله للمطوّر"} />
+            )}
+          </section>
+
+          <JobGroup group={groupOf("me")} first />
           <Section id="account" title="الحساب" icon={UserRound} className="mt-0!">
             <div className="rounded-xl border border-line bg-raised p-5 shadow-raised">
               <KeyValue
@@ -188,12 +237,8 @@ export default async function SettingsPage() {
             </Section>
           )}
 
-          {can(user.role, "reports:view") && (
-            <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتح الوثائق</LinkButton>}>
-              السجل التجاري ورخصة البلدية والشهادات الصحية والإقامات وعقد الإيجار، وتاريخ انتهاء كل منها. يذكّرك النظام قبل أن تنتهي.
-            </Callout>
-          )}
 
+          {(managedUsers || captureLinks) && <JobGroup group={groupOf("team")} />}
           {managedUsers && (
             <Section
               id="users"
@@ -232,6 +277,7 @@ export default async function SettingsPage() {
             </Section>
           )}
 
+          <JobGroup group={groupOf("recurring-group")} />
           {showMoney && (
             <Section
               id="recurring"
@@ -243,13 +289,22 @@ export default async function SettingsPage() {
               <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} suggestions={recurringSuggestions.flatMap((s) => (isTxCategory(s.category) ? [{ ...s, category: s.category }] : []))} />
             </Section>
           )}
+          {can(user.role, "reports:view") && (
+            <div id="obligations" className="scroll-mt-24">
+            <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتح الوثائق</LinkButton>}>
+              السجل التجاري ورخصة البلدية والشهادات الصحية والإقامات وعقد الإيجار، وتاريخ انتهاء كل منها. يذكّرك النظام قبل أن تنتهي.
+            </Callout>
+            </div>
+          )}
 
+          <JobGroup group={groupOf("bank-group")} />
           {showRules && (
             <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="تصنيف اخترته مرة عند استيراد كشف، فيُطبَّق على كل حركة فيها هذا النص في الكشوف التالية.">
               <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
             </Section>
           )}
 
+          <JobGroup group={groupOf("system-group")} />
           <Section
             id="health"
             title="حالة الربط وصحة البيانات"
@@ -257,8 +312,9 @@ export default async function SettingsPage() {
             hint="ما ليس موصولاً يظهر كذلك، ولا يُملأ بأصفار ولا ببيانات وهمية."
             action={<span className="text-xs font-bold text-ink-soft"><T s="نسبة الاكتمال {0}٪" a={[<span key="0" className="nums">{Math.round(health.confidence * 100)}</span>]} /></span>}
           >
+            {otherMetrics.length > 0 && (
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
-              {health.metrics.map((m) => {
+              {otherMetrics.map((m) => {
                 const ui = HEALTH_UI[m.state];
                 return (
                   <li key={m.id} className="px-4 py-3.5">
@@ -283,6 +339,25 @@ export default async function SettingsPage() {
                 );
               })}
             </ul>
+            )}
+            {/* المكتملُ سطرٌ واحد يُفتح — القسمُ لما ينقص، لا ثمانيةُ أشرطةٍ ممتلئة */}
+            {goodMetrics.length > 0 && (
+              <details className="group/good mt-3 rounded-xl border border-line bg-raised shadow-raised">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
+                  <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-bold text-ok">مكتمل</span>
+                  <span className="min-w-0 flex-1 text-[13px] text-ink-soft">{goodMetrics.map((m) => m.label).join("، ")}</span>
+                  <span className="text-[11px] text-muted group-open/good:hidden">اعرض</span>
+                </summary>
+                <ul className="divide-y divide-line-soft border-t border-line-soft">
+                  {goodMetrics.map((m) => (
+                    <li key={m.id} className="px-4 py-2.5">
+                      <span className="block text-[13px] font-bold">{m.label}</span>
+                      <span className="block text-[11px] leading-relaxed text-muted">{m.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </Section>
 
           <Section id="system" title="النظام" icon={Cpu}>
@@ -389,7 +464,7 @@ export default async function SettingsPage() {
                 <p className="text-sm text-ink-soft">لا عطل في آخر سبعة أيام.</p>
               ) : (
                 <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
-                  {serverErrorRows.map((r) => (
+                  {serverErrorRows.slice(0, 5).map((r) => (
                     <li key={r.fingerprint} className="px-4 py-3">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         <bdi dir="ltr" className="min-w-0 break-all text-[13px] font-bold">{r.method ? `${r.method} ` : ""}{r.route ?? "—"}</bdi>
@@ -403,10 +478,54 @@ export default async function SettingsPage() {
                   ))}
                 </ul>
               )}
+              {/* عشرون عطلاً متتابعة تُغرق آخر الصفحة — الخمسةُ الأحدث ظاهرة والباقي يُفتح */}
+              {serverErrorRows.length > 5 && (
+                <details className="mt-2 rounded-xl border border-line bg-raised">
+                  <summary className="flex min-h-11 cursor-pointer items-center px-4 text-[13px] font-bold">اعرض الأعطال الباقية ({serverErrorRows.length - 5})</summary>
+                  <ul className="divide-y divide-line-soft border-t border-line-soft">
+                    {serverErrorRows.slice(5).map((r) => (
+                      <li key={r.fingerprint} className="px-4 py-3">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <bdi dir="ltr" className="min-w-0 break-all text-[13px] font-bold">{r.method ? `${r.method} ` : ""}{r.route ?? "—"}</bdi>
+                        <span className="shrink-0 text-[11px] text-muted">
+                          <T s="{0} مرة · آخرها {1}" a={[<span key="0" className="nums">{r.occurrences}</span>, formatMoment(r.lastSeen)]} />
+                        </span>
+                      </div>
+                      <p dir="auto" className="mt-1 break-words text-xs text-ink-soft">{r.message}</p>
+                      {r.lastRef && <p className="mt-1 text-[11px] text-muted"><T s="المرجع {0}" a={[<bdi key="0" dir="ltr" className="nums">{r.lastRef}</bdi>]} /></p>}
+                    </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </Section>
           )}
         </div>
       </div>
     </PageShell>
+  );
+}
+
+/** عنوانُ مجموعة عمل — اسمُها وما فيها، فوق أقسامها. */
+function JobGroup({ group, first = false }: { group: { id: string; title: string; hint: string } | undefined; first?: boolean }) {
+  if (!group) return null;
+  return (
+    <div id={group.id} className={`${first ? "" : "mt-16"} mb-6 scroll-mt-24 border-b border-line pb-3`}>
+      <p className="text-lg font-bold tracking-tight">{group.title}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-muted">{group.hint}</p>
+    </div>
+  );
+}
+
+const TILE_TONE = { ok: "text-ok", warn: "text-warn", danger: "text-danger" } as const;
+
+/** بطاقةُ حال: كلمةٌ ملوّنة ومعناها، وتنزل إلى قسمها. */
+function StatusTile({ href, label, value, sub, tone }: { href: string; label: string; value: React.ReactNode; sub: React.ReactNode; tone: keyof typeof TILE_TONE }) {
+  return (
+    <a href={href} className="block min-h-11 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
+      <p className="text-xs text-muted">{label}</p>
+      <p className={`mt-1.5 text-xl font-bold leading-tight ${TILE_TONE[tone]}`}>{value}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{sub}</p>
+    </a>
   );
 }
