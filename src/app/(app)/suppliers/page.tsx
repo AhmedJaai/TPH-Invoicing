@@ -1,5 +1,6 @@
 import { Suspense, Fragment } from "react";
 import { SupplierLeverage } from "@/components/supplier-leverage";
+import { RECENT_SPEND_DAYS, loadRecentSpend, type RecentSpend } from "@/services/supplier-leverage.service";
 import { SectionBoundary } from "@/components/ui-client";
 import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
@@ -11,7 +12,7 @@ import { PageShell } from "@/components/page-shell";
 import { AccountReview } from "@/components/account-review";
 import { Money } from "@/components/money";
 import {
-  Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, type Column,
+  Badge, Callout, Card, DataTable, Delta, EmptyState, LinkButton, LinkTabs, Monogram, Section, type Column,
 } from "@/components/ui";
 import { AgeingBar, Figure } from "@/components/supplier-intel";
 import { SUPPLIER, countNoun, countNounGen, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic";
@@ -31,6 +32,7 @@ import { needsContract, needsPaperUpload } from "@/lib/supplier-policy-rules";
 import { ageOwed, ageTone, type OwedAgeing } from "@/lib/supplier-intel";
 import { txHref } from "@/lib/inspector";
 import { T } from "@/components/i18n/t";
+import { pctChange } from "@/lib/changes";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +77,7 @@ export default async function SuppliersPage({
   const wanted = VIEWS.find((v) => v === params.view) ?? "all";
 
   const canMerge = can(user.role, "supplier:merge");
-  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory, dupHints, statementMissing] = await Promise.all([
+  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory, dupHints, statementMissing, recentSpend] = await Promise.all([
     loadBalanceTotals(),
     showAmounts ? loadOverdueBalances() : Promise.resolve([]),
     loadOpenInvoiceAges(),
@@ -85,6 +87,7 @@ export default async function SuppliersPage({
     canMerge ? loadDuplicateHints() : Promise.resolve([]),
     /* فاتورةٌ في كشفه ليست عندنا تُرى بجانب اسمه — لا بفتح صفحته (أحمد، لوريفا SI-0106) */
     showAmounts ? latestStatementMissing() : Promise.resolve([]),
+    showAmounts ? loadRecentSpend() : Promise.resolve(new Map<string, RecentSpend>()),
   ]);
 
   if (directory.length === 0) {
@@ -124,6 +127,7 @@ export default async function SuppliersPage({
         contract: needsContract(m),
         paper: needsPaperUpload(m),
         statementMissing: missingBy.get(m.id) ?? null,
+        spend: recentSpend.get(m.id) ?? null,
       };
     })
     /*
@@ -285,6 +289,32 @@ export default async function SuppliersPage({
                 ) : (
                   <span className="text-[11px] text-muted">{r.idle ? "—" : "متوازن"}</span>
                 )
+              ),
+          },
+          {
+            /*
+              «من أشتري منه الآن، وهل زاد؟» — آخر ثلاثين يوماً بجانب الثلاثين قبلها، ويفتح
+              فواتيرَه. الزيادةُ بلا لون: قد تكون نموّاً وقد تكون تسرّباً.
+            */
+            key: "spend",
+            header: `اشتريت (${RECENT_SPEND_DAYS} يوماً)`,
+            numeric: true,
+            sortBy: (r) => r.spend?.currentMinor ?? null,
+            sortFirst: "desc",
+            cell: (r) =>
+              !r.spend ? (
+                <span className="text-[11px] text-muted">لا فاتورة في 60 يوماً</span>
+              ) : (
+                <Link
+                  href={`/purchases/invoices?supplier=${encodeURIComponent(r.slug)}`}
+                  className="relative inline-flex flex-wrap items-baseline justify-end gap-x-1.5 hover:text-accent"
+                  data-tip={`الثلاثون يوماً التي قبلها: ${formatRiyalsDisplay(r.spend.previousMinor)}`}
+                >
+                  {r.spend.currentMinor === 0 ? <span className="text-[11px] text-muted">لا شيء</span> : <Money minor={r.spend.currentMinor} />}
+                  {r.spend.previousMinor > 0 && r.spend.currentMinor > 0 && (
+                    <Delta pct={pctChange(r.spend.currentMinor, r.spend.previousMinor)} favourable={null} />
+                  )}
+                </Link>
               ),
           },
           {

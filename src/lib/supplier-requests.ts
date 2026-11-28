@@ -96,6 +96,28 @@ export function buildStatementRequest(supplierName: string, month: string): stri
 }
 
 /**
+ * رسالةُ «فواتير لم تصلنا» — لما شهد به كشفُ المورّد أو فودكس ولا ملفَّ له عندنا
+ * (`/purchases/missing`). كلُّ فاتورةٍ بيومها ورقمها إن عُرف ومبلغها، الأقدمُ أوّلاً.
+ */
+export function buildMissingInvoicesRequest(
+  supplierName: string,
+  invoices: readonly { day: string; ref: string | null; amountMinor: number }[],
+): string {
+  const lines = [...invoices]
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((i) => `• ${i.day}${i.ref ? ` — رقم ${i.ref}` : ""}: ${formatRiyalsDisplay(i.amountMinor)} ريال`);
+  return [
+    `السلام عليكم ${supplierName}،`,
+    ``,
+    invoices.length === 1 ? `لم تصلنا نسخة الفاتورة التالية:` : `لم تصلنا نسخ الفواتير التالية:`,
+    ...lines,
+    ``,
+    `نرجو إرسالها فواتير ضريبية باسم مؤسسة ذا بوبليك هاوس ورقمها الضريبي 310007971600003.`,
+    `شاكرين لكم.`,
+  ].join("\n");
+}
+
+/**
  * «لك عنده» أم «دفعتَ له بلا فاتورة»؟ (SCN-105)
  *
  * كانت الصفحة تكتب «لك عنده ٢٦٬٧٦٧» لكلّ مالٍ دُفع فوق الفواتير — وهي
