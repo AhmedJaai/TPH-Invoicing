@@ -5,7 +5,7 @@
  * المرشِّحُ في العنوان (`?from=&to=&min=&max=&cat=&state=`) فيُحفَظ الرابطُ ويُرسَل،
  * والخادمُ يحسب مجموعَ ما طابق. دالّةٌ خالصة: ما لا يُفهم يسقط ولا يُخمَّن.
  */
-import { parseRiyals } from "../money";
+import { HALALAS_PER_RIYAL, parseRiyals } from "../money";
 import { isoDay } from "../riyadh-time";
 import { CATEGORY_LABEL, isTxCategory, type TxCategory } from "./rules";
 
@@ -85,8 +85,8 @@ export function ledgerFilterParams(f: LedgerFilters): Record<string, string> {
 
 /** المبلغُ في حقل الإدخال — بلا فواصل، والكسرُ إن وُجد. عددٌ صحيح لا عشريّ. */
 export function minorToInput(minor: number): string {
-  const whole = Math.trunc(minor / 100);
-  const frac = minor % 100;
+  const frac = minor % HALALAS_PER_RIYAL;
+  const whole = (minor - frac) / HALALAS_PER_RIYAL;
   return frac === 0 ? String(whole) : `${whole}.${String(frac).padStart(2, "0")}`;
 }
 
