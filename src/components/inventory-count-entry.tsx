@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CornerDownLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { Meter, buttonClass } from "./ui";
@@ -99,6 +100,12 @@ export function InventoryCountEntry({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  /* خانةُ كلّ صنفٍ باسمه — «تابِع» يصل إليها ولو تغيّر ترتيبُ المعروض */
+  const saveButton = useRef<HTMLButtonElement | null>(null);
+  const byProduct = useRef<Map<string, HTMLInputElement>>(new Map());
+  /* آخرُ صنفٍ كُتب فيه على هذا الجهاز — يُعاد إليه بعد قفل الهاتف أو تحديث الصفحة */
+  const [resumeId, setResumeId] = useState<string | null>(null);
+  const [jumpTo, setJumpTo] = useState<string | null>(null);
 
   /*
     ما حفظه الخادم هو الأصل. والصفوفُ مصفوفةٌ جديدة في كلّ رسم (يرشّحها
@@ -182,6 +189,8 @@ export function InventoryCountEntry({
       setUnits((u) => ({ ...u, ...Object.fromEntries(mine.map(([id, d]) => [id, d.unit])) }));
       setRestored(mine.length);
     }
+    const last = readLast(`${draftKey}:last`);
+    if (last && known.has(last)) setResumeId(last);
     setDraftReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,6 +210,34 @@ export function InventoryCountEntry({
     setUnits(Object.fromEntries(rows.map((r) => [r.productId, r.baseUnit])));
     setRestored(0);
   }
+
+  /*
+    «تابِع من حيث توقّفت»: تُرفع التصفيةُ أوّلاً (الصنفُ قد يكون خارجها)، ثمّ يُركَّز
+    حقلُه بعد الرسم وينزل إليه — والوصولُ يُكتب فلا يُعرض الزرُّ لما وصلته للتوّ.
+  */
+  function goTo(productId: string) {
+    setQuery("");
+    setCategory("");
+    setOnlyUncounted(false);
+    setJumpTo(productId);
+  }
+  useEffect(() => {
+    if (!jumpTo) return;
+    const el = byProduct.current.get(jumpTo);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+    el.select();
+    setJumpTo(null);
+  }, [jumpTo, visible]);
+
+  const firstUncounted = rows.find((r) => (values[r.productId] ?? "").trim() === "") ?? null;
+  const resumeRow = resumeId ? rows.find((r) => r.productId === resumeId) ?? null : null;
+  /* التقدّمُ بكلّ فئة — رقائقُ تصفّي بها وترى ما بقي فيها */
+  const byCategory = categories.map((c) => {
+    const inCat = rows.filter((r) => r.category === c.key);
+    return { ...c, total: inCat.length, done: inCat.filter((r) => (values[r.productId] ?? "").trim() !== "").length };
+  }).filter((c) => c.total > 0);
 
   async function save() {
     if (dirty.length === 0 || invalid.length > 0) return;
@@ -232,8 +269,10 @@ export function InventoryCountEntry({
   function onKey(e: React.KeyboardEvent<HTMLInputElement>, at: number) {
     if (e.key === "Enter" || (e.key === "ArrowDown" && !e.shiftKey)) {
       e.preventDefault();
-      inputs.current[at + 1]?.focus();
-      inputs.current[at + 1]?.select();
+      const next = inputs.current[at + 1];
+      if (next) { next.focus(); next.select(); }
+      /* آخرُ صنفٍ معروض: Enter يصل إلى «احفظ» لا إلى لا شيء */
+      else saveButton.current?.focus();
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -268,6 +307,41 @@ export function InventoryCountEntry({
           <div className="mt-1.5"><Meter value={counted} max={rows.length} tone={counted === rows.length ? "ok" : "accent"} label="تقدّم العدّ" /></div>
         </div>
       </div>
+
+      {editable && counted < rows.length && (resumeRow || (counted > 0 && firstUncounted)) && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {resumeRow && (
+            <button type="button" onClick={() => goTo(resumeRow.productId)} className={`${buttonClass("secondary", "md")} max-w-full`}>
+              <CornerDownLeft className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+              <span className="truncate"><T s="تابِع من حيث توقفت: {0}" a={[<strong key="0">{resumeRow.productName}</strong>]} /></span>
+            </button>
+          )}
+          {firstUncounted && firstUncounted.productId !== resumeRow?.productId && counted > 0 && (
+            <button type="button" onClick={() => goTo(firstUncounted.productId)} className={`${buttonClass("quiet", "md")} max-w-full`}>
+              <span className="truncate"><T s="أول صنف لم يُعدّ: {0}" a={[firstUncounted.productName]} /></span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {byCategory.length > 1 && (
+        <ul aria-label="التقدّم في كل فئة" className="scroll-x -mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {byCategory.map((c) => {
+            const on = category === c.key;
+            const full = c.done === c.total;
+            return (
+              <li key={c.key} className="shrink-0">
+                <button type="button" aria-pressed={on} onClick={() => setCategory(on ? "" : c.key)}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors sm:min-h-9 ${
+                    on ? "border-accent bg-accent text-accent-ink" : full ? "border-ok/30 bg-ok-bg text-ok" : "border-line bg-raised text-ink-soft hover:border-accent-line"}`}>
+                  {c.label}
+                  <span className="nums nums-count font-normal opacity-80">{c.done}/{c.total}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <Toolbar query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories}>
         <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line-input bg-raised px-3 text-xs font-medium sm:min-h-9">
@@ -304,7 +378,11 @@ export function InventoryCountEntry({
                 <label className="flex min-w-0 items-center gap-2">
                   <span className="sr-only">{`العدّ الفعلي لـ${row.productName} بوحدة ${row.unitLabel}`}</span>
                   <input
-                    ref={(el) => { inputs.current[at] = el; }}
+                    ref={(el) => {
+                      inputs.current[at] = el;
+                      if (el) byProduct.current.set(row.productId, el);
+                      else byProduct.current.delete(row.productId);
+                    }}
                     type="text"
                     inputMode="decimal"
                     enterKeyHint="next"
@@ -313,7 +391,10 @@ export function InventoryCountEntry({
                     disabled={!editable || busy}
                     value={value}
                     aria-invalid={bad || undefined}
-                    onChange={(e) => setValues((v) => ({ ...v, [row.productId]: e.target.value }))}
+                    onChange={(e) => {
+                      setValues((v) => ({ ...v, [row.productId]: e.target.value }));
+                      writeLast(`${draftKey}:last`, row.productId);
+                    }}
                     onKeyDown={(e) => onKey(e, at)}
                     onFocus={(e) => e.currentTarget.select()}
                     placeholder="—"
@@ -377,6 +458,7 @@ export function InventoryCountEntry({
             </p>
             {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
             <button
+              ref={saveButton}
               aria-busy={busy}
               type="button"
               onClick={save}
@@ -393,6 +475,14 @@ export function InventoryCountEntry({
 }
 
 interface DraftEntry { value: string; unit: string }
+
+/** آخرُ صنفٍ كُتب فيه — تحسينٌ لا شرط، فالمنعُ والخطأ «لا موضع». */
+function readLast(key: string): string | null {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+}
+function writeLast(key: string, productId: string): void {
+  try { window.localStorage.setItem(key, productId); } catch { /* لا موضع يُحفظ */ }
+}
 
 /** مسوّدةُ هذا الجرد في المتصفّح — وما تعذّرت قراءتُه «لا مسوّدة». */
 function readDraft(key: string): Record<string, DraftEntry> {
