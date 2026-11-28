@@ -23,6 +23,8 @@ import { loadStoredReading } from "@/services/finance-reading.service";
 import { loadOutstanding } from "@/services/outstanding.service";
 import { T } from "@/components/i18n/t";
 import { BudgetSection } from "@/components/budget-section";
+import { ProfitBridgeCard } from "@/components/profit-bridge";
+import { profitBridge } from "@/lib/finance/bridge";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +100,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const canClose = can(user.role, "month:close");
   const tone = p.profitMinor === null ? undefined : p.profitMinor < 0 ? "danger" as const : p.complete ? "ok" as const : "warn" as const;
   const previous = series.find((v) => v.month < month);
+  /* الشهرُ الجاري يُقارَن حين ينتهي — نصفُ شهرٍ مقابل شهرٍ كامل فرقٌ مضلِّل */
+  const bridge = previous && !view.input.open ? profitBridge(p, previous.pnl) : null;
 
   return (
     <PageShell
@@ -166,22 +170,26 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             )}
           </KeyFigure>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Card href={`/finance/sales?month=${month}`}>
-              <p className="text-[11px] font-bold text-muted">الإيراد</p>
-              <p className="mt-1 text-base font-semibold"><MaybeMoney minor={p.revenueMinor} /></p>
-              {previous?.pnl.revenueMinor != null && p.revenueMinor !== null && !view.input.open && (
-                <p className="mt-1 text-[11px] text-muted">
-                  {formatMonth(previous.month)}: <Money minor={previous.pnl.revenueMinor} />
-                </p>
-              )}
-            </Card>
-            <Card href={`/finance/rows?month=${month}&line=cogs`}>
-              <p className="text-[11px] font-bold text-muted">مجمل الربح</p>
-              <p className="mt-1 text-base font-semibold"><MaybeMoney minor={p.grossProfitMinor} /></p>
-              <p className="mt-1 text-[11px] text-muted"><T s="هامش {0}" a={[formatShare(p.grossMarginBp)]} /></p>
-            </Card>
-          </div>
+          {bridge && previous ? (
+            <ProfitBridgeCard bridge={bridge} month={month} previous={previous.month} profitLabel={p.profitLabel} hrefOf={(id) => hrefOf(id, month)} />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Card href={`/finance/sales?month=${month}`}>
+                <p className="text-[11px] font-bold text-muted">الإيراد</p>
+                <p className="mt-1 text-base font-semibold"><MaybeMoney minor={p.revenueMinor} /></p>
+                {previous?.pnl.revenueMinor != null && p.revenueMinor !== null && !view.input.open && (
+                  <p className="mt-1 text-[11px] text-muted">
+                    {formatMonth(previous.month)}: <Money minor={previous.pnl.revenueMinor} />
+                  </p>
+                )}
+              </Card>
+              <Card href={`/finance/rows?month=${month}&line=cogs`}>
+                <p className="text-[11px] font-bold text-muted">مجمل الربح</p>
+                <p className="mt-1 text-base font-semibold"><MaybeMoney minor={p.grossProfitMinor} /></p>
+                <p className="mt-1 text-[11px] text-muted"><T s="هامش {0}" a={[formatShare(p.grossMarginBp)]} /></p>
+              </Card>
+            </div>
+          )}
         </div>
 
         <Card padded={false}>
