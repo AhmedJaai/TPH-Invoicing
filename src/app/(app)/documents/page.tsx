@@ -583,7 +583,7 @@ export default async function DocumentsPage({
                             <span className="block text-[11px] text-danger">لا يصلح لخصم الضريبة</span>
                           )}
                           {r.status === "REJECTED" && (
-                            <span className="block text-[11px] leading-relaxed text-muted">
+                            <span className="block text-[11px] leading-relaxed text-muted [overflow-wrap:anywhere]">
                               {j
                                 ? <><T s="رُفض في {0}{1}: {2}" a={[formatDay(j.at), j.by ? <Fragment key="1"> <T s=" بواسطة {0}" a={[<bdi key="0">{j.by}</bdi>]} /></Fragment> : null, j.reason ?? "بلا سبب مكتوب"]} /></>
                                 : "مرفوض، ولا يوجد سبب مسجّل."}
