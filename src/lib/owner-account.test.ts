@@ -43,4 +43,10 @@ describe("buildOwnerAccount", () => {
     expect(a.lines).toEqual([]);
     expect(a.years).toEqual([]);
   });
+
+  it("شهراً بشهر برصيد آخر الشهر الجاري", () => {
+    const e = (id: string, day: string, kind: OwnerEntry["kind"], amountMinor: number): OwnerEntry => ({ id, day, kind, amountMinor, label: id, href: "/" });
+    const a = buildOwnerAccount([e("a", "2026-10-03", "PUT_IN", 1000), e("b", "2026-10-20", "TOOK_OUT", 300), e("c", "2026-11-02", "TOOK_OUT", 900)]);
+    expect(a.months.map((m) => [m.month, m.netMinor, m.endBalanceMinor, m.count])).toEqual([["2026-11", -900, -200, 1], ["2026-10", 700, 700, 2]]);
+  });
 });
