@@ -17,6 +17,7 @@ import {
 import { ITEM, countNoun, nounForm } from "@/lib/arabic";
 import type { StartState } from "@/lib/start";
 import { T } from "@/components/i18n/t";
+import { TriageKeys } from "./attention-keys";
 
 /**
  * «يحتاج قرارك» — صندوقُ فرزٍ لا قائمةُ تنبيهات.
@@ -427,7 +428,12 @@ export function ItemDetail({
                   <T s="{0}تنبيه مالي" a={[<Activity key="0" className="h-3 w-3" strokeWidth={2.25} aria-hidden />]} /></span>
               )}
             </div>
-            <div className="hidden lg:block">
+            <div className="hidden items-center gap-3 lg:flex">
+              <TriageKeys
+                prev={nav.prev ? itemHref(nav.prev.id, lens, nav.after.prev) : undefined}
+                next={nav.next ? itemHref(nav.next.id, lens, nav.after.next) : undefined}
+                act={workspace ? { anchor: "resolve" } : { href: item.href }}
+              />
               <Pager nav={nav} total={list.length} lens={lens} />
             </div>
           </div>

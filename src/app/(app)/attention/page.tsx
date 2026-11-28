@@ -8,7 +8,7 @@ import { NoAccess } from "@/components/ui";
 import { SectionBoundary } from "@/components/ui-client";
 import { prioritize } from "@/lib/attention";
 import { attentionItems, snoozedAttention } from "@/lib/work";
-import { inLens, landing, parseLens } from "@/lib/attention-triage";
+import { inLens, itemHref, landing, neighbours, parseLens } from "@/lib/attention-triage";
 import { loadStartState } from "@/services/start.service";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { FirstTransferWorkspace, IbanGuardWorkspace } from "@/components/iban-guard";
@@ -117,6 +117,9 @@ export default async function AttentionPage({
     `IN_PLACE_IDS` (يُعلَّم بها الصفّ «يُحسم هنا»).
   */
   const id = selected?.id;
+  /* بعد «أجّله» إلى تالي البند كما كان — و`then=` فارغاً لآخر القائمة كي يُقال «تمّ البتّ» لا «لم يعد قائماً» */
+  const nextId = selected ? neighbours(list, selected.id).next?.id : undefined;
+  const afterSnooze = selected ? (nextId ? itemHref(selected.id, lens, nextId) : `${itemHref(selected.id, lens)}&then=`) : "/attention";
   const workspace =
     id === "duplicate-payments" || id === "duplicate-payments-claimed" ? (
       <DoublePaidWorkspace canEdit={canEdit} />
@@ -180,7 +183,7 @@ export default async function AttentionPage({
               item={selected}
               list={list}
               lens={lens}
-              extraAction={canEdit ? <SnoozeControl itemId={selected.id} options={snoozeOptions(todayInRiyadh())} /> : undefined}
+              extraAction={canEdit ? <SnoozeControl itemId={selected.id} options={snoozeOptions(todayInRiyadh())} after={afterSnooze} /> : undefined}
               workspace={
                 workspace ? (
                   /* اللوحُ يُقرأ من القاعدة — لا ينتظره ما فوقه */
