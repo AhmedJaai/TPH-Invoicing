@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CircleAlert, CircleCheck, PenLine, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, FileSearch, PenLine, TriangleAlert } from "lucide-react";
 import { DocumentPaper } from "./document-paper";
 import { Money } from "./money";
 import { Monogram } from "./ui";
@@ -54,7 +54,8 @@ export function WaitingCard({
   const unknown = <span className="font-normal text-muted">غير معروف</span>;
 
   return (
-    <li className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+    /* صفٌّ في الطابور: J/K تتنقّل، وEnter تفتح ملفَّه لوحاً، وA تعتمد، وX ترفض (`keyboard.tsx`) */
+    <li data-nav-item="" data-href={documentHref(r.id)} className="scroll-mt-24 overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3 px-4 pt-4 sm:px-5">
         <Monogram name={r.supplierName ?? "؟"} className="h-10 w-10 text-sm" />
         <div className="min-w-0 flex-1">
@@ -111,14 +112,19 @@ export function WaitingCard({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft bg-sunken/40 px-4 py-3 sm:px-5">
+        {/* ملفُّه: الورقةُ بجانب المقروء والثقةُ لكلّ حقل، ومنه إلى التالي — وبه يبدأ التنقّلُ بالمفاتيح */}
+        <Link href={documentHref(r.id)} data-row-link="" scroll={false} className={buttonClass("secondary", "sm")}>
+          <FileSearch className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          قارن وراجع
+        </Link>
         {r.invoiceId && showAmounts && (
           <Link href={invoiceHref(r.invoiceId, "tax")} className={buttonClass("quiet", "sm")}>
             <T s="{0}صحّح معلومة" a={[<PenLine key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
         )}
         <span className="flex-1" />
-        {canDecide && (showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} />}
+        {canDecide && (showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} keyAction />}
         {/* ما لم يُقيَّد له شيء لا يُعتمد — يُكمَل ويُقيَّد من ملفّه */}
-        {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" />}
+        {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" keyAction />}
         {canDecide && showAmounts && !r.invoiceId && RECORDABLE.has(r.kind) && (
           <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمله وسجّله</Link>
         )}
