@@ -178,3 +178,28 @@ describe("قيد الناقصة من كشف المورّد (غاناش)", () => 
       }));
   });
 });
+
+describe("سطرٌ عكسه المورّدُ بإشعارٍ دائن (أفال S00102 · RINV/2026/00016)", () => {
+  it("لا يُقيَّد من الكشف ولا يُعدّ «بلا ملف» — والإشعارُ في كشفٍ لاحق", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const aug = await statementWith(tx, s, [{ date: "2026-08-12", ref: "S00102", debit: 1_998_70 }]);
+      await statementWith(tx, s, [{ date: "2026-08-12", ref: "RINV/2026/00016 (Reversal of: INV/2026/00080)", debit: 0, credit: 1_998_70 }]);
+      const out = await recordStatementOnlyInvoices(tx, aug, await someone(tx));
+      expect(out.created).toHaveLength(0);
+      const open = await tx.select({ code: issues.code }).from(issues)
+        .where(and(eq(issues.entityId, aug), eq(issues.status, "OPEN")));
+      expect(open.map((o) => o.code)).not.toContain("INVOICE_IN_STATEMENT_NOT_ARCHIVED");
+    }));
+
+  it("دائنٌ بالمبلغ نفسه بلا عبارة إشعار (سداد) لا يُسقط السطر", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const st = await statementWith(tx, s, [
+        { date: "2026-08-12", ref: "S00103", debit: 500_00 },
+        { date: "2026-08-12", ref: "Payment BNK1/2026/0042", debit: 0, credit: 500_00 },
+      ]);
+      const out = await recordStatementOnlyInvoices(tx, st, await someone(tx));
+      expect(out.created.map((c) => c.number)).toEqual(["S00103"]);
+    }));
+});

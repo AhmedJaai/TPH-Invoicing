@@ -15,7 +15,7 @@ import { INVOICE, SUPPLIER, countNoun, countNounGen } from "@/lib/arabic";
 import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
-import { lineHasSameDayInvoice } from "@/services/statement-reconcile.service";
+import { lineHasSameDayInvoice, lineReversedBySupplier } from "@/services/statement-reconcile.service";
 import { loadStatementCredits } from "@/services/statement-credit.service";
 import { T } from "@/components/i18n/t";
 
@@ -64,8 +64,8 @@ export default async function StatementsPage({
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED' and sl.debit_minor > 0) as matched,
              /* سطور مدينة برقم لم يطابق: فواتير يذكرها الكشف ولا ملفّ لها — إلّا ما له عندنا فاتورةٌ
                 باليوم والمبلغ نفسيهما (مرجعٌ مقروءٌ خطأً، بيكوف «000285لـ#»): ليس ناقصاً */
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")}) as missing,
-             (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")}) as missing_minor
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")} and not ${lineReversedBySupplier("sl")}) as missing,
+             (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null and not ${lineHasSameDayInvoice("sl")} and not ${lineReversedBySupplier("sl")}) as missing_minor
         from statements st
         left join suppliers s on s.id = st.supplier_id
         left join documents d on d.id = st.document_id

@@ -12,7 +12,7 @@
  * - وما كان رقمُه عندنا (بأيّ صيغة) لا يُقيَّد ثانية؛ وسطرٌ في شهرٍ مقفل يُترك ويُقال.
  * - وحين يصل ملفُّ الفاتورة يتبنّاها `createInvoice` ولا تُكرَّر.
  */
-import { and, eq, gt, isNotNull } from "drizzle-orm";
+import { and, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { documents, invoices, statementLines, statements, suppliers } from "@/db/schema";
 import { reviewConfirmed } from "@/lib/confirm";
 import { companyConfig } from "@/config/drive";
@@ -23,7 +23,7 @@ import { monthOf } from "@/lib/filing";
 import { createInvoice, STATEMENT_LINE_ORIGIN } from "./invoice.service";
 import { applySupplierCredit } from "./supplier-credit.service";
 import { firstClosedMonth } from "./month-guard";
-import { refreshStatementFindings } from "./statement-reconcile.service";
+import { lineReversedBySupplier, refreshStatementFindings } from "./statement-reconcile.service";
 import type { Tx } from "./types";
 import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 import { amountAgrees, MISREAD_REF_EVIDENCE, STATEMENT_DATE_WINDOW_DAYS } from "@/lib/statement-match";
@@ -85,6 +85,8 @@ export async function recordStatementOnlyInvoices(
       eq(statementLines.matchStatus, "UNMATCHED"),
       gt(statementLines.debitMinor, 0),
       isNotNull(statementLines.ref),
+      /* ما عكسه المورّدُ بإشعارٍ دائن فاتورةٌ ملغاة لا تُقيَّد */
+      sql`not ${lineReversedBySupplier("statement_lines")}`,
     ))
     .orderBy(statementLines.date);
   const empty = (): StatementInvoicesOutcome => ({ created: [], matchedByAmount: [], ambiguous: [], unclear: [], alreadyRecorded: 0, closedMonth: [] });

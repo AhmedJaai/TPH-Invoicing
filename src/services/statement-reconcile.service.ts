@@ -35,6 +35,27 @@ export function lineHasSameDayInvoice(alias: string): SQL {
        and not exists (select 1 from statement_lines so where so.statement_id = ${a}.statement_id and so.matched_invoice_id = si.id))`;
 }
 
+/**
+ * سطرُ دينٍ في الكشف عكسه المورّدُ نفسُه: إشعارٌ دائن («Reversal of …» · ‎RINV‎ · «إشعار دائن») في أيّ
+ * كشفٍ له، بيومه وبمبلغه بالهللة. فاتورةٌ ألغاها المورّد ليست «فاتورةً بلا ملف» — كان كشفُ أغسطس لأفال
+ * يقول «سجّلها من الكشف» عن ‎S00102‎ (١٬٩٩٨٫٧٠) التي عكسها ‎RINV/2026/00016‎ في اليوم نفسه، وقيدُها
+ * (‎INV-2026-00080‎) أُلغي عمداً لأنّها دُفعت مرّتين — فتسجيلُها كان يعيد مالاً لا ندين به.
+ * والعبارةُ هي عبارةُ `classifyCredit` (`lib/credit-notes.ts`) في الإشعار الصريح.
+ */
+export function lineReversedBySupplier(alias: string): SQL {
+  const a = sql.raw(alias);
+  return sql`exists (
+    select 1 from statement_lines rv
+      join statements rst on rst.id = rv.statement_id
+      join statements ast on ast.id = ${a}.statement_id
+     where rst.supplier_id = ast.supplier_id
+       and rv.credit_minor > 0 and rv.credit_minor = ${a}.debit_minor
+       and (rv.date at time zone 'UTC')::date = (${a}.date at time zone 'UTC')::date
+       and (coalesce(rv.ref, '') || ' ' || coalesce(rv.description, '')) ~* ${REVERSAL_PATTERN})`;
+}
+/** الإشعارُ الصريح بعكس فاتورة — كما في `classifyCredit`. */
+const REVERSAL_PATTERN = "reversal[[:space:]]+of|rinv[/[:space:]-]?[0-9]|credit[[:space:]]*note|[اإ]شعار[[:space:]]*دائن";
+
 export interface ReconcileInput {
   statementId: string | null;
   supplierId: string;
@@ -193,8 +214,17 @@ export async function reconcileAndPersist(input: ReconcileInput) {
       },
     }, tx);
   };
-  if (input.tx) await persist(input.tx);
-  else await db.transaction(persist);
+  /*
+    تنبيها «بلا ملف» و«ملتبس» بعد الحفظ من القاعدة (`refreshStatementFindings`) — لهذا الكشف ولكشوف
+    المورّد الأخرى: إشعارٌ دائن في هذا الكشف قد يعكس سطراً في كشفٍ قبله.
+  */
+  const withRefresh = async (tx: Tx) => {
+    await persist(tx);
+    const all = await tx.select({ id: statements.id }).from(statements).where(eq(statements.supplierId, input.supplierId));
+    for (const s of all) await refreshStatementFindings(tx, s.id);
+  };
+  if (input.tx) await withRefresh(input.tx);
+  else await db.transaction(withRefresh);
 
   return { result, ours, start, end, periodLabel };
 }
@@ -286,7 +316,7 @@ export async function refreshStatementFindings(tx: Tx, statementId: string): Pro
     select count(*)::int as n, coalesce(sum(sl.debit_minor), 0)::bigint as total
       from statement_lines sl
      where sl.statement_id = ${statementId} and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0
-       and not ${lineHasSameDayInvoice("sl")}
+       and not ${lineHasSameDayInvoice("sl")} and not ${lineReversedBySupplier("sl")}
   `)).rows;
   await put(ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED, Number(left.n) === 0 ? null : {
     severity: "WARN",
@@ -296,7 +326,7 @@ export async function refreshStatementFindings(tx: Tx, statementId: string): Pro
   const [odd] = (await tx.execute<{ n: number }>(sql`
     select count(*)::int as n from statement_lines sl
      where sl.statement_id = ${statementId} and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0
-       and ${lineHasSameDayInvoice("sl")}`)).rows;
+       and ${lineHasSameDayInvoice("sl")} and not ${lineReversedBySupplier("sl")}`)).rows;
   await put(ISSUE.STATEMENT_LINE_AMBIGUOUS, Number(odd.n) === 0 ? null : {
     severity: "WARN",
     message: `${countNoun(Number(odd.n), INVOICE)} في الكشف مرجعها لا يطابق فاتورة، ولها عندنا فاتورة باليوم والمبلغ نفسيهما. ربما قُرئ المرجع خطأً، فقارنها بورقة الكشف ولا تقيّدها فاتورة جديدة`,
